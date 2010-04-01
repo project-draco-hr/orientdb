@@ -1,0 +1,22 @@
+{
+  checkOpeness();
+  if (iContent == null)   throw new IllegalArgumentException("Record " + iContent + " is null");
+  final long timer=OProfiler.getInstance().startChrono();
+  final boolean locked=acquireSharedLock();
+  try {
+    final int dataSegment=getDataSegmentForRecord(iClusterSegment,iContent);
+    ODataLocal data=getDataSegment(dataSegment);
+    final long clusterPosition=iClusterSegment.addPhysicalPosition(-1,-1);
+    final long dataOffset=data.addRecord(iClusterSegment.getId(),clusterPosition,iContent);
+    iClusterSegment.setPhysicalPosition(clusterPosition,dataSegment,dataOffset);
+    return clusterPosition;
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on creating record in cluster: " + iClusterSegment,e);
+    return -1;
+  }
+ finally {
+    releaseSharedLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageLocal.createRecord",timer);
+  }
+}

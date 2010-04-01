@@ -1,0 +1,23 @@
+{
+  checkDatabase();
+  if (OStorageRemoteThreadLocal.INSTANCE.get())   return null;
+  do {
+    boolean locked=acquireExclusiveLock();
+    try {
+      network.writeByte(OChannelBinaryProtocol.RECORD_LOAD);
+      network.writeShort((short)iClusterId);
+      network.writeLong(iPosition);
+      network.flush();
+      readStatus();
+      return new Object[]{network.readBytes(),network.readInt()};
+    }
+ catch (    Exception e) {
+      if (handleException("Error on read record: " + iClusterId + ":"+ iPosition,e))       break;
+    }
+ finally {
+      releaseExclusiveLock(locked);
+    }
+  }
+ while (true);
+  return null;
+}

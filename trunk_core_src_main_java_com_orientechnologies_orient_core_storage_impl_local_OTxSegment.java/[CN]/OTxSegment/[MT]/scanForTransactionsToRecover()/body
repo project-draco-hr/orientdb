@@ -1,0 +1,32 @@
+{
+  byte status;
+  int reqId;
+  int txId;
+  int offset;
+  Map<Integer,Integer> txToRecover=new HashMap<Integer,Integer>();
+  Map<Integer,Integer> txToNotRecover=new HashMap<Integer,Integer>();
+  int size=(file.getFilledUpTo() / RECORD_SIZE);
+  for (int i=0; i < size; ++i) {
+    offset=i * RECORD_SIZE;
+    status=file.readByte(offset);
+    offset+=OConstants.SIZE_BYTE;
+    offset+=OConstants.SIZE_BYTE;
+    reqId=file.readShort(offset);
+    offset+=OConstants.SIZE_SHORT;
+    txId=file.readShort(offset);
+switch (status) {
+case STATUS_FREE:
+      txToNotRecover.put(reqId,txId);
+    break;
+case STATUS_COMMITTING:
+  txToRecover.put(reqId,txId);
+break;
+}
+}
+Entry<Integer,Integer> entry;
+for (Iterator<Entry<Integer,Integer>> it=txToRecover.entrySet().iterator(); it.hasNext(); ) {
+entry=it.next();
+if (txToNotRecover.containsKey(entry.getKey()) && txToNotRecover.get(entry.getKey()).equals(entry.getValue())) it.remove();
+}
+return txToRecover;
+}

@@ -1,0 +1,25 @@
+{
+  checkCurrentDatabase();
+  if (iQuery == null)   return;
+  iQuery=iQuery.trim();
+  if (iQuery.length() == 0)   return;
+  iQuery="select " + iQuery;
+  currentResultSet=new ArrayList<ORecordVObject>();
+  final List<String> columns=new ArrayList<String>();
+  long start=System.currentTimeMillis();
+  currentDatabase.query(new OSQLAsynchQuery<ORecordVObject>(iQuery,new OAsynchQueryResultListener<ORecordVObject>(){
+    @Override public boolean result(    ORecordVObject iRecord){
+      if (currentResultSet.size() > RESULTSET_LIMIT) {
+        printHeaderLine(columns);
+        out.println("\nResultset contains more items not displayed (max=" + RESULTSET_LIMIT + ")");
+        return false;
+      }
+      dumpRecordInTable(currentResultSet.size(),iRecord,columns);
+      currentResultSet.add(iRecord);
+      return true;
+    }
+  }
+)).execute(RESULTSET_LIMIT + 1);
+  if (currentResultSet.size() > 0 && currentResultSet.size() <= RESULTSET_LIMIT)   printHeaderLine(columns);
+  out.println(currentResultSet.size() + " item(s) found. Query executed in " + (float)(System.currentTimeMillis() - start) / 1000 + " sec(s).");
+}

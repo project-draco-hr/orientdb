@@ -1,0 +1,25 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final boolean locked=acquireExclusiveLock();
+  if (!open)   return;
+  try {
+    if (physicalClusters != null)     for (    OCluster cluster : physicalClusters)     cluster.close();
+    physicalClusters=null;
+    logicalClusters.clear();
+    clusterSegmentMap.clear();
+    if (dataSegments != null)     for (    ODataLocal data : dataSegments)     data.close();
+    dataSegments=null;
+    txManager.close();
+    cache.removeUser();
+    cache.clear();
+    configuration=new OStorageConfiguration(this);
+    open=false;
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on closing of the storage '" + name,e,OStorageException.class);
+  }
+ finally {
+    releaseExclusiveLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageLocal.close",timer);
+  }
+}

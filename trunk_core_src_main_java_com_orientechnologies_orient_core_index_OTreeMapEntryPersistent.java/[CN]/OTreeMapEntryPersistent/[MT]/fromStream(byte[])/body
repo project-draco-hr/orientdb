@@ -1,0 +1,29 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final OMemoryInputStream record=new OMemoryInputStream(iStream);
+  try {
+    pageSize=record.getAsShort();
+    parentRid=getParent() != null ? ((OTreeMapEntryPersistent<K,V>)getParent()).record.getIdentity() : null;
+    leftRid=new ORecordId().fromStream(record.getAsByteArray());
+    rightRid=new ORecordId().fromStream(record.getAsByteArray());
+    color=record.getAsBoolean();
+    init();
+    size=record.getAsShort();
+    if (size > pageSize)     throw new OConfigurationException("Loaded index with page size setted to " + pageSize + " while the loaded was built with: "+ size);
+    serializedKeys=new byte[pageSize][];
+    for (int i=0; i < size; ++i) {
+      serializedKeys[i]=record.getAsByteArray();
+    }
+    keys=(K[])new Object[pageSize];
+    serializedValues=new byte[pageSize][];
+    for (int i=0; i < size; ++i) {
+      serializedValues[i]=record.getAsByteArray();
+    }
+    values=(V[])new Object[pageSize];
+    return this;
+  }
+  finally {
+    record.close();
+    OProfiler.getInstance().stopChrono("OTreeMapEntryP.fromStream",timer);
+  }
+}

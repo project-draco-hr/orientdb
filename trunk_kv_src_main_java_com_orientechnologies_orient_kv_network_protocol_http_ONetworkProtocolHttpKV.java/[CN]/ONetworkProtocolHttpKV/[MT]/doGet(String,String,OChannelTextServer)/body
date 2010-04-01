@@ -1,0 +1,35 @@
+{
+  if ("/".equals(iURI) || iURI.startsWith("/www")) {
+    directAccess(iURI);
+    return;
+  }
+  String parts[]=getRequestParameters(iURI);
+  String dbName=parts[0];
+  String bucket=parts[1];
+  String key=parts[2];
+  try {
+    String content;
+    String value;
+    ODatabaseRecordBinary db=acquireDatabase(dbName);
+    try {
+      OTreeMapPersistent<String,String> bucketTree=getBucket(db,bucket);
+      value=bucketTree.get(key);
+    }
+  finally {
+      releaseDatabase(dbName,db);
+    }
+    int code=value == null ? 404 : 200;
+    String reason=value == null ? "Not Found" : "Ok";
+    content=value == null ? "The key '" + key + "' was not found in database '"+ dbName+ "'" : value.toString();
+    sendTextContent(code,reason,"text/plain",content);
+  }
+ catch (  SocketException e) {
+    connectionError();
+  }
+catch (  SocketTimeoutException e) {
+    timeout();
+  }
+catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on retrieving key '" + key + "' from database '"+ dbName+ "'",e,ONetworkProtocolException.class);
+  }
+}

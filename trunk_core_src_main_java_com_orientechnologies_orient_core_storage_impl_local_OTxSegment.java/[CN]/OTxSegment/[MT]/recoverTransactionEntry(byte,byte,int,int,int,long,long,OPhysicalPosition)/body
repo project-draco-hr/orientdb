@@ -1,0 +1,23 @@
+{
+  OClusterLocal cluster=(OClusterLocal)storage.getCluster(clusterId);
+  OLogManager.instance().info(this,"Recovering tx <%d> by req <%d>. Operation <%d> was in status <%d> on record %d:%d in data space %d...",txId,reqId,operation,status,clusterId,clusterOffset,oldDataOffset);
+switch (operation) {
+case OPERATION_CREATE:
+    storage.deleteRecord(-1,clusterId,clusterOffset,-1);
+  break;
+case OPERATION_UPDATE:
+storage.getDataSegment(ppos.dataSegment).getRecordSize(oldDataOffset);
+cluster.getPhysicalPosition(clusterOffset,ppos);
+long newPosition=ppos.dataPosition;
+int newSize=ppos.recordSize;
+ppos.dataPosition=oldDataOffset;
+storage.getCluster(clusterId).setPhysicalPosition(clusterOffset,ppos.dataSegment,oldDataOffset);
+storage.getDataSegment(ppos.dataSegment).createHole(newPosition,newSize);
+break;
+case OPERATION_DELETE:
+cluster.getPhysicalPosition(clusterOffset,ppos);
+cluster.updateVersion(clusterOffset,0);
+cluster.removeHole(clusterOffset);
+break;
+}
+}

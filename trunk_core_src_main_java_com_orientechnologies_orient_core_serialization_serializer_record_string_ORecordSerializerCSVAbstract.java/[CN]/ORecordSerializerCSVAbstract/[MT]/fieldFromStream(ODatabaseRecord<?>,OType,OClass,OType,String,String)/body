@@ -1,0 +1,52 @@
+{
+switch (iType) {
+case EMBEDDEDLIST:
+case EMBEDDEDSET:
+{
+      if (iValue.length() == 0)       return null;
+      String value=iValue.substring(1,iValue.length() - 1);
+      if (value.length() == 0)       return null;
+      ArrayList<Object> coll=new ArrayList<Object>();
+      String[] items=split(value,RECORD_SEPARATOR_AS_CHAR);
+      if (iLinkedClass != null)       for (      String item : items) {
+        coll.add(fromString(iDatabase,item,new ORecordVObject((ODatabaseVObject)iDatabase,iLinkedClass.getName())));
+      }
+ else {
+        if (iLinkedType == null)         throw new IllegalArgumentException("Linked type can't be null. Probably the serialized type has not stored the type along with data");
+        for (        String item : items) {
+          coll.add(fieldTypeFromStream(iLinkedType,item));
+        }
+      }
+      return coll;
+    }
+case LINKLIST:
+case LINKSET:
+{
+    if (iValue.length() == 0)     return null;
+    String value=iValue.substring(1,iValue.length() - 1);
+    ArrayList<ORecord<?>> coll=new ArrayList<ORecord<?>>();
+    String[] items=split(value,RECORD_SEPARATOR_AS_CHAR);
+    for (    String item : items) {
+      int classSeparatorPos=value.indexOf(CLASS_SEPARATOR);
+      if (classSeparatorPos > -1) {
+        String className=value.substring(1,classSeparatorPos);
+        if (className != null) {
+          iLinkedClass=iDatabase.getMetadata().getSchema().getClass(className);
+          item=item.substring(classSeparatorPos + 1);
+        }
+      }
+      coll.add(new ORecordVObject((ODatabaseVObject)iDatabase,iLinkedClass != null ? iLinkedClass.getName() : null,new ORecordId(item)));
+    }
+    return coll;
+  }
+case LINK:
+int pos=iValue.indexOf(CLASS_SEPARATOR);
+if (pos > -1) iLinkedClass=iDatabase.getMetadata().getSchema().getClass(iValue.substring(LINK.length(),pos));
+ else pos=0;
+if (iLinkedClass == null) throw new IllegalArgumentException("Linked class not specified in ORID field: " + iValue);
+ORecordId recId=new ORecordId(iValue.substring(pos + 1));
+return new ORecordVObject((ODatabaseVObject)iDatabase,iLinkedClass.getName(),recId);
+default :
+return fieldTypeFromStream(iType,iValue);
+}
+}

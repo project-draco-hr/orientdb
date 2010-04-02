@@ -18,6 +18,7 @@ case OChannelBinaryProtocol.DB_OPEN:
       passwd=channel.readString();
       connection.database=new ODatabaseVObjectTx("local:" + OServerMain.server().getStoragePath(dbName));
       if (connection.database.isClosed())       connection.database.open(user,passwd);
+      underlyingDatabase=((ODatabaseRaw)((ODatabaseComplex<?>)connection.database.getUnderlying()).getUnderlying());
       if (!loadUserFromSchema(user,passwd)) {
         sendError(new OSecurityAccessException("Access denied to database '" + connection.database.getName() + "' for user: "+ user));
       }
@@ -39,6 +40,7 @@ case OChannelBinaryProtocol.DB_CREATE:
     String storageMode=channel.readString();
     connection.database=new ODatabaseVObjectTx("local:" + OServerMain.server().getStoragePath(dbName));
     connection.database.create(storageMode);
+    underlyingDatabase=((ODatabaseRaw)((ODatabaseComplex<?>)connection.database.getUnderlying()).getUnderlying());
     sendOk();
     break;
   }
@@ -61,27 +63,27 @@ sendOk();
 channel.writeShort((short)num);
 break;
 case OChannelBinaryProtocol.RECORD_LOAD:
-Object[] record=connection.database.getUnderlying().getUnderlying().read(channel.readShort(),channel.readLong());
+Object[] record=underlyingDatabase.read(channel.readShort(),channel.readLong());
 sendOk();
 channel.writeBytes((byte[])record[0]);
 channel.writeInt((Integer)record[1]);
 break;
 case OChannelBinaryProtocol.RECORD_CREATE:
-long location=connection.database.getUnderlying().getUnderlying().save(channel.readShort(),ORID.CLUSTER_POS_INVALID,channel.readBytes(),-1);
+long location=underlyingDatabase.save(channel.readShort(),ORID.CLUSTER_POS_INVALID,channel.readBytes(),-1);
 sendOk();
 channel.writeLong(location);
 break;
 case OChannelBinaryProtocol.RECORD_UPDATE:
 int clusterId=channel.readShort();
 long position=channel.readLong();
-long newVersion=connection.database.getUnderlying().getUnderlying().save(clusterId,position,channel.readBytes(),channel.readInt());
+long newVersion=underlyingDatabase.save(clusterId,position,channel.readBytes(),channel.readInt());
 if (clusterId == connection.database.getMetadata().getSchemaClusterId()) if (position == OSchema.CLASSES_RECORD_NUM) connection.database.getMetadata().loadSchema();
  else if (position == OSecurity.SECURITY_RECORD_NUM) connection.database.getMetadata().loadSecurity();
 sendOk();
 channel.writeInt((int)(newVersion * -1 + 2));
 break;
 case OChannelBinaryProtocol.RECORD_DELETE:
-connection.database.getUnderlying().getUnderlying().delete(channel.readShort(),channel.readLong(),channel.readInt());
+underlyingDatabase.delete(channel.readShort(),channel.readLong(),channel.readInt());
 sendOk();
 break;
 case OChannelBinaryProtocol.COUNT:
@@ -173,7 +175,7 @@ channel.writeInt(connection.database.getDictionary().size());
 break;
 }
 case OChannelBinaryProtocol.TX_COMMIT:
-((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),new OTransactionOptimisticProxy(connection.database.getUnderlying(),channel));
+((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),new OTransactionOptimisticProxy((ODatabaseRecordTx)connection.database.getUnderlying(),channel));
 sendOk();
 break;
 default :

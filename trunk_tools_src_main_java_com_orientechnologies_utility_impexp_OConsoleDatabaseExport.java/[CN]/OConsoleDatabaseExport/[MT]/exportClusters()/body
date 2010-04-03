@@ -1,0 +1,47 @@
+{
+  writer.beginSection(1,true,"clusters");
+  Collection<String> clusterNames=database.getClusterNames();
+  for (  String clusterName : clusterNames) {
+    writer.beginSection(2,true,"cluster");
+    writer.writeAttribute(3,true,"name",clusterName);
+    writer.writeAttribute(3,true,"id",database.getClusterIdByName(clusterName));
+    writer.beginSection(3,true,"content");
+    for (    ORecord<?> rec : database.browseCluster(clusterName)) {
+      writer.beginSection(4,true,rec.getIdentity());
+      writer.writeAttribute(5,true,"version",rec.getVersion());
+      if (rec instanceof ORecordVObject) {
+        ORecordVObject vobj=(ORecordVObject)rec;
+        if (vobj.getIdentity().isValid())         vobj.load();
+        writer.writeAttribute(0,false,"type","v");
+        Object value;
+        if (vobj.fields() != null && vobj.fields().length > 0) {
+          writer.beginSection(5,true,"fields");
+          for (          String f : vobj.fields()) {
+            value=vobj.field(f);
+            if (value != null)             if (value instanceof ORecordVObject) {
+              value=getOutputValue(value);
+            }
+ else             if (value instanceof Collection<?>) {
+              Collection<Object> coll=(Collection<Object>)value;
+              StringBuilder buffer=new StringBuilder();
+              buffer.append("[");
+              for (              Object v : coll) {
+                if (buffer.length() > 1)                 buffer.append(", ");
+                v=getOutputValue(v);
+                buffer.append(v);
+              }
+              buffer.append("]");
+              value=buffer.toString();
+            }
+            writer.writeAttribute(6,true,f,value);
+          }
+          writer.endSection(5,true);
+        }
+      }
+      writer.endSection(4,true);
+    }
+    writer.endSection(3,true);
+    writer.endSection(2,true);
+  }
+  writer.endSection(1,true);
+}

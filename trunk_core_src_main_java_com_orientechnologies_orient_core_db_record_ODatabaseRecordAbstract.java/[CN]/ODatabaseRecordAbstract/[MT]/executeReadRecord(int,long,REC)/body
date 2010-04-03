@@ -2,11 +2,16 @@
   checkOpeness();
   try {
     checkSecurity(OUser.CLUSTER + "." + iClusterId,OUser.READ);
-    final Object[] recordBuffer=underlying.read(iClusterId,iPosition);
+    final ORawBuffer recordBuffer=underlying.read(iClusterId,iPosition);
     if (recordBuffer == null)     return null;
+    if (iRecord.getRecordType() != recordBuffer.recordType) {
+      iRecord=(REC)ORecordFactory.getRecord(recordBuffer.recordType);
+    }
     iRecord.unsetDirty();
-    iRecord.fill(iRecord.getDatabase(),iClusterId,iPosition,(Integer)recordBuffer[1]);
-    iRecord.fromStream((byte[])recordBuffer[0]);
+    ODatabaseRecord<?> currDb=iRecord.getDatabase();
+    if (currDb == null)     currDb=(ODatabaseRecord<?>)databaseOwner;
+    iRecord.fill(currDb,iClusterId,iPosition,recordBuffer.version);
+    iRecord.fromStream(recordBuffer.buffer);
     iRecord.setStatus(STATUS.LOADED);
     return (REC)iRecord;
   }

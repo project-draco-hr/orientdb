@@ -1,0 +1,22 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final String recId=ORecordId.generateString(iClusterSegment.getId(),iPosition);
+  final boolean locked=acquireSharedLock();
+  try {
+    final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iPosition,new OPhysicalPosition());
+    if (!checkForRecordValidity(ppos))     return -1;
+    if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't update record #" + recId + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
+    iClusterSegment.updateVersion(iPosition,++ppos.version);
+    final long newDataSegmentOffset=getDataSegment(ppos.dataSegment).setRecord(ppos.dataPosition,iClusterSegment.getId(),iPosition,iContent);
+    if (newDataSegmentOffset != ppos.dataPosition)     iClusterSegment.setPhysicalPosition(iPosition,ppos.dataSegment,newDataSegmentOffset,iRecordType);
+    return ppos.version;
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on updating record #" + iPosition + " in cluster: "+ iClusterSegment,e);
+  }
+ finally {
+    releaseSharedLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageLocal.updateRecord",timer);
+  }
+  return -1;
+}

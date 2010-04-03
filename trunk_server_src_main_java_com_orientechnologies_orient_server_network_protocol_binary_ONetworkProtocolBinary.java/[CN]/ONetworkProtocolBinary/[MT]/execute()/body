@@ -63,20 +63,21 @@ sendOk();
 channel.writeShort((short)num);
 break;
 case OChannelBinaryProtocol.RECORD_LOAD:
-Object[] record=underlyingDatabase.read(channel.readShort(),channel.readLong());
+ORawBuffer record=underlyingDatabase.read(channel.readShort(),channel.readLong());
 sendOk();
-channel.writeBytes((byte[])record[0]);
-channel.writeInt((Integer)record[1]);
+channel.writeBytes(record.buffer);
+channel.writeInt(record.version);
+channel.writeByte(record.recordType);
 break;
 case OChannelBinaryProtocol.RECORD_CREATE:
-long location=underlyingDatabase.save(channel.readShort(),ORID.CLUSTER_POS_INVALID,channel.readBytes(),-1);
+long location=underlyingDatabase.save(channel.readShort(),ORID.CLUSTER_POS_INVALID,channel.readBytes(),-1,channel.readByte());
 sendOk();
 channel.writeLong(location);
 break;
 case OChannelBinaryProtocol.RECORD_UPDATE:
 int clusterId=channel.readShort();
 long position=channel.readLong();
-long newVersion=underlyingDatabase.save(clusterId,position,channel.readBytes(),channel.readInt());
+long newVersion=underlyingDatabase.save(clusterId,position,channel.readBytes(),channel.readInt(),channel.readByte());
 if (clusterId == connection.database.getMetadata().getSchemaClusterId()) if (position == OSchema.CLASSES_RECORD_NUM) connection.database.getMetadata().loadSchema();
  else if (position == OSecurity.SECURITY_RECORD_NUM) connection.database.getMetadata().loadSecurity();
 sendOk();

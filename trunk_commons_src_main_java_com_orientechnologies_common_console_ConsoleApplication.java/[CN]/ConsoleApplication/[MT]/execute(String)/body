@@ -1,0 +1,65 @@
+{
+  iCommand=iCommand.trim();
+  String[] commandWords=getWords(iCommand);
+  for (  String cmd : helpCommands)   if (cmd.equals(commandWords[0])) {
+    help();
+    return true;
+  }
+  for (  String cmd : exitCommands)   if (cmd.equals(commandWords[0])) {
+    return false;
+  }
+  String methodName;
+  ConsoleCommand ann;
+  for (  Method m : getConsoleMethods()) {
+    methodName=m.getName();
+    ann=m.getAnnotation(ConsoleCommand.class);
+    StringBuilder commandName=new StringBuilder();
+    char ch;
+    int commandWordCount=1;
+    for (int i=0; i < methodName.length(); ++i) {
+      ch=methodName.charAt(i);
+      if (Character.isUpperCase(ch)) {
+        commandName.append(" ");
+        ch=Character.toLowerCase(ch);
+        commandWordCount++;
+      }
+      commandName.append(ch);
+    }
+    if (!iCommand.startsWith(commandName.toString())) {
+      if (ann == null)       continue;
+      String[] aliases=ann.aliases();
+      if (aliases == null || aliases.length == 0)       continue;
+      boolean aliasMatch=false;
+      for (      String alias : aliases) {
+        if (iCommand.startsWith(alias.split(" ")[0])) {
+          aliasMatch=true;
+          commandWordCount=1;
+          break;
+        }
+      }
+      if (!aliasMatch)       continue;
+    }
+    Object[] methodArgs;
+    if (ann != null && !ann.splitInWords()) {
+      methodArgs=new String[]{iCommand.substring(iCommand.indexOf(" ") + 1)};
+    }
+ else {
+      methodArgs=Arrays.copyOfRange(commandWords,commandWordCount,commandWords.length);
+    }
+    try {
+      m.invoke(this,methodArgs);
+    }
+ catch (    IllegalArgumentException e) {
+      syntaxError(iCommand,m);
+    }
+catch (    Exception e) {
+      e.printStackTrace();
+      err.println();
+      if (e.getCause() != null)       onException(e.getCause());
+ else       e.printStackTrace();
+    }
+    return true;
+  }
+  out.println("!Unrecognized command: " + iCommand);
+  return true;
+}

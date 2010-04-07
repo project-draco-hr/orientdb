@@ -1,0 +1,85 @@
+{
+  ORecordDocument record=(ORecordDocument)iRecord;
+  ODatabaseDocument database=(ODatabaseDocument)iDatabase;
+  if (iRecord == null)   record=new ORecordDocument(database);
+  ByteArrayInputStream stream=null;
+  ObjectInput in=null;
+  try {
+    stream=new ByteArrayInputStream(iSource);
+    in=new ObjectInputStream(stream);
+    Object value;
+    int length;
+    byte[] buffer;
+    for (    OProperty p : record.getSchemaClass().properties()) {
+      value=null;
+      record.field(p.getName(),in.readObject());
+switch (p.getType()) {
+case BINARY:
+        length=in.readInt();
+      if (length >= 0) {
+        buffer=new byte[length];
+        in.read(buffer);
+        value=buffer;
+      }
+    break;
+case BOOLEAN:
+  value=in.readBoolean();
+break;
+case DATE:
+long date=in.readLong();
+if (date > -1) value=new Date(date);
+break;
+case DOUBLE:
+value=in.readDouble();
+break;
+case EMBEDDED:
+length=in.readInt();
+if (length >= 0) {
+buffer=new byte[length];
+in.read(buffer);
+value=new ORecordDocument(database,p.getLinkedClass().getName()).fromStream(buffer);
+}
+break;
+case EMBEDDEDLIST:
+break;
+case EMBEDDEDSET:
+break;
+case FLOAT:
+value=in.readFloat();
+break;
+case INTEGER:
+value=in.readInt();
+break;
+case LINK:
+value=new ORecordId(in.readInt(),in.readInt());
+break;
+case LINKLIST:
+break;
+case LINKSET:
+break;
+case LONG:
+value=in.readLong();
+break;
+case SHORT:
+value=in.readShort();
+break;
+case STRING:
+value=in.readUTF();
+break;
+}
+record.field(p.getName(),value);
+}
+}
+ catch (Exception e) {
+OLogManager.instance().error(this,"Error on unmarshalling object in binary format: " + record.getIdentity(),e);
+}
+ finally {
+try {
+if (stream != null) stream.close();
+if (in != null) in.close();
+}
+ catch (IOException e) {
+}
+}
+return iRecord;
+}

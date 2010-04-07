@@ -1,0 +1,25 @@
+{
+  checkOpeness();
+  try {
+    checkSecurity(OUser.CLUSTER + "." + iClusterId,OUser.READ);
+    final ORawBuffer recordBuffer=underlying.read(iClusterId,iPosition);
+    if (recordBuffer == null)     return null;
+    if (iRecord.getRecordType() != recordBuffer.recordType) {
+      iRecord=(REC)ORecordFactory.getRecord(recordBuffer.recordType);
+    }
+    iRecord.unsetDirty();
+    ODatabaseRecord<?> currDb=iRecord.getDatabase();
+    if (currDb == null)     currDb=(ODatabaseRecord<?>)databaseOwner;
+    iRecord.fill(currDb,iClusterId,iPosition,recordBuffer.version);
+    iRecord.fromStream(recordBuffer.buffer);
+    iRecord.setStatus(STATUS.LOADED);
+    return (REC)iRecord;
+  }
+ catch (  ODatabaseException e) {
+    throw e;
+  }
+catch (  Throwable t) {
+    OLogManager.instance().error(this,"Error on retrieving record #" + iPosition + " in cluster '"+ getStorage().getPhysicalClusterNameById(iClusterId)+ "'",t);
+  }
+  return null;
+}

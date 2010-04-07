@@ -1,0 +1,82 @@
+{
+  final ORecordDocument record=(ORecordDocument)iRecord;
+  if (iMarshalledRecords.containsKey(iRecord)) {
+    return "-";
+  }
+ else   iMarshalledRecords.put(iRecord,ORecordId.EMPTY_RECORD_ID);
+  ODatabaseRecord<?> database=(ODatabaseRecord<?>)record.getDatabase();
+  final StringBuilder buffer=new StringBuilder();
+  if (iRecord.getClassName() != null) {
+    buffer.append(iRecord.getClassName());
+    buffer.append(CLASS_SEPARATOR);
+  }
+  OProperty prop;
+  Object fieldValue;
+  OType type;
+  OClass linkedClass;
+  OType linkedType;
+  String fieldClassName;
+  int i=0;
+  for (  Entry<String,Object> f : record) {
+    if (i > 0)     buffer.append(RECORD_SEPARATOR);
+    prop=record.getSchemaClass() != null ? record.getSchemaClass().getProperty(f.getKey()) : null;
+    fieldValue=f.getValue();
+    fieldClassName=getClassName(fieldValue);
+    if (prop != null) {
+      type=prop.getType();
+      linkedClass=prop.getLinkedClass();
+      linkedType=prop.getLinkedType();
+    }
+ else {
+      type=OType.STRING;
+      linkedClass=null;
+      linkedType=null;
+      if (fieldValue instanceof Collection<?>) {
+        Collection<?> coll=(Collection<?>)fieldValue;
+        if (coll.size() > 0) {
+          Object firstValue=coll.iterator().next();
+          if (database != null && (firstValue instanceof ORecordSchemaAware<?> || (database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
+            linkedType=OType.LINK;
+            linkedClass=getLinkInfo(database,getClassName(firstValue));
+            if (coll instanceof Set<?>)             type=OType.LINKSET;
+ else             type=OType.LINKLIST;
+          }
+ else {
+            linkedType=OType.getTypeByClass(firstValue.getClass());
+            if (linkedType != OType.LINK) {
+              if (linkedType == null) {
+                linkedType=OType.EMBEDDED;
+                linkedClass=new OClass(firstValue.getClass());
+              }
+              if (coll instanceof Set<?>)               type=OType.EMBEDDEDSET;
+ else               type=OType.EMBEDDEDLIST;
+            }
+          }
+        }
+ else         type=OType.EMBEDDEDLIST;
+      }
+ else       if (fieldValue instanceof Map<?,?>) {
+        Map<?,?> map=(Map<?,?>)fieldValue;
+        if (map.size() > 0) {
+          Object firstValue=map.values().iterator().next();
+          linkedType=OType.getTypeByClass(firstValue.getClass());
+          type=OType.EMBEDDEDMAP;
+        }
+      }
+ else       if (database != null && fieldValue instanceof ORecordSchemaAware<?>) {
+        type=OType.LINK;
+        linkedClass=getLinkInfo(database,fieldClassName);
+      }
+ else       if (database != null && database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(fieldClassName) != null) {
+        type=OType.LINK;
+        linkedClass=getLinkInfo(database,fieldClassName);
+      }
+    }
+    fieldValue=fieldToStream((ORecordDocument)iRecord,iRecord.getDatabase(),iObjHandler,type,linkedClass,linkedType,f.getKey(),f.getValue(),iMarshalledRecords);
+    buffer.append(f.getKey());
+    buffer.append(FIELD_VALUE_SEPARATOR);
+    if (fieldValue != null)     buffer.append(fieldValue);
+    i++;
+  }
+  return buffer.toString();
+}

@@ -1,0 +1,32 @@
+{
+  checkOpeness();
+  if (!iContent.isDirty())   return;
+  final ORecordId rid=(ORecordId)iContent.getIdentity();
+  if (rid == null)   throw new ODatabaseException("Can't create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
+  try {
+    final int clusterId;
+    if (!rid.isValid()) {
+      clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
+      checkSecurity(OUser.CLUSTER + "." + clusterId,OUser.CREATE);
+    }
+ else {
+      clusterId=rid.clusterId;
+      checkSecurity(OUser.CLUSTER + "." + clusterId,OUser.UPDATE);
+    }
+    final byte[] stream=iContent.toStream();
+    long clusterPosition=underlying.save(clusterId,rid.getClusterPosition(),stream,iVersion,iContent.getRecordType());
+    if (clusterPosition < -1)     iContent.fill(iContent.getDatabase(),rid.getClusterId(),rid.getClusterPosition(),(int)clusterPosition * -1 - 2);
+    if (!rid.isValid()) {
+      rid.clusterId=clusterId;
+      rid.clusterPosition=clusterPosition;
+    }
+    if (iContent.isPinned())     getCache().addRecord(rid.toString(),new ORawBuffer(stream,iVersion,iRecordType));
+    iContent.unsetDirty();
+  }
+ catch (  ODatabaseException e) {
+    throw e;
+  }
+catch (  Throwable t) {
+    throw new ODatabaseException("Error on saving record in cluster #" + iContent.getIdentity().getClusterId(),t);
+  }
+}

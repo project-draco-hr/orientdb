@@ -1,0 +1,21 @@
+{
+  checkOpeness();
+  final boolean locked=acquireExclusiveLock();
+  try {
+    if (iClusterFileName == null)     iClusterFileName=storagePath + "/" + iClusterName;
+    OStoragePhysicalClusterConfiguration conf=new OStoragePhysicalClusterConfiguration(configuration,iClusterName);
+    configuration.physicalClusters.add(conf);
+    final int pos=registerClusterSegment(conf);
+    if (pos == -1)     throw new OConfigurationException("Can't add segment " + conf.name + " because already is part of the current storage");
+    physicalClusters[pos].create(iStartSize);
+    configuration.update();
+    return pos;
+  }
+ catch (  Throwable e) {
+    OLogManager.instance().error(this,"Error on creation of new cluster '" + iClusterName + "' in: "+ iClusterFileName,e,OStorageException.class);
+    return -1;
+  }
+ finally {
+    releaseExclusiveLock(locked);
+  }
+}

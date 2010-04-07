@@ -1,0 +1,48 @@
+{
+  return new Iterable<OTransactionEntry<OTransactionRecordProxy>>(){
+    public Iterator<OTransactionEntry<OTransactionRecordProxy>> iterator(){
+      return new Iterator<OTransactionEntry<OTransactionRecordProxy>>(){
+        private int current=1;
+        public boolean hasNext(){
+          if (emptyContent)           return false;
+          if (current > size)           emptyContent=true;
+          return current <= size;
+        }
+        public OTransactionEntry<OTransactionRecordProxy> next(){
+          ORecordId rid=(ORecordId)entry.record.getIdentity();
+          try {
+            entry.status=channel.readByte();
+            rid.clusterId=channel.readShort();
+switch (entry.status) {
+case OTransactionEntry.CREATED:
+              entry.clusterName=channel.readString();
+            entry.record.stream=channel.readBytes();
+          break;
+case OTransactionEntry.UPDATED:
+        rid.clusterPosition=channel.readLong();
+      entry.record.version=channel.readInt();
+    entry.record.stream=channel.readBytes();
+  break;
+case OTransactionEntry.DELETED:
+rid.clusterPosition=channel.readLong();
+entry.record.version=channel.readInt();
+break;
+default :
+throw new OTransactionException("Unrecognized tx command: " + entry.status);
+}
+current++;
+return entry;
+}
+ catch (IOException e) {
+throw new OSerializationException("Can't read transaction record from the network",e);
+}
+}
+public void remove(){
+throw new UnsupportedOperationException("remove");
+}
+}
+;
+}
+}
+;
+}

@@ -1,0 +1,36 @@
+{
+  try {
+    for (    OMMapBufferEntry e : buffersLRU) {
+      if (iFile.equals(e.file) && iBeginOffset >= e.beginOffset && iBeginOffset + iSize <= e.beginOffset + e.size) {
+        OProfiler.getInstance().updateStatistic("OMMapManager.usePage",1);
+        return e;
+      }
+    }
+    int bufferSize=iForce ? iSize : iSize <= DEF_BLOCK_SIZE ? DEF_BLOCK_SIZE : iSize;
+    if (iBeginOffset + bufferSize > iFile.getFileSize())     bufferSize=iFile.getFileSize() - iBeginOffset;
+    if (bufferSize <= 0)     throw new IllegalArgumentException("Invalid range requested for file " + iFile + ". Requested "+ iSize+ " bytes from the address: "+ iBeginOffset);
+    totalMemory+=bufferSize;
+    OMMapBufferEntry entry;
+    if (totalMemory > MAX_MEMORY) {
+      int pagesUnloaded=0;
+      for (Iterator<OMMapBufferEntry> it=buffersLRU.descendingIterator(); it.hasNext(); ) {
+        entry=it.next();
+        if (!entry.pin) {
+          it.remove();
+          pagesUnloaded++;
+          entry.buffer.force();
+          entry.buffer=null;
+          totalMemory-=entry.size;
+          if (totalMemory < MAX_MEMORY)           break;
+        }
+      }
+      OProfiler.getInstance().updateStatistic("OMMapManager.pagesUnloaded",pagesUnloaded);
+    }
+    entry=mapBuffer(iFile,iBeginOffset,bufferSize);
+    buffersLRU.push(entry);
+    return entry;
+  }
+ catch (  IOException e) {
+    throw new OIOException("You can't access to the file portion " + iBeginOffset + "-"+ iBeginOffset+ iSize+ " bytes",e);
+  }
+}

@@ -1,0 +1,20 @@
+{
+  ORawBuffer recordBuffer;
+  long positionInPhyCluster;
+  try {
+    cluster.lock();
+    OClusterPositionIterator iterator=cluster.absoluteIterator();
+    while (iterator.hasNext()) {
+      positionInPhyCluster=iterator.next();
+      recordBuffer=readRecord(iRequesterId,cluster,positionInPhyCluster,false);
+      if (recordBuffer == null)       continue;
+      if (recordBuffer.recordType != ORecordDocument.RECORD_TYPE)       continue;
+      iRecord.setIdentity(iClusterId,positionInPhyCluster);
+      iRecord.fromStream(recordBuffer.buffer);
+      if (!iListener.foreach(iRecord))       break;
+    }
+  }
+  finally {
+    cluster.unlock();
+  }
+}

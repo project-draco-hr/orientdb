@@ -1,0 +1,43 @@
+{
+  if (rec == null)   return;
+  writer.beginObject(4,true,rec.getIdentity());
+  writer.writeAttribute(0,false,"version",rec.getVersion());
+  if (rec.getIdentity().isValid())   rec.load();
+  if (rec instanceof ORecordDocument) {
+    ORecordDocument vobj=(ORecordDocument)rec;
+    writer.writeAttribute(0,false,"type","v");
+    Object value;
+    if (vobj.fields() != null && vobj.fields().length > 0) {
+      writer.beginObject(5,true,"fields");
+      for (      String f : vobj.fields()) {
+        value=vobj.field(f);
+        writer.writeAttribute(6,true,f,value);
+      }
+      writer.endObject(5,true);
+    }
+  }
+ else   if (rec instanceof ORecordColumn) {
+    ORecordColumn csv=(ORecordColumn)rec;
+    writer.writeAttribute(0,false,"type","c");
+    if (csv.size() > 0) {
+      writer.beginCollection(5,true,"values");
+      for (int i=0; i < csv.size(); ++i) {
+        writer.writeValue(6,true,csv.field(i));
+      }
+      writer.endCollection(5,true);
+    }
+  }
+ else   if (rec instanceof ORecordFlat) {
+    ORecordFlat flat=(ORecordFlat)rec;
+    writer.writeAttribute(0,false,"type","f");
+    writer.writeAttribute(6,true,"value",flat.value());
+  }
+ else   if (rec instanceof ORecordBytes) {
+    ORecordBytes bytes=(ORecordBytes)rec;
+    writer.writeAttribute(0,false,"type","b");
+    writer.writeAttribute(6,true,"value",bytes.toStream());
+  }
+  writer.endObject(4,true);
+  recordNum++;
+  if (recordTot > 10 && (recordNum + 1) % (recordTot / 10) == 0)   listener.onMessage(".");
+}

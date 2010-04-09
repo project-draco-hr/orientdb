@@ -2,16 +2,17 @@
   checkCurrentDatabase();
   if (iQuery == null)   return;
   iQuery=iQuery.trim();
-  if (iQuery.length() == 0)   return;
+  if (iQuery.length() == 0 || iQuery.equalsIgnoreCase("select"))   return;
   iQuery="select " + iQuery;
   currentResultSet=new ArrayList<ODocument>();
   final List<String> columns=new ArrayList<String>();
+  final int limit=Integer.parseInt((String)properties.get("limit"));
   long start=System.currentTimeMillis();
   currentDatabase.query(new OSQLAsynchQuery<ODocument>(iQuery,new OAsynchQueryResultListener<ODocument>(){
     public boolean result(    final ODocument iRecord){
-      if (currentResultSet.size() > RESULTSET_LIMIT) {
+      if (currentResultSet.size() > limit - 1) {
         printHeaderLine(columns);
-        out.println("\nResultset contains more items not displayed (max=" + RESULTSET_LIMIT + ")");
+        out.println("\nResultset contains more items not displayed (max=" + limit + ")");
         return false;
       }
       dumpRecordInTable(currentResultSet.size(),iRecord,columns);
@@ -19,7 +20,7 @@
       return true;
     }
   }
-)).execute(RESULTSET_LIMIT + 1);
-  if (currentResultSet.size() > 0 && currentResultSet.size() <= RESULTSET_LIMIT)   printHeaderLine(columns);
+)).execute(limit + 1);
+  if (currentResultSet.size() > 0 && currentResultSet.size() <= limit)   printHeaderLine(columns);
   out.println(currentResultSet.size() + " item(s) found. Query executed in " + (float)(System.currentTimeMillis() - start) / 1000 + " sec(s).");
 }

@@ -4,26 +4,20 @@
   String bucket=parts[1];
   String key=parts[2];
   try {
-    ODatabaseBinary db=acquireDatabase(dbName);
+    IMap<String,String> bucketMap=Hazelcast.getMap(dbName + "/" + bucket);
     int code;
     String reason;
     String content;
-    try {
-      OTreeMapPersistent<String,String> bucketTree=getBucket(db,bucket);
-      if (bucketTree.containsKey(key)) {
-        code=503;
-        reason="Entry already exists";
-        content="The entry with key: " + key + " already exists in the bucket '"+ bucket+ "'";
-      }
- else {
-        code=200;
-        reason="Ok";
-        content=null;
-        bucketTree.put(key,iContent);
-      }
+    if (bucketMap.containsKey(iURI)) {
+      code=503;
+      reason="Entry already exists";
+      content="The entry with key: " + key + " already exists in the bucket '"+ bucket+ "'";
     }
-  finally {
-      releaseDatabase(dbName,db);
+ else {
+      code=200;
+      reason="Ok";
+      content=null;
+      bucketMap.put(iURI,iContent);
     }
     sendTextContent(code,reason,"text/plain",content);
   }

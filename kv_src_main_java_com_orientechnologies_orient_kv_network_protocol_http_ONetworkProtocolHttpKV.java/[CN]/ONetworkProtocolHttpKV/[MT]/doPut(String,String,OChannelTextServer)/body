@@ -3,17 +3,23 @@
   String dbName=parts[0];
   String bucket=parts[1];
   String key=parts[2];
-  String value;
   try {
-    ODatabaseBinary db=acquireDatabase(dbName);
-    try {
-      OTreeMapPersistent<String,String> bucketTree=getBucket(db,bucket);
-      value=bucketTree.put(key,iContent);
+    IMap<String,String> bucketMap=Hazelcast.getMap(dbName + "/" + bucket);
+    int code;
+    String reason;
+    String content;
+    if (bucketMap.containsKey(iURI)) {
+      code=200;
+      reason="Ok";
+      content=null;
+      bucketMap.put(iURI,iContent);
     }
-  finally {
-      releaseDatabase(dbName,db);
+ else {
+      code=503;
+      reason="Entry not exists. Use HTTP POST instead.";
+      content="The entry with key: " + key + " not exists in the bucket '"+ bucket+ "'";
     }
-    sendTextContent(200,"Ok","text/plain",value);
+    sendTextContent(code,reason,"text/plain",content);
   }
  catch (  SocketTimeoutException e) {
     timeout();

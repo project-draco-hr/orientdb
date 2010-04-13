@@ -3,24 +3,16 @@
     directAccess(iURI);
     return;
   }
-  String parts[]=getRequestParameters(iURI);
+  String parts[]=ONetworkProtocolHttpKV.getRequestParameters(iURI);
   String dbName=parts[0];
   String bucket=parts[1];
   String key=parts[2];
   try {
-    String content;
-    String value;
-    ODatabaseBinary db=acquireDatabase(dbName);
-    try {
-      OTreeMapPersistent<String,String> bucketTree=getBucket(db,bucket);
-      value=bucketTree.get(key);
-    }
-  finally {
-      releaseDatabase(dbName,db);
-    }
+    IMap<String,String> bucketMap=Hazelcast.getMap(dbName + "/" + bucket);
+    String value=bucketMap.get(iURI);
     int code=value == null ? 404 : 200;
     String reason=value == null ? "Not Found" : "Ok";
-    content=value == null ? "The key '" + key + "' was not found in database '"+ dbName+ "'" : value.toString();
+    String content=value == null ? "The key '" + key + "' was not found in database '"+ dbName+ "'" : value.toString();
     sendTextContent(code,reason,"text/plain",content);
   }
  catch (  SocketException e) {

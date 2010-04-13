@@ -36,10 +36,16 @@ case OChannelBinaryProtocol.DB_OPEN:
 case OChannelBinaryProtocol.DB_CREATE:
 {
     String dbURL=channel.readString();
-    String dbName=dbURL.substring(dbURL.lastIndexOf(":") + 1);
+    String dbName=dbURL.substring(channel.readString().lastIndexOf(":") + 1);
     String storageMode=channel.readString();
-    connection.database=new ODatabaseDocumentTx("local:" + OServerMain.server().getStoragePath(dbName));
+    if (OServerMain.server().existsStoragePath(dbName))     throw new IllegalArgumentException("Database '" + dbName + "' already exists.");
+    final String path="${ORIENT_HOME}/databases/" + dbName + "/"+ dbName;
+    final String realPath=OSystemVariableResolver.resolveSystemVariables("${ORIENT_HOME}") + "/databases/" + dbName+ "/"+ dbName;
+    connection.database=new ODatabaseDocumentTx("local:" + realPath);
     connection.database.create(storageMode);
+    connection.database.close();
+    OServerMain.server().getConfiguration().storages.add(new OServerStorageConfiguration(dbName,path));
+    OServerMain.server().saveConfiguration();
     underlyingDatabase=((ODatabaseRaw)((ODatabaseComplex<?>)connection.database.getUnderlying()).getUnderlying());
     sendOk();
     break;

@@ -1,7 +1,12 @@
 {
-  OClusterMemory cluster=clusters.get(iClusterId);
-  OPhysicalPosition ppos=cluster.getPhysicalPosition(iPosition,new OPhysicalPosition());
-  if (iVersion > -1 && ppos.version != iVersion)   throw new OConcurrentModificationException("Can't update record #" + ORecordId.generateString(iClusterId,iPosition) + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
-  data.deleteRecord(ppos.dataPosition);
-  cluster.removePhysicalPosition(iClusterId,null);
+  OCluster cluster=getCluster(iClusterId);
+  try {
+    OPhysicalPosition ppos=cluster.getPhysicalPosition(iPosition,new OPhysicalPosition());
+    if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't update record #" + ORecordId.generateString(iClusterId,iPosition) + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
+    data.deleteRecord(ppos.dataPosition);
+    cluster.removePhysicalPosition(iClusterId,null);
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on delete record in cluster: " + iClusterId,e);
+  }
 }

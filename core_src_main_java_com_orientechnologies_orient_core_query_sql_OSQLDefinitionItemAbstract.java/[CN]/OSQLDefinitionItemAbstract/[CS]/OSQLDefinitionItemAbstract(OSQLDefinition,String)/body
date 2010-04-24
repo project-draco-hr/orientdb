@@ -1,0 +1,28 @@
+{
+  int pos=iName.indexOf(OSQLDefinitionFieldOperator.CHAIN_SEPARATOR);
+  if (pos > -1) {
+    name=iName.substring(0,pos);
+    String part=iName;
+    String partUpperCase=part.toUpperCase();
+    while (pos > -1) {
+      part=part.substring(pos + OSQLDefinitionFieldOperator.CHAIN_SEPARATOR.length());
+      partUpperCase=partUpperCase.substring(pos + OSQLDefinitionFieldOperator.CHAIN_SEPARATOR.length());
+      for (      OSQLDefinitionFieldOperator op : OSQLDefinitionFieldOperator.OPERATORS)       if (partUpperCase.startsWith(op.keyword)) {
+        final String arguments[];
+        if (op.minArguments > 0) {
+          arguments=OQueryHelper.getParameters(part);
+          if (arguments.length < op.minArguments || arguments.length > op.maxArguments)           throw new OQueryParsingException(iQueryCompiled.text,"Syntax error: field operator '" + op.keyword + "' needs "+ (op.minArguments == op.maxArguments ? op.minArguments : op.minArguments + "-" + op.maxArguments)+ " argument(s) while has been received "+ arguments.length,iQueryCompiled.currentPos + pos);
+        }
+ else         arguments=null;
+        if (operationsChain == null)         operationsChain=new ArrayList<OPair<Integer,String[]>>();
+        operationsChain.add(new OPair<Integer,String[]>(op.id,arguments));
+        pos=partUpperCase.indexOf(OQueryHelper.CLOSED_BRACE) + OSQLDefinitionFieldOperator.CHAIN_SEPARATOR.length();
+        break;
+      }
+      if (operationsChain == null)       throw new OQueryParsingException(iQueryCompiled.text,"Syntax error: field operator not recognized between the supported ones: " + Arrays.toString(OSQLDefinitionFieldOperator.OPERATORS),iQueryCompiled.currentPos + pos);
+      if (pos >= partUpperCase.length())       return;
+      pos=partUpperCase.indexOf(OSQLDefinitionFieldOperator.CHAIN_SEPARATOR,pos);
+    }
+  }
+ else   name=iName;
+}

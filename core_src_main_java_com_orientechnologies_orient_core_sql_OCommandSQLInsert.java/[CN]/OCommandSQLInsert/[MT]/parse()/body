@@ -1,11 +1,12 @@
 {
-  if (clusterName != null || className != null)   return;
-  int pos=textUpperCase.indexOf(KEYWORD_INTO);
-  if (pos == -1)   throw new OCommandSQLParsingException("Keyword " + KEYWORD_INTO + " not found",text,0);
-  pos+=KEYWORD_INTO.length() + 1;
+  if (className != null)   return;
   StringBuilder word=new StringBuilder();
+  int pos=OSQLHelper.nextWord(text,textUpperCase,0,word,true);
+  if (pos == -1 || !word.toString().equals(OSQLHelper.KEYWORD_INSERT))   throw new OCommandSQLParsingException("Keyword " + OSQLHelper.KEYWORD_INSERT + " not found",text,0);
   pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-  if (pos == -1)   throw new OCommandSQLParsingException("Invalid cluster/class name",text,pos);
+  if (pos == -1 || !word.toString().equals(KEYWORD_INTO))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_INTO + " not found",text,0);
+  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  if (pos == -1)   throw new OCommandSQLParsingException("Invalid class name",text,pos);
   String subjectName=word.toString();
   if (subjectName.startsWith(OSQLHelper.CLASS_PREFIX))   subjectName=subjectName.substring(OSQLHelper.CLASS_PREFIX.length());
   final OClass cls=database.getMetadata().getSchema().getClass(subjectName);
@@ -26,5 +27,6 @@
   String[] values=OQueryHelper.getParameters(text,beginValues);
   if (values.length == 0)   throw new OCommandSQLParsingException("Set of values is empty. Example: ('Bill', 'Stuart', 300)",text,beginValues);
   if (values.length != fieldNames.length)   throw new OCommandSQLParsingException("Fields not match with values",text,beginValues);
-  fieldValues=OSQLHelper.convertValues(values);
+  fieldValues=new Object[values.length];
+  for (int i=0; i < values.length; ++i)   fieldValues[i]=OSQLHelper.convertValue(values[i]);
 }

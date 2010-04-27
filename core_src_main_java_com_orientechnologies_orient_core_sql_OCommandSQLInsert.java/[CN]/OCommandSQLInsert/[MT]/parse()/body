@@ -1,0 +1,29 @@
+{
+  if (clusterName != null || className != null)   return;
+  int pos=textUpperCase.indexOf(KEYWORD_INTO);
+  if (pos == -1)   throw new OCommandSQLParsingException("Keyword " + KEYWORD_INTO + " not found",text,0);
+  pos+=KEYWORD_INTO.length() + 1;
+  StringBuilder word=new StringBuilder();
+  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  if (pos == -1)   throw new OCommandSQLParsingException("Invalid cluster/class name",text,pos);
+  String subjectName=word.toString();
+  if (subjectName.startsWith(OSQLHelper.CLASS_PREFIX))   subjectName=subjectName.substring(OSQLHelper.CLASS_PREFIX.length());
+  final OClass cls=database.getMetadata().getSchema().getClass(subjectName);
+  if (cls == null)   throw new OCommandSQLParsingException("Class " + subjectName + " not found in database",text,pos);
+  className=cls.getName();
+  final int beginFields=OSQLHelper.jumpWhiteSpaces(text,pos);
+  if (beginFields == -1 || text.charAt(beginFields) != '(')   throw new OCommandSQLParsingException("Set of fields is missed. Example: (name, surname)",text,pos);
+  final int endFields=text.indexOf(")",beginFields + 1);
+  if (endFields == -1)   throw new OCommandSQLParsingException("Missed closed brace",text,beginFields);
+  fields=OQueryHelper.getParameters(text,beginFields);
+  if (fields.length == 0)   throw new OCommandSQLParsingException("Set of fields is empty. Example: (name, surname)",text,endFields);
+  pos=OSQLHelper.nextWord(text,textUpperCase,endFields + 1,word,true);
+  if (pos == -1 || !word.toString().equals("VALUES"))   throw new OCommandSQLParsingException("Missed VALUES keyword",text,endFields);
+  final int beginValues=OSQLHelper.jumpWhiteSpaces(text,pos + 1);
+  if (pos == -1 || text.charAt(beginValues) != '(')   throw new OCommandSQLParsingException("Set of values is missed. Example: ('Bill', 'Stuart', 300)",text,pos);
+  final int endValues=text.indexOf(")",beginValues + 1);
+  if (endValues == -1)   throw new OCommandSQLParsingException("Missed closed brace",text,beginValues);
+  values=OQueryHelper.getParameters(text,beginValues);
+  if (values.length == 0)   throw new OCommandSQLParsingException("Set of values is empty. Example: ('Bill', 'Stuart', 300)",text,beginValues);
+  if (values.length != fields.length)   throw new OCommandSQLParsingException("Fields not match with values",text,beginValues);
+}

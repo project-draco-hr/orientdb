@@ -1,0 +1,39 @@
+{
+  checkConnection();
+  if (!(iCommand instanceof OSerializableStream))   throw new OCommandExecutionException("Can't serialize the command to being executed to the server side.");
+  OSerializableStream command=(OSerializableStream)iCommand;
+  final List<Object> result=new ArrayList<Object>();
+  do {
+    boolean locked=acquireExclusiveLock();
+    OStorageRemoteThreadLocal.INSTANCE.set(Boolean.TRUE);
+    try {
+      OCommandSQL aquery=(OCommandSQL)iCommand;
+      network.writeByte(OChannelBinaryProtocol.COMMAND);
+      network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(command));
+      network.flush();
+      readStatus();
+      while (network.readByte() == 1) {
+        ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork((ODatabaseRecord<?>)iCommand.getDatabase());
+        if (record == null)         break;
+        try {
+          if (!aquery.getResultListener().result(record)) {
+            while (network.in.available() > 0)             network.in.read();
+            break;
+          }
+        }
+ catch (        Throwable t) {
+        }
+      }
+      break;
+    }
+ catch (    Exception e) {
+      if (handleException("Error on executing command: " + iCommand,e))       break;
+    }
+ finally {
+      OStorageRemoteThreadLocal.INSTANCE.set(Boolean.FALSE);
+      releaseExclusiveLock(locked);
+    }
+  }
+ while (true);
+  return result;
+}

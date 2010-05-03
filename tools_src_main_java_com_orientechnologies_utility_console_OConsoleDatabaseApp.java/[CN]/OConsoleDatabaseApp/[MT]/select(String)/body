@@ -8,19 +8,20 @@
   final List<String> columns=new ArrayList<String>();
   final int limit=Integer.parseInt((String)properties.get("limit"));
   long start=System.currentTimeMillis();
-  currentDatabase.query(new OSQLAsynchQuery<ODocument>(iQueryText,new OAsynchQueryResultListener<ODocument>(){
-    public boolean result(    final ODocument iRecord){
+  currentDatabase.command(new OSQLAsynchQuery<ODocument>(iQueryText,limit + 1,new OCommandResultListener(){
+    public boolean result(    final Object iRecord){
       if (currentResultSet.size() > limit - 1) {
         printHeaderLine(columns);
         out.println("\nResultset contains more items not displayed (max=" + limit + ")");
         return false;
       }
-      dumpRecordInTable(currentResultSet.size(),iRecord,columns);
-      currentResultSet.add(iRecord);
+      ORecordSchemaAwareAbstract<?> record=(ORecordSchemaAwareAbstract<?>)iRecord;
+      dumpRecordInTable(currentResultSet.size(),record,columns);
+      currentResultSet.add(record);
       return true;
     }
   }
-)).execute(limit + 1);
+)).execute();
   if (currentResultSet.size() > 0 && currentResultSet.size() < limit)   printHeaderLine(columns);
   out.println(currentResultSet.size() + " item(s) found. Query executed in " + (float)(System.currentTimeMillis() - start) / 1000 + " sec(s).");
 }

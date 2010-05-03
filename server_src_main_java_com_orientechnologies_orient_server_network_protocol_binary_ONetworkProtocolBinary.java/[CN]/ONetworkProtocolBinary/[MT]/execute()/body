@@ -132,31 +132,22 @@ break;
 }
 case OChannelBinaryProtocol.COMMAND:
 {
-OCommandInternal command=(OCommandInternal)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
-Object result=connection.database.command(command).execute();
-sendOk();
-channel.writeBytes(OStreamSerializerAnyRuntime.INSTANCE.toStream(result));
-break;
-}
-case OChannelBinaryProtocol.QUERY:
-{
-final int limit=channel.readInt();
-OAsynchQuery<ORecordInternal<?>> query=(OAsynchQuery<ORecordInternal<?>>)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+final OCommandRequestAbstract<?> command=(OCommandRequestAbstract<?>)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
 final StringBuilder empty=new StringBuilder();
-query.setResultListener(new OAsynchQueryResultListener<ORecordInternal<?>>(){
+command.setResultListener(new OCommandResultListener(){
 private int items=0;
-public boolean result(ORecordInternal<?> iRecord){
+public boolean result(final Object iRecord){
 if (items == 0) try {
 sendOk();
 empty.append("-");
 }
  catch (IOException e1) {
 }
-if (limit > -1 && items > limit) return false;
+if (command.getLimit() > -1 && items > command.getLimit()) return false;
 try {
 channel.writeByte((byte)1);
 items++;
-writeRecord(iRecord);
+writeRecord((ORecordInternal<?>)iRecord);
 channel.flush();
 }
  catch (IOException e) {
@@ -166,24 +157,13 @@ return true;
 }
 }
 );
-connection.database.query((OQuery<ODocument>)query).execute(limit);
+((OCommandRequestInternal<ODatabaseRecord<?>>)connection.database.command(command)).execute();
 if (empty.length() == 0) try {
 sendOk();
 }
  catch (IOException e1) {
 }
 channel.writeByte((byte)0);
-break;
-}
-case OChannelBinaryProtocol.QUERY_FIRST:
-{
-String queryText=channel.readString();
-OSQLSynchQuery<ODocument> query=new OSQLSynchQuery<ODocument>(queryText);
-query.setRecord(new ODocument());
-query.setDatabase(connection.database);
-ORecordInternal<?> result=connection.database.query(query).executeFirst();
-sendOk();
-writeRecord(result);
 break;
 }
 case OChannelBinaryProtocol.DICTIONARY_LOOKUP:

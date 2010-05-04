@@ -2,38 +2,56 @@
   checkConnection();
   if (!(iCommand instanceof OSerializableStream))   throw new OCommandExecutionException("Can't serialize the command to being executed to the server side.");
   OSerializableStream command=(OSerializableStream)iCommand;
-  final List<Object> result=new ArrayList<Object>();
+  Object result=null;
   do {
     boolean locked=acquireExclusiveLock();
     OStorageRemoteThreadLocal.INSTANCE.set(Boolean.TRUE);
     try {
-      OCommandSQL aquery=(OCommandSQL)iCommand;
+      final OCommandSQL aquery=(OCommandSQL)iCommand;
+      final boolean asynch=iCommand instanceof OCommandRequestAsynch;
       network.writeByte(OChannelBinaryProtocol.COMMAND);
+      network.writeByte((byte)(asynch ? 'a' : 's'));
       network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(command));
       network.flush();
       readStatus();
-      while (network.readByte() == 1) {
-        ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork((ODatabaseRecord<?>)iCommand.getDatabase());
-        if (record == null)         break;
-        try {
-          if (!aquery.getResultListener().result(record)) {
-            while (network.in.available() > 0)             network.in.read();
-            break;
+      if (asynch) {
+        while (network.readByte() == 1) {
+          ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork((ODatabaseRecord<?>)iCommand.getDatabase());
+          if (record == null)           break;
+          try {
+            if (!aquery.getResultListener().result(record)) {
+              while (network.in.available() > 0)               network.in.read();
+              break;
+            }
+          }
+ catch (          Throwable t) {
           }
         }
- catch (        Throwable t) {
-        }
       }
-      break;
-    }
- catch (    Exception e) {
-      if (handleException("Error on executing command: " + iCommand,e))       break;
-    }
+ else {
+        final byte type=network.readByte();
+switch (type) {
+case 'n':
+          result=null;
+        break;
+case 'r':
+      result=readRecordFromNetwork((ODatabaseRecord<?>)iCommand.getDatabase());
+    break;
+case 'a':
+  result=OStreamSerializerAnyRuntime.INSTANCE.fromStream(network.readBytes());
+break;
+}
+}
+break;
+}
+ catch (Exception e) {
+if (handleException("Error on executing command: " + iCommand,e)) break;
+}
  finally {
-      OStorageRemoteThreadLocal.INSTANCE.set(Boolean.FALSE);
-      releaseExclusiveLock(locked);
-    }
-  }
+OStorageRemoteThreadLocal.INSTANCE.set(Boolean.FALSE);
+releaseExclusiveLock(locked);
+}
+}
  while (true);
-  return result;
+return result;
 }

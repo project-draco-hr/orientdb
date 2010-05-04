@@ -1,7 +1,10 @@
 {
+  commandType=-1;
+  long clock=0;
   try {
-    short type=channel.readByte();
-switch (type) {
+    commandType=channel.readByte();
+    clock=System.currentTimeMillis();
+switch (commandType) {
 case OChannelBinaryProtocol.CONNECT:
 {
         user=channel.readString();
@@ -132,7 +135,9 @@ break;
 }
 case OChannelBinaryProtocol.COMMAND:
 {
-final OCommandRequestAbstract<?> command=(OCommandRequestAbstract<?>)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+final boolean asynch=channel.readByte() == 'a';
+final OCommandRequestAbstract command=(OCommandRequestAbstract)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+if (asynch) {
 final StringBuilder empty=new StringBuilder();
 command.setResultListener(new OCommandResultListener(){
 private int items=0;
@@ -164,6 +169,23 @@ sendOk();
  catch (IOException e1) {
 }
 channel.writeByte((byte)0);
+}
+ else {
+final Object result=((OCommandRequestInternal<ODatabaseRecord<?>>)connection.database.command(command)).execute();
+sendOk();
+if (result == null) {
+channel.writeByte((byte)'n');
+channel.writeBytes(null);
+}
+ else if (result instanceof ORecord<?>) {
+channel.writeByte((byte)'r');
+writeRecord((ORecordInternal<?>)result);
+}
+ else {
+channel.writeByte((byte)'a');
+channel.writeBytes(OStreamSerializerAnyRuntime.INSTANCE.toStream(result));
+}
+}
 break;
 }
 case OChannelBinaryProtocol.DICTIONARY_LOOKUP:
@@ -211,7 +233,7 @@ case OChannelBinaryProtocol.TX_COMMIT:
 sendOk();
 break;
 default :
-OLogManager.instance().error(this,"Request not supported. Code: " + type);
+OLogManager.instance().error(this,"Request not supported. Code: " + commandType);
 channel.clearInput();
 sendError(null);
 }
@@ -236,6 +258,9 @@ channel.flush();
  catch (Throwable t) {
 OLogManager.instance().debug(this,"Error on send data over the network",t);
 }
-}
 OSerializationThreadLocal.INSTANCE.get().clear();
+lastCommandExecutionTime=System.currentTimeMillis() - clock;
+totalCommandExecutionTime+=lastCommandExecutionTime;
+lastCommandType=commandType;
+}
 }

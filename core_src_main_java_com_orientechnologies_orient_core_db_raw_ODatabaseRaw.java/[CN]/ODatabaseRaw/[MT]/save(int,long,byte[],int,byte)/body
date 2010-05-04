@@ -1,11 +1,17 @@
 {
   try {
-    if (iPosition == ORID.CLUSTER_POS_INVALID)     return storage.createRecord(iClusterId,iContent,iRecordType);
-    int newVersion=storage.updateRecord(id,iClusterId,iPosition,iContent,iVersion,iRecordType);
-    if (newVersion > -1)     return newVersion * -1 - 2;
+    if (iPosition == ORID.CLUSTER_POS_INVALID) {
+      iPosition=storage.createRecord(iClusterId,iContent,iRecordType);
+      if (useCache)       getCache().addRecord(ORecordId.generateString(iClusterId,iPosition),new ORawBuffer(iContent,0,iRecordType));
+      return iPosition;
+    }
+ else {
+      int newVersion=storage.updateRecord(id,iClusterId,iPosition,iContent,iVersion,iRecordType);
+      if (useCache)       getCache().addRecord(ORecordId.generateString(iClusterId,iPosition),new ORawBuffer(iContent,newVersion,iRecordType));
+      return newVersion;
+    }
   }
  catch (  Throwable t) {
     throw new ODatabaseException("Error on saving record in cluster id: " + iClusterId + ", position: "+ iPosition,t);
   }
-  return ORID.CLUSTER_POS_INVALID;
 }

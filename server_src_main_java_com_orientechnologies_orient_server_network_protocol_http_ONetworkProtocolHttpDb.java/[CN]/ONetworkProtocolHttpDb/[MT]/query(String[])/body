@@ -1,0 +1,15 @@
+{
+  checkSyntax(iParts,3,"Syntax error: query/sql/<query-text>[/<limit>]<br/>Limit is optional and is setted to 20 by default. Set expressely to 0 to have no limits.");
+  ODatabaseDocumentTx db=null;
+  try {
+    db=OSharedDocumentDatabase.acquireDatabase(iParts[1]);
+    final int limit=iParts.length > 3 ? Integer.parseInt(iParts[3]) : 20;
+    final String text=URLDecoder.decode(iParts[2].trim(),"UTF-8");
+    if (!text.toLowerCase().startsWith("select"))     throw new IllegalArgumentException("Only SQL Select are valid using HTTP GET");
+    final List<ORecord<?>> response=(List<ORecord<?>>)db.command(new OSQLSynchQuery<ORecordSchemaAware<?>>(text,limit)).execute();
+    sendRecordsContent(response);
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.releaseDatabase(db);
+  }
+}

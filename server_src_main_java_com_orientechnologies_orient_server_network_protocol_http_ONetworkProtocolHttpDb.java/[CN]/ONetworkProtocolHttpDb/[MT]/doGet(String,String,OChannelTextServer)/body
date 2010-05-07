@@ -1,0 +1,29 @@
+{
+  if (iURI == null || iURI.length() == 0)   return;
+  if (OHttpUtils.URL_SEPARATOR.equals(iURI) || iURI.startsWith("/www")) {
+    directAccess(iURI);
+    return;
+  }
+  final String[] parts=OHttpUtils.getParts(iURI);
+  if (parts.length == 0)   return;
+  try {
+    if (parts[0].equals("document"))     document(parts);
+ else     if (parts[0].equals("query"))     query(parts);
+ else     if (parts[0].equals("dictionary"))     dictionary(parts);
+ else     if (parts[0].equals("cluster"))     cluster(parts);
+ else     if (parts[0].equals("class"))     clazz(parts);
+ else     throw new IllegalArgumentException("Operation '" + parts[0] + "' not supported");
+  }
+ catch (  Exception e) {
+    int errorCode=500;
+    if (e instanceof ORecordNotFoundException)     errorCode=404;
+ else     if (e instanceof OLockException)     e=(Exception)e.getCause();
+    final String msg=e.getMessage() != null ? e.getMessage() : "Internal error";
+    try {
+      sendTextContent(errorCode,"Error",OHttpUtils.CONTENT_TEXT_PLAIN,msg);
+    }
+ catch (    IOException e1) {
+      sendShutdown();
+    }
+  }
+}

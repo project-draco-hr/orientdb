@@ -4,10 +4,11 @@
   final boolean locked=acquireSharedLock();
   try {
     final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iPosition,new OPhysicalPosition());
-    if (!checkForRecordValidity(ppos))     return;
+    if (!checkForRecordValidity(ppos))     return false;
     if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't delete the record #" + recId + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
     iClusterSegment.removePhysicalPosition(iPosition,ppos);
     getDataSegment(ppos.dataSegment).deleteRecord(ppos.dataPosition);
+    return true;
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on deleting record #" + iPosition + " in cluster: "+ iClusterSegment,e);
@@ -16,4 +17,5 @@
     releaseSharedLock(locked);
     OProfiler.getInstance().stopChrono("OStorageLocal.deleteRecord",timer);
   }
+  return false;
 }

@@ -1,0 +1,19 @@
+{
+  iRequest.data.commandType=OChannelBinaryProtocol.COMMAND;
+  String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: class/<database>/<class-name>[/<limit>]<br/>Limit is optional and is setted to 20 by default. Set expressely to 0 to have no limits.");
+  ODatabaseDocumentTx db=null;
+  try {
+    db=OSharedDocumentDatabase.acquireDatabase(urlParts[1]);
+    if (db.getMetadata().getSchema().getClass(urlParts[2]) == null)     throw new IllegalArgumentException("Invalid class '" + urlParts[2] + "'");
+    final int limit=urlParts.length > 3 ? Integer.parseInt(urlParts[3]) : 20;
+    final List<ORecord<?>> response=new ArrayList<ORecord<?>>();
+    for (    ORecord<?> rec : db.browseClass(urlParts[2])) {
+      if (limit > 0 && response.size() >= limit)       break;
+      response.add(rec);
+    }
+    sendRecordsContent(iRequest,response);
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.releaseDatabase(db);
+  }
+}

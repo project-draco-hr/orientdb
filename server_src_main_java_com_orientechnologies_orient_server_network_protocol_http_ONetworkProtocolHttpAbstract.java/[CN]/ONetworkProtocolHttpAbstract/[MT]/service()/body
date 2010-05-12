@@ -1,0 +1,36 @@
+{
+  OProfiler.getInstance().updateStatistic("Server.requests",+1);
+  ++data.totalRequests;
+  data.commandType=-1;
+  data.lastCommandType=-1;
+  data.lastCommandDetail=request.url;
+  data.lastCommandExecutionTime=0;
+  long begin=System.currentTimeMillis();
+  final String command;
+  if (request.url.length() < 2) {
+    command="";
+  }
+ else {
+    final int sep=request.url.indexOf("/",1);
+    command=sep == -1 ? request.url.substring(1) : request.url.substring(1,sep);
+  }
+  OServerCommand cmd=commands.get(request.method + "." + command);
+  if (cmd != null)   try {
+    cmd.execute(request);
+  }
+ catch (  Exception e) {
+    final StringBuilder buffer=new StringBuilder();
+    buffer.append(e);
+    Throwable cause=e.getCause();
+    while (cause != null && cause != cause.getCause()) {
+      buffer.append("\r\n--> ");
+      buffer.append(cause);
+      cause=cause.getCause();
+    }
+    sendTextContent(500,"Unknow error",OHttpUtils.CONTENT_TEXT_PLAIN,buffer.toString());
+  }
+ else   OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Command not found: "+ command);
+  data.lastCommandType=data.commandType;
+  data.lastCommandExecutionTime=System.currentTimeMillis() - begin;
+  data.totalCommandExecutionTime+=data.lastCommandExecutionTime;
+}

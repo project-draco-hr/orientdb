@@ -4,10 +4,12 @@
     name=iName.substring(0,pos);
     String part=iName;
     String partUpperCase=part.toUpperCase();
+    boolean operatorFound;
     while (pos > -1) {
       part=part.substring(pos + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length());
       partUpperCase=partUpperCase.substring(pos + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length());
-      for (      OSQLFilterFieldOperator op : OSQLFilterFieldOperator.OPERATORS)       if (partUpperCase.startsWith(op.keyword)) {
+      operatorFound=false;
+      for (      OSQLFilterFieldOperator op : OSQLFilterFieldOperator.OPERATORS)       if (partUpperCase.startsWith(op.keyword + "(")) {
         final String arguments[];
         if (op.minArguments > 0) {
           arguments=OQueryHelper.getParameters(part);
@@ -17,9 +19,19 @@
         if (operationsChain == null)         operationsChain=new ArrayList<OPair<Integer,String[]>>();
         operationsChain.add(new OPair<Integer,String[]>(op.id,arguments));
         pos=partUpperCase.indexOf(OQueryHelper.CLOSED_BRACE) + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length();
+        operatorFound=true;
         break;
       }
-      if (operationsChain == null)       throw new OQueryParsingException(iQueryCompiled.text,"Syntax error: field operator not recognized between the supported ones: " + Arrays.toString(OSQLFilterFieldOperator.OPERATORS),iQueryCompiled.currentPos + pos);
+      if (!operatorFound) {
+        pos=partUpperCase.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR,pos);
+        int posOpenBrace=part.indexOf("(");
+        if (posOpenBrace == -1 || posOpenBrace > pos) {
+          String chainedFieldName=pos > -1 ? part.substring(0,pos) : part;
+          if (operationsChain == null)           operationsChain=new ArrayList<OPair<Integer,String[]>>();
+          operationsChain.add(new OPair<Integer,String[]>(OSQLFilterFieldOperator.FIELD.id,new String[]{chainedFieldName}));
+        }
+ else         throw new OQueryParsingException(iQueryCompiled.text,"Syntax error: field operator not recognized between the supported ones: " + Arrays.toString(OSQLFilterFieldOperator.OPERATORS),iQueryCompiled.currentPos + pos);
+      }
       if (pos >= partUpperCase.length())       return;
       pos=partUpperCase.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR,pos);
     }

@@ -23,23 +23,25 @@
     prop=record.getSchemaClass() != null ? record.getSchemaClass().getProperty(f.getKey()) : null;
     fieldValue=f.getValue();
     fieldClassName=getClassName(fieldValue);
+    type=record.fieldType(f.getKey());
+    linkedClass=null;
+    linkedType=null;
     if (prop != null) {
       type=prop.getType();
       linkedClass=prop.getLinkedClass();
       linkedType=prop.getLinkedType();
     }
- else {
-      type=OType.EMBEDDED;
-      linkedClass=null;
-      linkedType=null;
-      if (fieldValue instanceof Collection<?>) {
-        Collection<?> coll=(Collection<?>)fieldValue;
-        if (coll.size() > 0) {
-          Object firstValue=coll.iterator().next();
+ else     if (fieldValue != null) {
+      if (fieldValue instanceof String)       type=OType.STRING;
+ else       if (fieldValue instanceof Collection<?> || fieldValue.getClass().isArray()) {
+        Collection<?> coll=fieldValue instanceof Collection<?> ? (Collection<?>)fieldValue : null;
+        int size=coll != null ? coll.size() : Array.getLength(fieldValue);
+        if (size > 0) {
+          Object firstValue=coll != null ? coll.iterator().next() : Array.get(fieldValue,0);
           if (database != null && (firstValue instanceof ORecordSchemaAware<?> || (database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
             linkedType=OType.LINK;
             linkedClass=getLinkInfo(database,getClassName(firstValue));
-            if (coll instanceof Set<?>)             type=OType.LINKSET;
+            if (type == null && coll instanceof Set<?>)             type=OType.LINKSET;
  else             type=OType.LINKLIST;
           }
  else {
@@ -49,33 +51,38 @@
                 linkedType=OType.EMBEDDED;
                 linkedClass=new OClass(firstValue.getClass());
               }
-              if (coll instanceof Set<?>)               type=OType.EMBEDDEDSET;
+              if (type == null && coll instanceof Set<?>)               type=OType.EMBEDDEDSET;
  else               type=OType.EMBEDDEDLIST;
             }
           }
         }
- else         type=OType.EMBEDDEDLIST;
+ else         if (type == null)         type=OType.EMBEDDEDLIST;
       }
  else       if (fieldValue instanceof Map<?,?>) {
+        if (type == null)         type=OType.EMBEDDEDMAP;
         Map<?,?> map=(Map<?,?>)fieldValue;
         if (map.size() > 0) {
           Object firstValue=map.values().iterator().next();
-          linkedType=OType.getTypeByClass(firstValue.getClass());
-          type=OType.EMBEDDEDMAP;
+          if (database != null && (firstValue instanceof ORecordSchemaAware<?> || (database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
+            linkedType=OType.LINK;
+            linkedClass=getLinkInfo(database,getClassName(firstValue));
+          }
+ else           linkedType=OType.getTypeByClass(firstValue.getClass());
         }
       }
  else       if (database != null && fieldValue instanceof ORecordSchemaAware<?>) {
-        type=OType.LINK;
+        if (type == null)         type=OType.LINK;
         linkedClass=getLinkInfo(database,fieldClassName);
       }
  else       if (database != null && database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(fieldClassName) != null) {
-        type=OType.LINK;
+        if (type == null)         type=OType.LINK;
         linkedClass=getLinkInfo(database,fieldClassName);
       }
  else       if (fieldValue instanceof Date) {
-        type=OType.DATE;
+        if (type == null)         type=OType.DATE;
       }
     }
+    if (type == null)     type=OType.EMBEDDED;
     fieldValue=fieldToStream((ODocument)iRecord,iRecord.getDatabase(),iObjHandler,type,linkedClass,linkedType,f.getKey(),f.getValue(),iMarshalledRecords);
     buffer.append(f.getKey());
     buffer.append(FIELD_VALUE_SEPARATOR);

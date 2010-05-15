@@ -1,6 +1,7 @@
 {
-  iRequest.data.commandType=-1;
   String[] urlParts=checkSyntax(iRequest.url,2,"Syntax error: database/<database>");
+  iRequest.data.commandInfo="Database info";
+  iRequest.data.commandDetail=urlParts[1];
   ODatabaseDocumentTx db=null;
   try {
     db=OSharedDocumentDatabase.acquireDatabase(urlParts[1]);
@@ -47,6 +48,22 @@
       }
       json.endCollection(1,true);
     }
+    json.beginCollection(1,false,"users");
+    for (    OUser user : db.getMetadata().getSecurity().getUsers()) {
+      json.beginObject(2,true,null);
+      json.writeAttribute(3,false,"name",user.getName());
+      json.writeAttribute(3,false,"roles",user.getRoles() != null ? Arrays.toString(user.getRoles().toArray()) : "null");
+      json.endObject(2,false);
+    }
+    json.endCollection(1,true);
+    json.beginCollection(1,false,"roles");
+    for (    ORole role : db.getMetadata().getSecurity().getRoles()) {
+      json.beginObject(2,true,null);
+      json.writeAttribute(3,false,"name",role.getName());
+      json.writeAttribute(3,false,"ACL","not supported yet");
+      json.endObject(2,false);
+    }
+    json.endCollection(1,true);
     json.endObject();
     sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,buffer.toString());
   }

@@ -49,13 +49,28 @@ case EMBEDDEDMAP:
   Map<String,Object> map=new HashMap<String,Object>();
   if (value.length() == 0)   return map;
   String[] items=OStringSerializerHelper.split(value,OStringSerializerHelper.RECORD_SEPARATOR_AS_CHAR);
-  if (iLinkedClass != null)   for (  String item : items) {
-    map.put("",fromString(iDatabase,item,new ODocument((ODatabaseDocument)iDatabase,iLinkedClass.getName())));
-  }
- else {
-    if (iLinkedType == null)     throw new IllegalArgumentException("Linked type can't be null. Probably the serialized type has not stored the type along with data");
-    for (    String item : items) {
-      map.put("",OStringSerializerHelper.fieldTypeFromStream(iLinkedType,item));
+  String[] entry;
+  String mapValue;
+  for (  String item : items) {
+    if (item != null && item.length() > 0) {
+      entry=item.split(OStringSerializerHelper.ENTRY_SEPARATOR);
+      if (entry.length > 0) {
+        mapValue=entry[1];
+        if (mapValue.contains(ORID.SEPARATOR)) {
+          iLinkedType=OType.LINK;
+          int classSeparatorPos=value.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
+          if (classSeparatorPos > -1) {
+            String className=value.substring(1,classSeparatorPos);
+            if (className != null)             iLinkedClass=iDatabase.getMetadata().getSchema().getClass(className);
+          }
+        }
+ else         if (Character.isDigit(mapValue.charAt(0)) || mapValue.charAt(0) == '+' || mapValue.charAt(0) == '-') {
+          iLinkedType=getNumber(iUnusualSymbols,mapValue);
+        }
+ else         if (mapValue.charAt(0) == '\'' || mapValue.charAt(0) == '"')         iLinkedType=OType.STRING;
+ else         iLinkedType=OType.EMBEDDED;
+        map.put((String)OStringSerializerHelper.fieldTypeFromStream(OType.STRING,entry[0]),OStringSerializerHelper.fieldTypeFromStream(iLinkedType,mapValue));
+      }
     }
   }
   return map;

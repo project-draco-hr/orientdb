@@ -1,0 +1,18 @@
+{
+  String[] urlParts=checkSyntax(iRequest.url,4,"Syntax error: command/sql/<command-text>");
+  final String text=urlParts[3].trim();
+  iRequest.data.commandInfo="Command";
+  iRequest.data.commandDetail=text;
+  ODatabaseDocumentTx db=null;
+  final Object response;
+  try {
+    db=OSharedDocumentDatabase.acquireDatabase(urlParts[2]);
+    response=db.command(new OCommandSQL(text)).execute();
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.releaseDatabase(db);
+  }
+  if (response instanceof List<?>)   sendRecordsContent(iRequest,(List<ORecord<?>>)response);
+ else   if (response instanceof Integer)   sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Records affected: " + response);
+ else   sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,response.toString());
+}

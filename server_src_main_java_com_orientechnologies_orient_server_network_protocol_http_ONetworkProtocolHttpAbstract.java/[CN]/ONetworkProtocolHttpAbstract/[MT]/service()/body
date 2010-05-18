@@ -17,17 +17,17 @@
     cmd.execute(request);
   }
  catch (  Exception e) {
-    final StringBuilder buffer=new StringBuilder();
-    buffer.append(e);
-    Throwable cause=e.getCause();
-    while (cause != null && cause != cause.getCause()) {
-      buffer.append("\r\n--> ");
-      buffer.append(cause);
-      cause=cause.getCause();
-    }
-    sendTextContent(500,"Unknow error",OHttpUtils.CONTENT_TEXT_PLAIN,buffer.toString());
+    handleError(e);
   }
- else   OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Command not found: "+ command);
+ else {
+    try {
+      OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Command not found: "+ command);
+      sendTextContent(405,"Command '" + command + "' not found",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Command not found: " + command);
+    }
+ catch (    IOException e1) {
+      sendShutdown();
+    }
+  }
   data.lastCommandInfo=data.commandInfo;
   data.lastCommandDetail=data.commandDetail;
   data.lastCommandExecutionTime=System.currentTimeMillis() - begin;

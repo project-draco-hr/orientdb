@@ -8,6 +8,7 @@
   try {
     char c=(char)channel.inStream.read();
     if (channel.inStream.available() == 0) {
+      connectionClosed();
       return;
     }
     data.lastCommandReceived=OProfiler.getInstance().startChrono();
@@ -41,11 +42,15 @@ catch (  SocketTimeoutException e) {
     timeout();
   }
 catch (  Throwable t) {
-    if (request.method != null && request.url != null)     try {
-      sendTextContent(505,"Error on excuting of " + request.method + " for the resource: "+ request.url,"text/plain",t.toString());
+    if (request.method != null && request.url != null) {
+      try {
+        sendTextContent(505,"Error on executing of " + request.method + " for the resource: "+ request.url,null,"text/plain",t.toString());
+      }
+ catch (      IOException e) {
+      }
     }
- catch (    IOException e) {
-    }
+ else     sendTextContent(505,"Error on executing request",null,"text/plain",t.toString());
+    readAllContent(request);
   }
  finally {
     if (data.lastCommandReceived > -1)     OProfiler.getInstance().stopChrono("ONetworkProtocolHttp.execute",data.lastCommandReceived);

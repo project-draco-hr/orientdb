@@ -1,19 +1,32 @@
 {
-  StringBuilder buffer=new StringBuilder();
-  buffer.append("{ \"result\": [\r\n");
+  final StringWriter buffer=new StringWriter();
+  final OJSONWriter json=new OJSONWriter(buffer);
+  json.beginObject();
+  if (iRecords != null && iRecords.size() > 0) {
+    ORecord<?> first=iRecords.get(0);
+    if (first != null && first instanceof ODocument) {
+      ODatabaseDocumentTx db=(ODatabaseDocumentTx)((ODocument)first).getDatabase();
+      String className=((ODocument)first).getClassName();
+      final OClass cls=db.getMetadata().getSchema().getClass(className);
+      json.write("\"schema\": ");
+      exportClassSchema(db,json,cls);
+    }
+  }
+  json.beginCollection(1,true,"result");
   if (iRecords != null) {
     int counter=0;
-    String json;
+    String objectJson;
     for (    ORecord<?> rec : iRecords) {
       try {
-        json=rec.toJSON();
+        objectJson=rec.toJSON();
         if (counter++ > 0)         buffer.append(",\r\n");
-        buffer.append(json);
+        buffer.append(objectJson);
       }
  catch (      Exception e) {
       }
     }
   }
-  buffer.append("] }");
+  json.endCollection(1,true);
+  json.endObject();
   sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,buffer.toString());
 }

@@ -5,21 +5,28 @@
   try {
     if (recordsToCommit.size() > 0) {
       for (      OTreeMapEntryPersistent<K,V> node : recordsToCommit) {
-        if (!node.record.getIdentity().isValid()) {
+        if (node.record.isDirty() && !node.record.getIdentity().isValid()) {
+          if (iDatabase != null)           node.record.setDatabase(iDatabase);
           node.save();
         }
       }
       for (      OTreeMapEntryPersistent<K,V> node : recordsToCommit) {
-        rid=(ORecordId)node.record.getIdentity();
-        if (rid.isValid())         node.save();
+        if (node.record.isDirty() && node.record.getIdentity().isValid()) {
+          if (iDatabase != null)           node.record.setDatabase(iDatabase);
+          node.save();
+        }
       }
       recordsToCommit.clear();
     }
-    if (record.isDirty())     save();
+    if (record.isDirty()) {
+      if (iDatabase != null)       record.setDatabase(iDatabase);
+      save();
+    }
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on saving the tree",e,ODatabaseException.class);
-    database.rollback();
+    if (iDatabase != null)     iDatabase.rollback();
+ else     database.rollback();
   }
  finally {
     lock.releaseExclusiveLock();

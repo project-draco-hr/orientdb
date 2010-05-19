@@ -2,13 +2,15 @@
   OLogManager.instance().config(this,"Saving entry into database: %s",iKey);
   ODatabaseBinary db=null;
   try {
-    String[] parts=ONetworkProtocolHttpKV.getDbBucketKey(iKey,3);
+    final String[] parts=OKVServerCommandAbstract.getDbBucketKey(iKey,3);
     db=OSharedBinaryDatabase.acquireDatabase(parts[0]);
-    Map<String,String> bucket=OServerClusterMember.getDictionaryBucket(db,parts[1],false);
-    bucket.put(parts[2],iValue);
+    final Map<String,String> bucketMap=OKVDictionaryBucketManager.getDictionaryBucket(db,parts[1],false);
+synchronized (bucketMap) {
+      bucketMap.put(parts[2],iValue);
+    }
   }
  catch (  Exception e) {
-    throw new ODistributedException("Error on save the entry with key: " + iKey,e);
+    throw new OKVDistributedException("Error on save the entry with key: " + iKey,e);
   }
  finally {
     if (db != null)     OSharedBinaryDatabase.releaseDatabase(db);

@@ -3,7 +3,7 @@
   final int partitionId=iEvent.getPartitionId();
   if (!iEvent.getNewOwner().equals(Hazelcast.getCluster().getLocalMember()))   return;
   String parts[];
-  Map<String,String> bucket;
+  Map<String,String> bucketMap;
   for (  Instance instance : Hazelcast.getInstances()) {
     if (instance.getInstanceType() == InstanceType.MAP) {
       IMap<String,String> map=(IMap<String,String>)instance;
@@ -12,14 +12,16 @@
       for (      String localKey : localKeys) {
         if (partitionService.getPartition(localKey).getPartitionId() == partitionId) {
           try {
-            parts=ONetworkProtocolHttpKV.getDbBucketKey(localKey,3);
+            parts=OKVServerCommandAbstract.getDbBucketKey(localKey,3);
             ODatabaseBinary db=OSharedBinaryDatabase.acquireDatabase(parts[0]);
-            bucket=getDictionaryBucket(db,parts[1],false);
-            bucket.put(localKey,map.get(localKey));
+            bucketMap=OKVDictionaryBucketManager.getDictionaryBucket(db,parts[1],false);
+synchronized (bucketMap) {
+              bucketMap.put(localKey,map.get(localKey));
+            }
             OLogManager.instance().debug(this,"Caught failure of node '%s'. Save entry with key '%s' on local node",iEvent.getOldOwner().getInetSocketAddress(),localKey);
           }
  catch (          Exception e) {
-            throw new ODistributedException("Error on saving record: " + localKey,e);
+            throw new OKVDistributedException("Error on saving record: " + localKey,e);
           }
         }
       }

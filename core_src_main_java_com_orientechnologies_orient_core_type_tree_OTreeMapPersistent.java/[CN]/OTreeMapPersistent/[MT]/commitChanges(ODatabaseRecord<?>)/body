@@ -1,0 +1,32 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  lock.acquireExclusiveLock();
+  try {
+    if (recordsToCommit.size() > 0) {
+      for (      OTreeMapEntryPersistent<K,V> node : recordsToCommit) {
+        if (node.record.isDirty() && !node.record.getIdentity().isValid()) {
+          if (iDatabase != null)           node.record.setDatabase(iDatabase);
+          node.save();
+        }
+      }
+      for (      OTreeMapEntryPersistent<K,V> node : recordsToCommit) {
+        if (node.record.isDirty() && node.record.getIdentity().isValid()) {
+          if (iDatabase != null)           node.record.setDatabase(iDatabase);
+          node.save();
+        }
+      }
+      recordsToCommit.clear();
+    }
+    if (record.isDirty()) {
+      if (iDatabase != null)       record.setDatabase(iDatabase);
+      save();
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().exception("Error on saving the tree",e,OStorageException.class);
+  }
+ finally {
+    lock.releaseExclusiveLock();
+    OProfiler.getInstance().stopChrono("OTreeMapPersistent.commitChanges",timer);
+  }
+}

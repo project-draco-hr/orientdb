@@ -1,0 +1,30 @@
+{
+  checkConnection();
+  do {
+    boolean locked=acquireExclusiveLock();
+    try {
+      network.writeByte(OChannelBinaryProtocol.CLUSTER_ADD);
+      network.writeString(iClusterType);
+      network.writeString(iClusterName);
+      if (OStorage.TYPE_PHYSICAL.equals(iClusterType)) {
+        network.writeString((String)iArguments[0]).writeInt((Integer)iArguments[1]);
+      }
+ else {
+        network.writeInt((Integer)iArguments[0]);
+      }
+      network.flush();
+      readStatus();
+      int clusterId=network.readShort();
+      clusters.put(iClusterName.toLowerCase(),clusterId);
+      return clusterId;
+    }
+ catch (    Exception e) {
+      if (handleException("Error on add new cluster",e))       break;
+    }
+ finally {
+      releaseExclusiveLock(locked);
+    }
+  }
+ while (true);
+  return 0;
+}

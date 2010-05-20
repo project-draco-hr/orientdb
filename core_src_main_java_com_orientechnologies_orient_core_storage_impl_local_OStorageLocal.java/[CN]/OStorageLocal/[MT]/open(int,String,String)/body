@@ -7,35 +7,34 @@
     if (open)     return;
     open=true;
     int pos;
-    pos=registerDataSegment(new OStorageDataConfiguration(configuration,OStorage.DEFAULT_SEGMENT));
+    pos=registerDataSegment(new OStorageDataConfiguration(configuration,OStorage.DATA_DEFAULT_NAME));
     dataSegments[pos].open();
-    pos=registerClusterSegment(new OStoragePhysicalClusterConfiguration(configuration,OMetadata.CLUSTER_METADATA_NAME));
-    physicalClusters[pos].open();
-    pos=registerClusterSegment(new OStoragePhysicalClusterConfiguration(configuration,"index"));
-    physicalClusters[pos].open();
-    defaultCluster=registerClusterSegment(new OStoragePhysicalClusterConfiguration(configuration,OStorage.DEFAULT_SEGMENT));
-    physicalClusters[defaultCluster].open();
+    pos=createClusterFromConfig(new OStoragePhysicalClusterConfiguration(configuration,OStorage.CLUSTER_METADATA_NAME,clusters.length));
+    clusters[pos].open();
+    pos=createClusterFromConfig(new OStoragePhysicalClusterConfiguration(configuration,OStorage.CLUSTER_INDEX_NAME,clusters.length));
+    clusters[pos].open();
+    defaultClusterId=createClusterFromConfig(new OStoragePhysicalClusterConfiguration(configuration,OStorage.CLUSTER_DEFAULT_NAME,clusters.length));
+    clusters[defaultClusterId].open();
     configuration.load();
     if (configuration.isEmpty())     throw new OStorageException("Can't open storage because it not exists. Storage path: " + fileURL);
     for (    OStorageDataConfiguration data : configuration.dataSegments) {
       pos=registerDataSegment(data);
       if (pos > -1)       dataSegments[pos].open();
     }
-    for (    OStoragePhysicalClusterConfiguration cluster : configuration.physicalClusters) {
-      pos=registerClusterSegment(cluster);
+    for (    OStorageClusterConfiguration clusterConfig : configuration.clusters) {
+      pos=createClusterFromConfig(clusterConfig);
       if (pos > -1) {
-        if (cluster.name.equals(OStorage.DEFAULT_SEGMENT))         defaultCluster=pos;
-        physicalClusters[pos].open();
+        if (clusterConfig.getName().equals(OStorage.CLUSTER_DEFAULT_NAME))         defaultClusterId=pos;
+        clusters[pos].open();
       }
     }
     txManager.open();
   }
  catch (  IOException e) {
     open=false;
-    dataSegments=null;
-    physicalClusters=null;
-    clusterSegmentMap.clear();
-    logicalClusters.clear();
+    dataSegments=new ODataLocal[0];
+    clusters=new OCluster[0];
+    clusterMap.clear();
     throw new OStorageException("Can't open local storage: " + fileURL + ", with mode="+ mode,e);
   }
  finally {

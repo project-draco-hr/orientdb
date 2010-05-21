@@ -2,7 +2,7 @@
   iRequest.getDatabase().checkSecurity(ODatabaseSecurityResources.COMMAND,ORole.OPERATIONS.UPDATE);
   init(iRequest.getDatabase(),iRequest.getText());
   className=null;
-  fieldEntries.clear();
+  setEntries.clear();
   query=null;
   recordCount=0;
   final StringBuilder word=new StringBuilder();
@@ -17,30 +17,17 @@
   if (cls == null)   throw new OCommandSQLParsingException("Class " + subjectName + " not found in database",text,pos);
   className=cls.getName();
   newPos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-  if (pos == -1 || !word.toString().equals(KEYWORD_SET))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_SET + " not found",text,pos);
-  String fieldName;
-  String fieldValue;
-  while (pos != -1 && (fieldEntries.size() == 0 || word.toString().equals(","))) {
-    newPos=OSQLHelper.nextWord(text,textUpperCase,newPos,word,false);
-    if (pos == -1)     throw new OCommandSQLParsingException("Field name expected",text,pos);
-    pos=newPos;
-    fieldName=word.toString();
-    pos=OSQLHelper.jumpWhiteSpaces(text,pos);
-    if (pos == -1 || text.charAt(pos) != '=')     throw new OCommandSQLParsingException("Character '=' was expected",text,pos);
-    newPos=OSQLHelper.nextWord(text,textUpperCase,pos + 1,word,false);
-    if (pos == -1)     throw new OCommandSQLParsingException("Value expected",text,pos);
-    fieldValue=word.toString();
-    if (fieldValue.endsWith(",")) {
-      pos=newPos - 1;
-      fieldValue=fieldValue.substring(0,fieldValue.length() - 1);
+  if (pos == -1 || (!word.toString().equals(KEYWORD_SET) && !word.toString().equals(KEYWORD_REMOVE)))   throw new OCommandSQLParsingException("Expected keyword " + KEYWORD_SET + " or "+ KEYWORD_REMOVE,text,pos);
+  while (pos != -1 && !word.toString().equals(OSQLHelper.KEYWORD_WHERE)) {
+    if (word.toString().equals(KEYWORD_SET)) {
+      pos=parseSetFields(word,pos,newPos);
     }
- else     pos=newPos;
-    fieldEntries.put(fieldName,OSQLHelper.convertValue(database,fieldValue));
-    newPos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+ else     if (word.toString().equals(KEYWORD_REMOVE)) {
+      pos=parseRemoveFields(word,newPos);
+    }
   }
-  if (fieldEntries.size() == 0)   throw new OCommandSQLParsingException("Set of entries <field> = <value> is missed. Example: name = 'Bill', salary = 300.2",text,pos);
   String whereCondition=word.toString();
-  if (whereCondition.equals(OSQLHelper.KEYWORD_WHERE))   query=database.command(new OSQLAsynchQuery<ODocument>("select from " + className + text.substring(pos),this));
+  if (whereCondition.equals(OSQLHelper.KEYWORD_WHERE))   query=database.command(new OSQLAsynchQuery<ODocument>("select from " + className + " where "+ text.substring(pos),this));
  else   query=database.command(new OSQLAsynchQuery<ODocument>("select from " + className,this));
   return this;
 }

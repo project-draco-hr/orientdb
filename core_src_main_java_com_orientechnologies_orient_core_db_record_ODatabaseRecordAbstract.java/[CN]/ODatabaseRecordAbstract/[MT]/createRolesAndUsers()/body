@@ -1,26 +1,31 @@
 {
-  final int metadataClusterId=getClusterIdByName(OStorage.CLUSTER_METADATA_NAME);
-  metadata.getSchema().createClass("ORole",metadataClusterId);
-  metadata.getSchema().createClass("OUser",metadataClusterId);
-  final ORole role=metadata.getSecurity().createRole("admin",ORole.ALLOW_MODES.ALLOW_ALL_BUT);
-  user=metadata.getSecurity().createUser("admin","admin",new String[]{role.getName()});
+  final OClass role=metadata.getSchema().createClass("ORole");
+  metadata.getSchema().createClass("OUser").createProperty("roles",OType.LINKSET,role);
+  metadata.getSchema().save();
+  final ORole adminRole=metadata.getSecurity().createRole("admin",ORole.ALLOW_MODES.ALLOW_ALL_BUT);
+  user=metadata.getSecurity().createUser("admin","admin",new String[]{adminRole.getName()});
   final ORole readerRole=metadata.getSecurity().createRole("reader",ORole.ALLOW_MODES.DENY_ALL_BUT);
   readerRole.addRule(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);
   readerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".metadata",ORole.PERMISSION_NONE);
+  readerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".ouser",ORole.PERMISSION_NONE);
+  readerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".orole",ORole.PERMISSION_NONE);
   readerRole.addRule(ODatabaseSecurityResources.ALL_CLASSES,ORole.PERMISSION_READ);
   readerRole.addRule(ODatabaseSecurityResources.ALL_CLUSTERS,ORole.PERMISSION_READ);
   readerRole.addRule(ODatabaseSecurityResources.QUERY,ORole.PERMISSION_READ);
   readerRole.addRule(ODatabaseSecurityResources.COMMAND,ORole.PERMISSION_READ);
   readerRole.addRule(ODatabaseSecurityResources.RECORD_HOOK,ORole.PERMISSION_READ);
+  readerRole.save();
   metadata.getSecurity().createUser("reader","reader",new String[]{readerRole.getName()});
   final ORole writerRole=metadata.getSecurity().createRole("writer",ORole.ALLOW_MODES.DENY_ALL_BUT);
   writerRole.addRule(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);
   writerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".metadata",ORole.PERMISSION_NONE);
+  writerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".ouser",ORole.PERMISSION_NONE);
+  writerRole.addRule(ODatabaseSecurityResources.CLUSTER + ".orole",ORole.PERMISSION_NONE);
   writerRole.addRule(ODatabaseSecurityResources.ALL_CLASSES,ORole.PERMISSION_ALL);
   writerRole.addRule(ODatabaseSecurityResources.ALL_CLUSTERS,ORole.PERMISSION_ALL);
   writerRole.addRule(ODatabaseSecurityResources.QUERY,ORole.PERMISSION_READ);
   writerRole.addRule(ODatabaseSecurityResources.COMMAND,ORole.PERMISSION_ALL);
   writerRole.addRule(ODatabaseSecurityResources.RECORD_HOOK,ORole.PERMISSION_ALL);
+  writerRole.save();
   metadata.getSecurity().createUser("writer","writer",new String[]{writerRole.getName()});
-  metadata.getSecurity().save();
 }

@@ -9,12 +9,15 @@ case EMBEDDEDSET:
       Collection<Object> coll=iType == OType.EMBEDDEDLIST ? new ArrayList<Object>() : new HashSet<Object>();
       if (value.length() == 0)       return coll;
       String[] items=OStringSerializerHelper.split(value,OStringSerializerHelper.RECORD_SEPARATOR_AS_CHAR);
-      if (iLinkedClass != null)       for (      String item : items) {
-        coll.add(fromString(iDatabase,item,new ODocument(iDatabase,iLinkedClass.getName())));
-      }
+      for (      String item : items) {
+        if (iLinkedClass != null) {
+          coll.add(fromString(iDatabase,item,new ODocument(iDatabase,iLinkedClass.getName())));
+        }
+ else         if (item.length() > 0 && item.charAt(0) == OStringSerializerHelper.EMBEDDED) {
+          coll.add(OStringSerializerHelper.fieldTypeFromStream(iLinkedType,item.substring(1,item.length() - 1)));
+        }
  else {
-        if (iLinkedType == null)         throw new IllegalArgumentException("Linked type can't be null. Probably the serialized type has not stored the type along with data");
-        for (        String item : items) {
+          if (iLinkedType == null)           throw new IllegalArgumentException("Linked type can't be null. Probably the serialized type has not stored the type along with data");
           coll.add(OStringSerializerHelper.fieldTypeFromStream(iLinkedType,item));
         }
       }
@@ -56,18 +59,23 @@ case EMBEDDEDMAP:
       entry=item.split(OStringSerializerHelper.ENTRY_SEPARATOR);
       if (entry.length > 0) {
         mapValue=entry[1];
-        if (mapValue.contains(ORID.SEPARATOR)) {
-          iLinkedType=OType.LINK;
-          int classSeparatorPos=value.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
-          if (classSeparatorPos > -1) {
-            String className=value.substring(1,classSeparatorPos);
-            if (className != null)             iLinkedClass=iDatabase.getMetadata().getSchema().getClass(className);
+        if (mapValue.length() > 0) {
+          if (mapValue.startsWith(OStringSerializerHelper.LINK)) {
+            iLinkedType=OType.LINK;
+            int classSeparatorPos=value.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
+            if (classSeparatorPos > -1) {
+              String className=value.substring(1,classSeparatorPos);
+              if (className != null)               iLinkedClass=iDatabase.getMetadata().getSchema().getClass(className);
+            }
           }
+ else           if (mapValue.charAt(0) == OStringSerializerHelper.EMBEDDED) {
+            iLinkedType=OType.EMBEDDED;
+          }
+ else           if (Character.isDigit(mapValue.charAt(0)) || mapValue.charAt(0) == '+' || mapValue.charAt(0) == '-') {
+            iLinkedType=getNumber(iUnusualSymbols,mapValue);
+          }
+ else           if (mapValue.charAt(0) == '\'' || mapValue.charAt(0) == '"')           iLinkedType=OType.STRING;
         }
- else         if (Character.isDigit(mapValue.charAt(0)) || mapValue.charAt(0) == '+' || mapValue.charAt(0) == '-') {
-          iLinkedType=getNumber(iUnusualSymbols,mapValue);
-        }
- else         if (mapValue.charAt(0) == '\'' || mapValue.charAt(0) == '"')         iLinkedType=OType.STRING;
  else         iLinkedType=OType.EMBEDDED;
         map.put((String)OStringSerializerHelper.fieldTypeFromStream(OType.STRING,entry[0]),OStringSerializerHelper.fieldTypeFromStream(iLinkedType,mapValue));
       }

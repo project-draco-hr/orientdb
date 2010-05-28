@@ -2,13 +2,25 @@
   StringBuilder buffer=new StringBuilder();
   char stringBeginChar=' ';
   char c;
-  boolean insideCollection=false;
-  boolean insideMap=false;
+  boolean insideEmbedded=false;
+  int insideCollection=0;
+  int insideMap=0;
   ArrayList<String> parts=new ArrayList<String>();
   for (int i=0; i < iSource.length(); ++i) {
     c=iSource.charAt(i);
     if (stringBeginChar == ' ') {
-      if (!insideCollection && !insideMap) {
+      if (c == COLLECTION_BEGIN)       insideCollection++;
+ else       if (c == MAP_BEGIN)       insideMap++;
+ else       if (c == COLLECTION_END) {
+        if (insideCollection == 0)         throw new OSerializationException("Found invalid " + COLLECTION_END + " character. Assure to open and close correctly.");
+        insideCollection--;
+      }
+ else       if (c == MAP_END) {
+        if (insideMap == 0)         throw new OSerializationException("Found invalid " + MAP_END + " character. Assure to open and close correctly.");
+        insideMap--;
+      }
+ else       if (c == EMBEDDED)       insideEmbedded=!insideEmbedded;
+      if (insideCollection == 0 && insideMap == 0 && !insideEmbedded) {
         if (c == '\'' || c == '"') {
           stringBeginChar=c;
         }
@@ -17,12 +29,6 @@
           buffer.setLength(0);
           continue;
         }
- else         if (c == COLLECTION_BEGIN)         insideCollection=true;
- else         if (c == MAP_BEGIN)         insideMap=true;
-      }
- else {
-        if (insideCollection && c == COLLECTION_END)         insideCollection=false;
- else         if (insideMap && c == MAP_END)         insideMap=false;
       }
     }
  else {

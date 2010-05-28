@@ -1,24 +1,24 @@
 {
   final byte result=network.readByte();
   if (result == OChannelBinaryProtocol.ERROR) {
-    final String excClassName=network.readString();
-    final String excMessage=network.readString();
-    Constructor c=null;
-    try {
-      final Class<RuntimeException> excClass=(Class<RuntimeException>)Class.forName(excClassName);
-      c=excClass.getConstructor(String.class);
+    StringBuilder buffer=new StringBuilder();
+    boolean moreDetails=false;
+    String rootClassName=null;
+    do {
+      final String excClassName=network.readString();
+      final String excMessage=network.readString();
+      if (!moreDetails) {
+        rootClassName=excClassName;
+      }
+ else {
+        buffer.append("\n-> ");
+        buffer.append(excClassName);
+        buffer.append(": ");
+      }
+      buffer.append(excMessage);
+      moreDetails=network.readByte() == 1;
     }
- catch (    Exception e) {
-      throw new OStorageException(excMessage,null);
-    }
-    if (c != null)     try {
-      throw (RuntimeException)c.newInstance(excMessage);
-    }
- catch (    InstantiationException e) {
-    }
-catch (    IllegalAccessException e) {
-    }
-catch (    InvocationTargetException e) {
-    }
+ while (moreDetails);
+    throw createException(rootClassName,buffer.toString());
   }
 }

@@ -1,29 +1,37 @@
 {
   checkOpeness();
-  if (!iContent.isDirty())   return;
-  final ORecordId rid=(ORecordId)iContent.getIdentity();
+  if (!iRecord.isDirty())   return;
+  final ORecordId rid=(ORecordId)iRecord.getIdentity();
   if (rid == null)   throw new ODatabaseException("Can't create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   try {
     final int clusterId;
+    final byte[] stream=iRecord.toStream();
     boolean isNew=!rid.isValid();
     if (isNew) {
       clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
       checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,clusterId);
+      callbackHooks(TYPE.BEFORE_CREATE,iRecord);
     }
  else {
       clusterId=rid.clusterId;
       checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName,clusterId);
+      callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
     }
-    final byte[] stream=iContent.toStream();
-    long result=underlying.save(clusterId,rid.getClusterPosition(),stream,iVersion,iContent.getRecordType());
-    if (isNew)     iContent.fill(iContent.getDatabase(),clusterId,result,0);
- else     iContent.fill(iContent.getDatabase(),clusterId,rid.getClusterPosition(),(int)result);
-    iContent.unsetDirty();
+    long result=underlying.save(clusterId,rid.getClusterPosition(),stream,iVersion,iRecord.getRecordType());
+    iRecord.unsetDirty();
+    if (isNew) {
+      iRecord.fill(iRecord.getDatabase(),clusterId,result,0);
+      callbackHooks(TYPE.AFTER_CREATE,iRecord);
+    }
+ else {
+      iRecord.fill(iRecord.getDatabase(),clusterId,rid.getClusterPosition(),(int)result);
+      callbackHooks(TYPE.AFTER_UPDATE,iRecord);
+    }
   }
  catch (  ODatabaseException e) {
     throw e;
   }
 catch (  Throwable t) {
-    throw new ODatabaseException("Error on saving record in cluster #" + iContent.getIdentity().getClusterId(),t);
+    throw new ODatabaseException("Error on saving record in cluster #" + iRecord.getIdentity().getClusterId(),t);
   }
 }

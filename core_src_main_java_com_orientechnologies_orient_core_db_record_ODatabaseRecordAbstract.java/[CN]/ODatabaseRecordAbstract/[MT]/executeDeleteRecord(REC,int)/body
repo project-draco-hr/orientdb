@@ -1,17 +1,19 @@
 {
   checkOpeness();
-  ORecordId rid=(ORecordId)iContent.getIdentity();
+  ORecordId rid=(ORecordId)iRecord.getIdentity();
   if (rid == null)   throw new ODatabaseException("Can't delete record because it has no identity. Probably was created from scratch or contains projections of fields rather than a full record");
-  final int clusterId=iContent.getIdentity().getClusterId();
+  final int clusterId=iRecord.getIdentity().getClusterId();
   checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_DELETE,getClusterNameById(clusterId),clusterId);
   try {
-    underlying.delete(iContent.getIdentity().getClusterId(),iContent.getIdentity().getClusterPosition(),iVersion);
+    callbackHooks(TYPE.BEFORE_DELETE,iRecord);
+    underlying.delete(iRecord.getIdentity().getClusterId(),iRecord.getIdentity().getClusterPosition(),iVersion);
     if (underlying.isUseCache())     getCache().removeRecord(rid.toString());
+    callbackHooks(TYPE.AFTER_DELETE,iRecord);
   }
  catch (  ODatabaseException e) {
     throw e;
   }
 catch (  Throwable t) {
-    throw new ODatabaseException("Error on deleting record in cluster #" + iContent.getIdentity().getClusterId(),t);
+    throw new ODatabaseException("Error on deleting record in cluster #" + iRecord.getIdentity().getClusterId(),t);
   }
 }

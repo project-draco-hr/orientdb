@@ -2,17 +2,24 @@
   db=new ODatabaseDocumentTx("local:C:/work/dev/orientechnologies/orientdb/temp/danny/library/library");
   try {
     db.create();
-    dependents=db.getMetadata().getSchema().createClass("Dependents");
-    dependents.createProperty("type",OType.STRING);
-    dependents.createProperty("dependents",OType.EMBEDDEDLIST,OType.STRING);
     master=db.getMetadata().getSchema().createClass("Master");
     master.createProperty("type",OType.STRING);
-    master.createProperty("master",OType.STRING);
+    master.createProperty("master",OType.LONG);
+    dependents=db.getMetadata().getSchema().createClass("Dependents");
+    dependents.createProperty("type",OType.STRING);
+    dependents.createProperty("dependents",OType.EMBEDDEDLIST,master);
     db.getMetadata().getSchema().save();
     db.close();
     db.open("admin","admin");
     dependents=db.getMetadata().getSchema().getClass("Dependents");
     master=db.getMetadata().getSchema().getClass("Master");
+    new ODocument(db,"Dependents").field("dependents",new ODocument[]{new ODocument(db,"Master").field("mastertype","Title").field("master",4151788013272153098L)}).save();
+    db.close();
+    db.open("admin","admin");
+    for (    ODocument doc : db.browseClass("Dependents")) {
+      System.out.println(doc);
+      for (      ODocument emb : (Iterable<ODocument>)doc.field("dependents"))       Assert.assertEquals(emb.field("master"),4151788013272153098L);
+    }
     db.close();
   }
  catch (  Exception e) {

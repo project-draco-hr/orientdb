@@ -8,6 +8,11 @@
     if (record instanceof ORecordSchemaAware<?>)     ((ORecordSchemaAware<?>)record).setClassName(cls.getName());
     clusterIds=cls.getClusterIds();
     for (    int clusterId : clusterIds)     database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,database.getClusterNameById(clusterId),clusterId);
+    List<ORecord<?>> resultSet=searchForIndexes(cls);
+    if (resultSet.size() > 0) {
+      for (      ORecord<?> record : resultSet)       request.getResultListener().result(record.copy());
+    }
+ else     scanClusters(clusterIds);
   }
  else {
     String firstCluster=compiledFilter.getClusters().size() > 0 ? compiledFilter.getClusters().keySet().iterator().next() : null;
@@ -15,7 +20,7 @@
     if (Character.isDigit(firstCluster.charAt(0)))     clusterIds=OStringSerializerHelper.splitIntArray(firstCluster);
  else     clusterIds=new int[]{database.getClusterIdByName(firstCluster.toLowerCase())};
     database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,firstCluster.toLowerCase(),clusterIds[0]);
+    scanClusters(clusterIds);
   }
-  ((OStorageLocal)database.getStorage()).browse(database.getId(),clusterIds,this,record,false);
   return null;
 }

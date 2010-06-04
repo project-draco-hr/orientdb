@@ -4,28 +4,36 @@
   final ORecordId rid=(ORecordId)iRecord.getIdentity();
   if (rid == null)   throw new ODatabaseException("Can't create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   try {
-    final int clusterId;
     final byte[] stream=iRecord.toStream();
     boolean isNew=!rid.isValid();
-    if (isNew) {
-      clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
-      checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,clusterId);
-      callbackHooks(TYPE.BEFORE_CREATE,iRecord);
-    }
+    final int clusterId;
+    if (isNew)     clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
+ else     clusterId=rid.clusterId;
+    if (stream.length > 0) {
+      if (isNew) {
+        checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,clusterId);
+        callbackHooks(TYPE.BEFORE_CREATE,iRecord);
+      }
  else {
-      clusterId=rid.clusterId;
-      checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName,clusterId);
-      callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
+        checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName,clusterId);
+        callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
+      }
+      if (!iRecord.isDirty()) {
+        if (underlying.isUseCache())         getCache().addRecord(iRecord.getIdentity().toString(),new ORawBuffer(iRecord.toStream(),iRecord.getVersion(),iRecordType));
+        return;
+      }
     }
     long result=underlying.save(clusterId,rid.getClusterPosition(),stream,iVersion,iRecord.getRecordType());
-    iRecord.unsetDirty();
+    if (stream.length > 0)     iRecord.unsetDirty();
     if (isNew) {
       iRecord.fill(iRecord.getDatabase(),clusterId,result,0);
-      callbackHooks(TYPE.AFTER_CREATE,iRecord);
+      iRecord.setStatus(STATUS.LOADED);
+      if (stream.length > 0)       callbackHooks(TYPE.AFTER_CREATE,iRecord);
     }
  else {
       iRecord.fill(iRecord.getDatabase(),clusterId,rid.getClusterPosition(),(int)result);
-      callbackHooks(TYPE.AFTER_UPDATE,iRecord);
+      iRecord.setStatus(STATUS.LOADED);
+      if (stream.length > 0)       callbackHooks(TYPE.AFTER_UPDATE,iRecord);
     }
   }
  catch (  ODatabaseException e) {

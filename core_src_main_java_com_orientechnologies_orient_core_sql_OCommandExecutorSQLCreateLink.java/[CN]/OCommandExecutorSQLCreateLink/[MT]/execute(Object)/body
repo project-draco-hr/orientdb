@@ -9,7 +9,12 @@
   Object value;
   String cmd="select from " + destClassName + " where "+ destField+ " = ";
   List<ODocument> result;
+  ODocument target;
+  Object oldValue;
   long total=0;
+  if (linkName == null)   linkName=sourceField;
+  boolean inverse=linkType != null && linkType.equalsIgnoreCase("inverse");
+  boolean multipleRelationship=false;
   for (  ODocument doc : db.browseClass(sourceClass.getName())) {
     value=doc.field(sourceField);
     if (value != null) {
@@ -19,26 +24,61 @@
       }
  else {
         if (value instanceof String) {
+          target=null;
           if (((String)value).length() == 0)           value=null;
  else {
             value="'" + value + "'";
             result=database.command(new OSQLSynchQuery<ODocument>(cmd + value)).execute();
             if (result == null || result.size() == 0)             value=null;
  else             if (result.size() > 1)             throw new OCommandExecutionException("Can't create link because multiple records was found in class '" + destClass.getName() + "' with value "+ value+ " in field '"+ destField+ "'");
- else             value=result.get(0);
+ else {
+              target=result.get(0);
+              value=target;
+            }
           }
-          doc.field(sourceField,value);
-          doc.save();
+          if (target != null && inverse) {
+            oldValue=target.field(linkName);
+            if (oldValue != null) {
+              if (!multipleRelationship)               multipleRelationship=true;
+              Collection<ODocument> coll;
+              if (oldValue instanceof Collection) {
+                coll=(Collection<ODocument>)oldValue;
+                target.setDirty();
+              }
+ else {
+                coll=new ArrayList<ODocument>(2);
+                target.field(linkName,coll);
+                coll.add((ODocument)oldValue);
+              }
+              coll.add(doc);
+            }
+ else {
+              target.field(linkName,doc);
+            }
+            target.save();
+          }
+ else {
+            doc.field(linkName,value);
+            doc.save();
+          }
           total++;
         }
       }
     }
   }
   if (total > 0) {
-    OProperty prop=sourceClass.getProperty(sourceField);
-    if (prop != null)     sourceClass.removeProperty(sourceField);
-    sourceClass.createProperty(sourceField,OType.LINK,destClass);
-    database.getMetadata().getSchema().save();
+    if (inverse) {
+      OProperty prop=destClass.getProperty(linkName);
+      if (prop != null)       destClass.removeProperty(linkName);
+      destClass.createProperty(linkName,multipleRelationship ? OType.LINKLIST : OType.LINK,sourceClass);
+      database.getMetadata().getSchema().save();
+    }
+ else {
+      OProperty prop=sourceClass.getProperty(linkName);
+      if (prop != null)       sourceClass.removeProperty(linkName);
+      sourceClass.createProperty(linkName,OType.LINK,destClass);
+      database.getMetadata().getSchema().save();
+    }
   }
   return total;
 }

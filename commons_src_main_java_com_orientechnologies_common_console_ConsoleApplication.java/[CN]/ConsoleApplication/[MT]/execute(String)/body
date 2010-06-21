@@ -1,6 +1,6 @@
 {
   iCommand=iCommand.trim();
-  String[] commandWords=OStringParser.getWords(iCommand,wordSeparator);
+  final String[] commandWords=OStringParser.getWords(iCommand,wordSeparator);
   for (  String cmd : helpCommands)   if (cmd.equals(commandWords[0])) {
     help();
     return true;
@@ -10,6 +10,8 @@
   }
   String methodName;
   ConsoleCommand ann;
+  Method lastMethodInvoked=null;
+  StringBuilder lastCommandInvoked=new StringBuilder();
   for (  Method m : getConsoleMethods()) {
     methodName=m.getName();
     ann=m.getAnnotation(ConsoleCommand.class);
@@ -50,12 +52,13 @@
       m.invoke(this,methodArgs);
     }
  catch (    IllegalArgumentException e) {
-      StringBuilder cmd=new StringBuilder();
+      lastMethodInvoked=m;
+      lastCommandInvoked.setLength(0);
       for (int i=0; i < commandWordCount; ++i) {
-        if (cmd.length() > 0)         cmd.append(" ");
-        cmd.append(commandWords[i]);
+        if (lastCommandInvoked.length() > 0)         lastCommandInvoked.append(" ");
+        lastCommandInvoked.append(commandWords[i]);
       }
-      syntaxError(cmd.toString(),m);
+      continue;
     }
 catch (    Exception e) {
       if (e.getCause() != null)       onException(e.getCause());
@@ -63,6 +66,7 @@ catch (    Exception e) {
     }
     return true;
   }
+  if (lastMethodInvoked != null)   syntaxError(lastCommandInvoked.toString(),lastMethodInvoked);
   out.println("!Unrecognized command: " + iCommand);
   return true;
 }

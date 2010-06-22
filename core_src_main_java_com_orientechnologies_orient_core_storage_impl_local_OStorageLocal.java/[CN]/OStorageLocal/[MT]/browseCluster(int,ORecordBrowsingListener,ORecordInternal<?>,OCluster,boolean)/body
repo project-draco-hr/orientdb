@@ -9,13 +9,20 @@
       recordBuffer=readRecord(iRequesterId,cluster,positionInPhyCluster,!iLockEntireCluster);
       if (recordBuffer == null)       continue;
       if (recordBuffer.recordType != ODocument.RECORD_TYPE && recordBuffer.recordType != ORecordColumn.RECORD_TYPE)       continue;
-      iRecord.reset();
-      iRecord.setIdentity(cluster.getId(),positionInPhyCluster);
-      iRecord.fromStream(recordBuffer.buffer);
-      if (!iListener.foreach(iRecord))       break;
+      if (ioRecord == null)       ioRecord=ORecordFactory.newInstance(recordBuffer.recordType);
+ else       if (ioRecord.getRecordType() != recordBuffer.recordType) {
+        final ORecordInternal<?> newRecord=ORecordFactory.newInstance(recordBuffer.recordType);
+        newRecord.setDatabase(ioRecord.getDatabase());
+        ioRecord=newRecord;
+      }
+ else       ioRecord.reset();
+      ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
+      ioRecord.fromStream(recordBuffer.buffer);
+      if (!iListener.foreach(ioRecord))       break;
     }
   }
   finally {
     if (iLockEntireCluster)     cluster.unlock();
   }
+  return ioRecord;
 }

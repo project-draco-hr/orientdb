@@ -11,30 +11,41 @@
   dateTimeFormat=read(values[index++]);
   int size=Integer.parseInt(read(values[index++]));
   String clusterType;
+  int clusterId;
+  String clusterName;
   clusters=new ArrayList<OStorageClusterConfiguration>(size);
+  for (int i=0; i < size; ++i)   clusters.add(null);
   OStoragePhysicalClusterConfiguration phyCluster;
   OStorageLogicalClusterConfiguration logCluster;
   for (int i=0; i < size; ++i) {
+    clusterId=Integer.parseInt(read(values[index++]));
+    clusterName=read(values[index++]);
     clusterType=read(values[index++]);
     if (clusterType.equals("p")) {
-      phyCluster=new OStoragePhysicalClusterConfiguration(this,i);
+      phyCluster=new OStoragePhysicalClusterConfiguration(this,clusterId);
+      phyCluster.name=clusterName;
       index=phySegmentFromStream(values,index,phyCluster);
       phyCluster.holeFile=new OStorageClusterHoleConfiguration(phyCluster,read(values[index++]),read(values[index++]),read(values[index++]));
-      clusters.add(phyCluster);
+      clusters.set(clusterId,phyCluster);
     }
  else {
-      logCluster=new OStorageLogicalClusterConfiguration(read(values[index++]),i,Integer.parseInt(read(values[index++])),new ORecordId(values[index++]));
-      clusters.add(logCluster);
+      logCluster=new OStorageLogicalClusterConfiguration(clusterName,clusterId,Integer.parseInt(read(values[index++])),new ORecordId(values[index++]));
+      clusters.set(clusterId,logCluster);
     }
   }
   size=Integer.parseInt(read(values[index++]));
   dataSegments=new ArrayList<OStorageDataConfiguration>(size);
+  for (int i=0; i < size; ++i)   dataSegments.add(null);
+  int dataId;
+  String dataName;
   OStorageDataConfiguration data;
   for (int i=0; i < size; ++i) {
-    data=new OStorageDataConfiguration(this);
+    dataId=Integer.parseInt(read(values[index++]));
+    dataName=read(values[index++]);
+    data=new OStorageDataConfiguration(this,dataName);
     index=phySegmentFromStream(values,index,data);
     data.holeFile=new OStorageDataHoleConfiguration(data,read(values[index++]),read(values[index++]),read(values[index++]));
-    dataSegments.add(data);
+    dataSegments.set(dataId,data);
   }
   txSegment=new OStorageTxConfiguration(read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]));
   size=Integer.parseInt(read(values[index++]));

@@ -159,9 +159,11 @@ case OChannelBinaryProtocol.COMMAND:
 data.commandInfo="Execute remote command";
 final boolean asynch=channel.readByte() == 'a';
 final OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+final OQuery<?> query=(OQuery<?>)(command instanceof OQuery<?> ? command : null);
 data.commandDetail=command.getText();
 if (asynch) {
 final StringBuilder empty=new StringBuilder();
+final Set<ODocument> recordToSend=new HashSet<ODocument>();
 command.setResultListener(new OCommandResultListener(){
 public boolean result(final Object iRecord){
 if (empty.length() == 0) try {
@@ -174,11 +176,36 @@ try {
 channel.writeByte((byte)1);
 writeRecord((ORecordInternal<?>)iRecord);
 channel.flush();
+if (query != null && query.getFetchPlan() != null && iRecord instanceof ODocument) fetchInDeep((ODocument)iRecord,query.getFetchPlan().split(" "),null,0,-1);
 }
  catch (IOException e) {
 return false;
 }
 return true;
+}
+private void fetchInDeep(final ODocument doc,final String[] iFetchPlan,final String iCurrentField,final int iCurrentLevel,final int iMaxFetch){
+if (recordToSend.size() >= iMaxFetch) return;
+String parts[];
+Object fieldValue;
+int depthLevel;
+int currentLevel;
+for (String field : iFetchPlan) {
+parts=field.split(":");
+depthLevel=Integer.parseInt(parts[1]);
+if (depthLevel == 0) continue;
+if (parts[0].equals(iCurrentField)) {
+currentLevel=iCurrentLevel + 1;
+if (depthLevel >= currentLevel) continue;
+}
+ else currentLevel=0;
+if (recordToSend.size() >= iMaxFetch) return;
+fieldValue=doc.field(parts[0]);
+if (fieldValue != null && fieldValue instanceof ODocument) {
+final ODocument linked=(ODocument)fieldValue;
+recordToSend.add(linked);
+fetchInDeep(linked,iFetchPlan,parts[0],currentLevel,iMaxFetch);
+}
+}
 }
 }
 );
@@ -187,6 +214,10 @@ if (empty.length() == 0) try {
 sendOk();
 }
  catch (IOException e1) {
+}
+for (ODocument doc : recordToSend) {
+channel.writeByte((byte)2);
+writeRecord(doc);
 }
 channel.writeByte((byte)0);
 }

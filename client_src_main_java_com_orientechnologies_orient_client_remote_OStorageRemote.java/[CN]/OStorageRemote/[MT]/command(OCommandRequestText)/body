@@ -15,31 +15,38 @@
       network.flush();
       readStatus();
       if (asynch) {
-        while (network.readByte() == 1) {
+        byte status;
+        while ((status=network.readByte()) > 0) {
           ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork(iCommand.getDatabase());
           if (record == null)           break;
-          try {
-            if (!aquery.getResultListener().result(record)) {
-              while (network.in.available() > 0)               network.in.read();
-              break;
+switch (status) {
+case 1:
+            try {
+              if (!aquery.getResultListener().result(record)) {
+                while (network.in.available() > 0)                 network.in.read();
+                break;
+              }
             }
-          }
- catch (          Throwable t) {
-            t.printStackTrace();
-          }
-        }
-      }
+ catch (            Throwable t) {
+              t.printStackTrace();
+            }
+          break;
+case 2:
+        cache.addRecord(record.getIdentity().toString(),new ORawBuffer(record.toStream(),record.getVersion(),record.getRecordType()));
+    }
+  }
+}
  else {
-        final byte type=network.readByte();
+  final byte type=network.readByte();
 switch (type) {
 case 'n':
-          result=null;
-        break;
+    result=null;
+  break;
 case 'r':
-      result=readRecordFromNetwork(iCommand.getDatabase());
-    break;
+result=readRecordFromNetwork(iCommand.getDatabase());
+break;
 case 'a':
-  result=OStreamSerializerAnyRuntime.INSTANCE.fromStream(network.readBytes());
+result=OStreamSerializerAnyRuntime.INSTANCE.fromStream(network.readBytes());
 break;
 }
 }

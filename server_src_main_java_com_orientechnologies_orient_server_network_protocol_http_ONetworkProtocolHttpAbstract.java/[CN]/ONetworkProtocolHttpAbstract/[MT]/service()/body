@@ -9,10 +9,22 @@
     command="";
   }
  else {
-    final int sep=request.url.indexOf("/",1);
-    command=sep == -1 ? request.url.substring(1) : request.url.substring(1,sep);
+    command=request.url.substring(1);
   }
-  OServerCommand cmd=commands.get(request.method + COMMAND_SEPARATOR + command);
+  final String commandString=request.method + COMMAND_SEPARATOR + command;
+  OServerCommand cmd=exactCommands.get(commandString);
+  if (cmd == null) {
+    String partLeft, partRight;
+    for (    Entry<String,OServerCommand> entry : wildcardCommands.entrySet()) {
+      int wildcardPos=entry.getKey().indexOf("*");
+      partLeft=entry.getKey().substring(0,wildcardPos);
+      partRight=entry.getKey().substring(wildcardPos + 1);
+      if (commandString.startsWith(partLeft) && commandString.endsWith(partRight)) {
+        cmd=entry.getValue();
+        break;
+      }
+    }
+  }
   if (cmd != null)   try {
     if (cmd.beforeExecute(request)) {
       cmd.execute(request);

@@ -164,6 +164,17 @@ data.commandDetail=command.getText();
 if (asynch) {
 final StringBuilder empty=new StringBuilder();
 final Set<ODocument> recordToSend=new HashSet<ODocument>();
+final Map<String,Integer> fetchPlan;
+if (query != null && query.getFetchPlan() != null) {
+final String[] planParts=query.getFetchPlan().split(" ");
+fetchPlan=new HashMap<String,Integer>();
+String[] parts;
+for (String planPart : planParts) {
+parts=planPart.split(":");
+fetchPlan.put(parts[0],Integer.parseInt(parts[1]));
+}
+}
+ else fetchPlan=null;
 command.setResultListener(new OCommandResultListener(){
 public boolean result(final Object iRecord){
 if (empty.length() == 0) try {
@@ -176,34 +187,42 @@ try {
 channel.writeByte((byte)1);
 writeRecord((ORecordInternal<?>)iRecord);
 channel.flush();
-if (query != null && query.getFetchPlan() != null && iRecord instanceof ODocument) fetchInDeep((ODocument)iRecord,query.getFetchPlan().split(" "),null,0,-1);
+if (fetchPlan != null && iRecord instanceof ODocument) {
+fetchInDeep((ODocument)iRecord,fetchPlan,null,0,-1);
+}
 }
  catch (IOException e) {
 return false;
 }
 return true;
 }
-private void fetchInDeep(final ODocument doc,final String[] iFetchPlan,final String iCurrentField,final int iCurrentLevel,final int iMaxFetch){
-if (recordToSend.size() >= iMaxFetch) return;
-String parts[];
+private void fetchInDeep(final ODocument doc,final Map<String,Integer> iFetchPlan,final String iCurrentField,final int iCurrentLevel,final int iMaxFetch){
+if (iMaxFetch > -1 && recordToSend.size() >= iMaxFetch) return;
 Object fieldValue;
-int depthLevel;
+Integer depthLevel;
 int currentLevel;
-for (String field : iFetchPlan) {
-parts=field.split(":");
-depthLevel=Integer.parseInt(parts[1]);
-if (depthLevel == 0) continue;
-if (parts[0].equals(iCurrentField)) {
+Integer anyFieldDepthLevel=iFetchPlan.get("*");
+for (String fieldName : doc.fieldNames()) {
+depthLevel=iFetchPlan.get(fieldName);
+if (depthLevel == null) {
+OClass cls=doc.getSchemaClass();
+while (cls != null && depthLevel == null) {
+depthLevel=iFetchPlan.get(cls.getName() + "." + fieldName);
+if (depthLevel == null) cls=cls.getSuperClass();
+}
+}
+if (depthLevel == null) depthLevel=anyFieldDepthLevel;
+ else if (depthLevel == 0) continue;
+if (fieldName.equals(iCurrentField)) {
 currentLevel=iCurrentLevel + 1;
 if (depthLevel >= currentLevel) continue;
 }
  else currentLevel=0;
-if (recordToSend.size() >= iMaxFetch) return;
-fieldValue=doc.field(parts[0]);
+if (iMaxFetch > -1 && recordToSend.size() >= iMaxFetch) return;
+fieldValue=doc.field(fieldName);
 if (fieldValue != null && fieldValue instanceof ODocument) {
 final ODocument linked=(ODocument)fieldValue;
-recordToSend.add(linked);
-fetchInDeep(linked,iFetchPlan,parts[0],currentLevel,iMaxFetch);
+if (recordToSend.add(linked)) fetchInDeep(linked,iFetchPlan,fieldName,currentLevel,iMaxFetch);
 }
 }
 }

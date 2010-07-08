@@ -1,0 +1,31 @@
+{
+  if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)   return;
+  Object fieldValue;
+  Integer depthLevel;
+  int currentLevel;
+  Integer anyFieldDepthLevel=iFetchPlan.get(ANY_FIELD);
+  for (  String fieldName : doc.fieldNames()) {
+    fieldValue=doc.field(fieldName);
+    if (fieldValue == null || !(fieldValue instanceof ODocument))     continue;
+    depthLevel=iFetchPlan.get(fieldName);
+    if (depthLevel == null) {
+      OClass cls=doc.getSchemaClass();
+      while (cls != null && depthLevel == null) {
+        depthLevel=iFetchPlan.get(cls.getName() + "." + fieldName);
+        if (depthLevel == null)         cls=cls.getSuperClass();
+      }
+    }
+    if (depthLevel == null)     depthLevel=anyFieldDepthLevel;
+ else     if (depthLevel == 0)     continue;
+    if (fieldName.equals(iCurrentField)) {
+      currentLevel=iCurrentLevel + 1;
+      if (depthLevel >= currentLevel)       continue;
+    }
+ else     currentLevel=0;
+    if (fieldValue instanceof ODocument) {
+      final ODocument linked=(ODocument)fieldValue;
+      if (iListener.fetchLinked(doc,fieldName,linked))       fetch(linked,iFetchPlan,fieldName,currentLevel,iMaxFetch,iListener);
+    }
+    if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)     return;
+  }
+}

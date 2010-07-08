@@ -1,0 +1,30 @@
+{
+  if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)   return;
+  Object fieldValue;
+  Integer depthLevel;
+  int currentLevel;
+  Integer anyFieldDepthLevel=iFetchPlan != null ? iFetchPlan.get(ANY_FIELD) : -1;
+  for (  String fieldName : iRootRecord.fieldNames()) {
+    fieldValue=iRootRecord.field(fieldName);
+    if (fieldValue == null || !(fieldValue instanceof ODocument) && (!(fieldValue instanceof Collection<?>) || ((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof ODocument)))     continue;
+    depthLevel=getDepthLevel(iRootRecord,iFetchPlan,fieldName);
+    if (depthLevel == null)     depthLevel=anyFieldDepthLevel;
+ else     if (depthLevel == 0)     continue;
+    if (fieldName.equals(iCurrentField)) {
+      currentLevel=iCurrentLevel + 1;
+      if (depthLevel >= currentLevel)       continue;
+    }
+ else     currentLevel=0;
+    Object userObject;
+    if (fieldValue instanceof ODocument) {
+      final ODocument linked=(ODocument)fieldValue;
+      userObject=iListener.fetchLinked(iRootRecord,iUserObject,fieldName,linked);
+      if (userObject != null)       fetch(linked,userObject,iFetchPlan,fieldName,currentLevel,iMaxFetch,iListener);
+    }
+ else     if (fieldValue instanceof Collection<?>) {
+      final Collection<ODocument> linked=(Collection<ODocument>)fieldValue;
+      userObject=iListener.fetchLinked(iRootRecord,iUserObject,fieldName,linked);
+    }
+    if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)     return;
+  }
+}

@@ -5,29 +5,33 @@ synchronized (classes) {
     classes.put(iClass.getName(),properties);
     String fieldName;
     int fieldModifier;
-    for (Class<?> currentClass=iClass; currentClass != Object.class; currentClass=currentClass.getSuperclass())     for (    Field f : currentClass.getDeclaredFields()) {
-      fieldModifier=f.getModifiers();
-      if (Modifier.isStatic(fieldModifier) || Modifier.isNative(fieldModifier) || Modifier.isTransient(fieldModifier))       continue;
-      properties.add(f);
-      fieldName=f.getName();
-      try {
-        String getterName="get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        Method m=currentClass.getMethod(getterName,NO_ARGS);
-        getters.put(iClass.getName() + "." + fieldName,m);
+    for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
+      for (      Field f : currentClass.getDeclaredFields()) {
+        fieldModifier=f.getModifiers();
+        if (Modifier.isStatic(fieldModifier) || Modifier.isNative(fieldModifier) || Modifier.isTransient(fieldModifier))         continue;
+        properties.add(f);
+        fieldName=f.getName();
+        try {
+          String getterName="get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+          Method m=currentClass.getMethod(getterName,NO_ARGS);
+          getters.put(iClass.getName() + "." + fieldName,m);
+        }
+ catch (        Exception e) {
+          if (!f.isAccessible())           f.setAccessible(true);
+          getters.put(iClass.getName() + "." + fieldName,f);
+        }
+        try {
+          String getterName="set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+          Method m=currentClass.getMethod(getterName,f.getType());
+          setters.put(iClass.getName() + "." + fieldName,m);
+        }
+ catch (        Exception e) {
+          if (!f.isAccessible())           f.setAccessible(true);
+          setters.put(iClass.getName() + "." + fieldName,f);
+        }
       }
- catch (      Exception e) {
-        if (!f.isAccessible())         f.setAccessible(true);
-        getters.put(iClass.getName() + "." + fieldName,f);
-      }
-      try {
-        String getterName="set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        Method m=currentClass.getMethod(getterName,f.getType());
-        setters.put(iClass.getName() + "." + fieldName,m);
-      }
- catch (      Exception e) {
-        if (!f.isAccessible())         f.setAccessible(true);
-        setters.put(iClass.getName() + "." + fieldName,f);
-      }
+      currentClass=currentClass.getSuperclass();
+      if (currentClass.equals(ODocument.class))       currentClass=Object.class;
     }
     return properties;
   }

@@ -5,30 +5,37 @@ synchronized (classes) {
     classes.put(iClass.getName(),properties);
     String fieldName;
     int fieldModifier;
+    OBind bindAnnotation;
+    boolean autoBinding;
     for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
       for (      Field f : currentClass.getDeclaredFields()) {
         fieldModifier=f.getModifiers();
         if (Modifier.isStatic(fieldModifier) || Modifier.isNative(fieldModifier) || Modifier.isTransient(fieldModifier))         continue;
         properties.add(f);
         fieldName=f.getName();
-        try {
+        bindAnnotation=f.getAnnotation(OBind.class);
+        autoBinding=bindAnnotation == null || bindAnnotation.mode() == MODES.AUTO;
+        if (autoBinding)         try {
           String getterName="get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
           Method m=currentClass.getMethod(getterName,NO_ARGS);
           getters.put(iClass.getName() + "." + fieldName,m);
         }
  catch (        Exception e) {
-          if (!f.isAccessible())           f.setAccessible(true);
-          getters.put(iClass.getName() + "." + fieldName,f);
+          registerFieldGetter(iClass,fieldName,f);
         }
-        try {
+ else         registerFieldGetter(iClass,fieldName,f);
+        if (autoBinding)         try {
           String getterName="set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
           Method m=currentClass.getMethod(getterName,f.getType());
           setters.put(iClass.getName() + "." + fieldName,m);
         }
  catch (        Exception e) {
-          if (!f.isAccessible())           f.setAccessible(true);
-          setters.put(iClass.getName() + "." + fieldName,f);
+          registerFieldSetter(iClass,fieldName,f);
         }
+ else         registerFieldSetter(iClass,fieldName,f);
+      }
+      for (      Method m : currentClass.getDeclaredMethods()) {
+        if (m.getAnnotation(PostConstruct.class) != null)         initMethods.put(iClass.getName(),m);
       }
       currentClass=currentClass.getSuperclass();
       if (currentClass.equals(ODocument.class))       currentClass=Object.class;

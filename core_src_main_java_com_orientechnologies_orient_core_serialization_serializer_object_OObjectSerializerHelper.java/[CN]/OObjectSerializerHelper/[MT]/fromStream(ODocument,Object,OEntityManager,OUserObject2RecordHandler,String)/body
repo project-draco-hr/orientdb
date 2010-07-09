@@ -5,11 +5,13 @@
   if (properties == null)   properties=registerClass(c);
   String fieldName;
   Object fieldValue;
-  if (iRecord.getStatus() == STATUS.NOT_LOADED)   iRecord.load();
+  if (iRecord.getInternalStatus() == STATUS.NOT_LOADED)   iRecord.load();
   for (  Field p : properties) {
     fieldName=p.getName();
-    fieldValue=iRecord.field(fieldName);
-    if (fieldValue == null || !(fieldValue instanceof ODocument) || (fieldValue instanceof Collection<?> && (((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof ODocument))))     setFieldValue(iPojo,fieldName,fieldValue);
+    if (iRecord.containsField(fieldName)) {
+      fieldValue=iRecord.field(fieldName);
+      if (fieldValue == null || !(fieldValue instanceof ODocument) || (fieldValue instanceof Collection<?> && (((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof ODocument))))       setFieldValue(iPojo,fieldName,fieldValue);
+    }
   }
   final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(iFetchPlan);
   OFetchHelper.fetch(iRecord,iPojo,fetchPlan,null,0,-1,new OFetchListener(){
@@ -49,6 +51,15 @@
     }
   }
 );
+  final Method initMethod=initMethods.get(c.getName());
+  if (initMethod != null) {
+    try {
+      initMethod.invoke(iPojo);
+    }
+ catch (    Exception e) {
+      throw new OConfigurationException("Error on initializing pojo of class '" + c.getName() + "' after unmarshalling",e);
+    }
+  }
   OProfiler.getInstance().stopChrono("Object.fromStream",timer);
   return iPojo;
 }

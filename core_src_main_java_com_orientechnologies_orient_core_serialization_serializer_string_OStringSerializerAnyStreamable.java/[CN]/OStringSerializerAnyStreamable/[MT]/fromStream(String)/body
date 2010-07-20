@@ -1,16 +1,24 @@
 {
   if (iStream == null || iStream.length() == 0)   return null;
+  OSerializableStream instance=null;
   int pos=iStream.indexOf(OStreamSerializerHelper.SEPARATOR);
-  if (pos < 0)   OLogManager.instance().error(this,"Class signature not found in ANY element: " + iStream,OSerializationException.class);
-  final String className=iStream.substring(0,pos);
+  if (pos < 0)   instance=new ODocument();
+ else {
+    final String className=iStream.substring(0,pos);
+    try {
+      final Class<?> clazz=Class.forName(className);
+      instance=(OSerializableStream)clazz.newInstance();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"Error on unmarshalling content. Class: " + className,e,OSerializationException.class);
+    }
+  }
   try {
-    Class<?> clazz=Class.forName(className);
-    OSerializableStream instance=(OSerializableStream)clazz.newInstance();
     instance.fromStream(OBinaryProtocol.string2bytes(iStream.substring(pos + 1)));
     return instance;
   }
- catch (  Exception e) {
-    OLogManager.instance().error(this,"Error on unmarshalling content. Class: " + className,e,OSerializationException.class);
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on unmarshalling embedded instance. Class: " + instance.getClass().getName(),e,OSerializationException.class);
   }
   return null;
 }

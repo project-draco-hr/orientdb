@@ -2,9 +2,23 @@
   if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"[checkSecurity] Check permissions for resource '%s', target(s) '%s', operation '%s'",iResourceGeneric,Arrays.toString(iResourcesSpecific),iOperation);
   if (user != null) {
     try {
-      ORole role=user.allow(iResourceGeneric + "." + ODatabaseSecurityResources.ALL,iOperation);
-      for (      Object target : iResourcesSpecific)       if (target != null && user.isRuleDefined(iResourceGeneric + "." + target.toString())) {
-        role=user.allow(iResourceGeneric + "." + target.toString(),iOperation);
+      final StringBuilder keyBuffer=new StringBuilder();
+      String key;
+      keyBuffer.append(iResourceGeneric);
+      keyBuffer.append('.');
+      keyBuffer.append(ODatabaseSecurityResources.ALL);
+      ORole role=user.allow(keyBuffer.toString(),iOperation);
+      for (      Object target : iResourcesSpecific) {
+        if (target != null) {
+          keyBuffer.setLength(0);
+          keyBuffer.append(iResourceGeneric);
+          keyBuffer.append('.');
+          keyBuffer.append(target.toString());
+          key=keyBuffer.toString();
+          if (user.isRuleDefined(key)) {
+            role=user.allow(key,iOperation);
+          }
+        }
       }
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"[checkSecurity] Granted permission for resource '%s', target(s) '%s', operation '%s' by role: %s",iResourceGeneric,Arrays.toString(iResourcesSpecific),iOperation,role.getName());
     }

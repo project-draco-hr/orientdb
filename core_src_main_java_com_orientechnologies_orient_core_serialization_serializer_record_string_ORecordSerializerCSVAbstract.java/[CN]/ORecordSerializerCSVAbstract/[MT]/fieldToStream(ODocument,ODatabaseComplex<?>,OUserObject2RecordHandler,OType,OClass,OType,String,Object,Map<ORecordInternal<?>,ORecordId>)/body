@@ -1,15 +1,75 @@
 {
   StringBuilder buffer=new StringBuilder();
 switch (iType) {
-case EMBEDDED:
-    if (iValue instanceof ODocument)     buffer.append(toString((ODocument)iValue,null,iObjHandler,iMarshalledRecords));
- else     if (iValue != null)     buffer.append(iValue.toString());
-  break;
 case LINK:
 {
-  linkToStream(buffer,iRecord,iValue);
+      final ORID rid=linkToStream(buffer,iRecord,iValue);
+      if (rid != null)       iRecord.field(iName,rid);
+      break;
+    }
+case LINKLIST:
+{
+    buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
+    ORID rid;
+    int items=0;
+    List<Object> coll=(List<Object>)iValue;
+    for (int i=0; i < coll.size(); ++i) {
+      if (items++ > 0)       buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+      rid=linkToStream(buffer,iRecord,coll.get(i));
+      if (rid != null)       coll.set(i,rid);
+    }
+    buffer.append(OStringSerializerHelper.COLLECTION_END);
+    break;
+  }
+case LINKSET:
+{
+  buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
+  ORID rid;
+  int items=0;
+  Set<Object> coll=(Set<Object>)iValue;
+  Map<Object,Object> objToReplace=null;
+  for (  Object item : coll) {
+    if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+    rid=linkToStream(buffer,iRecord,item);
+    if (rid != null) {
+      if (objToReplace == null)       objToReplace=new HashMap<Object,Object>();
+      objToReplace.put(item,rid);
+    }
+  }
+  if (objToReplace != null)   for (  Map.Entry<Object,Object> entry : objToReplace.entrySet()) {
+    coll.remove(entry.getKey());
+    coll.add(entry.getValue());
+  }
+  buffer.append(OStringSerializerHelper.COLLECTION_END);
   break;
 }
+case LINKMAP:
+{
+buffer.append(OStringSerializerHelper.MAP_BEGIN);
+ORID rid;
+int items=0;
+Map<String,Object> map=(Map<String,Object>)iValue;
+Map<String,Object> objToReplace=null;
+for (Map.Entry<String,Object> entry : map.entrySet()) {
+  if (items++ > 0)   buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+  buffer.append(OStringSerializerHelper.fieldTypeToString(OType.STRING,entry.getKey()));
+  buffer.append(OStringSerializerHelper.ENTRY_SEPARATOR);
+  rid=linkToStream(buffer,iRecord,entry.getValue());
+  if (rid != null) {
+    if (objToReplace == null)     objToReplace=new HashMap<String,Object>();
+    objToReplace.put(entry.getKey(),rid);
+  }
+}
+if (objToReplace != null) for (Map.Entry<String,Object> entry : objToReplace.entrySet()) {
+  map.put(entry.getKey(),entry.getValue());
+}
+buffer.append(OStringSerializerHelper.MAP_END);
+break;
+}
+case EMBEDDED:
+if (iValue instanceof ODocument) buffer.append(toString((ODocument)iValue,null,iObjHandler,iMarshalledRecords));
+ else if (iValue != null) buffer.append(iValue.toString());
+break;
 case EMBEDDEDLIST:
 case EMBEDDEDSET:
 {
@@ -23,26 +83,26 @@ int items=0;
 if (iLinkedClass != null) {
 ODocument record;
 for (Entry<String,Object> o : ((Map<String,Object>)iValue).entrySet()) {
-  if (items > 0)   buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-  if (o != null) {
-    if (o instanceof ODocument)     record=(ODocument)o;
- else     record=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord<?>)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
-      public Object getUserObjectByRecord(      ORecordInternal<?> iRecord,      final String iFetchPlan){
-        return iRecord;
-      }
-      public ORecordInternal<?> getRecordByUserObject(      Object iPojo,      boolean iIsMandatory){
-        return new ODocument(iLinkedClass);
-      }
-      public boolean existsUserObjectByRecord(      ORecordInternal<?> iRecord){
-        return false;
-      }
-    }
+if (items > 0) buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+if (o != null) {
+if (o instanceof ODocument) record=(ODocument)o;
+ else record=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord<?>)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+public Object getUserObjectByRecord(ORecordInternal<?> iRecord,final String iFetchPlan){
+  return iRecord;
+}
+public ORecordInternal<?> getRecordByUserObject(Object iPojo,boolean iIsMandatory){
+  return new ODocument(iLinkedClass);
+}
+public boolean existsUserObjectByRecord(ORecordInternal<?> iRecord){
+  return false;
+}
+}
 );
-    buffer.append(OStringSerializerHelper.EMBEDDED);
-    buffer.append(toString(record,null,iObjHandler,iMarshalledRecords));
-    buffer.append(OStringSerializerHelper.EMBEDDED);
-  }
-  items++;
+buffer.append(OStringSerializerHelper.EMBEDDED);
+buffer.append(toString(record,null,iObjHandler,iMarshalledRecords));
+buffer.append(OStringSerializerHelper.EMBEDDED);
+}
+items++;
 }
 }
  else for (Entry<String,Object> o : ((Map<String,Object>)iValue).entrySet()) {
@@ -53,18 +113,6 @@ buffer.append(OStringSerializerHelper.fieldTypeToString(iLinkedType,o.getValue()
 items++;
 }
 buffer.append(OStringSerializerHelper.MAP_END);
-break;
-}
-case LINKLIST:
-case LINKSET:
-{
-buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
-int items=0;
-for (Object link : (Collection<Object>)iValue) {
-if (items++ > 0) buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-linkToStream(buffer,iRecord,link);
-}
-buffer.append(OStringSerializerHelper.COLLECTION_END);
 break;
 }
 default :

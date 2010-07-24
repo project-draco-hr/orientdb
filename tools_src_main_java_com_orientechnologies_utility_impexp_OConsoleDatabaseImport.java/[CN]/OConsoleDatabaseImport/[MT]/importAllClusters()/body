@@ -1,0 +1,38 @@
+{
+  long total=0;
+  jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
+  jsonReader.checkContent("\"clusters\"");
+  jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+  long totalRecords=0;
+  while (jsonReader.lastChar() != ']') {
+    jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
+    jsonReader.checkContent("\"cluster\"");
+    jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+    String name=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"name\"").readString(OJSONReader.COMMA_SEPARATOR);
+    int id=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"id\"").readInteger(OJSONReader.COMMA_SEPARATOR);
+    String type=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"type\"").readString(OJSONReader.NEXT_IN_OBJECT);
+    int clusterId=database.getClusterIdByName(name);
+    if (clusterId == -1) {
+      if (type.equals("PHYSICAL"))       clusterId=database.addPhysicalCluster(name,name,-1);
+ else       clusterId=database.addLogicalCluster(name,database.getDefaultClusterId());
+    }
+    if (clusterId != id)     throw new OSchemaException("Imported cluster '" + name + "' has id="+ clusterId+ " different from the original: "+ id);
+    if (jsonReader.lastChar() != '}') {
+      jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
+      jsonReader.checkContent("\"records\"");
+      jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
+      listener.onMessage("\n- Exporting cluster '" + name + "' -> ");
+      long clusterRecords;
+      for (clusterRecords=0; jsonReader.lastChar() != ']'; ++clusterRecords) {
+        importClusterRecord();
+        if (jsonReader.lastChar() == '}')         jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+      }
+      totalRecords+=clusterRecords;
+      listener.onMessage("OK (" + clusterRecords + " records)");
+      jsonReader.readNext(OJSONReader.END_OBJECT);
+    }
+    jsonReader.readNext(OJSONReader.COMMA_SEPARATOR);
+  }
+  listener.onMessage("\n\nDone. Imported " + totalRecords + " records");
+  return total;
+}

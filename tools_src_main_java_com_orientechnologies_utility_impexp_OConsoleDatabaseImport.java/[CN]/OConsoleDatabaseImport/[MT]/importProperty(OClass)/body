@@ -1,0 +1,36 @@
+{
+  String propName=jsonReader.readNext(OJSONReader.BEGIN_OBJECT).readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"name\"").readString(OJSONReader.COMMA_SEPARATOR);
+  final int id=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"id\"").readInteger(OJSONReader.COMMA_SEPARATOR);
+  final OType type=OType.valueOf(jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"type\"").readString(OJSONReader.NEXT_IN_OBJECT));
+  String attrib;
+  String value;
+  String min=null;
+  String max=null;
+  String linkedClass=null;
+  OType linkedType=null;
+  ORecordId indexRid=null;
+  Boolean indexUnique=null;
+  while (jsonReader.lastChar() == ',') {
+    jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
+    attrib=jsonReader.getValue();
+    value=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
+    if (attrib.equals("\"min\""))     min=value;
+ else     if (attrib.equals("\"max\""))     max=value;
+ else     if (attrib.equals("\"linked-class\""))     linkedClass=value;
+ else     if (attrib.equals("\"linked-type\""))     linkedType=OType.valueOf(value);
+ else     if (attrib.equals("\"index-rid\""))     indexRid=new ORecordId(value);
+ else     if (attrib.equals("\"index-unique\""))     indexUnique=new Boolean(value);
+  }
+  OProperty prop=iClass.getProperty(propName);
+  if (prop == null) {
+    prop=iClass.createProperty(propName,type);
+  }
+ else {
+    if (prop.getId() != id)     throw new OSchemaException("Imported property '" + iClass.getName() + "."+ propName+ "' has an id different from the original: "+ id);
+  }
+  if (min != null)   prop.setMin(min);
+  if (max != null)   prop.setMin(max);
+  if (linkedClass != null)   linkedClasses.put(prop,linkedClass);
+  if (linkedType != null)   prop.setLinkedType(linkedType);
+  if (indexRid != null)   prop.setIndex(new ODocument(database,indexRid),indexUnique);
+}

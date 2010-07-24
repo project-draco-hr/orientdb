@@ -5,45 +5,30 @@
   char type=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"@type\"").readString(OJSONReader.COMMA_SEPARATOR).charAt(0);
 switch (type) {
 case 'b':
-{
-      String value=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"value\"").readString(OJSONReader.END_OBJECT);
-      int b;
-      int offset;
-      byte[] buffer=new byte[value.length() / 3];
-      for (int i=0; i < buffer.length; ++i) {
-        offset=i * 3;
-        b=Integer.parseInt(value.substring(offset,offset + 3));
-        buffer[i]=(byte)b;
-      }
-      if (record == null || !(record instanceof ORecordBytes))       record=new ORecordBytes(database);
- else       record.reset();
-      record.fromStream(buffer);
-      break;
-    }
-case 'v':
-{
-    jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
-    if (record == null || !(record instanceof ODocument))     record=new ODocument(database);
+    if (record == null || !(record instanceof ORecordBytes))     record=new ORecordBytes(database);
  else     record.reset();
-    if (jsonReader.getValue().equals("\"@class\"")) {
-      ((ODocument)record).setClassName(jsonReader.readString(OJSONReader.COMMA_SEPARATOR));
-      jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
-    }
-    String obj=jsonReader.checkContent("\"fields\"").readString(OJSONReader.END_OBJECT,true);
-    record.fromJSON(obj);
-    break;
-  }
-case 'f':
-{
-  String value=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"value\"").readString(OJSONReader.END_OBJECT);
-  if (record == null || !(record instanceof ORecordFlat))   record=new ORecordFlat(database);
- else   record.reset();
-  ((ORecordFlat)record).value(value);
   break;
+case 'v':
+if (record == null || !(record instanceof ODocument)) record=new ODocument(database);
+ else record.reset();
+if (jsonReader.getValue().equals("\"@class\"")) {
+((ODocument)record).setClassName(jsonReader.readString(OJSONReader.COMMA_SEPARATOR));
+jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT);
 }
+break;
+case 'c':
+if (record == null || !(record instanceof ORecordColumn)) record=new ORecordColumn(database);
+ else record.reset();
+break;
+case 'f':
+if (record == null || !(record instanceof ORecordFlat)) record=new ORecordFlat(database);
+ else record.reset();
+break;
 default :
 throw new OSchemaException("Error: unsupported record type: " + type);
 }
+String value=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"value\"").readString(OJSONReader.END_OBJECT,true);
+record.fromJSON(value);
 record.setVersion(version);
 rid.fromString(id);
 if (rid.clusterPosition < database.countClusterElements(rid.clusterId)) {

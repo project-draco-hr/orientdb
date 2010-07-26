@@ -1,0 +1,19 @@
+{
+  String value=jsonReader.readString(OJSONReader.END_OBJECT,true);
+  record=ORecordSerializerJSON.INSTANCE.fromString(database,value,record);
+  String rid=record.getIdentity().toString();
+  System.out.print("\nImporting record of type '" + (char)record.getRecordType() + "' with id="+ rid);
+  if (record.getIdentity().getClusterPosition() < database.countClusterElements(record.getIdentity().getClusterId())) {
+    if (record instanceof ORecordBytes)     ((ODatabaseRecord<ORecordBytes>)database.getUnderlying()).save((ORecordBytes)record);
+ else     if (record instanceof ORecordFlat || record instanceof ODocument)     ((ODocument)record).save();
+  }
+ else {
+    String clusterName=database.getClusterNameById(record.getIdentity().getClusterId());
+    record.setIdentity(-1,-1);
+    if (record instanceof ORecordBytes)     ((ODatabaseRecord<ORecordBytes>)database.getUnderlying()).save((ORecordBytes)record,clusterName);
+ else     if (record instanceof ORecordFlat)     ((ODatabaseRecord<ORecordInternal<?>>)database.getUnderlying()).save(record,clusterName);
+ else     if (record instanceof ODocument)     ((ODatabaseRecord<ORecordInternal<?>>)database.getUnderlying()).save(record,clusterName);
+  }
+  if (!record.getIdentity().toString().equals(rid))   throw new OSchemaException("Imported record '" + record.getIdentity() + "' has rid different from the original: "+ rid);
+  jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+}

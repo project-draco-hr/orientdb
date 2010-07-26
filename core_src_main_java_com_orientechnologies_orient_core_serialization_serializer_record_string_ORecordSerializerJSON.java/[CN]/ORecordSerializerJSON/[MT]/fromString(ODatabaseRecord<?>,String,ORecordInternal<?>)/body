@@ -1,56 +1,54 @@
 {
+  iSource=iSource.trim();
+  if (!iSource.startsWith("{") || !iSource.endsWith("}"))   throw new OSerializationException("Error on unmarshalling JSON content: content must be embraced by { }");
+  if (iRecord != null)   iRecord.setDirty();
+  iSource=iSource.substring(1,iSource.length() - 1).trim();
+  String[] fields=OStringParser.getWords(iSource,":,");
   try {
-    iSource=iSource.trim();
-    if (iRecord instanceof ODocument) {
-      if (!iSource.startsWith("{") || !iSource.endsWith("}"))       throw new OSerializationException("Error on unmarshalling JSON content: content must be embraced by { }");
-      iSource=iSource.substring(1,iSource.length() - 1).trim();
-      String[] fields=OStringParser.getWords(iSource,":,");
-      if (fields != null && fields.length > 0) {
-        ODocument doc=(ODocument)iRecord;
-        boolean isNew=!doc.getIdentity().isValid();
-        String fieldName;
-        String fieldValue;
-        for (int i=0; i < fields.length; i+=2) {
-          fieldName=fields[i];
-          fieldValue=fields[i + 1];
-          if (fieldName.equals(ATTRIBUTE_CLASS))           doc.setClassName(fields[i + 1]);
- else           if (fieldName.equals(ATTRIBUTE_ID)) {
-            if (isNew) {
-              ORecordId rid=new ORecordId(fieldValue);
-              doc.setIdentity(rid.clusterId,rid.clusterPosition);
-            }
-          }
- else           if (fieldName.equals(ATTRIBUTE_VERSION)) {
-            if (!isNew) {
-              doc.setVersion(Integer.parseInt(fieldValue));
-            }
-          }
- else {
-            if (fieldValue.equals("null"))             doc.field(fieldName,null);
- else             if (fieldValue.startsWith("{") && fieldValue.endsWith("}")) {
-              Map<String,String> map=OStringSerializerHelper.getMap(fieldValue);
-              doc.field(fieldName,map);
-            }
- else             doc.field(fieldName,fieldValue);
+    if (fields != null && fields.length > 0) {
+      String fieldName;
+      String fieldValue;
+      for (int i=0; i < fields.length; i+=2) {
+        fieldName=fields[i];
+        fieldValue=fields[i + 1];
+        if (fieldName.equals(ATTRIBUTE_ID))         iRecord.setIdentity(new ORecordId(fieldValue));
+ else         if (fieldName.equals(ATTRIBUTE_VERSION))         iRecord.setVersion(Integer.parseInt(fieldValue));
+ else         if (fieldName.equals(ATTRIBUTE_TYPE)) {
+          if (iRecord == null || iRecord.getRecordType() != fieldValue.charAt(0)) {
+            iRecord=ORecordFactory.newInstance((byte)fieldValue.charAt(0));
+            iRecord.setDatabase(iDatabase);
           }
         }
+ else         if (fieldName.equals(ATTRIBUTE_CLASS) && iRecord instanceof ODocument)         ((ODocument)iRecord).setClassName(fieldValue);
+ else         if (fieldName.equals("value")) {
+          if (iRecord instanceof ORecordColumn) {
+            fieldValue=fieldValue.trim();
+            if (!fieldValue.startsWith("[") || !fieldValue.endsWith("]"))             throw new OSerializationException("Error on unmarshalling JSON content: value must be embraced by [ ]");
+            fieldValue=fieldValue.substring(1,fieldValue.length() - 1).trim();
+            String[] items=OStringParser.getWords(fieldValue,",");
+            for (            String item : items) {
+              ((ORecordColumn)iRecord).add(item);
+            }
+          }
+ else           if (iRecord instanceof ORecordBytes) {
+            int b;
+            int offset;
+            byte[] buffer=new byte[fieldValue.length() / 3];
+            for (int pos=0; pos < buffer.length; ++pos) {
+              offset=pos * 3;
+              b=Integer.parseInt(fieldValue.substring(offset,offset + 3));
+              buffer[pos]=(byte)b;
+            }
+            iRecord.fromStream(buffer);
+          }
+ else           if (iRecord instanceof ORecordStringable) {
+            ((ORecordStringable)iRecord).value(fieldValue);
+          }
+        }
+ else {
+          if (iRecord instanceof ODocument)           ((ODocument)iRecord).field(fieldName,extractFieldValue(iRecord,fieldValue));
+        }
       }
-    }
- else     if (iRecord instanceof ORecordColumn) {
-    }
- else     if (iRecord instanceof ORecordStringable) {
-      ((ORecordStringable)iRecord).value(iSource);
-    }
- else     if (iRecord instanceof ORecordBytes) {
-      int b;
-      int offset;
-      byte[] buffer=new byte[iSource.length() / 3];
-      for (int i=0; i < buffer.length; ++i) {
-        offset=i * 3;
-        b=Integer.parseInt(iSource.substring(offset,offset + 3));
-        buffer[i]=(byte)b;
-      }
-      iRecord.fromStream(buffer);
     }
   }
  catch (  Exception e) {

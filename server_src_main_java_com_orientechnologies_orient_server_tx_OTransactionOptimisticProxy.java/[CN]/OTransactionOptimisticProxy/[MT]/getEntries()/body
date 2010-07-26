@@ -1,36 +1,38 @@
 {
-  return new Iterable<OTransactionEntry<OTransactionRecordProxy>>(){
-    public Iterator<OTransactionEntry<OTransactionRecordProxy>> iterator(){
-      return new Iterator<OTransactionEntry<OTransactionRecordProxy>>(){
+  return new Iterable<OTransactionEntryProxy>(){
+    public Iterator<OTransactionEntryProxy> iterator(){
+      return new Iterator<OTransactionEntryProxy>(){
         private int current=1;
         public boolean hasNext(){
-          if (emptyContent)           return false;
-          if (current > size)           emptyContent=true;
           return current <= size;
         }
-        public OTransactionEntry<OTransactionRecordProxy> next(){
-          ORecordId rid=(ORecordId)entry.record.getIdentity();
+        public OTransactionEntryProxy next(){
           try {
-            entry.status=channel.readByte();
-            rid.clusterId=channel.readShort();
-            entry.record.recordType=channel.readByte();
+            if (entries.size() < size) {
+              final ORecordId rid=(ORecordId)entry.record.getIdentity();
+              entry.status=channel.readByte();
+              rid.clusterId=channel.readShort();
+              entry.record.recordType=channel.readByte();
 switch (entry.status) {
 case OTransactionEntry.CREATED:
-              entry.clusterName=channel.readString();
-            entry.record.stream=channel.readBytes();
-          break;
+                entry.clusterName=channel.readString();
+              entry.record.stream=channel.readBytes();
+            break;
 case OTransactionEntry.UPDATED:
-        rid.clusterPosition=channel.readLong();
-      entry.record.version=channel.readInt();
-    entry.record.stream=channel.readBytes();
-  break;
+          rid.clusterPosition=channel.readLong();
+        entry.record.version=channel.readInt();
+      entry.record.stream=channel.readBytes();
+    break;
 case OTransactionEntry.DELETED:
-rid.clusterPosition=channel.readLong();
+  rid.clusterPosition=channel.readLong();
 entry.record.version=channel.readInt();
 break;
 default :
 throw new OTransactionException("Unrecognized tx command: " + entry.status);
 }
+entries.add(entry);
+}
+ else entry=entries.get(current - 1);
 current++;
 return entry;
 }

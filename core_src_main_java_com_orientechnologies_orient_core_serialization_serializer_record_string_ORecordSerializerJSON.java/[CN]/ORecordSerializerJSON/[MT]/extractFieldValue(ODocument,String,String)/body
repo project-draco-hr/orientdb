@@ -1,0 +1,40 @@
+{
+  OType type=null;
+  OType linkedType=null;
+  if (iRecord.getSchemaClass() != null) {
+    final OProperty p=iRecord.getSchemaClass().getProperty(iFieldName);
+    if (p != null) {
+      type=p.getType();
+      linkedType=p.getLinkedType();
+    }
+  }
+  if (iFieldValue.equals("null"))   return null;
+ else   if (iFieldValue.startsWith("{") && iFieldValue.endsWith("}")) {
+    return ORecordSerializerSchemaAware2CSV.INSTANCE.embeddedMapFromStream(iRecord.getDatabase(),OType.EMBEDDED,iFieldValue);
+  }
+ else   if (iFieldValue.startsWith("[") && iFieldValue.endsWith("]")) {
+    Collection<Object> embeddedCollection;
+    if (type == OType.LINKSET || type == OType.EMBEDDEDSET)     embeddedCollection=new HashSet<Object>();
+ else     embeddedCollection=new ArrayList<Object>();
+    iFieldValue=iFieldValue.substring(1,iFieldValue.length() - 1);
+    List<String> items=OStringSerializerHelper.smartSplit(iFieldValue,',');
+    Object itemToAdd;
+    for (    String item : items) {
+      item=item.trim();
+      itemToAdd=item;
+      if (linkedType == null)       if (item.length() >= 4 && item.charAt(0) == '"' && item.charAt(1) == '#')       linkedType=OType.LINK;
+ else       if (iFieldValue.startsWith("{") && iFieldValue.endsWith("}"))       linkedType=OType.EMBEDDED;
+      if (linkedType != null)       if (linkedType == OType.LINK)       itemToAdd=new ORecordId(item.substring(2,item.length() - 1));
+ else       if (linkedType == OType.EMBEDDED)       itemToAdd=fromString(iRecord.getDatabase(),item);
+      embeddedCollection.add(itemToAdd);
+    }
+    return embeddedCollection;
+  }
+ else {
+    if (linkedType == null)     if (iFieldValue.length() >= 4 && iFieldValue.charAt(0) == '#')     linkedType=OType.LINK;
+ else     if (iFieldValue.startsWith("{") && iFieldValue.endsWith("}"))     linkedType=OType.EMBEDDED;
+    if (linkedType != null)     if (linkedType == OType.LINK)     return new ORecordId(iFieldValue.substring(1));
+ else     if (linkedType == OType.EMBEDDED)     return fromString(iRecord.getDatabase(),iFieldValue);
+  }
+  return iFieldValue;
+}

@@ -1,0 +1,62 @@
+{
+  if (iFieldValueAsString.equals("null"))   return null;
+  if (iFieldName != null)   if (iRecord.getSchemaClass() != null) {
+    final OProperty p=iRecord.getSchemaClass().getProperty(iFieldName);
+    if (p != null) {
+      type=p.getType();
+      linkedType=p.getLinkedType();
+    }
+  }
+  if (iFieldValue.startsWith("{") && iFieldValue.endsWith("}")) {
+    String[] fields=OStringParser.getWords(iFieldValueAsString,":,",true);
+    if (fields == null || fields.length == 0)     return null;
+    if (fields[0].equals("\"@type\""))     return fromString(iRecord.getDatabase(),iFieldValue,null);
+ else {
+      final Map<String,Object> embeddedMap;
+      embeddedMap=new HashMap<String,Object>();
+      for (int i=0; i < fields.length; i+=2) {
+        iFieldName=fields[i];
+        iFieldValue=fields[i + 1];
+        iFieldValueAsString=iFieldValue.length() >= 2 ? iFieldValue.substring(1,iFieldValue.length() - 1) : iFieldValue;
+        embeddedMap.put(iFieldName,getValue(iRecord,null,iFieldValue,iFieldValueAsString,linkedType,null));
+      }
+      return embeddedMap;
+    }
+  }
+ else   if (iFieldValue.startsWith("[") && iFieldValue.endsWith("]")) {
+    final Collection<Object> embeddedCollection;
+    if (type == OType.LINKSET || type == OType.EMBEDDEDSET)     embeddedCollection=new HashSet<Object>();
+ else     embeddedCollection=new ArrayList<Object>();
+    iFieldValue=iFieldValue.substring(1,iFieldValue.length() - 1);
+    if (iFieldValue.length() > 0) {
+      List<String> items=OStringSerializerHelper.smartSplit(iFieldValue,',');
+      for (      String item : items) {
+        iFieldValue=item.trim();
+        iFieldValueAsString=iFieldValue.length() >= 2 ? iFieldValue.substring(1,iFieldValue.length() - 1) : iFieldValue;
+        embeddedCollection.add(getValue(iRecord,null,iFieldValue,iFieldValueAsString,linkedType,null));
+      }
+    }
+    return embeddedCollection;
+  }
+  if (type == null)   if (iFieldValue.charAt(0) != '\"') {
+    if (iFieldValue.equalsIgnoreCase("false") || iFieldValue.equalsIgnoreCase("true"))     type=OType.BOOLEAN;
+ else     if (OStringSerializerHelper.contains(iFieldValue,'.'))     type=OType.DOUBLE;
+ else     type=OType.LONG;
+  }
+ else   if (iFieldValueAsString.length() >= 4 && iFieldValueAsString.charAt(0) == '#')   type=OType.LINK;
+ else   if (iFieldValueAsString.startsWith("{") && iFieldValueAsString.endsWith("}"))   type=OType.EMBEDDED;
+ else   type=OType.STRING;
+  if (type != null) switch (type) {
+case STRING:
+    return iFieldValueAsString;
+case LINK:
+  final int pos=iFieldValueAsString.indexOf("@");
+if (pos > -1) return new ODocument(iRecord.getDatabase(),iFieldValueAsString.substring(1,pos),new ORecordId(iFieldValueAsString.substring(pos + 1)));
+ else return new ORecordId(iFieldValueAsString.substring(1));
+case EMBEDDED:
+return fromString(iRecord.getDatabase(),iFieldValueAsString);
+default :
+return OStringSerializerHelper.fieldTypeFromStream(type,iFieldValue);
+}
+return iFieldValueAsString;
+}

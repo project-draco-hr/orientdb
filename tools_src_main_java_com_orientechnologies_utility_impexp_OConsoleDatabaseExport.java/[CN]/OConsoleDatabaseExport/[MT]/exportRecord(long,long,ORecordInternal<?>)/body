@@ -1,41 +1,9 @@
 {
   if (rec == null)   return;
-  byte recordType=rec.getRecordType();
-  writer.beginObject(3,true,null);
-  writer.writeAttribute(0,false,ATTRIBUTE_TYPE,"" + (char)recordType);
-  writer.writeAttribute(0,false,ORecordSerializerJSON.ATTRIBUTE_ID,rec.getIdentity());
-  writer.writeAttribute(0,false,ORecordSerializerJSON.ATTRIBUTE_VERSION,rec.getVersion());
   if (rec.getIdentity().isValid())   rec.load();
-switch (recordType) {
-case ODocument.RECORD_TYPE:
-    final ODocument vobj=(ODocument)rec;
-  if (vobj.getClassName() != null)   writer.writeAttribute(0,false,"@class",vobj.getClassName());
-Object value;
-if (vobj.fieldNames() != null && vobj.fieldNames().length > 0) {
-for (String f : vobj.fieldNames()) {
-  value=vobj.field(f);
-  writer.writeAttribute(5,true,f,value);
-}
-}
-break;
-case ORecordColumn.RECORD_TYPE:
-ORecordColumn csv=(ORecordColumn)rec;
-if (csv.size() > 0) {
-writer.beginCollection(4,true,null);
-for (int i=0; i < csv.size(); ++i) {
-writer.writeValue(5,true,csv.field(i));
-}
-writer.endCollection(4,true);
-}
-break;
-case ORecordFlat.RECORD_TYPE:
-writer.writeAttribute(5,true,"value",((ORecordFlat)rec).value());
-break;
-case ORecordBytes.RECORD_TYPE:
-writer.writeAttribute(5,true,"value",rec.toStream());
-break;
-}
-writer.endObject(3,true);
-recordNum++;
-if (recordTot > 10 && (recordNum + 1) % (recordTot / 10) == 0) listener.onMessage(".");
+  if (recordExported > 0)   writer.append(",");
+  writer.append(rec.toJSON("rid,type,version,class,ident:4"));
+  recordExported++;
+  recordNum++;
+  if (recordTot > 10 && (recordNum + 1) % (recordTot / 10) == 0)   listener.onMessage(".");
 }

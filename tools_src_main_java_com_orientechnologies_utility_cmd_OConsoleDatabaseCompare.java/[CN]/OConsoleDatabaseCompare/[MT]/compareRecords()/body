@@ -1,38 +1,60 @@
 {
   listener.onMessage("\nStarting deep comparison record by record. It can takes some minutes. Wait please...");
   int clusterId;
-  long clusterMax;
   ORawBuffer buffer1, buffer2;
   for (  String clusterName : storage1.getClusterNames()) {
+    if (includeClusters != null) {
+      if (!includeClusters.contains(clusterName))       continue;
+    }
+ else     if (excludeClusters != null) {
+      if (excludeClusters.contains(clusterName))       continue;
+    }
     clusterId=storage1.getClusterIdByName(clusterName);
-    clusterMax=storage1.getClusterLastEntryPosition(clusterId);
+    long db1Max=storage1.getClusterLastEntryPosition(clusterId);
+    long db2Max=storage2.getClusterLastEntryPosition(clusterId);
+    long clusterMax=Math.max(db1Max,db2Max);
     for (int i=0; i < clusterMax; ++i) {
-      buffer1=storage1.readRecord(null,0,clusterId,i,null);
-      buffer2=storage2.readRecord(null,0,clusterId,i,null);
-      if (buffer1 == null && buffer2 == null || buffer1.buffer == null && buffer2.buffer == null)       continue;
-      if (buffer1.recordType != buffer2.recordType) {
-        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " recordType is different: "+ (char)buffer1.recordType+ " <-> "+ (char)buffer2.recordType);
+      buffer1=i < db1Max ? storage1.readRecord(null,0,clusterId,i,null) : null;
+      buffer2=i < db2Max ? storage2.readRecord(null,0,clusterId,i,null) : null;
+      if (buffer1 == null && buffer2 == null)       continue;
+ else       if (buffer1 == null && buffer2 != null) {
+        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " is null in DB1");
         ++differences;
       }
-      if (buffer1.buffer == null && buffer2.buffer != null) {
-        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content is different: null <-> "+ buffer2.buffer.length);
-        ++differences;
-      }
- else       if (buffer1.buffer != null && buffer2.buffer == null) {
-        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content is different: "+ buffer1.buffer.length+ " <-> null");
-        ++differences;
-      }
- else       if (buffer1.buffer.length != buffer2.buffer.length) {
-        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content length is different: "+ buffer1.buffer.length+ " <-> "+ buffer2.buffer.length);
-        if (buffer1.recordType == ODocument.RECORD_TYPE || buffer1.recordType == ORecordFlat.RECORD_TYPE || buffer1.recordType == ORecordColumn.RECORD_TYPE)         listener.onMessage("\n--- REC1: " + new String(buffer1.buffer));
-        if (buffer2.recordType == ODocument.RECORD_TYPE || buffer2.recordType == ORecordFlat.RECORD_TYPE || buffer2.recordType == ORecordColumn.RECORD_TYPE)         listener.onMessage("\n--- REC2: " + new String(buffer2.buffer));
+ else       if (buffer1 != null && buffer2 == null) {
+        listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " is null in DB2");
         ++differences;
       }
  else {
-        for (int b=0; b < buffer1.buffer.length; ++b) {
-          if (buffer1.buffer[b] != buffer2.buffer[b]) {
-            listener.onMessage("\n--- KO: RID=" + clusterId + ":"+ i+ " content is different at byte #"+ b+ ": "+ buffer1.buffer[b]+ " <-> "+ buffer2.buffer[b]);
-            ++differences;
+        if (buffer1.recordType != buffer2.recordType) {
+          listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " recordType is different: "+ (char)buffer1.recordType+ " <-> "+ (char)buffer2.recordType);
+          ++differences;
+        }
+        if (buffer1.buffer == null && buffer2.buffer != null) {
+          listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content is different: null <-> "+ buffer2.buffer.length);
+          ++differences;
+        }
+ else         if (buffer1.buffer != null && buffer2.buffer == null) {
+          listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content is different: "+ buffer1.buffer.length+ " <-> null");
+          ++differences;
+        }
+ else         if (buffer1.buffer.length != buffer2.buffer.length) {
+          listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content length is different: "+ buffer1.buffer.length+ " <-> "+ buffer2.buffer.length);
+          if (buffer1.recordType == ODocument.RECORD_TYPE || buffer1.recordType == ORecordFlat.RECORD_TYPE || buffer1.recordType == ORecordColumn.RECORD_TYPE)           listener.onMessage("\n--- REC1: " + new String(buffer1.buffer));
+          if (buffer2.recordType == ODocument.RECORD_TYPE || buffer2.recordType == ORecordFlat.RECORD_TYPE || buffer2.recordType == ORecordColumn.RECORD_TYPE)           listener.onMessage("\n--- REC2: " + new String(buffer2.buffer));
+          listener.onMessage("\n");
+          ++differences;
+        }
+ else {
+          for (int b=0; b < buffer1.buffer.length; ++b) {
+            if (buffer1.buffer[b] != buffer2.buffer[b]) {
+              listener.onMessage("\n- KO: RID=" + clusterId + ":"+ i+ " content is different at byte #"+ b+ ": "+ buffer1.buffer[b]+ " <-> "+ buffer2.buffer[b]);
+              listener.onMessage("\n--- REC1: " + new String(buffer1.buffer));
+              listener.onMessage("\n--- REC2: " + new String(buffer2.buffer));
+              listener.onMessage("\n");
+              ++differences;
+              break;
+            }
           }
         }
       }

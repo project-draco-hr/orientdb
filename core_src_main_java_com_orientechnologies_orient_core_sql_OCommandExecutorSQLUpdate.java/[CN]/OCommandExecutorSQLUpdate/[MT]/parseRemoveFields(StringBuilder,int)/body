@@ -1,10 +1,26 @@
 {
   String fieldName;
+  String fieldValue;
+  Object value;
+  int newPos=pos;
   while (pos != -1 && (removeEntries.size() == 0 || word.toString().equals(","))) {
-    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
-    if (pos == -1)     throw new OCommandSQLParsingException("Field name expected",text,pos);
+    newPos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
+    if (newPos == -1)     throw new OCommandSQLParsingException("Field name expected",text,pos);
     fieldName=word.toString();
-    removeEntries.add(fieldName);
+    pos=OStringParser.jumpWhiteSpaces(text,pos);
+    if (pos > -1 && text.charAt(newPos) == '=') {
+      pos=OSQLHelper.nextWord(text,textUpperCase,pos + 1,word,false," =><");
+      if (pos == -1)       throw new OCommandSQLParsingException("Value expected",text,pos);
+      fieldValue=word.toString();
+      if (fieldValue.endsWith(",")) {
+        pos=newPos - 1;
+        fieldValue=fieldValue.substring(0,fieldValue.length() - 1);
+      }
+ else       pos=newPos;
+      value=fieldValue;
+    }
+ else     value=EMPTY_VALUE;
+    removeEntries.put(fieldName,value);
     pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
   }
   if (removeEntries.size() == 0)   throw new OCommandSQLParsingException("Field(s) to remove are missed. Example: name, salary",text,pos);

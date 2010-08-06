@@ -1,0 +1,40 @@
+{
+  String fieldName;
+  String fieldKey;
+  String fieldValue;
+  int newPos=pos;
+  while (pos != -1 && (setEntries.size() == 0 || word.toString().equals(","))) {
+    newPos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
+    if (newPos == -1)     throw new OCommandSQLParsingException("Field name expected",text,pos);
+    pos=newPos;
+    fieldName=word.toString();
+    newPos=OStringParser.jumpWhiteSpaces(text,pos);
+    if (newPos == -1 || text.charAt(newPos) != '=')     throw new OCommandSQLParsingException("Character '=' was expected",text,pos);
+    pos=newPos;
+    newPos=OSQLHelper.nextWord(text,textUpperCase,pos + 1,word,false," =><");
+    if (pos == -1)     throw new OCommandSQLParsingException("Key expected",text,pos);
+    fieldKey=word.toString();
+    if (fieldKey.endsWith(",")) {
+      pos=newPos + 1;
+      fieldKey=fieldKey.substring(0,fieldKey.length() - 1);
+    }
+ else {
+      pos=newPos;
+      newPos=OStringParser.jumpWhiteSpaces(text,pos);
+      if (newPos == -1 || text.charAt(pos) != ',')       throw new OCommandSQLParsingException("',' expected",text,pos);
+      pos=newPos;
+    }
+    newPos=OSQLHelper.nextWord(text,textUpperCase,pos + 1,word,false," =><");
+    if (pos == -1)     throw new OCommandSQLParsingException("Value expected",text,pos);
+    fieldValue=word.toString();
+    if (fieldValue.endsWith(",")) {
+      pos=newPos - 1;
+      fieldValue=fieldValue.substring(0,fieldValue.length() - 1);
+    }
+ else     pos=newPos;
+    putEntries.put(fieldName,new OPair<String,Object>((String)OSQLHelper.parseValue(database,this,fieldKey),OSQLHelper.parseValue(database,this,fieldValue)));
+    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  }
+  if (putEntries.size() == 0)   throw new OCommandSQLParsingException("Entries to put <field> = <key>, <value> are missed. Example: name = 'Bill', 30",text,pos);
+  return pos;
+}

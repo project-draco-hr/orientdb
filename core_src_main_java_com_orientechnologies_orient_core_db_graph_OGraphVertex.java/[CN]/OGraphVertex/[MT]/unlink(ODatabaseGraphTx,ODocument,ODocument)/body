@@ -1,0 +1,39 @@
+{
+  if (iTargetVertex == null)   throw new IllegalArgumentException("Missed the target vertex");
+  if (iDatabase.existsUserObjectByRecord(iSourceVertex)) {
+    final OGraphVertex vertex=(OGraphVertex)iDatabase.getUserObjectByRecord(iSourceVertex,null);
+    if (vertex.outEdges != null && vertex.outEdges.get() != null) {
+      for (      OGraphEdge e : vertex.outEdges.get())       if (e.getIn().getDocument().equals(iTargetVertex)) {
+        vertex.outEdges.get().remove(e);
+      }
+    }
+  }
+  if (iDatabase.existsUserObjectByRecord(iTargetVertex)) {
+    final OGraphVertex vertex=(OGraphVertex)iDatabase.getUserObjectByRecord(iTargetVertex,null);
+    if (vertex.inEdges != null && vertex.inEdges.get() != null) {
+      for (      OGraphEdge e : vertex.inEdges.get())       if (e.getOut().getDocument().equals(iSourceVertex)) {
+        vertex.inEdges.get().remove(e);
+      }
+    }
+  }
+  ODocument edge=null;
+  List<ODocument> docs=iSourceVertex.field(FIELD_OUT_EDGES);
+  if (docs != null) {
+    for (    ODocument d : docs)     if (d.field(OGraphEdge.IN).equals(iTargetVertex)) {
+      docs.remove(d);
+      edge=d;
+    }
+  }
+  if (edge == null)   throw new OGraphException("Edge not found between the ougoing edges");
+  iSourceVertex.setDirty();
+  iSourceVertex.save();
+  docs=iTargetVertex.field(FIELD_IN_EDGES);
+  if (docs != null) {
+    for (    ODocument d : docs)     if (d.field(OGraphEdge.IN).equals(iTargetVertex)) {
+      docs.remove(d);
+    }
+  }
+  iTargetVertex.setDirty();
+  iTargetVertex.save();
+  edge.delete();
+}

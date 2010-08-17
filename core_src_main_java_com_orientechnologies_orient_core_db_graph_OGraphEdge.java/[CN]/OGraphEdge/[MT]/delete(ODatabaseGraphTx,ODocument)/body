@@ -1,0 +1,38 @@
+{
+  final ODocument sourceVertex=(ODocument)iEdge.field(OUT);
+  final ODocument targetVertex=(ODocument)iEdge.field(IN);
+  List<OGraphEdge> edges;
+  if (iDatabase.existsUserObjectByRecord(sourceVertex)) {
+    final OGraphVertex vertex=(OGraphVertex)iDatabase.getUserObjectByRecord(sourceVertex,null);
+    edges=vertex.getOutEdges();
+    if (edges != null) {
+      for (      OGraphEdge e : edges)       if (e.getDocument().equals(iEdge)) {
+        edges.remove(e);
+        break;
+      }
+    }
+  }
+  if (iDatabase.existsUserObjectByRecord(targetVertex)) {
+    final OGraphVertex vertex=(OGraphVertex)iDatabase.getUserObjectByRecord(targetVertex,null);
+    edges=vertex.getInEdges();
+    if (edges != null) {
+      for (      OGraphEdge e : edges)       if (e.getDocument().equals(iEdge)) {
+        edges.remove(e);
+        break;
+      }
+    }
+  }
+  List<ODocument> docs=sourceVertex.field(OGraphVertex.FIELD_OUT_EDGES);
+  if (docs != null)   docs.remove(iEdge);
+  sourceVertex.setDirty();
+  sourceVertex.save();
+  docs=targetVertex.field(OGraphVertex.FIELD_IN_EDGES);
+  if (docs != null)   docs.remove(iEdge);
+  targetVertex.setDirty();
+  targetVertex.save();
+  if (iDatabase.existsUserObjectByRecord(sourceVertex)) {
+    final OGraphEdge edge=(OGraphEdge)iDatabase.getUserObjectByRecord(iEdge,null);
+    iDatabase.unregisterPojo(edge,iEdge);
+  }
+  iEdge.delete();
+}

@@ -1,2 +1,26 @@
 {
+  final boolean locked=acquireSharedLock();
+  try {
+    for (    OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
+      commitEntry(iRequesterId,iTx.getId(),txEntry);
+    }
+    String rid;
+    ORawBuffer cachedBuffer;
+    for (    OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
+      rid=txEntry.record.getIdentity().toString();
+      cachedBuffer=getCache().getRecord(rid);
+      if (cachedBuffer != null) {
+        cachedBuffer.buffer=txEntry.record.toStream();
+        cachedBuffer.version=txEntry.record.getVersion();
+        cachedBuffer.recordType=txEntry.record.getRecordType();
+      }
+ else       if (txEntry.record.isPinned())       getCache().pushRecord(rid,new ORawBuffer(txEntry.record.toStream(),txEntry.record.getVersion(),txEntry.record.getRecordType()));
+    }
+  }
+ catch (  IOException e) {
+    rollback(iRequesterId,iTx);
+  }
+ finally {
+    releaseSharedLock(locked);
+  }
 }

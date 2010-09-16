@@ -1,0 +1,34 @@
+{
+  try {
+    dgram.setLength(recvBuffer.length);
+    socket.receive(dgram);
+    OLogManager.instance().debug(this,"Received multicast packet %d bytes from %s:%d",dgram.getLength(),dgram.getAddress(),dgram.getPort());
+    try {
+      String packet=new String(dgram.getData());
+      String[] parts=packet.trim().split("\\|");
+      if (!parts[0].startsWith(OClusterNode.PACKET_HEADER))       return;
+      if (Integer.parseInt(parts[1]) != OClusterNode.PROTOCOL_VERSION) {
+        OLogManager.instance().debug(this,"Received bad multicast packet with version %s not equals to the current %d",parts[1],OClusterNode.PROTOCOL_VERSION);
+        return;
+      }
+      if (!parts[2].equals(clusterNode.name)) {
+        OLogManager.instance().debug(this,"Received bad multicast packet with cluster name %s not equals to the current %s",parts[2],clusterNode.name);
+        return;
+      }
+      if (!parts[3].equals(clusterNode.password)) {
+        OLogManager.instance().debug(this,"Received bad multicast packet with cluster password not equals to the current one",parts[3],clusterNode.password);
+        return;
+      }
+      final String serverAddress=parts[4];
+      final int serverPort=Integer.parseInt(parts[5]);
+      OLogManager.instance().warn(this,"Discovered cluster node %s:%d",serverAddress,serverPort);
+    }
+ catch (    Exception e) {
+    }
+  }
+ catch (  Throwable t) {
+    OLogManager.instance().error(this,"Error on executing request",t);
+  }
+ finally {
+  }
+}

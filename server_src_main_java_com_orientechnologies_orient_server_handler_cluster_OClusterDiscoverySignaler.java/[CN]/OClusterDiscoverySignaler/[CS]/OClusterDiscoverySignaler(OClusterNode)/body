@@ -1,0 +1,20 @@
+{
+  super(iClusterNode.signalPresenceEverySecs * 1000,OServer.getThreadGroup(),"DiscoverySignaler");
+  OServerNetworkListener binaryNetworkListener=null;
+  for (  OServerNetworkListener l : iClusterNode.server.getListeners()) {
+    if (l.getProtocolType().equals(ONetworkProtocolBinary.class)) {
+      binaryNetworkListener=l;
+      break;
+    }
+  }
+  if (binaryNetworkListener == null)   OLogManager.instance().error(this,"Can't find a configured network listener with binary protocol. Can't start cluster node",null,OConfigurationException.class);
+  discoveryPacket=(OClusterNode.PACKET_HEADER + OConstants.ORIENT_VERSION + "|"+ OClusterNode.PROTOCOL_VERSION+ "|"+ iClusterNode.name+ "|"+ iClusterNode.password+ "|"+ binaryNetworkListener.getInboundAddr().getHostName()+ "|"+ binaryNetworkListener.getInboundAddr().getPort()).getBytes();
+  try {
+    dgram=new DatagramPacket(discoveryPacket,discoveryPacket.length,iClusterNode.networkAddress,iClusterNode.networkPort);
+    socket=new DatagramSocket();
+    start();
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Can't startup cluster discovery signaler",e);
+  }
+}

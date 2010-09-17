@@ -1,18 +1,7 @@
 {
-  for (  OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
-    commitEntry(iRequesterId,iTx.getId(),txEntry);
-  }
+  commitAllEntries(iRequesterId,iTx,iTx.getEntries());
+  commitAllEntries(iRequesterId,iTx,iTx.getNewEntriesOnCommit());
   txSegment.clearLogEntries(iRequesterId,iTx.getId());
-  String rid;
-  ORawBuffer cachedBuffer;
-  for (  OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
-    rid=txEntry.record.getIdentity().toString();
-    cachedBuffer=storage.getCache().getRecord(rid);
-    if (cachedBuffer != null) {
-      cachedBuffer.buffer=txEntry.record.toStream();
-      cachedBuffer.version=txEntry.record.getVersion();
-      cachedBuffer.recordType=txEntry.record.getRecordType();
-    }
- else     if (txEntry.record.isPinned())     storage.getCache().pushRecord(rid,new ORawBuffer(txEntry.record.toStream(),txEntry.record.getVersion(),txEntry.record.getRecordType()));
-  }
+  updateCacheFromEntries(iTx,iTx.getEntries());
+  updateCacheFromEntries(iTx,iTx.getNewEntriesOnCommit());
 }

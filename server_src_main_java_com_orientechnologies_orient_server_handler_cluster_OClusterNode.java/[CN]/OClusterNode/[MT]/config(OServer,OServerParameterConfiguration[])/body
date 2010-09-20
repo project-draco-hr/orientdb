@@ -1,0 +1,38 @@
+{
+  server=iServer;
+  try {
+    name="unknown";
+    securityKey=null;
+    configNetworkMulticastAddress=InetAddress.getByName("235.1.1.1");
+    configNetworkMulticastPort=2424;
+    configNetworkMulticastHeartbeat=10;
+    securityAlgorithm="Blowfish";
+    byte[] tempSecurityKey=null;
+    if (iParams != null)     for (    OServerParameterConfiguration param : iParams) {
+      if ("name".equalsIgnoreCase(param.name))       name=param.value;
+ else       if ("security.algorithm".equalsIgnoreCase(param.name))       securityAlgorithm=param.value;
+ else       if ("security.key".equalsIgnoreCase(param.name))       tempSecurityKey=OBase64Utils.decode(param.value);
+ else       if ("network.multicast.address".equalsIgnoreCase(param.name))       configNetworkMulticastAddress=InetAddress.getByName(param.value);
+ else       if ("network.multicast.port".equalsIgnoreCase(param.name))       configNetworkMulticastPort=Integer.parseInt(param.value);
+ else       if ("network.multicast.heartbeat".equalsIgnoreCase(param.name))       configNetworkMulticastHeartbeat=Integer.parseInt(param.value);
+    }
+    if (tempSecurityKey == null) {
+      OLogManager.instance().info(this,"Generating Server security key...");
+      securityKey=OSecurityManager.instance().generateKey(securityAlgorithm,96);
+      for (      OServerHandlerConfiguration handler : iServer.getConfiguration().handlers) {
+        if (handler.clazz.equals(getClass().getName())) {
+          handler.parameters=new OServerParameterConfiguration[iParams.length + 1];
+          for (int i=0; i < iParams.length; ++i) {
+            handler.parameters[i]=iParams[i];
+          }
+          handler.parameters[iParams.length]=new OServerParameterConfiguration("security.key",OBase64Utils.encodeBytes(securityKey.getEncoded()));
+        }
+      }
+      iServer.saveConfiguration();
+    }
+ else     securityKey=OSecurityManager.instance().createKey(securityAlgorithm,tempSecurityKey);
+  }
+ catch (  Exception e) {
+    throw new OConfigurationException("Can't configure OrientDB Server as Cluster Node",e);
+  }
+}

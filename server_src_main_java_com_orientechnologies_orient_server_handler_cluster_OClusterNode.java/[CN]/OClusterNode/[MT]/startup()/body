@@ -1,12 +1,22 @@
 {
-  OServerNetworkListener binaryNetworkListener=null;
+  OServerNetworkListener found=null;
   for (  OServerNetworkListener l : server.getListeners()) {
     if (l.getProtocolType().equals(ONetworkProtocolBinary.class)) {
-      binaryNetworkListener=l;
+      found=l;
       break;
     }
   }
+  final OServerNetworkListener binaryNetworkListener=found;
   if (binaryNetworkListener == null)   OLogManager.instance().error(this,"Can't find a configured network listener with binary protocol. Can't start cluster node",null,OConfigurationException.class);
   discoverySignaler=new OClusterDiscoverySignaler(this,binaryNetworkListener);
-  discoveryListener=new OClusterDiscoveryListener(this,binaryNetworkListener);
+  Orient.getTimer().schedule(new TimerTask(){
+    @Override public void run(){
+synchronized (this) {
+        discoverySignaler.sendShutdown();
+        if (master != null)         return;
+        startListener(binaryNetworkListener);
+      }
+    }
+  }
+,networkTimeoutMaster);
 }

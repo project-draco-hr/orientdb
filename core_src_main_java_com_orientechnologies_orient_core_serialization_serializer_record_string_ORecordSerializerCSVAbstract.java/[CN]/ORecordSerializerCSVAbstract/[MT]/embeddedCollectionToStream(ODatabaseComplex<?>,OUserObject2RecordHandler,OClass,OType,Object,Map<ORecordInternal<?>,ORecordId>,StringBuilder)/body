@@ -8,36 +8,41 @@
  else     o=Array.get(iValue,i);
     if (i > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
     if (o == null)     continue;
-    ODocument record=null;
+    ODocument document=null;
+    final OClass linkedClass;
     if (!(o instanceof ORecord<?>)) {
       final String fieldBound=OObjectSerializerHelper.getDocumentBoundField(o.getClass());
       if (fieldBound != null) {
         OObjectSerializerHelper.invokeCallback(o,null,OBeforeSerialization.class);
-        record=(ODocument)OObjectSerializerHelper.getFieldValue(o,fieldBound);
-        OObjectSerializerHelper.invokeCallback(o,record,OAfterSerialization.class);
+        document=(ODocument)OObjectSerializerHelper.getFieldValue(o,fieldBound);
+        OObjectSerializerHelper.invokeCallback(o,document,OAfterSerialization.class);
       }
+      linkedClass=iLinkedClass;
     }
- else     record=(ODocument)o;
-    if (record != null)     buffer.append(OStringSerializerHelper.EMBEDDED);
-    if (iLinkedClass != null || record != null) {
-      if (record == null)       record=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord<?>)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+ else {
+      document=(ODocument)o;
+      linkedClass=document.getSchemaClass();
+    }
+    if (document != null)     buffer.append(OStringSerializerHelper.EMBEDDED);
+    if (linkedClass != null || document != null) {
+      if (document == null)       document=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord<?>)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
         public Object getUserObjectByRecord(        ORecordInternal<?> iRecord,        final String iFetchPlan){
           return iRecord;
         }
         public ORecordInternal<?> getRecordByUserObject(        Object iPojo,        boolean iIsMandatory){
-          return new ODocument(iLinkedClass);
+          return new ODocument(linkedClass);
         }
         public boolean existsUserObjectByRecord(        ORecordInternal<?> iRecord){
           return false;
         }
       }
 );
-      buffer.append(toString(record,null,iObjHandler,iMarshalledRecords));
+      buffer.append(toString(document,null,iObjHandler,iMarshalledRecords));
     }
  else {
       buffer.append(OStringSerializerHelper.fieldTypeToString(iLinkedType,o));
     }
-    if (record != null)     buffer.append(OStringSerializerHelper.EMBEDDED);
+    if (document != null)     buffer.append(OStringSerializerHelper.EMBEDDED);
   }
   buffer.append(OStringSerializerHelper.COLLECTION_END);
 }

@@ -1,34 +1,36 @@
 {
-  if (root == null) {
-    root=createEntry(key,value);
-    size=1;
-    modCount++;
-    if (listener != null)     listener.signalTreeChanged(this);
-    return null;
-  }
-  OTreeMapEntry<K,V> parent=getEntry(key,true);
-  if (pageItemFound)   return parent.setValue(value);
-  if (parent == null)   parent=root;
-  if (parent.getFreeSpace() > 0) {
-    parent.insert(pageIndex,key,value);
-  }
- else {
-    final OTreeMapEntry<K,V> newEntry=createEntry(parent,false);
-    if (pageIndex < parent.getPageSplitItems())     parent.insert(pageIndex,key,value);
- else     newEntry.insert(pageIndex - parent.getPageSplitItems(),key,value);
-    if (false) {
-      OTreeMapEntry<K,V> prevNode=parent.getLeft();
-      if (prevNode != null)       newEntry.setLeft(prevNode);
-      parent.setLeft(newEntry);
+  OTreeMapEntry<K,V> parentNode=null;
+  try {
+    if (root == null) {
+      root=createEntry(key,value);
+      size=1;
+      modCount++;
+      if (listener != null)       listener.signalTreeChanged(this);
+      return null;
+    }
+    parentNode=getEntry(key,true);
+    if (pageItemFound)     return parentNode.setValue(value);
+    if (parentNode == null)     parentNode=root;
+    if (parentNode.getFreeSpace() > 0) {
+      parentNode.insert(pageIndex,key,value);
     }
  else {
-      OTreeMapEntry<K,V> prevNode=parent.getRight();
+      final OTreeMapEntry<K,V> newEntry=createEntry(parentNode);
+      if (pageIndex < parentNode.getPageSplitItems())       parentNode.insert(pageIndex,key,value);
+ else       newEntry.insert(pageIndex - parentNode.getPageSplitItems(),key,value);
+      OTreeMapEntry<K,V> prevNode=parentNode.getRight();
       if (prevNode != null)       newEntry.setRight(prevNode);
-      parent.setRight(newEntry);
+      parentNode.setRight(newEntry);
+      fixAfterInsertion(newEntry);
+      checkTreeStructure(parentNode);
+      modCount++;
     }
-    modCount++;
+    checkTreeStructure(parentNode);
+    size++;
+    if (listener != null)     listener.signalTreeChanged(this);
   }
-  size++;
-  if (listener != null)   listener.signalTreeChanged(this);
+  finally {
+    checkTreeStructure(parentNode);
+  }
   return null;
 }

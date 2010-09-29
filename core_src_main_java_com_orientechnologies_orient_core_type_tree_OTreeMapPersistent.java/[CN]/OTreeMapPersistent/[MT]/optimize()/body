@@ -6,8 +6,16 @@
     OLogManager.instance().debug(this,"Starting optimization of RB+Tree...");
     if (entryPoints.size() == 0)     entryPoints.add((OTreeMapEntryPersistent<K,V>)root);
     int nodes=0;
-    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     for (OTreeMapEntryPersistent<K,V> e=entryPoint; e != null; e=e.getNextInMemory()) {
-      ++nodes;
+    List<OTreeMapEntryPersistent<K,V>> tmp=null;
+    if (isRuntimeCheckEnabled())     tmp=new ArrayList<OTreeMapEntryPersistent<K,V>>();
+    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints) {
+      for (OTreeMapEntryPersistent<K,V> e=(OTreeMapEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory()) {
+        if (isRuntimeCheckEnabled()) {
+          for (          OTreeMapEntryPersistent<K,V> t : tmp)           if (t == e || t.record.getIdentity().equals(e.record.getIdentity()))           OLogManager.instance().error(this,"Found duplicated Node in memory: " + e);
+          tmp.add(e);
+        }
+        ++nodes;
+      }
     }
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Found %d nodes in memory, %d items on disk, threshold=%d, entryPoints=%d",nodes,size,(entryPointSize * entryPointThresholdFactor),entryPoints.size());
     if (nodes < entryPointSize * entryPointThresholdFactor)     return;
@@ -28,14 +36,15 @@
     entryPoints=tmpEntryPoints;
     tmpEntryPoints=a;
     tmpEntryPoints.clear();
-    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     entryPoint.disconnect();
-    if (OLogManager.instance().isDebugEnabled()) {
+    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     entryPoint.disconnectLinked();
+    if (isRuntimeCheckEnabled())     if (OLogManager.instance().isDebugEnabled()) {
       nodes=0;
       for (      OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)       for (OTreeMapEntryPersistent<K,V> e=entryPoint; e != null; e=e.getNextInMemory())       ++nodes;
       OLogManager.instance().debug(this,"Now Found %d nodes in memory and threshold=%d. EntryPoints=%d",nodes,(entryPointSize * entryPointThresholdFactor),entryPoints.size());
     }
   }
   finally {
+    if (isRuntimeCheckEnabled())     for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     checkTreeStructure(entryPoint);
     lock.releaseExclusiveLock();
     OProfiler.getInstance().stopChrono("OTreeMapPersistent.optimize",timer);
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Optimization completed in %d ms\n",System.currentTimeMillis() - timer);

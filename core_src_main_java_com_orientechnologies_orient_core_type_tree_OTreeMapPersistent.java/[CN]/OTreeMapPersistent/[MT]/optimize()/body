@@ -9,9 +9,9 @@
     List<OTreeMapEntryPersistent<K,V>> tmp=null;
     if (isRuntimeCheckEnabled())     tmp=new ArrayList<OTreeMapEntryPersistent<K,V>>();
     for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints) {
-      for (OTreeMapEntryPersistent<K,V> e=(OTreeMapEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory()) {
+      for (OTreeMapEntryPersistent<K,V> e=(OTreeMapEntryPersistent<K,V>)entryPoint; e != null; e=e.getNextInMemory()) {
         if (isRuntimeCheckEnabled()) {
-          for (          OTreeMapEntryPersistent<K,V> t : tmp)           if (t == e || t.record.getIdentity().equals(e.record.getIdentity()))           OLogManager.instance().error(this,"Found duplicated Node in memory: " + e);
+          for (          OTreeMapEntryPersistent<K,V> t : tmp)           if (t != e && t.record.getIdentity().equals(e.record.getIdentity()))           OLogManager.instance().error(this,"Found Node loaded in memory twice with different instances: " + e);
           tmp.add(e);
         }
         ++nodes;
@@ -19,6 +19,7 @@
     }
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Found %d nodes in memory, %d items on disk, threshold=%d, entryPoints=%d",nodes,size,(entryPointSize * entryPointThresholdFactor),entryPoints.size());
     if (nodes < entryPointSize * entryPointThresholdFactor)     return;
+    cache.clear();
     final int distance;
     if (nodes <= entryPointSize)     distance=1;
  else     distance=nodes / entryPointSize + 1;
@@ -28,7 +29,15 @@
     OTreeMapEntryPersistent<K,V> lastNode=null;
     for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     for (OTreeMapEntryPersistent<K,V> e=entryPoint; e != null; e=e.getNextInMemory()) {
       ++nodeCounter;
-      if (tmpEntryPoints.size() == 0 || nodeCounter % distance == 0)       tmpEntryPoints.add(e);
+      if (tmpEntryPoints.size() == 0 || nodeCounter % distance == 0) {
+        boolean alreadyPresent=false;
+        for (        OTreeMapEntryPersistent<K,V> ep : tmpEntryPoints)         if (ep == e) {
+          alreadyPresent=true;
+          break;
+        }
+        if (alreadyPresent)         --nodeCounter;
+ else         tmpEntryPoints.add(e);
+      }
       lastNode=e;
     }
     if (tmpEntryPoints.size() > 1 && tmpEntryPoints.get(tmpEntryPoints.size() - 1) != lastNode)     tmpEntryPoints.add(lastNode);
@@ -36,7 +45,10 @@
     entryPoints=tmpEntryPoints;
     tmpEntryPoints=a;
     tmpEntryPoints.clear();
-    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     entryPoint.disconnectLinked();
+    for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints) {
+      entryPoint.disconnectLinked();
+      cache.put(entryPoint.record.getIdentity(),entryPoint);
+    }
     if (isRuntimeCheckEnabled())     if (OLogManager.instance().isDebugEnabled()) {
       nodes=0;
       for (      OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)       for (OTreeMapEntryPersistent<K,V> e=entryPoint; e != null; e=e.getNextInMemory())       ++nodes;

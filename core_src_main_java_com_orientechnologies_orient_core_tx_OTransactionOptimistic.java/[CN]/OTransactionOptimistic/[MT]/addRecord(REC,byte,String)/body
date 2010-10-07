@@ -1,35 +1,40 @@
 {
   checkTransaction();
-  int clusterId=iRecord.getIdentity().getClusterId();
-  long position=iRecord.getIdentity().getClusterPosition();
-  final StringBuilder key=new StringBuilder();
-  key.append(clusterId);
-  key.append(ORID.SEPARATOR);
-  if (position == -1) {
-    for (    OTransactionEntry<REC> entry : entries.values()) {
-      if (entry.record == iRecord)       return;
-    }
-    position=newObjectCounter++;
-    key.append(position);
-    key.append('+');
-  }
- else   key.append(position);
-  OTransactionEntry<REC> txEntry=entries.get(key);
-  if (txEntry == null) {
-    txEntry=new OTransactionEntry<REC>(iRecord,iStatus,iClusterName);
-    entries.put(key.toString(),txEntry);
-  }
+  if (status == OTransaction.TXSTATUS.COMMITTING) {
+switch (iStatus) {
+case OTransactionEntry.CREATED:
+case OTransactionEntry.UPDATED:
+      database.executeSaveRecord(iRecord,iClusterName,iRecord.getVersion(),iRecord.getRecordType());
+    break;
+case OTransactionEntry.DELETED:
+  database.executeDeleteRecord(iRecord,iRecord.getVersion());
+break;
+}
+}
  else {
-    txEntry.record=iRecord;
+final ORecordId rid=(ORecordId)iRecord.getIdentity();
+if (rid.getClusterPosition() == ORID.CLUSTER_POS_INVALID) {
+for (OTransactionEntry<REC> entry : entries.values()) {
+if (entry.record == iRecord) return;
+}
+rid.clusterPosition=newObjectCounter--;
+}
+OTransactionEntry<REC> txEntry=entries.get(rid);
+if (txEntry == null) {
+txEntry=new OTransactionEntry<REC>(iRecord,iStatus,iClusterName);
+entries.put(rid,txEntry);
+}
+ else {
+txEntry.record=iRecord;
 switch (txEntry.status) {
 case OTransactionEntry.LOADED:
 switch (iStatus) {
 case OTransactionEntry.UPDATED:
-        txEntry.status=OTransactionEntry.UPDATED;
-      break;
+  txEntry.status=OTransactionEntry.UPDATED;
+break;
 case OTransactionEntry.DELETED:
-    txEntry.status=OTransactionEntry.DELETED;
-  break;
+txEntry.status=OTransactionEntry.DELETED;
+break;
 }
 break;
 case OTransactionEntry.UPDATED:
@@ -44,10 +49,11 @@ break;
 case OTransactionEntry.CREATED:
 switch (iStatus) {
 case OTransactionEntry.DELETED:
-entries.remove(key);
+entries.remove(rid);
 break;
 }
 break;
+}
 }
 }
 }

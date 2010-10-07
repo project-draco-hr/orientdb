@@ -1,21 +1,17 @@
 {
   final boolean locked=acquireSharedLock();
   try {
-    for (    OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
-      commitEntry(iRequesterId,iTx.getId(),txEntry);
+    final List<OTransactionEntry<? extends ORecord<?>>> allEntries=new ArrayList<OTransactionEntry<? extends ORecord<?>>>();
+    final List<OTransactionEntry<? extends ORecord<?>>> tmpEntries=new ArrayList<OTransactionEntry<? extends ORecord<?>>>();
+    while (iTx.getEntries().iterator().hasNext()) {
+      for (      OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries())       tmpEntries.add(txEntry);
+      iTx.clearEntries();
+      for (      OTransactionEntry<? extends ORecord<?>> txEntry : tmpEntries)       commitEntry(iRequesterId,iTx.getId(),txEntry);
+      allEntries.addAll(tmpEntries);
+      tmpEntries.clear();
     }
-    String rid;
-    ORawBuffer cachedBuffer;
-    for (    OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
-      rid=txEntry.record.getIdentity().toString();
-      cachedBuffer=getCache().getRecord(rid);
-      if (cachedBuffer != null) {
-        cachedBuffer.buffer=txEntry.record.toStream();
-        cachedBuffer.version=txEntry.record.getVersion();
-        cachedBuffer.recordType=txEntry.record.getRecordType();
-      }
- else       if (txEntry.record.isPinned())       getCache().pushRecord(rid,new ORawBuffer(txEntry.record.toStream(),txEntry.record.getVersion(),txEntry.record.getRecordType()));
-    }
+    OTransactionAbstract.updateCacheFromEntries(this,iTx,allEntries);
+    allEntries.clear();
   }
  catch (  IOException e) {
     rollback(iRequesterId,iTx);

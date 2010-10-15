@@ -1,0 +1,27 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  close();
+  File dbDir=new File(url);
+  if (!dbDir.exists() || !dbDir.isDirectory())   dbDir=dbDir.getParentFile();
+  final boolean locked=acquireExclusiveLock();
+  try {
+    for (int i=0; i < 3; ++i) {
+      System.gc();
+      if (dbDir.exists() && dbDir.isDirectory()) {
+        for (        File f : dbDir.listFiles())         f.delete();
+        if (dbDir.delete())         return;
+      }
+ else       return;
+      try {
+        Thread.sleep(200);
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+    throw new OStorageException("Can't delete database '" + name + "' located in: "+ dbDir);
+  }
+  finally {
+    releaseExclusiveLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageLocal.delete",timer);
+  }
+}

@@ -1,29 +1,31 @@
 {
-  boolean needToUpdate=false;
-  if (!parentRid.isValid() && parent != null) {
-    if (parent.record.getIdentity().isNew()) {
-      parent.save();
-      needToUpdate=true;
-    }
+  if (parent != null && !parentRid.isValid()) {
+    if (parent.record.getIdentity().isNew())     ((OTreeMapEntryDatabase<K,V>)parent).save();
     parentRid=parent.record.getIdentity();
+    record.setDirty();
   }
-  if (!leftRid.isValid() && left != null) {
-    if (left.record.getIdentity().isNew()) {
-      left.save();
-      needToUpdate=true;
-    }
+  if (left != null && !leftRid.isValid()) {
+    if (left.record.getIdentity().isNew())     ((OTreeMapEntryDatabase<K,V>)left).save();
     leftRid=left.record.getIdentity();
+    record.setDirty();
   }
-  if (!rightRid.isValid() && right != null) {
-    if (right.record.getIdentity().isNew()) {
-      right.save();
-      needToUpdate=true;
-    }
+  if (right != null && !rightRid.isValid()) {
+    if (right.record.getIdentity().isNew())     ((OTreeMapEntryDatabase<K,V>)right).save();
     rightRid=right.record.getIdentity();
+    record.setDirty();
   }
-  if (needToUpdate) {
-    markDirty();
-    save();
+  if (record.isDirty()) {
+    final boolean isNew=record.getIdentity().isNew();
+    toStream();
+    record.save(pTree.getClusterName());
+    if (isNew) {
+      if (left != null)       left.parentRid=record.getIdentity();
+      if (right != null)       right.parentRid=record.getIdentity();
+      if (parent != null) {
+        if (parent.left == this)         parent.leftRid=record.getIdentity();
+ else         if (parent.right == this)         parent.rightRid=record.getIdentity();
+      }
+    }
   }
-  return needToUpdate;
+  return true;
 }

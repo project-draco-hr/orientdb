@@ -1,0 +1,28 @@
+{
+  Object fieldValue;
+  ODocument doc;
+  clear();
+  acquireExclusiveLock();
+  try {
+    int documentIndexed=0;
+    int documentNum=0;
+    final int[] clusterIds=owner.getOwnerClass().getClusterIds();
+    final long documentTotal=map.getDatabase().countClusterElements(clusterIds);
+    for (    int clusterId : clusterIds)     for (    Object record : map.getDatabase().browseCluster(map.getDatabase().getClusterNameById(clusterId))) {
+      if (record instanceof ODocument) {
+        doc=(ODocument)record;
+        fieldValue=doc.field(owner.getName());
+        if (fieldValue != null) {
+          put(fieldValue.toString(),(ORecordId)doc.getIdentity());
+          ++documentIndexed;
+        }
+      }
+      documentNum++;
+      if (iProgressListener != null)       iProgressListener.onProgress(this,documentNum,(int)(documentNum / documentTotal) * 100);
+    }
+    lazySave();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

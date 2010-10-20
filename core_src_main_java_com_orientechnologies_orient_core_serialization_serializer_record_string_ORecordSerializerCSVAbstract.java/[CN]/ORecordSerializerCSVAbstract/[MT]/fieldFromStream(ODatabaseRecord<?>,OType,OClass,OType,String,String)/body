@@ -27,10 +27,28 @@ case LINKSET:
     }
     return coll;
   }
-case EMBEDDEDMAP:
+case LINKMAP:
 {
-  return embeddedMapFromStream(iDatabase,iLinkedType,iValue);
+  if (iValue.length() == 0)   return null;
+  String value=iValue.substring(1,iValue.length() - 1);
+  @SuppressWarnings("rawtypes") final Map map=new OLazyRecordMap(iDatabase,ODocument.RECORD_TYPE);
+  if (value.length() == 0)   return map;
+  final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR);
+  List<String> entry;
+  String mapValue;
+  for (  String item : items) {
+    if (item != null && item.length() > 0) {
+      entry=OStringSerializerHelper.smartSplit(item,OStringSerializerHelper.ENTRY_SEPARATOR);
+      if (entry.size() > 0) {
+        mapValue=getLinkedRecord(iDatabase,value,entry.get(1));
+        map.put((String)OStringSerializerHelper.fieldTypeFromStream(OType.STRING,entry.get(0)),new ORecordId(mapValue));
+      }
+    }
+  }
+  return map;
 }
+case EMBEDDEDMAP:
+return embeddedMapFromStream(iDatabase,iLinkedType,iValue);
 case LINK:
 if (iValue.length() > 1) {
 int pos=iValue.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);

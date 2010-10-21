@@ -15,70 +15,81 @@
   if (linkName == null)   linkName=sourceField;
   boolean inverse=linkType != null && linkType.equalsIgnoreCase("inverse");
   boolean multipleRelationship=false;
-  for (  ODocument doc : db.browseClass(sourceClass.getName())) {
-    value=doc.field(sourceField);
-    if (value != null) {
-      if (value instanceof ODocument || value instanceof ORID) {
-      }
- else       if (value instanceof Collection<?>) {
-      }
+  long totRecords=db.countClass(sourceClass.getName());
+  long currRecord=0;
+  if (progressListener != null)   progressListener.onBegin(this,totRecords);
+  try {
+    for (    ODocument doc : db.browseClass(sourceClass.getName())) {
+      value=doc.field(sourceField);
+      if (value != null) {
+        if (value instanceof ODocument || value instanceof ORID) {
+        }
+ else         if (value instanceof Collection<?>) {
+        }
  else {
-        if (value instanceof String) {
-          target=null;
-          if (((String)value).length() == 0)           value=null;
+          if (value instanceof String) {
+            target=null;
+            if (((String)value).length() == 0)             value=null;
  else {
-            value="'" + value + "'";
-            result=database.command(new OSQLSynchQuery<ODocument>(cmd + value)).execute();
-            if (result == null || result.size() == 0)             value=null;
- else             if (result.size() > 1)             throw new OCommandExecutionException("Can't create link because multiple records was found in class '" + destClass.getName() + "' with value "+ value+ " in field '"+ destField+ "'");
+              value="'" + value + "'";
+              result=database.command(new OSQLSynchQuery<ODocument>(cmd + value)).execute();
+              if (result == null || result.size() == 0)               value=null;
+ else               if (result.size() > 1)               throw new OCommandExecutionException("Can't create link because multiple records was found in class '" + destClass.getName() + "' with value "+ value+ " in field '"+ destField+ "'");
  else {
-              target=result.get(0);
-              value=target;
+                target=result.get(0);
+                value=target;
+              }
             }
-          }
-          if (target != null && inverse) {
-            oldValue=target.field(linkName);
-            if (oldValue != null) {
-              if (!multipleRelationship)               multipleRelationship=true;
-              Collection<ODocument> coll;
-              if (oldValue instanceof Collection) {
-                coll=(Collection<ODocument>)oldValue;
-                target.setDirty();
+            if (target != null && inverse) {
+              oldValue=target.field(linkName);
+              if (oldValue != null) {
+                if (!multipleRelationship)                 multipleRelationship=true;
+                Collection<ODocument> coll;
+                if (oldValue instanceof Collection) {
+                  coll=(Collection<ODocument>)oldValue;
+                  target.setDirty();
+                }
+ else {
+                  coll=new ArrayList<ODocument>(2);
+                  target.field(linkName,coll);
+                  coll.add((ODocument)oldValue);
+                }
+                coll.add(doc);
               }
  else {
-                coll=new ArrayList<ODocument>(2);
-                target.field(linkName,coll);
-                coll.add((ODocument)oldValue);
+                target.field(linkName,doc);
               }
-              coll.add(doc);
+              target.save();
             }
  else {
-              target.field(linkName,doc);
+              doc.field(linkName,value);
+              doc.save();
             }
-            target.save();
+            total++;
           }
- else {
-            doc.field(linkName,value);
-            doc.save();
-          }
-          total++;
         }
       }
+      if (progressListener != null)       progressListener.onProgress(this,currRecord,currRecord * 100f / totRecords);
     }
-  }
-  if (total > 0) {
-    if (inverse) {
-      OProperty prop=destClass.getProperty(linkName);
-      if (prop != null)       destClass.removeProperty(linkName);
-      destClass.createProperty(linkName,multipleRelationship ? OType.LINKLIST : OType.LINK,sourceClass);
-      database.getMetadata().getSchema().save();
-    }
+    if (total > 0) {
+      if (inverse) {
+        OProperty prop=destClass.getProperty(linkName);
+        if (prop != null)         destClass.removeProperty(linkName);
+        destClass.createProperty(linkName,multipleRelationship ? OType.LINKLIST : OType.LINK,sourceClass);
+        database.getMetadata().getSchema().save();
+      }
  else {
-      OProperty prop=sourceClass.getProperty(linkName);
-      if (prop != null)       sourceClass.removeProperty(linkName);
-      sourceClass.createProperty(linkName,OType.LINK,destClass);
-      database.getMetadata().getSchema().save();
+        OProperty prop=sourceClass.getProperty(linkName);
+        if (prop != null)         sourceClass.removeProperty(linkName);
+        sourceClass.createProperty(linkName,OType.LINK,destClass);
+        database.getMetadata().getSchema().save();
+      }
     }
+    if (progressListener != null)     progressListener.onCompletition(this,true);
+  }
+ catch (  Exception e) {
+    if (progressListener != null)     progressListener.onCompletition(this,false);
+    throw new OCommandExecutionException("Error on creation of links",e);
   }
   return total;
 }

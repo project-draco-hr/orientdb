@@ -1,4 +1,5 @@
 {
+  contextConfig=new OContextConfiguration();
   try {
     String config=OServerConfiguration.DEFAULT_CONFIG_FILE;
     if (System.getProperty(OServerConfiguration.PROPERTY_CONFIG_FILE) != null)     config=System.getProperty(OServerConfiguration.PROPERTY_CONFIG_FILE);
@@ -6,10 +7,25 @@
     configuration=configurationLoader.load();
     if (configuration.users != null && configuration.users.length > 0) {
       for (      OServerUserConfiguration u : configuration.users) {
-        if (u.name.equals(OServerConfiguration.SRV_ROOT_ADMIN))         return;
+        if (u.name.equals(OServerConfiguration.SRV_ROOT_ADMIN)) {
+          rootPassword=u.password;
+          break;
+        }
       }
     }
-    createAdminUser();
+    if (iServerAddress == null) {
+      for (      OServerNetworkListenerConfiguration l : configuration.network.listeners) {
+        if (l.protocol.equals("binary")) {
+          clusterNetworkAddress=l.ipAddress;
+          clusterNetworkPort=OServerNetworkListener.getPorts(l.portRange);
+          break;
+        }
+      }
+    }
+ else {
+      clusterNetworkAddress=iServerAddress;
+      clusterNetworkPort=OServerNetworkListener.getPorts(iServerPorts);
+    }
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on reading server configuration.",OConfigurationException.class);

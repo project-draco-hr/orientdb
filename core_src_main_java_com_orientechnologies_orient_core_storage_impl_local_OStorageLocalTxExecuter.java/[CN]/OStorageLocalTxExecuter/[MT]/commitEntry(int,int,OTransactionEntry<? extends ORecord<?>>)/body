@@ -1,27 +1,29 @@
 {
-  final ORecordId rid=(ORecordId)txEntry.record.getIdentity();
+  final ORecordId rid=(ORecordId)txEntry.getRecord().getIdentity();
   final OCluster cluster=txEntry.clusterName != null ? storage.getClusterByName(txEntry.clusterName) : storage.getClusterById(rid.clusterId);
   if (!(cluster instanceof OClusterLocal))   return;
+  if (txEntry.getRecord() instanceof OTxListener)   ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.BEFORE_COMMIT);
 switch (txEntry.status) {
 case OTransactionEntry.LOADED:
     break;
 case OTransactionEntry.CREATED:
   if (rid.isNew()) {
-    final byte[] stream=txEntry.record.toStream();
+    final byte[] stream=txEntry.getRecord().toStream();
     if (rid.isNew()) {
-      rid.clusterPosition=createRecord(iRequesterId,iTxId,cluster,stream,txEntry.record.getRecordType());
+      rid.clusterPosition=createRecord(iRequesterId,iTxId,cluster,stream,txEntry.getRecord().getRecordType());
       rid.clusterId=cluster.getId();
     }
  else {
-      txEntry.record.setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,stream,txEntry.record.getVersion(),txEntry.record.getRecordType()));
+      txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
     }
   }
 break;
 case OTransactionEntry.UPDATED:
-txEntry.record.setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.record.toStream(),txEntry.record.getVersion(),txEntry.record.getRecordType()));
+txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.getRecord().toStream(),txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
 break;
 case OTransactionEntry.DELETED:
-deleteRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.record.getVersion());
+deleteRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
 break;
 }
+if (txEntry.getRecord() instanceof OTxListener) ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.AFTER_COMMIT);
 }

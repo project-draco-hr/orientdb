@@ -7,15 +7,19 @@
     OTreeMapEntryPersistent<K,V> pRoot=(OTreeMapEntryPersistent<K,V>)root;
     final int depth=pRoot.getMaxDepthInMemory();
     if (depth < entryPointsSize * optimizeEntryPointsFactor)     return;
-    pRoot.disconnect((int)(entryPointsSize * optimizeEntryPointsFactor));
+    pRoot.checkToDisconnect((int)(entryPointsSize * optimizeEntryPointsFactor));
     if (isRuntimeCheckEnabled()) {
       for (      OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)       for (OTreeMapEntryPersistent<K,V> e=(OTreeMapEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
     }
   }
   finally {
-    if (isRuntimeCheckEnabled())     for (    OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)     checkTreeStructure(entryPoint.getFirstInMemory());
+    if (isRuntimeCheckEnabled()) {
+      if (entryPoints.size() > 0)       for (      OTreeMapEntryPersistent<K,V> entryPoint : entryPoints)       checkTreeStructure(entryPoint.getFirstInMemory());
+ else       checkTreeStructure(root);
+    }
     lock.releaseExclusiveLock();
     OProfiler.getInstance().stopChrono("OTreeMapPersistent.optimize",timer);
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Optimization completed in %d ms\n",System.currentTimeMillis() - timer);
+    usageCounter=0;
   }
 }

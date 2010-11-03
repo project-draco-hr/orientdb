@@ -1,4 +1,5 @@
 {
+  if (!txEntry.getRecord().isDirty())   return;
   final ORecordId rid=(ORecordId)txEntry.getRecord().getIdentity();
   final OCluster cluster=txEntry.clusterName != null ? storage.getClusterByName(txEntry.clusterName) : storage.getClusterById(rid.clusterId);
   if (!(cluster instanceof OClusterLocal))   return;
@@ -7,16 +8,14 @@ switch (txEntry.status) {
 case OTransactionEntry.LOADED:
     break;
 case OTransactionEntry.CREATED:
-  if (rid.isNew()) {
-    final byte[] stream=txEntry.getRecord().toStream();
-    if (rid.isNew()) {
-      rid.clusterPosition=createRecord(iRequesterId,iTxId,cluster,stream,txEntry.getRecord().getRecordType());
-      rid.clusterId=cluster.getId();
-    }
+  final byte[] stream=txEntry.getRecord().toStream();
+if (rid.isNew()) {
+  rid.clusterPosition=createRecord(iRequesterId,iTxId,cluster,stream,txEntry.getRecord().getRecordType());
+  rid.clusterId=cluster.getId();
+}
  else {
-      txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
-    }
-  }
+  txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+}
 break;
 case OTransactionEntry.UPDATED:
 txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.getRecord().toStream(),txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
@@ -25,5 +24,6 @@ case OTransactionEntry.DELETED:
 deleteRecord(iRequesterId,iTxId,cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
 break;
 }
+txEntry.getRecord().unsetDirty();
 if (txEntry.getRecord() instanceof OTxListener) ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.AFTER_COMMIT);
 }

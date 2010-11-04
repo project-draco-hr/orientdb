@@ -1,0 +1,63 @@
+{
+  if (iValue == null)   return null;
+switch (iType) {
+case EMBEDDEDLIST:
+case EMBEDDEDSET:
+    return embeddedCollectionFromStream(iSourceRecord.getDatabase(),iType,iLinkedClass,iLinkedType,iValue);
+case LINKLIST:
+case LINKSET:
+{
+    if (iValue.length() == 0)     return null;
+    String value=iValue.startsWith("[") ? iValue.substring(1,iValue.length() - 1) : iValue;
+    Collection<Object> coll=iType == OType.LINKLIST ? new OLazyRecordList(iSourceRecord,ODocument.RECORD_TYPE) : new OLazyRecordSet(iSourceRecord,ODocument.RECORD_TYPE);
+    if (value.length() == 0)     return coll;
+    final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR);
+    for (    String item : items) {
+      int classSeparatorPos=value.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
+      if (classSeparatorPos > -1) {
+        String className=value.substring(1,classSeparatorPos);
+        if (className != null) {
+          iLinkedClass=iSourceRecord.getDatabase().getMetadata().getSchema().getClass(className);
+          item=item.substring(classSeparatorPos + 1);
+        }
+      }
+ else       item=item.substring(1);
+      if (item.length() == 0)       continue;
+      coll.add(new ORecordId(item));
+    }
+    return coll;
+  }
+case LINKMAP:
+{
+  if (iValue.length() == 0)   return null;
+  String value=iValue.substring(1,iValue.length() - 1);
+  @SuppressWarnings("rawtypes") final Map map=new OLazyRecordMap(iSourceRecord,ODocument.RECORD_TYPE);
+  if (value.length() == 0)   return map;
+  final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR);
+  List<String> entry;
+  String mapValue;
+  for (  String item : items) {
+    if (item != null && item.length() > 0) {
+      entry=OStringSerializerHelper.smartSplit(item,OStringSerializerHelper.ENTRY_SEPARATOR);
+      if (entry.size() > 0) {
+        mapValue=getLinkedRecord(iSourceRecord.getDatabase(),value,entry.get(1));
+        map.put((String)OStringSerializerHelper.fieldTypeFromStream(OType.STRING,entry.get(0)),new ORecordId(mapValue));
+      }
+    }
+  }
+  return map;
+}
+case EMBEDDEDMAP:
+return embeddedMapFromStream(iSourceRecord,iLinkedType,iValue);
+case LINK:
+if (iValue.length() > 1) {
+int pos=iValue.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
+if (pos > -1) iLinkedClass=iSourceRecord.getDatabase().getMetadata().getSchema().getClass(iValue.substring(1,pos));
+ else pos=0;
+return new ORecordId(iValue.substring(pos + 1));
+}
+ else return null;
+default :
+return OStringSerializerHelper.fieldTypeFromStream(iType,iValue);
+}
+}

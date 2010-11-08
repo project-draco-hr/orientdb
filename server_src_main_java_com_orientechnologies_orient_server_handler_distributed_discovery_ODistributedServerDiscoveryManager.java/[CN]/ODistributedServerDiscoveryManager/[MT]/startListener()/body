@@ -1,0 +1,31 @@
+{
+  discoveryListener=new ODistributedServerDiscoveryListener(this,distributedNetworkListener);
+  Orient.getTimer().schedule(new TimerTask(){
+    @Override public void run(){
+      final List<ODistributedServerNode> nodeList;
+      boolean locked=lock.acquireSharedLock();
+      try {
+        if (nodes.values().size() == 0)         return;
+        nodeList=new ArrayList<ODistributedServerNode>(nodes.values());
+      }
+  finally {
+        lock.releaseSharedLock(locked);
+      }
+      try {
+        for (        ODistributedServerNode node : nodeList) {
+          if (!node.sendKeepAlive(networkTimeoutLeader)) {
+            OLogManager.instance().warn(this,"Remote server node %s:%d seems down, retrying to connect...",node.networkAddress,node.networkPort);
+            OLogManager.instance().warn(this,"Remote server node %s:%d is down, remove from the server list",node.networkAddress,node.networkPort);
+            locked=lock.acquireExclusiveLock();
+            nodes.remove(node.toString());
+            lock.releaseExclusiveLock(locked);
+          }
+        }
+        nodeList.clear();
+      }
+ catch (      Exception e) {
+      }
+    }
+  }
+,networkKeepaliveDelay,networkKeepaliveDelay);
+}

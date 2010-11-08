@@ -4,23 +4,28 @@
     return;
   }
 switch (commandType) {
+case OChannelDistributedProtocol.NODECLUSTER_KEEPALIVE:
+    data.commandInfo="Keep-alive";
+  sendOk(clientTxId);
+break;
 case OChannelDistributedProtocol.NODECLUSTER_CONNECT:
 {
-      data.commandInfo="Cluster connection";
-      sendOk(clientTxId);
-      Map<String,Long> storages=new HashMap<String,Long>();
-      for (      OStorage stg : Orient.instance().getStorages()) {
-        storages.put(stg.getName(),stg.getVersion());
-      }
-      channel.writeInt(storages.size());
-      for (      Entry<String,Long> s : storages.entrySet()) {
-        channel.writeString(s.getKey());
-        channel.writeLong(s.getValue());
-      }
-      break;
-    }
+data.commandInfo="Cluster connection";
+manager.receivedLeaderConnection(this);
+sendOk(clientTxId);
+Map<String,Long> storages=new HashMap<String,Long>();
+for (OStorage stg : Orient.instance().getStorages()) {
+  storages.put(stg.getName(),stg.getVersion());
+}
+channel.writeInt(storages.size());
+for (Entry<String,Long> s : storages.entrySet()) {
+  channel.writeString(s.getKey());
+  channel.writeLong(s.getValue());
+}
+break;
+}
 default :
-  data.commandInfo="Command not supported";
+data.commandInfo="Command not supported";
 OLogManager.instance().error(this,"Request not supported. Code: " + commandType);
 channel.clearInput();
 sendError(clientTxId,null);

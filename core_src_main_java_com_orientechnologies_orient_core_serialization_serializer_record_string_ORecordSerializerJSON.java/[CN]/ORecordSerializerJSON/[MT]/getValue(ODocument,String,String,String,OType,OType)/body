@@ -3,8 +3,8 @@
   if (iFieldName != null)   if (iRecord.getSchemaClass() != null) {
     final OProperty p=iRecord.getSchemaClass().getProperty(iFieldName);
     if (p != null) {
-      type=p.getType();
-      linkedType=p.getLinkedType();
+      iType=p.getType();
+      iLinkedType=p.getLinkedType();
     }
   }
   if (iFieldValue.startsWith("{") && iFieldValue.endsWith("}")) {
@@ -18,42 +18,45 @@
         if (iFieldName.length() >= 2)         iFieldName=iFieldName.substring(1,iFieldName.length() - 1);
         iFieldValue=fields[i + 1];
         iFieldValueAsString=iFieldValue.length() >= 2 ? iFieldValue.substring(1,iFieldValue.length() - 1) : iFieldValue;
-        embeddedMap.put(iFieldName,getValue(iRecord,null,iFieldValue,iFieldValueAsString,linkedType,null));
+        embeddedMap.put(iFieldName,getValue(iRecord,null,iFieldValue,iFieldValueAsString,iLinkedType,null));
       }
       return embeddedMap;
     }
   }
  else   if (iFieldValue.startsWith("[") && iFieldValue.endsWith("]")) {
     final Collection<Object> embeddedCollection;
-    if (type == OType.LINKSET || type == OType.EMBEDDEDSET)     embeddedCollection=new HashSet<Object>();
- else     embeddedCollection=new ArrayList<Object>();
+    if (iType == OType.LINKSET || iType == OType.EMBEDDEDSET)     embeddedCollection=new ORecordTrackedSet(iRecord);
+ else     embeddedCollection=new ORecordTrackedList(iRecord);
     iFieldValue=iFieldValue.substring(1,iFieldValue.length() - 1);
     if (iFieldValue.length() > 0) {
       List<String> items=OStringSerializerHelper.smartSplit(iFieldValue,',');
+      Object collectionItem;
       for (      String item : items) {
         iFieldValue=item.trim();
         iFieldValueAsString=iFieldValue.length() >= 2 ? iFieldValue.substring(1,iFieldValue.length() - 1) : iFieldValue;
-        embeddedCollection.add(getValue(iRecord,null,iFieldValue,iFieldValueAsString,linkedType,null));
+        collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,iLinkedType,null);
+        if (collectionItem instanceof ODocument && iRecord instanceof ODocument)         ((ODocument)collectionItem).setOwner(iRecord);
+        embeddedCollection.add(collectionItem);
       }
     }
     return embeddedCollection;
   }
-  if (type == null)   if (iFieldValue.charAt(0) != '\"') {
-    if (iFieldValue.equalsIgnoreCase("false") || iFieldValue.equalsIgnoreCase("true"))     type=OType.BOOLEAN;
- else     if (OStringSerializerHelper.contains(iFieldValue,'.'))     type=OType.DOUBLE;
- else     type=OType.LONG;
+  if (iType == null)   if (iFieldValue.charAt(0) != '\"') {
+    if (iFieldValue.equalsIgnoreCase("false") || iFieldValue.equalsIgnoreCase("true"))     iType=OType.BOOLEAN;
+ else     if (OStringSerializerHelper.contains(iFieldValue,'.'))     iType=OType.DOUBLE;
+ else     iType=OType.LONG;
   }
- else   if (iFieldValueAsString.length() >= 4 && iFieldValueAsString.charAt(0) == '#')   type=OType.LINK;
- else   if (iFieldValueAsString.startsWith("{") && iFieldValueAsString.endsWith("}"))   type=OType.EMBEDDED;
+ else   if (iFieldValueAsString.length() >= 4 && iFieldValueAsString.charAt(0) == '#')   iType=OType.LINK;
+ else   if (iFieldValueAsString.startsWith("{") && iFieldValueAsString.endsWith("}"))   iType=OType.EMBEDDED;
  else {
     if (iFieldValueAsString.length() == DEF_DATE_FORMAT.length())     try {
       return dateFormat.parseObject(iFieldValueAsString);
     }
  catch (    Exception e) {
     }
-    type=OType.STRING;
+    iType=OType.STRING;
   }
-  if (type != null) switch (type) {
+  if (iType != null) switch (iType) {
 case STRING:
     return iFieldValueAsString;
 case LINK:
@@ -70,7 +73,7 @@ return dateFormat.parseObject(iFieldValueAsString);
 throw new OSerializationException("Unable to unmarshall date: " + iFieldValueAsString,e);
 }
 default :
-return OStringSerializerHelper.fieldTypeFromStream(type,iFieldValue);
+return OStringSerializerHelper.fieldTypeFromStream(iType,iFieldValue);
 }
 return iFieldValueAsString;
 }

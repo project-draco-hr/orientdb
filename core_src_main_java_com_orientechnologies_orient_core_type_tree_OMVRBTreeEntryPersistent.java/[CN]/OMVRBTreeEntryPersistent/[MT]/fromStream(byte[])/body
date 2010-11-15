@@ -1,0 +1,32 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final OMemoryInputStream buffer=new OMemoryInputStream(iStream);
+  try {
+    pageSize=buffer.getAsShort();
+    parentRid=new ORecordId().fromStream(buffer.getAsByteArrayFixed(ORecordId.PERSISTENT_SIZE));
+    leftRid=new ORecordId().fromStream(buffer.getAsByteArrayFixed(ORecordId.PERSISTENT_SIZE));
+    rightRid=new ORecordId().fromStream(buffer.getAsByteArrayFixed(ORecordId.PERSISTENT_SIZE));
+    color=buffer.getAsBoolean();
+    init();
+    size=buffer.getAsShort();
+    if (size > pageSize)     throw new OConfigurationException("Loaded index with page size setted to " + pageSize + " while the loaded was built with: "+ size);
+    serializedKeys=new byte[pageSize][];
+    for (int i=0; i < size; ++i) {
+      serializedKeys[i]=buffer.getAsByteArray();
+    }
+    keys=(K[])new Object[pageSize];
+    serializedValues=new byte[pageSize][];
+    for (int i=0; i < size; ++i) {
+      serializedValues[i]=buffer.getAsByteArray();
+    }
+    values=(V[])new Object[pageSize];
+    return this;
+  }
+ catch (  IOException e) {
+    throw new OSerializationException("Can't unmarshall RB+Tree node",e);
+  }
+ finally {
+    buffer.close();
+    OProfiler.getInstance().stopChrono("OMVRBTreeEntryP.fromStream",timer);
+  }
+}

@@ -1,0 +1,33 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final Integer identityRecord=System.identityHashCode(record);
+  final Set<Integer> marshalledRecords=OSerializationThreadLocal.INSTANCE.get();
+  if (marshalledRecords.contains(identityRecord)) {
+    return new byte[]{};
+  }
+ else   marshalledRecords.add(identityRecord);
+  OMemoryOutputStream stream=new OMemoryOutputStream();
+  try {
+    if (root != null) {
+      OMVRBTreeEntryPersistent<K,V> pRoot=(OMVRBTreeEntryPersistent<K,V>)root;
+      if (pRoot.record.getIdentity().isNew()) {
+        pRoot.save();
+      }
+      stream.addAsFixed(pRoot.record.getIdentity().toStream());
+    }
+ else     stream.addAsFixed(ORecordId.EMPTY_RECORD_ID_STREAM);
+    stream.add(size);
+    stream.add((short)lastPageSize);
+    stream.add(keySerializer.getName());
+    stream.add(valueSerializer.getName());
+    record.fromStream(stream.getByteArray());
+    return record.toStream();
+  }
+ catch (  IOException e) {
+    throw new OSerializationException("Error on marshalling RB+Tree",e);
+  }
+ finally {
+    marshalledRecords.remove(identityRecord);
+    OProfiler.getInstance().stopChrono("OMVRBTreePersistent.toStream",timer);
+  }
+}

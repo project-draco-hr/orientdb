@@ -1,0 +1,40 @@
+{
+  OMVRBTreeEntry<K,V> parentNode=null;
+  try {
+    if (root == null) {
+      root=createEntry(key,value);
+      root.setColor(BLACK);
+      size=1;
+      modCount++;
+      if (listener != null)       listener.signalTreeChanged(this);
+      return null;
+    }
+    parentNode=getEntry(key,true);
+    if (pageItemFound)     return parentNode.setValue(value);
+    if (parentNode == null)     parentNode=root;
+    if (parentNode.getFreeSpace() > 0) {
+      parentNode.insert(pageIndex,key,value);
+    }
+ else {
+      final OMVRBTreeEntry<K,V> newNode=createEntry(parentNode);
+      if (pageIndex < parentNode.getPageSplitItems())       parentNode.insert(pageIndex,key,value);
+ else       newNode.insert(pageIndex - parentNode.getPageSplitItems(),key,value);
+      final OMVRBTreeEntry<K,V> prevNode=parentNode.getRight();
+      parentNode.setRight(newNode);
+      if (prevNode != null) {
+        newNode.setRight(prevNode);
+        fixAfterInsertion(prevNode);
+      }
+ else       fixAfterInsertion(newNode);
+      checkTreeStructure(parentNode);
+      modCount++;
+    }
+    checkTreeStructure(parentNode);
+    size++;
+    if (listener != null)     listener.signalTreeChanged(this);
+  }
+  finally {
+    checkTreeStructure(parentNode);
+  }
+  return null;
+}

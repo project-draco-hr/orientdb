@@ -1,0 +1,60 @@
+{
+  if (key == null)   return null;
+  pageItemFound=false;
+  if (comparator != null)   return getEntryUsingComparator(key,iGetContainer);
+  OMVRBTreeEntry<K,V> p=getBestEntryPoint(key);
+  checkTreeStructure(p);
+  if (p == null)   return null;
+  OMVRBTreeEntry<K,V> lastNode=p;
+  OMVRBTreeEntry<K,V> prevNode=null;
+  OMVRBTreeEntry<K,V> tmpNode;
+  int beginKey=-1;
+  int steps=-1;
+  final Comparable<? super K> k=(Comparable<? super K>)key;
+  try {
+    while (p != null) {
+      steps++;
+      lastNode=p;
+      try {
+        beginKey=k.compareTo(p.getFirstKey());
+      }
+ catch (      Exception e) {
+      }
+      if (beginKey == 0) {
+        pageIndex=0;
+        pageItemFound=true;
+        pageItemComparator=0;
+        return p;
+      }
+      pageItemComparator=k.compareTo(p.getLastKey());
+      if (beginKey < 0) {
+        if (pageItemComparator < 0) {
+          tmpNode=predecessor(p);
+          if (tmpNode != null && tmpNode != prevNode) {
+            prevNode=p;
+            p=tmpNode;
+            continue;
+          }
+        }
+      }
+ else       if (beginKey > 0) {
+        if (pageItemComparator > 0) {
+          tmpNode=successor(p);
+          if (tmpNode != null && tmpNode != prevNode) {
+            prevNode=p;
+            p=tmpNode;
+            continue;
+          }
+        }
+      }
+      final V value=lastNode.search(k);
+      if (value != null || iGetContainer)       return lastNode;
+      return null;
+    }
+  }
+  finally {
+    checkTreeStructure(p);
+    OProfiler.getInstance().updateStat("[OMVRBTree.getEntry] Steps of search",steps);
+  }
+  return null;
+}

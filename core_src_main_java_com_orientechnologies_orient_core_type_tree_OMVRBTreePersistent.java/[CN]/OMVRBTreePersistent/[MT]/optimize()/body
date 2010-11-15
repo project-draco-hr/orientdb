@@ -1,0 +1,25 @@
+{
+  final long timer=System.currentTimeMillis();
+  lock.acquireExclusiveLock();
+  try {
+    if (root == null)     return;
+    OLogManager.instance().debug(this,"Starting optimization of RB+Tree...");
+    OMVRBTreeEntryPersistent<K,V> pRoot=(OMVRBTreeEntryPersistent<K,V>)root;
+    final int depth=pRoot.getMaxDepthInMemory();
+    if (depth < entryPointsSize * optimizeEntryPointsFactor)     return;
+    pRoot.checkToDisconnect((int)(entryPointsSize * optimizeEntryPointsFactor));
+    if (isRuntimeCheckEnabled()) {
+      for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
+    }
+  }
+  finally {
+    if (isRuntimeCheckEnabled()) {
+      if (entryPoints.size() > 0)       for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       checkTreeStructure(entryPoint.getFirstInMemory());
+ else       checkTreeStructure(root);
+    }
+    lock.releaseExclusiveLock();
+    OProfiler.getInstance().stopChrono("OMVRBTreePersistent.optimize",timer);
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Optimization completed in %d ms\n",System.currentTimeMillis() - timer);
+    usageCounter=0;
+  }
+}

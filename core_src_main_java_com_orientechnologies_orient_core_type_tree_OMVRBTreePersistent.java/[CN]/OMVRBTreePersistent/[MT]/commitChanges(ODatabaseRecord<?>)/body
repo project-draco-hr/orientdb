@@ -1,0 +1,30 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  lock.acquireExclusiveLock();
+  try {
+    if (recordsToCommit.size() > 0) {
+      final List<OMVRBTreeEntryPersistent<K,V>> tmp=new ArrayList<OMVRBTreeEntryPersistent<K,V>>();
+      while (recordsToCommit.iterator().hasNext()) {
+        tmp.addAll(recordsToCommit);
+        recordsToCommit.clear();
+        for (        OMVRBTreeEntryPersistent<K,V> node : tmp)         if (node.record.isDirty()) {
+          if (iDatabase != null)           node.record.setDatabase(iDatabase);
+          node.save();
+        }
+        tmp.clear();
+      }
+      recordsToCommit.clear();
+    }
+    if (record.isDirty()) {
+      if (iDatabase != null)       record.setDatabase(iDatabase);
+      save();
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().exception("Error on saving the tree",e,OStorageException.class);
+  }
+ finally {
+    lock.releaseExclusiveLock();
+    OProfiler.getInstance().stopChrono("OMVRBTreePersistent.commitChanges",timer);
+  }
+}

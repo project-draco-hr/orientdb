@@ -1,0 +1,78 @@
+{
+  final StringBuilder buffer=new StringBuilder();
+  if (iValue == null)   buffer.append("null");
+ else   if (iValue instanceof ORecordId) {
+    final ORecordId rid=(ORecordId)iValue;
+    buffer.append("\"");
+    buffer.append(rid.toString());
+    buffer.append('\"');
+  }
+ else   if (iValue instanceof ORecord<?>) {
+    final ORecord<?> linked=(ORecord<?>)iValue;
+    if (linked.getIdentity().isValid()) {
+      buffer.append("\"#");
+      buffer.append(linked.getIdentity().toString());
+      buffer.append('\"');
+    }
+ else {
+      buffer.append(linked.toJSON(iFormat));
+    }
+  }
+ else   if (iValue.getClass().isArray()) {
+    if (iValue instanceof byte[]) {
+      buffer.append('\"');
+      final byte[] source=(byte[])iValue;
+      buffer.append(OBase64Utils.encodeBytes(source));
+      buffer.append('\"');
+    }
+ else {
+      buffer.append('[');
+      for (int i=0; i < Array.getLength(iValue); ++i) {
+        if (i > 0)         buffer.append(", ");
+        buffer.append(writeValue(Array.get(iValue,i),iFormat));
+      }
+      buffer.append(']');
+    }
+  }
+ else   if (iValue instanceof Collection<?>) {
+    final Collection<Object> coll=(Collection<Object>)iValue;
+    buffer.append('[');
+    int i=0;
+    for (Iterator<Object> it=coll.iterator(); it.hasNext(); ++i) {
+      if (i > 0)       buffer.append(", ");
+      buffer.append(writeValue(it.next(),iFormat));
+    }
+    buffer.append(']');
+  }
+ else   if (iValue instanceof Map<?,?>) {
+    final Map<Object,Object> map=(Map<Object,Object>)iValue;
+    buffer.append('{');
+    int i=0;
+    Entry<Object,Object> entry;
+    for (Iterator<Entry<Object,Object>> it=map.entrySet().iterator(); it.hasNext(); ++i) {
+      entry=it.next();
+      if (i > 0)       buffer.append(", ");
+      buffer.append(writeValue(entry.getKey(),iFormat));
+      buffer.append(": ");
+      buffer.append(writeValue(entry.getValue(),iFormat));
+    }
+    buffer.append('}');
+  }
+ else   if (iValue instanceof Date) {
+    final SimpleDateFormat dateFormat=new SimpleDateFormat(ORecordSerializerJSON.DEF_DATE_FORMAT);
+    buffer.append('"');
+    buffer.append(dateFormat.format(iValue));
+    buffer.append('"');
+  }
+ else   if (iValue instanceof String) {
+    final String v=iValue.toString();
+    if (v.startsWith("\""))     buffer.append(v);
+ else {
+      buffer.append('"');
+      buffer.append(v);
+      buffer.append('"');
+    }
+  }
+ else   buffer.append(iValue.toString());
+  return buffer.toString();
+}

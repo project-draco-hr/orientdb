@@ -1,0 +1,52 @@
+{
+  if (status == STATUS.DISCONNECTED) {
+synchronized (bufferedChanges) {
+      if (bufferedChanges.size() > manager.serverOutSynchMaxBuffers) {
+        manager.removeNode(this);
+        bufferedChanges.clear();
+      }
+ else       bufferedChanges.add(iRequest);
+    }
+  }
+ else {
+    final ORecordInternal<?> record=iRequest.getRecord();
+    try {
+switch (iRequest.status) {
+case OTransactionEntry.CREATED:
+        network.writeByte(OChannelDistributedProtocol.REQUEST_RECORD_CREATE);
+      network.writeInt(0);
+    network.writeShort((short)record.getIdentity().getClusterId());
+  network.writeBytes(record.toStream());
+network.writeByte(record.getRecordType());
+network.flush();
+network.readStatus();
+break;
+case OTransactionEntry.UPDATED:
+network.writeByte(OChannelDistributedProtocol.REQUEST_RECORD_UPDATE);
+network.writeInt(0);
+network.writeShort((short)record.getIdentity().getClusterId());
+network.writeLong(record.getIdentity().getClusterPosition());
+network.writeBytes(record.toStream());
+network.writeInt(record.getVersion());
+network.writeByte(record.getRecordType());
+network.flush();
+readStatus();
+network.readInt();
+break;
+case OTransactionEntry.DELETED:
+network.writeByte(OChannelDistributedProtocol.REQUEST_RECORD_DELETE);
+network.writeInt(0);
+network.writeShort((short)record.getIdentity().getClusterId());
+network.writeLong(record.getIdentity().getClusterPosition());
+network.writeInt(record.getVersion());
+network.flush();
+readStatus();
+network.readLong();
+break;
+}
+}
+ catch (RuntimeException e) {
+throw e;
+}
+}
+}

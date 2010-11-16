@@ -1,5 +1,5 @@
 {
-switch (commandType) {
+switch (requestType) {
 case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
 {
       data.commandInfo="Shutdowning";
@@ -39,7 +39,6 @@ case OChannelBinaryProtocol.REQUEST_DB_OPEN:
   if (connection.database.isClosed())   if (connection.database.getStorage() instanceof OStorageMemory)   connection.database.create();
  else   connection.database.open(user,passwd);
   underlyingDatabase=((ODatabaseRaw)((ODatabaseComplex<?>)connection.database.getUnderlying()).getUnderlying());
-  installClusterTrigger();
   if (!(underlyingDatabase.getStorage() instanceof OStorageMemory) && !loadUserFromSchema(user,passwd)) {
     sendError(clientTxId,new OSecurityAccessException(connection.database.getName(),"Access denied to database '" + connection.database.getName() + "' for user: "+ user));
   }
@@ -82,7 +81,7 @@ if (storageMode.equals(OEngineLocal.NAME)) {
   OServerMain.server().getMemoryDatabases().put(dbName,connection.database);
 }
 underlyingDatabase=((ODatabaseRaw)((ODatabaseComplex<?>)connection.database.getUnderlying()).getUnderlying());
-installClusterTrigger();
+invokeHandlerCallbackOnClientConnection();
 sendOk(clientTxId);
 break;
 }
@@ -385,7 +384,7 @@ break;
 }
 default :
 data.commandInfo="Command not supported";
-OLogManager.instance().error(this,"Request not supported. Code: " + commandType);
+OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
 channel.clearInput();
 sendError(clientTxId,null);
 }

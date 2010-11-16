@@ -1,0 +1,31 @@
+{
+  flush();
+  final byte result=readByte();
+  final int clientTxId=readInt();
+  if (result == OChannelBinaryProtocol.RESPONSE_STATUS_ERROR) {
+    StringBuilder buffer=new StringBuilder();
+    boolean moreDetails=false;
+    String rootClassName=null;
+    do {
+      final String excClassName=readString();
+      final String excMessage=readString();
+      if (!moreDetails) {
+        rootClassName=excClassName;
+      }
+ else {
+        buffer.append("\n-> ");
+        buffer.append(excClassName);
+        buffer.append(": ");
+      }
+      buffer.append(excMessage);
+      moreDetails=readByte() == 1;
+    }
+ while (moreDetails);
+    throw createException(rootClassName,buffer.toString());
+  }
+ else   if (result != OChannelBinaryProtocol.RESPONSE_STATUS_OK) {
+    clearInput();
+    throw new ONetworkProtocolException("Error on reading response from the server");
+  }
+  return clientTxId;
+}

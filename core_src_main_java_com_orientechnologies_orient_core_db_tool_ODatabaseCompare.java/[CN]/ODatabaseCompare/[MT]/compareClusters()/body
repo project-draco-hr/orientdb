@@ -1,0 +1,39 @@
+{
+  listener.onMessage("\nStarting shallow comparison of clusters:");
+  listener.onMessage("\nChecking the number of clusters...");
+  if (storage1.getClusterNames().size() != storage1.getClusterNames().size()) {
+    listener.onMessage("KO: cluster sizes are different: " + storage1.getClusterNames().size() + " <-> "+ storage1.getClusterNames().size());
+    ++differences;
+  }
+  int cluster2Id;
+  boolean ok;
+  for (  String clusterName : storage1.getClusterNames()) {
+    if (includeClusters != null) {
+      if (!includeClusters.contains(clusterName))       continue;
+    }
+ else     if (excludeClusters != null) {
+      if (excludeClusters.contains(clusterName))       continue;
+    }
+    ok=true;
+    cluster2Id=storage2.getClusterIdByName(clusterName);
+    listener.onMessage("\n- Checking cluster " + String.format("%-25s: ","'" + clusterName + "'"));
+    if (cluster2Id == -1) {
+      listener.onMessage("KO: cluster name " + clusterName + " was not found on database "+ storage2);
+      ++differences;
+      ok=false;
+    }
+    if (cluster2Id != storage1.getClusterIdByName(clusterName)) {
+      listener.onMessage("KO: cluster id is different for cluster " + clusterName + ": "+ storage1.getClusterIdByName(clusterName)+ " <-> "+ cluster2Id);
+      ++differences;
+      ok=false;
+    }
+    if (storage1.count(cluster2Id) != storage2.count(cluster2Id)) {
+      listener.onMessage("KO: number of records differents in cluster '" + clusterName + "' (id="+ cluster2Id+ "): "+ storage1.count(cluster2Id)+ " <-> "+ storage2.count(cluster2Id));
+      ++differences;
+      ok=false;
+    }
+    if (ok)     listener.onMessage("OK");
+  }
+  listener.onMessage("\n\nShallow analysis done.");
+  return true;
+}

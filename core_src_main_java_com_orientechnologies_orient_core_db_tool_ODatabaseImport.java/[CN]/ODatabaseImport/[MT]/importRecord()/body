@@ -1,0 +1,40 @@
+{
+  String value=jsonReader.readString(OJSONReader.END_OBJECT,true);
+  record=ORecordSerializerJSON.INSTANCE.fromString(database,value,record);
+  if (includeClusters != null) {
+    if (!includeClusters.contains(database.getClusterNameById(record.getIdentity().getClusterId()))) {
+      jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+      return null;
+    }
+  }
+ else   if (excludeClusters != null) {
+    if (excludeClusters.contains(database.getClusterNameById(record.getIdentity().getClusterId()))) {
+      jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+      return null;
+    }
+  }
+  String rid=record.getIdentity().toString();
+  long nextAvailablePos=database.getStorage().getClusterDataRange(record.getIdentity().getClusterId())[1] + 1;
+  if (record.getIdentity().getClusterPosition() < nextAvailablePos) {
+    if (record instanceof ODocument)     record.save();
+ else     ((ODatabaseRecord<ORecordInternal<?>>)database.getUnderlying()).save(record);
+  }
+ else {
+    String clusterName=database.getClusterNameById(record.getIdentity().getClusterId());
+    if (record.getIdentity().getClusterPosition() > nextAvailablePos) {
+      int holes=(int)(record.getIdentity().getClusterPosition() - nextAvailablePos);
+      ODocument tempRecord=new ODocument(database);
+      for (int i=0; i < holes; ++i) {
+        tempRecord.reset();
+        ((ODatabaseRecord<ORecordInternal<?>>)database.getUnderlying()).save(tempRecord,clusterName);
+        recordToDelete.add(tempRecord.getIdentity().toString());
+      }
+    }
+    record.setIdentity(-1,-1);
+    if (record instanceof ODocument)     record.save(clusterName);
+ else     ((ODatabaseRecord<ORecordInternal<?>>)database.getUnderlying()).save(record,clusterName);
+  }
+  if (!record.getIdentity().toString().equals(rid))   throw new OSchemaException("Imported record '" + record.getIdentity() + "' has rid different from the original: "+ rid);
+  jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+  return record.getIdentity();
+}

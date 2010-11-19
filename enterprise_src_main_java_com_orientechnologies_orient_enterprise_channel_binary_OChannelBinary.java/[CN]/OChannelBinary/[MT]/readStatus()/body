@@ -4,24 +4,20 @@
   final int clientTxId=readInt();
   if (result == OChannelBinaryProtocol.RESPONSE_STATUS_ERROR) {
     StringBuilder buffer=new StringBuilder();
-    boolean moreDetails=false;
     String rootClassName=null;
-    do {
+    while (readByte() == 1) {
       final String excClassName=readString();
       final String excMessage=readString();
-      if (!moreDetails) {
-        rootClassName=excClassName;
-      }
+      if (rootClassName == null)       rootClassName=excClassName;
  else {
         buffer.append("\n-> ");
         buffer.append(excClassName);
         buffer.append(": ");
       }
       buffer.append(excMessage);
-      moreDetails=readByte() == 1;
     }
- while (moreDetails);
-    throw createException(rootClassName,buffer.toString());
+    if (rootClassName != null)     throw createException(rootClassName,buffer.toString());
+    throw new ONetworkProtocolException("Network response error: " + buffer.toString());
   }
  else   if (result != OChannelBinaryProtocol.RESPONSE_STATUS_OK) {
     clearInput();

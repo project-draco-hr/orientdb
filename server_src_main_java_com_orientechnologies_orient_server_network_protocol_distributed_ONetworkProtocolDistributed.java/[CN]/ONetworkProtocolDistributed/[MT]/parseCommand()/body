@@ -25,26 +25,12 @@ final String dbName=channel.readString();
 final String dbUser=channel.readString();
 final String dbPassword=channel.readString();
 final String remoteServerName=channel.readString();
+final String mode=channel.readString();
 checkServerAccess("database.share");
 db=openDatabase(dbName,dbUser,dbPassword);
 final String engineName=db.getStorage() instanceof OStorageLocal ? "local" : "memory";
 final ODistributedServerNode remoteServerNode=manager.getNode(remoteServerName);
-if (remoteServerNode.getStatus() == STATUS.DISCONNECTED) throw new ODistributedSynchronizationException("Can't share database '" + dbName + "' on remote server node '"+ remoteServerName+ "' because is disconnected");
-try {
-remoteServerNode.channel.acquireExclusiveLock();
-OLogManager.instance().info(this,"Sharing database '" + dbName + "' to remote server "+ remoteServerName+ "...");
-remoteServerNode.channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER);
-remoteServerNode.channel.writeInt(0);
-remoteServerNode.channel.writeString(dbName);
-remoteServerNode.channel.writeString(engineName);
-OLogManager.instance().info(this,"Exporting database '%s' via streaming to remote server node: %s...",dbName,remoteServerName);
-new ODatabaseExport(db,new OChannelBinaryOutputStream(remoteServerNode.channel),this).exportDatabase();
-OLogManager.instance().info(this,"Database exported correctly");
-remoteServerNode.channel.readStatus();
-}
-  finally {
-remoteServerNode.channel.releaseExclusiveLock();
-}
+remoteServerNode.shareDatabase(db,remoteServerName,engineName,mode);
 sendOk(0);
 }
   finally {

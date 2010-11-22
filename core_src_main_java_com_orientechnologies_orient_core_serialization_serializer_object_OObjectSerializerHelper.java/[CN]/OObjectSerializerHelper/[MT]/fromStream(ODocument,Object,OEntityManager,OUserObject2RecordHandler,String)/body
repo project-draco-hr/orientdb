@@ -11,38 +11,30 @@
     if (iRecord.containsField(fieldName)) {
       fieldValue=iRecord.field(fieldName);
       if (fieldValue == null || !(fieldValue instanceof ODocument) || (fieldValue instanceof Collection<?> && (((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof ODocument))) || (!(fieldValue instanceof Map<?,?>) || ((Map<?,?>)fieldValue).size() == 0 || !(((Map<?,?>)fieldValue).values().iterator().next() instanceof ODocument))) {
-        final Type genericType=p.getGenericType();
-        if (genericType != null && genericType instanceof ParameterizedType) {
-          final ParameterizedType pt=(ParameterizedType)genericType;
-          if (pt.getActualTypeArguments() != null && pt.getActualTypeArguments().length > 0) {
-            if (pt.getActualTypeArguments()[0] instanceof Class<?>) {
-              Class<?> genericTypeClass=(Class<?>)pt.getActualTypeArguments()[0];
-              if (genericTypeClass.isEnum()) {
-                if (fieldValue instanceof Collection) {
-                  if (fieldValue instanceof List) {
-                    final List<Object> list=(List<Object>)fieldValue;
-                    Object v;
-                    for (int i=0; i < list.size(); ++i) {
-                      v=list.get(i);
-                      if (v != null) {
-                        v=Enum.valueOf((Class<Enum>)genericTypeClass,v.toString());
-                        list.set(i,v);
-                      }
-                    }
-                  }
- else                   if (fieldValue instanceof List) {
-                    Set<Object> newColl=new HashSet<Object>();
-                    final Set<Object> set=(Set<Object>)fieldValue;
-                    for (                    Object v : set) {
-                      if (v != null) {
-                        v=Enum.valueOf((Class<Enum>)genericTypeClass,v.toString());
-                        newColl.add(v);
-                      }
-                    }
-                    fieldValue=newColl;
-                  }
+        final Class<?> genericTypeClass=getGenericMultivalueType(p);
+        if (genericTypeClass != null)         if (genericTypeClass.isEnum()) {
+          if (fieldValue instanceof Collection) {
+            if (fieldValue instanceof List) {
+              final List<Object> list=(List<Object>)fieldValue;
+              Object v;
+              for (int i=0; i < list.size(); ++i) {
+                v=list.get(i);
+                if (v != null) {
+                  v=Enum.valueOf((Class<Enum>)genericTypeClass,v.toString());
+                  list.set(i,v);
                 }
               }
+            }
+ else             if (fieldValue instanceof List) {
+              Set<Object> newColl=new HashSet<Object>();
+              final Set<Object> set=(Set<Object>)fieldValue;
+              for (              Object v : set) {
+                if (v != null) {
+                  v=Enum.valueOf((Class<Enum>)genericTypeClass,v.toString());
+                  newColl.add(v);
+                }
+              }
+              fieldValue=newColl;
             }
           }
         }
@@ -90,7 +82,7 @@
       }
  else       if (type.isEnum()) {
         String enumName=((ODocument)iLinked).field(iFieldName);
-        @SuppressWarnings("rawtypes") Class<Enum> enumClass=(Class<Enum>)type;
+        Class<Enum> enumClass=(Class<Enum>)type;
         fieldValue=Enum.valueOf(enumClass,enumName);
       }
  else {

@@ -1,16 +1,27 @@
 {
+  final List<ODistributedServerNode> nodeList;
   lock.acquireSharedLock();
   try {
-    if (nodes != null) {
-      for (      ODistributedServerNode node : nodes.values()) {
-        node.sendRequest(iTransactionEntry);
-      }
+    if (nodes == null)     return;
+    final ODocument clusters=serverDistributionConfiguration.field("clusters");
+    final ODocument servers=(ODocument)(clusters.containsField(iTransactionEntry.clusterName) ? clusters.field(iTransactionEntry.clusterName) : clusters.field("*"));
+    nodeList=new ArrayList<ODistributedServerNode>();
+    for (    String s : (List<String>)servers.field("synch")) {
+      nodeList.add(nodes.get(s));
+    }
+    for (    String s : (List<String>)servers.field("asynch")) {
+      nodeList.add(nodes.get(s));
+    }
+  }
+  finally {
+    lock.releaseSharedLock();
+  }
+  try {
+    for (    ODistributedServerNode node : nodeList) {
+      node.sendRequest(iTransactionEntry);
     }
   }
  catch (  IOException e) {
     e.printStackTrace();
-  }
- finally {
-    lock.releaseSharedLock();
   }
 }

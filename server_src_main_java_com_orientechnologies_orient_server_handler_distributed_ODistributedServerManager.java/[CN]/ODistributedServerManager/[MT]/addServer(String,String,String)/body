@@ -1,0 +1,30 @@
+{
+  ODocument servers=serverDistributionConfiguration.field("servers");
+  if (servers == null) {
+    servers=new ODocument();
+    serverDistributionConfiguration.field("servers",servers);
+  }
+  servers.field(iAlias,iAddress);
+  ODocument clusters=serverDistributionConfiguration.field("clusters");
+  if (clusters == null) {
+    clusters=new ODocument();
+    serverDistributionConfiguration.field("clusters",clusters);
+  }
+  ODocument allClusters=clusters.field("*");
+  if (allClusters == null) {
+    allClusters=new ODocument();
+    clusters.field("*",allClusters);
+  }
+  ODocument cfgDoc=new ODocument().fromJSON(iServerClusterConfiguration);
+  Object fieldValue;
+  for (  String fieldName : cfgDoc.fieldNames()) {
+    fieldValue=cfgDoc.field(fieldName);
+    ODocument clusterConfig=clusters.field(fieldName);
+    if (clusterConfig == null)     clusterConfig=(ODocument)fieldValue;
+ else {
+      if (fieldValue instanceof ODocument)       clusterConfig.merge((ODocument)cfgDoc.field(fieldName),true,true);
+ else       clusterConfig.merge((Map<String,Object>)cfgDoc.field(fieldName),true,true);
+    }
+  }
+  OLogManager.instance().info(this,"Updated server node configuration: %s",serverDistributionConfiguration.toJSON(""));
+}

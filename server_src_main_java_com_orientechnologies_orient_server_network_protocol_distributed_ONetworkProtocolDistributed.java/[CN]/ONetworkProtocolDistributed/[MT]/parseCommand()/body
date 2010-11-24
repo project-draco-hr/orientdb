@@ -19,23 +19,17 @@ break;
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_SENDER:
 {
 data.commandInfo="Share the database to a remote server";
-ODatabaseDocumentTx db=null;
-try {
 final String dbName=channel.readString();
 final String dbUser=channel.readString();
 final String dbPassword=channel.readString();
 final String remoteServerName=channel.readString();
 final boolean synchronousMode=channel.readByte() == 1;
 checkServerAccess("database.share");
-db=openDatabase(dbName,dbUser,dbPassword);
-final String engineName=db.getStorage() instanceof OStorageLocal ? "local" : "memory";
+connection.database=openDatabase(dbName,dbUser,dbPassword);
+final String engineName=connection.database.getStorage() instanceof OStorageLocal ? "local" : "memory";
 final ODistributedServerNode remoteServerNode=manager.getNode(remoteServerName);
-remoteServerNode.shareDatabase(db,remoteServerName,engineName,synchronousMode);
+remoteServerNode.shareDatabase(connection.database,remoteServerName,engineName,synchronousMode);
 sendOk(0);
-}
-  finally {
-if (db != null) db.close();
-}
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER:
@@ -44,22 +38,17 @@ data.commandInfo="Received a shared database from a remote server to install";
 final String dbName=channel.readString();
 final String engineName=channel.readString();
 OLogManager.instance().info(this,"Received database '%s' to share on local server node",dbName);
-final ODatabaseDocumentTx db=getDatabaseInstance(dbName,engineName);
-try {
-if (db.exists()) {
-OLogManager.instance().info(this,"Deleting existent database '%s'",db.getName());
-db.delete();
+connection.database=getDatabaseInstance(dbName,engineName);
+if (connection.database.exists()) {
+OLogManager.instance().info(this,"Deleting existent database '%s'",connection.database.getName());
+connection.database.delete();
 }
-createDatabase(db);
-if (db.isClosed()) db.open(OUser.ADMIN,OUser.ADMIN);
+createDatabase(connection.database);
+if (connection.database.isClosed()) connection.database.open(OUser.ADMIN,OUser.ADMIN);
 OLogManager.instance().info(this,"Importing database '%s' via streaming from remote server node...",dbName);
-new ODatabaseImport(db,new OChannelBinaryInputStream(channel),this).importDatabase();
+new ODatabaseImport(connection.database,new OChannelBinaryInputStream(channel),this).importDatabase();
 OLogManager.instance().info(this,"Database imported correctly",dbName);
 sendOk(0);
-}
-  finally {
-db.close();
-}
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:

@@ -1,8 +1,10 @@
 {
-  flush();
   final byte result=readByte();
   final int clientTxId=readInt();
-  if (result == OChannelBinaryProtocol.RESPONSE_STATUS_ERROR) {
+  if (result == OChannelBinaryProtocol.RESPONSE_STATUS_OK) {
+    setRequestResult(clientTxId,OChannelBinaryProtocol.RESPONSE_STATUS_OK);
+  }
+ else   if (result == OChannelBinaryProtocol.RESPONSE_STATUS_ERROR) {
     StringBuilder buffer=new StringBuilder();
     String rootClassName=null;
     while (readByte() == 1) {
@@ -16,11 +18,13 @@
       }
       buffer.append(excMessage);
     }
-    if (rootClassName != null)     throw createException(rootClassName,buffer.toString());
-    throw new ONetworkProtocolException("Network response error: " + buffer.toString());
+    if (rootClassName != null)     setRequestResult(clientTxId,createException(rootClassName,buffer.toString()));
+ else {
+      setRequestResult(clientTxId,new ONetworkProtocolException("Network response error: " + buffer.toString()));
+    }
   }
- else   if (result != OChannelBinaryProtocol.RESPONSE_STATUS_OK) {
-    clearInput();
+ else {
+    close();
     throw new ONetworkProtocolException("Error on reading response from the server");
   }
   return clientTxId;

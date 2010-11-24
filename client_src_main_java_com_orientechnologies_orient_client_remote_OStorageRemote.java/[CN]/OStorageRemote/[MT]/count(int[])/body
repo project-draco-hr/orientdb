@@ -1,19 +1,29 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_DATACLUSTER_COUNT);
-      network.writeShort((short)iClusterIds.length);
-      for (int i=0; i < iClusterIds.length; ++i)       network.writeShort((short)iClusterIds[i]);
-      network.readStatus();
-      return network.readLong();
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DATACLUSTER_COUNT);
+        network.writeShort((short)iClusterIds.length);
+        for (int i=0; i < iClusterIds.length; ++i)         network.writeShort((short)iClusterIds[i]);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return network.readLong();
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on read record count in clusters: " + iClusterIds,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

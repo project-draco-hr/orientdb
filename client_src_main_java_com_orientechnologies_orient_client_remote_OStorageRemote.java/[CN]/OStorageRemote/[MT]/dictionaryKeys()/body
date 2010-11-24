@@ -1,17 +1,27 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_DICTIONARY_KEYS);
-      network.readStatus();
-      return network.readStringSet();
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DICTIONARY_KEYS);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return network.readStringSet();
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on getting keys of database's dictionary",e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

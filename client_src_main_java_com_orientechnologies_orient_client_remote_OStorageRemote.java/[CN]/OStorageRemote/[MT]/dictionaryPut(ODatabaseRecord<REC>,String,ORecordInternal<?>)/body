@@ -1,22 +1,32 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
       final ORID rid=iRecord.getIdentity();
-      writeCommand(OChannelBinaryProtocol.REQUEST_DICTIONARY_PUT);
-      network.writeString(iKey);
-      network.writeByte(iRecord.getRecordType());
-      network.writeShort((short)rid.getClusterId());
-      network.writeLong(rid.getClusterPosition());
-      network.readStatus();
-      return (REC)readRecordFromNetwork(iDatabase);
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DICTIONARY_PUT);
+        network.writeString(iKey);
+        network.writeByte(iRecord.getRecordType());
+        network.writeShort((short)rid.getClusterId());
+        network.writeLong(rid.getClusterPosition());
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return (REC)readRecordFromNetwork(iDatabase);
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on insert record with key: " + iKey,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

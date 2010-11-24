@@ -1,20 +1,30 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
-      network.writeShort((short)iClusterId);
-      network.writeBytes(iContent);
-      network.writeByte(iRecordType);
-      network.readStatus();
-      return network.readLong();
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+        network.writeShort((short)iClusterId);
+        network.writeBytes(iContent);
+        network.writeByte(iRecordType);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return network.readLong();
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on create record in cluster: " + iClusterId,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

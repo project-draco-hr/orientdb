@@ -2,26 +2,36 @@
   checkConnection();
   if (OStorageRemoteThreadLocal.INSTANCE.get())   return null;
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_RECORD_LOAD);
-      network.writeShort((short)iClusterId);
-      network.writeLong(iPosition);
-      network.writeString(iFetchPlan != null ? iFetchPlan : "");
-      network.readStatus();
-      if (network.readByte() == 0)       return null;
-      final ORawBuffer buffer=new ORawBuffer(network.readBytes(),network.readInt(),network.readByte());
-      while (network.readByte() == 2) {
-        ORecordInternal<?> record=readRecordFromNetwork(iDatabase);
-        cache.pushRecord(record.getIdentity().toString(),new ORawBuffer(record.toStream(),record.getVersion(),record.getRecordType()));
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_LOAD);
+        network.writeShort((short)iClusterId);
+        network.writeLong(iPosition);
+        network.writeString(iFetchPlan != null ? iFetchPlan : "");
       }
-      return buffer;
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        if (network.readByte() == 0)         return null;
+        final ORawBuffer buffer=new ORawBuffer(network.readBytes(),network.readInt(),network.readByte());
+        while (network.readByte() == 2) {
+          ORecordInternal<?> record=readRecordFromNetwork(iDatabase);
+          cache.pushRecord(record.getIdentity().toString(),new ORawBuffer(record.toStream(),record.getVersion(),record.getRecordType()));
+        }
+        return buffer;
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on read record: " + iClusterId + ":"+ iPosition,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

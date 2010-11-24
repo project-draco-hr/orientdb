@@ -1,17 +1,27 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_DB_EXIST);
-      network.readStatus();
-      return network.readByte() == 1;
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DB_EXIST);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return network.readByte() == 1;
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on checking if the database exists",e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

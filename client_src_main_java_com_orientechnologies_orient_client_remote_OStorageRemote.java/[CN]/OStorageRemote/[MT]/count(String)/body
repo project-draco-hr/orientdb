@@ -1,18 +1,28 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_COUNT);
-      network.writeString(iClassName);
-      network.readStatus();
-      return network.readLong();
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_COUNT);
+        network.writeString(iClassName);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return network.readLong();
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on executing count on class: " + iClassName,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

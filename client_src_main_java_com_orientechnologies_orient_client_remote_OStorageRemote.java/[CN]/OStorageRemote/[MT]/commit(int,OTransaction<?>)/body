@@ -1,25 +1,26 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
-      network.writeInt(iTx.getId());
-      network.writeInt(iTx.size());
-      for (      OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
-        if (txEntry.status == OTransactionEntry.LOADED)         continue;
-        network.writeByte(txEntry.status);
-        network.writeShort((short)txEntry.getRecord().getIdentity().getClusterId());
-        network.writeByte(txEntry.getRecord().getRecordType());
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
+        network.writeInt(iTx.getId());
+        network.writeInt(iTx.size());
+        for (        OTransactionEntry<? extends ORecord<?>> txEntry : iTx.getEntries()) {
+          if (txEntry.status == OTransactionEntry.LOADED)           continue;
+          network.writeByte(txEntry.status);
+          network.writeShort((short)txEntry.getRecord().getIdentity().getClusterId());
+          network.writeByte(txEntry.getRecord().getRecordType());
 switch (txEntry.status) {
 case OTransactionEntry.CREATED:
-          network.writeString(txEntry.clusterName);
-        network.writeBytes(txEntry.getRecord().toStream());
-      break;
+            network.writeString(txEntry.clusterName);
+          network.writeBytes(txEntry.getRecord().toStream());
+        break;
 case OTransactionEntry.UPDATED:
-    network.writeLong(txEntry.getRecord().getIdentity().getClusterPosition());
-  network.writeInt(txEntry.getRecord().getVersion());
-network.writeBytes(txEntry.getRecord().toStream());
+      network.writeLong(txEntry.getRecord().getIdentity().getClusterPosition());
+    network.writeInt(txEntry.getRecord().getVersion());
+  network.writeBytes(txEntry.getRecord().toStream());
 break;
 case OTransactionEntry.DELETED:
 network.writeLong(txEntry.getRecord().getIdentity().getClusterPosition());
@@ -27,14 +28,18 @@ network.writeInt(txEntry.getRecord().getVersion());
 break;
 }
 }
-network.readStatus();
+}
+  finally {
+endRequest();
+}
+getResponse();
 break;
 }
  catch (Exception e) {
 if (handleException("Error on commit",e)) break;
 }
  finally {
-releaseExclusiveLock(locked);
+lock.releaseExclusiveLock(locked);
 }
 }
  while (true);

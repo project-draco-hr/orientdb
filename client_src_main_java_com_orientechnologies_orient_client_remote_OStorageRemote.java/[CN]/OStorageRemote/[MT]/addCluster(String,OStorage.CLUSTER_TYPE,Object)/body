@@ -1,30 +1,40 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_DATACLUSTER_ADD);
-      network.writeString(iClusterType.toString());
-      network.writeString(iClusterName);
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DATACLUSTER_ADD);
+        network.writeString(iClusterType.toString());
+        network.writeString(iClusterName);
 switch (iClusterType) {
 case PHYSICAL:
-        network.writeString(iArguments.length > 0 ? (String)iArguments[0] : "").writeInt(iArguments.length > 0 ? (Integer)iArguments[1] : -1);
-      break;
+          network.writeString(iArguments.length > 0 ? (String)iArguments[0] : "").writeInt(iArguments.length > 0 ? (Integer)iArguments[1] : -1);
+        break;
 case LOGICAL:
-    network.writeInt(iArguments.length > 0 ? (Integer)iArguments[0] : -1);
-  break;
+      network.writeInt(iArguments.length > 0 ? (Integer)iArguments[0] : -1);
+    break;
 }
-network.readStatus();
-int clusterId=network.readShort();
+}
+  finally {
+endRequest();
+}
+try {
+beginResponse();
+final int clusterId=network.readShort();
 clustersIds.put(iClusterName.toLowerCase(),clusterId);
 clustersTypes.put(iClusterName.toLowerCase(),iClusterType.toString());
 return clusterId;
+}
+  finally {
+endResponse();
+}
 }
  catch (Exception e) {
 if (handleException("Error on add new cluster",e)) break;
 }
  finally {
-releaseExclusiveLock(locked);
+lock.releaseExclusiveLock(locked);
 }
 }
  while (true);

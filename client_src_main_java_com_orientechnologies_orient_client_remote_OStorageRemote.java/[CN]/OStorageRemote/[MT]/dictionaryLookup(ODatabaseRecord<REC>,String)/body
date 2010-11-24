@@ -1,18 +1,28 @@
 {
   checkConnection();
   do {
-    boolean locked=acquireExclusiveLock();
+    boolean locked=lock.acquireExclusiveLock();
     try {
-      writeCommand(OChannelBinaryProtocol.REQUEST_DICTIONARY_LOOKUP);
-      network.writeString(iKey);
-      network.readStatus();
-      return (REC)readRecordFromNetwork(iDatabase);
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_DICTIONARY_LOOKUP);
+        network.writeString(iKey);
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        return (REC)readRecordFromNetwork(iDatabase);
+      }
+  finally {
+        endResponse();
+      }
     }
  catch (    Exception e) {
       if (handleException("Error on lookup record with key: " + iKey,e))       break;
     }
  finally {
-      releaseExclusiveLock(locked);
+      lock.releaseExclusiveLock(locked);
     }
   }
  while (true);

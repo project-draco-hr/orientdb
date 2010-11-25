@@ -1,0 +1,25 @@
+{
+  for (  ODistributedServerNode node : getNodeList()) {
+    if (node.getStatus() == STATUS.CONNECTED)     node.sendConfiguration();
+  }
+  OChannelBinary ch;
+  for (  OClientConnection c : OClientConnectionManager.instance().getConnections()) {
+    if (c.protocol.getChannel() instanceof OChannelBinary) {
+      ch=(OChannelBinary)c.protocol.getChannel();
+      OLogManager.instance().info(this,"Sending the configuration to the connected client %s...",ch.socket.getRemoteSocketAddress());
+      ch.acquireExclusiveLock();
+      try {
+        ch.writeByte(OChannelBinaryProtocol.RESPONSE_STATUS_OK);
+        ch.writeInt(-10);
+        ch.writeByte(OChannelDistributedProtocol.PUSH_DISTRIBUTED_CONFIG);
+        ch.writeBytes(serverDistributionConfiguration.toStream());
+      }
+ catch (      IOException e) {
+        e.printStackTrace();
+      }
+ finally {
+        ch.releaseExclusiveLock();
+      }
+    }
+  }
+}

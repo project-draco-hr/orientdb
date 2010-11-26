@@ -7,13 +7,19 @@ switch (requestType) {
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
     data.commandInfo="Keep-alive";
   manager.updateHeartBeatTime();
-sendOk(0);
+sendOk(clientTxId);
+channel.writeLong(connection.database == null ? 0 : connection.database.getStorage().getVersion());
 break;
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_CONNECT:
 {
 data.commandInfo="Cluster connection";
 manager.receivedLeaderConnection(this);
-sendOk(0);
+final String dbName=channel.readString();
+if (dbName != null) {
+connection.database=openDatabase(dbName,channel.readString(),channel.readString());
+}
+sendOk(clientTxId);
+channel.writeLong(connection.database != null ? connection.database.getStorage().getVersion() : 0);
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_SENDER:
@@ -28,7 +34,7 @@ checkServerAccess("database.share");
 connection.database=openDatabase(dbName,dbUser,dbPassword);
 final String engineName=connection.database.getStorage() instanceof OStorageLocal ? "local" : "memory";
 final ODistributedServerNode remoteServerNode=manager.getNode(remoteServerName);
-remoteServerNode.shareDatabase(connection.database,remoteServerName,engineName,synchronousMode);
+remoteServerNode.shareDatabase(connection.database,remoteServerName,dbUser,dbPassword,engineName,synchronousMode);
 sendOk(connection.id);
 manager.addServerInConfiguration(dbName,remoteServerName,engineName,synchronousMode);
 break;
@@ -37,6 +43,8 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER:
 {
 data.commandInfo="Received a shared database from a remote server to install";
 final String dbName=channel.readString();
+final String dbUser=channel.readString();
+final String dbPasswd=channel.readString();
 final String engineName=channel.readString();
 OLogManager.instance().info(this,"Received database '%s' to share on local server node",dbName);
 connection.database=getDatabaseInstance(dbName,engineName);
@@ -45,11 +53,12 @@ OLogManager.instance().info(this,"Deleting existent database '%s'",connection.da
 connection.database.delete();
 }
 createDatabase(connection.database);
-if (connection.database.isClosed()) connection.database.open(OUser.ADMIN,OUser.ADMIN);
+if (connection.database.isClosed()) connection.database.open(dbUser,dbPasswd);
 OLogManager.instance().info(this,"Importing database '%s' via streaming from remote server node...",dbName);
 new ODatabaseImport(connection.database,new OChannelBinaryInputStream(channel),this).importDatabase();
 OLogManager.instance().info(this,"Database imported correctly",dbName);
-sendOk(0);
+sendOk(clientTxId);
+channel.writeLong(connection.database.getStorage().getVersion());
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
@@ -57,7 +66,7 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
 data.commandInfo="Update db configuration from server node leader";
 ODocument config=(ODocument)new ODocument().fromStream(channel.readBytes());
 OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",config.toJSON("indent:2"));
-sendOk(0);
+sendOk(clientTxId);
 break;
 }
 default :

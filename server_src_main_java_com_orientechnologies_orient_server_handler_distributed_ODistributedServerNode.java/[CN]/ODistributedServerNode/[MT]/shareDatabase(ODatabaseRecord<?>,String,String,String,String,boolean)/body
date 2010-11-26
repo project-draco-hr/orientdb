@@ -8,14 +8,19 @@
     channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER);
     channel.writeInt(0);
     channel.writeString(dbName);
+    channel.writeString(iDbUser);
+    channel.writeString(iDbPasswd);
     channel.writeString(iEngineName);
     OLogManager.instance().info(this,"Exporting database '%s' via streaming to remote server node: %s...",iDatabase.getName(),iRemoteServerName);
     new ODatabaseExport(iDatabase,new OChannelBinaryOutputStream(channel),this).exportDatabase();
     OLogManager.instance().info(this,"Database exported correctly");
     clientTxId=channel.readStatus();
-    status=STATUS.CONNECTED;
+    dbVersion=channel.readLong();
   }
   finally {
     channel.releaseExclusiveLock();
   }
+  status=STATUS.CONNECTED;
+  database=dbName;
+  manager.setClusterDbSecurity(dbName,iDbUser,iDbPasswd);
 }

@@ -3,11 +3,13 @@
   OLogManager.instance().debug(this,"Sending keepalive message to distributed server node %s:%d...",networkAddress,networkPort);
   channel.acquireExclusiveLock();
   try {
-    channel.out.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
-    channel.out.writeInt(0);
+    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
+    channel.writeInt(clientTxId);
     channel.flush();
     readStatus();
     lastHeartBeat=System.currentTimeMillis();
+    long remoteVersion=channel.readLong();
+    if (remoteVersion != dbVersion)     throw new ODistributedException("Database version doesn't match between current node (" + dbVersion + ") and remote ("+ remoteVersion+ ")");
   }
  catch (  Exception e) {
     return false;

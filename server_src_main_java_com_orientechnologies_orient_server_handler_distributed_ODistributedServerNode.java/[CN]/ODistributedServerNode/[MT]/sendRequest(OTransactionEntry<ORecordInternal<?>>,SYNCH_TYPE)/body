@@ -2,6 +2,7 @@
   if (status == STATUS.UNREACHABLE)   bufferChange(iRequest);
  else {
     final ORecordInternal<?> record=iRequest.getRecord();
+    status=STATUS.SYNCHRONIZING;
     try {
 switch (iRequest.status) {
 case OTransactionEntry.CREATED:
@@ -58,9 +59,14 @@ channel.releaseExclusiveLock();
 }
 break;
 }
+status=STATUS.CONNECTED;
 }
- catch (RuntimeException e) {
+ catch (IOException e) {
+manager.handleNodeFailure(this);
+if (iRequestType == SYNCH_TYPE.SYNCHRONOUS) {
 throw e;
+}
+ else bufferChange(iRequest);
 }
 }
 }

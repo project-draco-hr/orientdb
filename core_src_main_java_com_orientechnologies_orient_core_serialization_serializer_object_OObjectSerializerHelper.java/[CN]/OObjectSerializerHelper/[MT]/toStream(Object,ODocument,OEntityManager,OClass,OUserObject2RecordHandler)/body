@@ -5,13 +5,30 @@
   if (OSerializationThreadLocal.INSTANCE.get().contains(identityRecord))   return iRecord;
   OSerializationThreadLocal.INSTANCE.get().add(identityRecord);
   OProperty schemaProperty;
-  Class<?> c=iPojo.getClass();
-  final List<Field> properties=getClassFields(c);
+  final Class<?> pojoClass=iPojo.getClass();
+  final List<Field> properties=getClassFields(pojoClass);
+  final String idFieldName=fieldIds.get(pojoClass);
+  if (idFieldName != null) {
+    Object id=getFieldValue(iPojo,idFieldName);
+    if (id != null) {
+      if (id instanceof ORecordId) {
+        iRecord.setIdentity((ORecordId)id);
+      }
+ else       if (id instanceof Number) {
+        ((ORecordId)iRecord.getIdentity()).clusterId=schemaClass.getDefaultClusterId();
+        ((ORecordId)iRecord.getIdentity()).clusterPosition=((Number)id).longValue();
+      }
+ else       if (id instanceof String) {
+        ((ORecordId)iRecord.getIdentity()).fromString((String)id);
+      }
+    }
+  }
   String fieldName;
   Object fieldValue;
   invokeCallback(iPojo,iRecord,OBeforeSerialization.class);
   for (  Field p : properties) {
     fieldName=p.getName();
+    if (fieldName.equals(idFieldName))     continue;
     fieldValue=getFieldValue(iPojo,fieldName);
     schemaProperty=schemaClass != null ? schemaClass.getProperty(fieldName) : null;
     fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,iEntityManager,iObj2RecHandler);

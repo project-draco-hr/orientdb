@@ -4,16 +4,38 @@ synchronized (classes) {
     List<Field> properties=new ArrayList<Field>();
     classes.put(iClass.getName(),properties);
     String fieldName;
+    Class<?> fieldType;
     int fieldModifier;
     boolean autoBinding;
     for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
       for (      Field f : currentClass.getDeclaredFields()) {
         fieldModifier=f.getModifiers();
         if (Modifier.isStatic(fieldModifier) || Modifier.isNative(fieldModifier) || Modifier.isTransient(fieldModifier))         continue;
-        properties.add(f);
         fieldName=f.getName();
-        autoBinding=f.getAnnotation(ORawBinding.class) == null;
-        if (f.getAnnotation(ODocumentInstance.class) != null)         boundDocumentFields.put(iClass.getName(),fieldName);
+        fieldType=f.getType();
+        properties.add(f);
+        autoBinding=true;
+        if (f.getAnnotation(OAccess.class) == null || f.getAnnotation(OAccess.class).value() == OAccess.OAccessType.PROPERTY)         autoBinding=true;
+ else         if (jpaAccessClass != null) {
+          Annotation ann=f.getAnnotation(jpaAccessClass);
+          if (ann != null) {
+            autoBinding=true;
+          }
+        }
+        if (f.getAnnotation(ODocumentInstance.class) != null)         boundDocumentFields.put(iClass,fieldName);
+        boolean idFound=false;
+        if (f.getAnnotation(OId.class) != null) {
+          fieldIds.put(iClass,fieldName);
+          idFound=true;
+        }
+ else         if (jpaIdClass != null && f.getAnnotation(jpaIdClass) != null) {
+          fieldIds.put(iClass,fieldName);
+          idFound=true;
+        }
+        if (idFound) {
+          if (fieldType.isPrimitive())           OLogManager.instance().warn(OObjectSerializerHelper.class,"Field '%s' can't be a literal to manage the Record Id",f.toString());
+ else           if (fieldType != String.class && fieldType != Object.class && !Number.class.isAssignableFrom(fieldType))           OLogManager.instance().warn(OObjectSerializerHelper.class,"Field '%s' can't be managed as type: %s",f.toString(),fieldType);
+        }
         if (autoBinding)         try {
           String getterName="get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
           Method m=currentClass.getMethod(getterName,NO_ARGS);

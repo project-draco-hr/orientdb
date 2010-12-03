@@ -18,9 +18,21 @@
         ((ORecordId)iRecord.getIdentity()).clusterId=schemaClass.getDefaultClusterId();
         ((ORecordId)iRecord.getIdentity()).clusterPosition=((Number)id).longValue();
       }
- else       if (id instanceof String) {
-        ((ORecordId)iRecord.getIdentity()).fromString((String)id);
+ else       if (id instanceof String)       ((ORecordId)iRecord.getIdentity()).fromString((String)id);
+ else       if (id.getClass().equals(Object.class))       iRecord.setIdentity((ORecordId)id);
+ else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Id field has been declared as %s while the supported are: ORID, Number, String, Object",id.getClass());
+    }
+  }
+  final String vFieldName=fieldVersions.get(pojoClass);
+  if (vFieldName != null) {
+    Object ver=getFieldValue(iPojo,vFieldName);
+    if (ver != null) {
+      if (ver instanceof Number) {
+        iRecord.setVersion(((Number)ver).intValue());
       }
+ else       if (ver instanceof String)       iRecord.setVersion(Integer.parseInt((String)ver));
+ else       if (ver.getClass().equals(Object.class))       iRecord.setVersion((Integer)ver);
+ else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Version field has been declared as %s while the supported are: Number, String, Object",ver.getClass());
     }
   }
   String fieldName;
@@ -28,7 +40,7 @@
   invokeCallback(iPojo,iRecord,OBeforeSerialization.class);
   for (  Field p : properties) {
     fieldName=p.getName();
-    if (fieldName.equals(idFieldName))     continue;
+    if (fieldName.equals(idFieldName) || fieldName.equals(vFieldName))     continue;
     fieldValue=getFieldValue(iPojo,fieldName);
     schemaProperty=schemaClass != null ? schemaClass.getProperty(fieldName) : null;
     fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,iEntityManager,iObj2RecHandler,iSaveOnlyDirty);

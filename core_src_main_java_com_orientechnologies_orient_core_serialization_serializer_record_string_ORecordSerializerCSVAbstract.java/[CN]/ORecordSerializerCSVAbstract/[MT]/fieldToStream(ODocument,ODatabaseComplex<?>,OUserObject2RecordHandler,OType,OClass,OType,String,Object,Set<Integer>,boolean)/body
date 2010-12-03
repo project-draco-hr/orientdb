@@ -14,10 +14,20 @@ case LINKLIST:
       ORID rid;
       int items=0;
       List<Object> coll=(List<Object>)iValue;
-      for (int i=0; i < coll.size(); ++i) {
-        if (items++ > 0)         buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-        rid=linkToStream(buffer,iRecord,coll.get(i));
-        if (rid != null)         coll.set(i,rid);
+      if (coll instanceof OLazyObjectList<?>) {
+        ((OLazyObjectList)coll).setConvertToRecord(false);
+      }
+      try {
+        for (int i=0; i < coll.size(); ++i) {
+          if (items++ > 0)           buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+          rid=linkToStream(buffer,iRecord,coll.get(i));
+          if (rid != null)           coll.set(i,rid);
+        }
+      }
+  finally {
+        if (coll instanceof OLazyObjectList<?>) {
+          ((OLazyObjectList)coll).setConvertToRecord(true);
+        }
       }
     }
     buffer.append(OStringSerializerHelper.COLLECTION_END);
@@ -52,14 +62,24 @@ ORID rid;
 int items=0;
 Map<String,Object> map=(Map<String,Object>)iValue;
 Map<String,Object> objToReplace=null;
-for (Map.Entry<String,Object> entry : map.entrySet()) {
-  if (items++ > 0)   buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-  buffer.append(OStringSerializerHelper.fieldTypeToString(iDatabase,OType.STRING,entry.getKey()));
-  buffer.append(OStringSerializerHelper.ENTRY_SEPARATOR);
-  rid=linkToStream(buffer,iRecord,entry.getValue());
-  if (rid != null) {
-    if (objToReplace == null)     objToReplace=new HashMap<String,Object>();
-    objToReplace.put(entry.getKey(),rid);
+if (map instanceof OLazyObjectMap<?>) {
+  ((OLazyObjectMap)map).setConvertToRecord(false);
+}
+try {
+  for (  Map.Entry<String,Object> entry : map.entrySet()) {
+    if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+    buffer.append(OStringSerializerHelper.fieldTypeToString(iDatabase,OType.STRING,entry.getKey()));
+    buffer.append(OStringSerializerHelper.ENTRY_SEPARATOR);
+    rid=linkToStream(buffer,iRecord,entry.getValue());
+    if (rid != null) {
+      if (objToReplace == null)       objToReplace=new HashMap<String,Object>();
+      objToReplace.put(entry.getKey(),rid);
+    }
+  }
+}
+  finally {
+  if (map instanceof OLazyObjectMap<?>) {
+    ((OLazyObjectMap)map).setConvertToRecord(true);
   }
 }
 if (objToReplace != null) for (Map.Entry<String,Object> entry : objToReplace.entrySet()) {

@@ -1,37 +1,33 @@
 {
   jumpWhiteSpaces();
-  int nextPosition;
-  int endPosition=textUpperCase.indexOf(OCommandExecutorSQLAbstract.KEYWORD_WHERE,currentPos);
-  if (endPosition == -1) {
-    endPosition=text.length();
-    nextPosition=endPosition;
-  }
- else   nextPosition=endPosition + OCommandExecutorSQLAbstract.KEYWORD_WHERE.length();
-  final String txt=textUpperCase.substring(currentPos,endPosition);
-  if (Character.isDigit(txt.charAt(0))) {
+  if (currentPos == -1)   throw new OQueryParsingException("No query target found",text,0);
+  if (Character.isDigit(text.charAt(currentPos))) {
+    final StringBuilder word=new StringBuilder();
+    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
     targetRecords=new ArrayList<String>();
-    targetRecords.add(text);
+    targetRecords.add(word.toString());
   }
- else   if (txt.charAt(0) == OStringSerializerHelper.COLLECTION_BEGIN) {
-    targetRecords=OStringSerializerHelper.getCollection(txt);
+ else   if (text.charAt(currentPos) == OStringSerializerHelper.COLLECTION_BEGIN) {
+    targetRecords=OStringSerializerHelper.getCollection(text,currentPos);
   }
  else {
-    final List<String> items=OStringSerializerHelper.split(txt,',');
-    if (items == null || items.size() == 0)     throw new OQueryParsingException("No clusters found after " + OCommandExecutorSQLAbstract.KEYWORD_FROM,text,0);
-    String[] words;
     String subjectName;
     String alias;
     String subjectToMatch;
-    for (    String i : items) {
-      words=i.split(" ");
-      if (words != null && words.length > 1) {
-        subjectName=words[0].trim();
-        alias=words[1].trim();
+    int newPos;
+    final StringBuilder word=new StringBuilder();
+    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+    while (currentPos > -1 && (targetClasses == null && targetClusters == null)) {
+      subjectName=word.toString();
+      newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+      if (newPos > -1 && word.toString().equals("AS")) {
+        currentPos=newPos;
+        newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+        if (newPos == -1)         throw new OQueryParsingException("No alias found. Example: SELECT FROM Customer AS c",text,currentPos);
+        currentPos=newPos;
+        alias=word.toString();
       }
- else {
-        subjectName=i.trim();
-        alias=subjectName;
-      }
+ else       alias=subjectName;
       subjectToMatch=subjectName;
       if (subjectToMatch.startsWith(OCommandExecutorSQLAbstract.CLUSTER_PREFIX)) {
         if (targetClusters == null)         targetClusters=new HashMap<String,String>();
@@ -46,6 +42,5 @@
       }
     }
   }
-  currentPos=nextPosition;
-  return nextPosition < text.length();
+  return currentPos < text.length();
 }

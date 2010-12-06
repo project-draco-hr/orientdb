@@ -1,0 +1,28 @@
+{
+  int newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+  if (!KEYWORD_BY.equals(word.toString()))   throw new OQueryParsingException("Expected keyword " + KEYWORD_BY);
+  currentPos=newPos;
+  String fieldName;
+  String fieldOrdering;
+  orderedFields=new ArrayList<OPair<String,String>>();
+  while (currentPos != -1 && (orderedFields.size() == 0 || word.toString().equals(","))) {
+    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,false);
+    if (currentPos == -1)     throw new OCommandSQLParsingException("Field name expected",text,currentPos);
+    fieldName=word.toString();
+    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+    if (currentPos == -1)     fieldOrdering=KEYWORD_ASC;
+ else {
+      if (word.toString().endsWith(",")) {
+        currentPos--;
+        word.deleteCharAt(word.length() - 1);
+      }
+      if (word.toString().equals(KEYWORD_ASC))       fieldOrdering=KEYWORD_ASC;
+ else       if (word.toString().equals(KEYWORD_DESC))       fieldOrdering=KEYWORD_DESC;
+ else       throw new OCommandSQLParsingException("Ordering mode '" + word + "' not supported. Valid is 'ASC', 'DESC' or nothing ('ASC' by default)",text,currentPos);
+      currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+    }
+    orderedFields.add(new OPair<String,String>(fieldName,fieldOrdering));
+    if (currentPos == -1)     break;
+  }
+  if (orderedFields.size() == 0)   throw new OCommandSQLParsingException("Order by field set was missed. Example: ORDER BY name ASC, salary DESC",text,currentPos);
+}

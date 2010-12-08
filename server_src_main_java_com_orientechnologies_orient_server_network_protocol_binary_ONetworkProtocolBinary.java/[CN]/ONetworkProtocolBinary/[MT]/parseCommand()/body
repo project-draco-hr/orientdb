@@ -1,5 +1,5 @@
 {
-switch (requestType) {
+switch (lastRequestType) {
 case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
 {
       data.commandInfo="Shutdowning";
@@ -8,7 +8,7 @@ case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
       passwd=channel.readString();
       if (OServerMain.server().authenticate(user,passwd,"shutdown")) {
         OLogManager.instance().info(this,"Remote client %s:%d authenticated. Starting shutdown of server...",channel.socket.getInetAddress(),channel.socket.getPort());
-        sendOk(clientTxId);
+        sendOk(lastClientTxId);
         channel.flush();
         channel.close();
         OServerMain.server().shutdown();
@@ -16,14 +16,14 @@ case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
         return;
       }
       OLogManager.instance().error(this,"Authentication error of remote client %s:%d: shutdown is aborted.",channel.socket.getInetAddress(),channel.socket.getPort());
-      sendError(clientTxId,new OSecurityAccessException("Invalid user/password to shutdown the server"));
+      sendError(lastClientTxId,new OSecurityAccessException("Invalid user/password to shutdown the server"));
       break;
     }
 case OChannelBinaryProtocol.REQUEST_CONNECT:
 {
     data.commandInfo="Connect";
     serverLogin(channel.readString(),channel.readString());
-    sendOk(clientTxId);
+    sendOk(lastClientTxId);
     channel.writeInt(connection.id);
     break;
   }
@@ -36,10 +36,10 @@ case OChannelBinaryProtocol.REQUEST_DB_OPEN:
   passwd=channel.readString();
   connection.database=openDatabase(dbName,user,passwd);
   if (!(underlyingDatabase.getStorage() instanceof OStorageMemory) && !loadUserFromSchema(user,passwd)) {
-    sendError(clientTxId,new OSecurityAccessException(connection.database.getName(),"Access denied to database '" + connection.database.getName() + "' for user: "+ user));
+    sendError(lastClientTxId,new OSecurityAccessException(connection.database.getName(),"Access denied to database '" + connection.database.getName() + "' for user: "+ user));
   }
  else {
-    sendOk(clientTxId);
+    sendOk(lastClientTxId);
     channel.writeInt(connection.id);
     channel.writeInt(connection.database.getClusterNames().size());
     for (    OCluster c : (connection.database.getStorage()).getClusters()) {
@@ -61,7 +61,7 @@ String storageMode=channel.readString();
 checkServerAccess("database.create");
 connection.database=getDatabaseInstance(dbName,storageMode);
 createDatabase(connection.database);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_CLOSE:
@@ -73,7 +73,7 @@ case OChannelBinaryProtocol.REQUEST_DB_EXIST:
 {
 data.commandInfo="Exists database";
 channel.writeByte((byte)(connection.database.exists() ? 1 : 0));
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 break;
 }
 case OChannelBinaryProtocol.REQUEST_DATACLUSTER_COUNT:
@@ -82,7 +82,7 @@ data.commandInfo="Count cluster elements";
 int[] clusterIds=new int[channel.readShort()];
 for (int i=0; i < clusterIds.length; ++i) clusterIds[i]=channel.readShort();
 long count=connection.database.countClusterElements(clusterIds);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(count);
 break;
 }
@@ -90,7 +90,7 @@ case OChannelBinaryProtocol.REQUEST_DATACLUSTER_DATARANGE:
 {
 data.commandInfo="Get the begin/end range of data in cluster";
 long[] pos=connection.database.getStorage().getClusterDataRange(channel.readShort());
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(pos[0]);
 channel.writeLong(pos[1]);
 break;
@@ -115,7 +115,7 @@ break;
 default :
 throw new IllegalArgumentException("Cluster type " + type + " is not supported");
 }
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeShort((short)num);
 break;
 }
@@ -124,7 +124,7 @@ case OChannelBinaryProtocol.REQUEST_DATACLUSTER_REMOVE:
 data.commandInfo="remove cluster";
 final int id=channel.readShort();
 boolean result=connection.database.getStorage().removeCluster(id);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeByte((byte)(result ? 1 : 0));
 break;
 }
@@ -135,7 +135,7 @@ final short clusterId=channel.readShort();
 final long clusterPosition=channel.readLong();
 final String fetchPlanString=channel.readString();
 final ORawBuffer buffer=underlyingDatabase.read(clusterId,clusterPosition,null);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 if (buffer != null) {
 channel.writeByte((byte)1);
 channel.writeBytes(buffer.buffer);
@@ -175,7 +175,7 @@ break;
 case OChannelBinaryProtocol.REQUEST_RECORD_CREATE:
 data.commandInfo="Create record";
 final long location=underlyingDatabase.save(channel.readShort(),ORID.CLUSTER_POS_INVALID,channel.readBytes(),-1,channel.readByte());
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(location);
 break;
 case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
@@ -185,13 +185,13 @@ final long position=channel.readLong();
 long newVersion=underlyingDatabase.save(clusterId,position,channel.readBytes(),channel.readInt(),channel.readByte());
 if (connection.database.getMetadata().getSchema().getDocument().getIdentity().getClusterId() == clusterId && connection.database.getMetadata().getSchema().getDocument().getIdentity().getClusterPosition() == position) connection.database.getMetadata().loadSchema();
  else if (((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().getClusterId() == clusterId && ((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().getClusterPosition() == position) ((ODictionaryLocal<?>)connection.database.getDictionary()).load();
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeInt((int)newVersion);
 break;
 case OChannelBinaryProtocol.REQUEST_RECORD_DELETE:
 data.commandInfo="Delete record";
 underlyingDatabase.delete(channel.readShort(),channel.readLong(),channel.readInt());
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeByte((byte)1);
 break;
 case OChannelBinaryProtocol.REQUEST_COUNT:
@@ -199,7 +199,7 @@ case OChannelBinaryProtocol.REQUEST_COUNT:
 data.commandInfo="Count cluster records";
 final String clusterName=channel.readString();
 final long size=connection.database.countClusterElements(clusterName);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(size);
 break;
 }
@@ -213,7 +213,7 @@ data.commandDetail=command.getText();
 if (asynch) {
 final StringBuilder empty=new StringBuilder();
 final Set<ODocument> recordsToSend=new HashSet<ODocument>();
-final int txId=clientTxId;
+final int txId=lastClientTxId;
 final Map<String,Integer> fetchPlan=query != null ? OFetchHelper.buildFetchPlan(query.getFetchPlan()) : null;
 command.setResultListener(new OCommandResultListener(){
 public boolean result(final Object iRecord){
@@ -250,7 +250,7 @@ return true;
 );
 ((OCommandRequestInternal)connection.database.command(command)).execute();
 if (empty.length() == 0) try {
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 }
  catch (IOException e1) {
 }
@@ -262,7 +262,7 @@ channel.writeByte((byte)0);
 }
  else {
 final Object result=((OCommandRequestInternal)connection.database.command(command)).execute();
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 if (result == null) {
 channel.writeByte((byte)'n');
 channel.writeBytes(null);
@@ -284,7 +284,7 @@ data.commandInfo="Dictionary lookup";
 final String key=channel.readString();
 final ORecordAbstract<?> value=connection.database.getDictionary().get(key);
 if (value != null) ((ODatabaseRecordTx<ORecordInternal<?>>)connection.database.getUnderlying()).load(value);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 writeRecord(value);
 break;
 }
@@ -298,7 +298,7 @@ value.setIdentity(rid.clusterId,rid.clusterPosition);
 value.setDatabase(connection.database);
 value=connection.database.getDictionary().putRecord(key,value);
 if (value != null) ((ODatabaseRecordTx<ORecordInternal<?>>)connection.database.getUnderlying()).load(value);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 writeRecord(value);
 break;
 }
@@ -308,28 +308,28 @@ data.commandInfo="Dictionary remove";
 final String key=channel.readString();
 final ORecordInternal<?> value=connection.database.getDictionary().remove(key);
 if (value != null) ((ODatabaseRecordTx<ORecordInternal<?>>)connection.database.getUnderlying()).load(value);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 writeRecord(value);
 break;
 }
 case OChannelBinaryProtocol.REQUEST_DICTIONARY_SIZE:
 {
 data.commandInfo="Dictionary size";
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeInt(connection.database.getDictionary().size());
 break;
 }
 case OChannelBinaryProtocol.REQUEST_DICTIONARY_KEYS:
 {
 data.commandInfo="Dictionary keys";
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeCollectionString(connection.database.getDictionary().keySet());
 break;
 }
 case OChannelBinaryProtocol.REQUEST_TX_COMMIT:
 data.commandInfo="Transaction commit";
 ((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),new OTransactionOptimisticProxy((ODatabaseRecordTx<OTransactionRecordProxy>)connection.database.getUnderlying(),channel));
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 break;
 case OChannelBinaryProtocol.REQUEST_CONFIG_GET:
 {
@@ -338,7 +338,7 @@ checkServerAccess("server.config.get");
 final String key=channel.readString();
 final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(key);
 String cfgValue=cfg != null ? cfg.getValueAsString() : "";
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeString(cfgValue);
 break;
 }
@@ -350,14 +350,14 @@ final String key=channel.readString();
 final String value=channel.readString();
 final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(key);
 if (cfg != null) cfg.setValue(value);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 break;
 }
 case OChannelBinaryProtocol.REQUEST_CONFIG_LIST:
 {
 data.commandInfo="List config";
 checkServerAccess("server.config.get");
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeShort((short)OGlobalConfiguration.values().length);
 for (OGlobalConfiguration cfg : OGlobalConfiguration.values()) {
 channel.writeString(cfg.getKey());
@@ -367,8 +367,8 @@ break;
 }
 default :
 data.commandInfo="Command not supported";
-OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
+OLogManager.instance().error(this,"Request not supported. Code: " + lastRequestType);
 channel.clearInput();
-sendError(clientTxId,new ONetworkProtocolException("Request not supported. Code: " + requestType));
+sendError(lastClientTxId,new ONetworkProtocolException("Request not supported. Code: " + lastRequestType));
 }
 }

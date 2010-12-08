@@ -1,0 +1,31 @@
+{
+  if (status != STATUS.CONNECTED)   throw new ODistributedSynchronizationException("Can't share database '" + iDatabase.getName() + "' on remote server node '"+ iRemoteServerName+ "' because is disconnected");
+  final String dbName=iDatabase.getName();
+  channel.acquireExclusiveLock();
+  try {
+    status=STATUS.SYNCHRONIZING;
+    OLogManager.instance().info(this,"Sharing database '" + dbName + "' to remote server "+ iRemoteServerName+ "...");
+    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER);
+    channel.writeInt(0);
+    channel.writeString(dbName);
+    channel.writeString(iDbUser);
+    channel.writeString(iDbPasswd);
+    channel.writeString(iEngineName);
+    OLogManager.instance().info(this,"Exporting database '%s' via streaming to remote server node: %s...",iDatabase.getName(),iRemoteServerName);
+    new ODatabaseExport(iDatabase,new OChannelBinaryOutputStream(channel),this).exportDatabase();
+    OLogManager.instance().info(this,"Database exported correctly");
+    try {
+      clientTxId=channel.beginResponse(0);
+      dbVersion=channel.readLong();
+    }
+  finally {
+      channel.endResponse();
+    }
+  }
+  finally {
+    channel.releaseExclusiveLock();
+  }
+  status=STATUS.CONNECTED;
+  database=dbName;
+  manager.setClusterDbSecurity(dbName,iDbUser,iDbPasswd);
+}

@@ -1,13 +1,13 @@
 {
-  if (requestType < 80) {
+  if (lastRequestType < 80) {
     super.parseCommand();
     return;
   }
-switch (requestType) {
+switch (lastRequestType) {
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
     data.commandInfo="Keep-alive";
   manager.updateHeartBeatTime();
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(connection.database == null ? 0 : connection.database.getStorage().getVersion());
 break;
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_CONNECT:
@@ -18,7 +18,7 @@ final String dbName=channel.readString();
 if (dbName != null) {
 connection.database=openDatabase(dbName,channel.readString(),channel.readString());
 }
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(connection.database != null ? connection.database.getStorage().getVersion() : 0);
 break;
 }
@@ -33,7 +33,7 @@ final boolean synchronousMode=channel.readByte() == 1;
 checkServerAccess("database.share");
 connection.database=openDatabase(dbName,dbUser,dbPassword);
 final String engineName=connection.database.getStorage() instanceof OStorageLocal ? "local" : "memory";
-final ODistributedServerNode remoteServerNode=manager.getNode(remoteServerName);
+final ODistributedServerNodeRemote remoteServerNode=manager.getNode(remoteServerName);
 remoteServerNode.shareDatabase(connection.database,remoteServerName,dbUser,dbPassword,engineName,synchronousMode);
 sendOk(connection.id);
 manager.addServerInConfiguration(dbName,remoteServerName,engineName,synchronousMode);
@@ -59,10 +59,11 @@ if (connection.database.isClosed()) connection.database.open(dbUser,dbPasswd);
 OLogManager.instance().info(this,"Importing database '%s' via streaming from remote server node...",dbName);
 new ODatabaseImport(connection.database,new OChannelBinaryInputStream(channel),this).importDatabase();
 OLogManager.instance().info(this,"Database imported correctly",dbName);
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 channel.writeLong(connection.database.getStorage().getVersion());
 }
   finally {
+manager.updateHeartBeatTime();
 manager.setStatus(ODistributedServerManager.STATUS.ONLINE);
 }
 break;
@@ -72,13 +73,13 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
 data.commandInfo="Update db configuration from server node leader";
 ODocument config=(ODocument)new ODocument().fromStream(channel.readBytes());
 OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",config.toJSON("indent:2"));
-sendOk(clientTxId);
+sendOk(lastClientTxId);
 break;
 }
 default :
 data.commandInfo="Command not supported";
-OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
+OLogManager.instance().error(this,"Request not supported. Code: " + lastRequestType);
 channel.clearInput();
-sendError(clientTxId,null);
+sendError(lastClientTxId,null);
 }
 }

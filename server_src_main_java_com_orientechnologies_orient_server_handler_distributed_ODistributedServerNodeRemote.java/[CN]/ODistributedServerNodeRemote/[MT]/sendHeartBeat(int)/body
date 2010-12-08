@@ -1,0 +1,30 @@
+{
+  configuration.setValue(OGlobalConfiguration.NETWORK_SOCKET_TIMEOUT,iNetworkTimeout);
+  OLogManager.instance().debug(this,"Sending keepalive message to distributed server node %s:%d...",networkAddress,networkPort);
+  channel.acquireExclusiveLock();
+  try {
+    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
+    channel.writeInt(-1);
+    channel.flush();
+    long remoteVersion=-1;
+    try {
+      channel.beginResponse(-1);
+      remoteVersion=channel.readLong();
+    }
+  finally {
+      channel.endResponse();
+    }
+    lastHeartBeat=System.currentTimeMillis();
+    if (remoteVersion != dbVersion) {
+      OLogManager.instance().warn(this,"Database version doesn't match between current node (" + dbVersion + ") and remote ("+ remoteVersion+ ")");
+      throw new ODistributedException("Database version doesn't match between current node (" + dbVersion + ") and remote ("+ remoteVersion+ ")");
+    }
+  }
+ catch (  Exception e) {
+    return false;
+  }
+ finally {
+    channel.releaseExclusiveLock();
+  }
+  return true;
+}

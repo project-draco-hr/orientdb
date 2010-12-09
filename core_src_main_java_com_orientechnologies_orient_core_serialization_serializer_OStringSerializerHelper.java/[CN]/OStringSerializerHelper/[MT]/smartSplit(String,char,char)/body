@@ -4,6 +4,7 @@
   char c;
   char previousChar=' ';
   boolean insideEmbedded=false;
+  int insideParameters=0;
   int insideCollection=0;
   int insideMap=0;
   int insideLinkPart=0;
@@ -13,10 +14,19 @@
     c=iSource.charAt(i);
     if (stringBeginChar == ' ') {
       if (c == COLLECTION_BEGIN)       insideCollection++;
- else       if (c == MAP_BEGIN)       insideMap++;
  else       if (c == COLLECTION_END) {
         if (insideCollection == 0)         throw new OSerializationException("Found invalid " + COLLECTION_END + " character. Assure to open and close correctly.");
         insideCollection--;
+      }
+ else       if (c == OPEN_BRACE) {
+        insideParameters++;
+      }
+ else       if (c == CLOSED_BRACE) {
+        if (insideParameters == 0)         throw new OSerializationException("Found invalid " + CLOSED_BRACE + " character. Assure to open and close correctly.");
+        insideParameters--;
+      }
+ else       if (c == MAP_BEGIN) {
+        insideMap++;
       }
  else       if (c == MAP_END) {
         if (insideMap == 0)         throw new OSerializationException("Found invalid " + MAP_END + " character. Assure to open and close correctly.");
@@ -26,7 +36,7 @@
  else       if (c == LINK)       insideLinkPart=1;
  else       if (insideLinkPart == 1 && c == ORID.SEPARATOR)       insideLinkPart=2;
       if (insideLinkPart > 0 && c != '-' && !Character.isDigit(c) && c != ORID.SEPARATOR && c != LINK)       insideLinkPart=0;
-      if (insideCollection == 0 && insideMap == 0 && !insideEmbedded && insideLinkPart == 0) {
+      if (insideParameters == 0 && insideCollection == 0 && insideMap == 0 && !insideEmbedded && insideLinkPart == 0) {
         if ((c == '\'' || c == '"') && previousChar != '\\') {
           stringBeginChar=c;
         }
@@ -44,8 +54,18 @@
         }
       }
     }
-    buffer.append(c);
     previousChar=c;
+    if (iJumpChars.length > 0) {
+      boolean found=false;
+      for (      char jc : iJumpChars) {
+        if (jc == c) {
+          found=true;
+          break;
+        }
+      }
+      if (found)       continue;
+    }
+    buffer.append(c);
   }
   parts.add(buffer.toString());
   return parts;

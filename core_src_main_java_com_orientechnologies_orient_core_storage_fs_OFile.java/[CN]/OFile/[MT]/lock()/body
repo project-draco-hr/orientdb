@@ -1,3 +1,18 @@
 {
-  fileLock=channel.lock();
+  for (int i=0; i < LOCK_MAX_RETRIES; ++i) {
+    try {
+      fileLock=channel.tryLock(0,1,false);
+      break;
+    }
+ catch (    OverlappingFileLockException e) {
+      try {
+        OLogManager.instance().debug(this,"Can't open file '" + osFile.getAbsolutePath() + "' because it's locked. Waiting %d ms and retry %d/%d...",LOCK_WAIT_TIME,i,LOCK_MAX_RETRIES);
+        System.runFinalization();
+        Thread.sleep(LOCK_WAIT_TIME);
+      }
+ catch (      InterruptedException ex) {
+      }
+    }
+  }
+  if (fileLock == null)   throw new OLockException("File '" + osFile.getPath() + "' is locked by another process");
 }

@@ -293,8 +293,8 @@ case OChannelBinaryProtocol.REQUEST_DICTIONARY_PUT:
 data.commandInfo="Dictionary put";
 String key=channel.readString();
 ORecordInternal<?> value=ORecordFactory.newInstance(channel.readByte());
-final ORecordId rid=new ORecordId(channel.readShort(),channel.readLong());
-value.setIdentity(rid.clusterId,rid.clusterPosition);
+final ORecordId rid=channel.readRID();
+value.setIdentity(rid);
 value.setDatabase(connection.database);
 value=connection.database.getDictionary().putRecord(key,value);
 if (value != null) ((ODatabaseRecordTx<ORecordInternal<?>>)connection.database.getUnderlying()).load(value);
@@ -327,10 +327,18 @@ channel.writeCollectionString(connection.database.getDictionary().keySet());
 break;
 }
 case OChannelBinaryProtocol.REQUEST_TX_COMMIT:
+{
 data.commandInfo="Transaction commit";
-((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),new OTransactionOptimisticProxy((ODatabaseRecordTx<OTransactionRecordProxy>)connection.database.getUnderlying(),channel));
+final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy((ODatabaseRecordTx<OTransactionRecordProxy>)connection.database.getUnderlying(),channel);
+((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),tx);
 sendOk(lastClientTxId);
+channel.writeInt(tx.getUpdatedRecords().size());
+for (Entry<ORecordId,ORecord<?>> entry : tx.getUpdatedRecords().entrySet()) {
+channel.writeRID(entry.getKey());
+channel.writeInt(entry.getValue().getVersion());
+}
 break;
+}
 case OChannelBinaryProtocol.REQUEST_CONFIG_GET:
 {
 data.commandInfo="Get config";

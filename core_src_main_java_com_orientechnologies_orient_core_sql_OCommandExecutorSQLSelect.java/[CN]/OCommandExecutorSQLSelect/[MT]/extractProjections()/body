@@ -1,14 +1,26 @@
 {
-  final String textUpperCase=text.toUpperCase();
   int currentPos=0;
   final StringBuilder word=new StringBuilder();
   currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
   if (!word.toString().equals(KEYWORD_SELECT))   return -1;
   int fromPosition=textUpperCase.indexOf(KEYWORD_FROM,currentPos);
   if (fromPosition == -1)   throw new OQueryParsingException("Missed " + KEYWORD_FROM,text,currentPos);
-  String[] items=textUpperCase.substring(currentPos,fromPosition).split(",");
-  if (items == null || items.length == 0)   throw new OQueryParsingException("No projections found between " + KEYWORD_SELECT + " and "+ KEYWORD_FROM,text,currentPos);
-  for (  String i : items)   projections.add(i.trim());
+  final String projectionString=textUpperCase.substring(currentPos,fromPosition).trim();
+  if (projectionString.length() > 0 && !projectionString.equals("*")) {
+    projections=new HashMap<String,Object>();
+    final String[] items=text.substring(currentPos,fromPosition).split(",");
+    String fieldName;
+    int pos;
+    for (    String i : items) {
+      i=i.trim();
+      pos=i.indexOf('.');
+      fieldName=pos > -1 ? i.substring(0,pos) : i;
+      for (int fieldIndex=2; projections.containsKey(fieldName); ++fieldIndex) {
+        fieldName+=fieldIndex;
+      }
+      projections.put(fieldName,OSQLHelper.parseValue(database,this,i));
+    }
+  }
   currentPos=fromPosition + KEYWORD_FROM.length() + 1;
   return currentPos;
 }

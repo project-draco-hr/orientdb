@@ -1,0 +1,71 @@
+{
+  StringBuilder buffer=new StringBuilder();
+  char stringBeginChar=' ';
+  char c;
+  char previousChar=' ';
+  int insideParenthesis=0;
+  int insideCollection=0;
+  int insideMap=0;
+  int insideLinkPart=0;
+  final ArrayList<String> parts=new ArrayList<String>();
+  final int max=iSource.length();
+  for (int i=0; i < max; ++i) {
+    c=iSource.charAt(i);
+    if (stringBeginChar == ' ') {
+      if (c == COLLECTION_BEGIN)       insideCollection++;
+ else       if (c == COLLECTION_END) {
+        if (!isCharPresent(c,iRecordSeparator)) {
+          if (insideCollection == 0)           throw new OSerializationException("Found invalid " + COLLECTION_END + " character. Assure to open and close correctly.");
+          insideCollection--;
+        }
+      }
+ else       if (c == PARENTHESIS_BEGIN) {
+        insideParenthesis++;
+      }
+ else       if (c == PARENTHESIS_END) {
+        if (!isCharPresent(c,iRecordSeparator)) {
+          if (insideParenthesis == 0)           throw new OSerializationException("Found invalid " + PARENTHESIS_END + " character. Assure to open and close correctly.");
+          insideParenthesis--;
+        }
+      }
+ else       if (c == MAP_BEGIN) {
+        insideMap++;
+      }
+ else       if (c == MAP_END) {
+        if (!isCharPresent(c,iRecordSeparator)) {
+          if (insideMap == 0)           throw new OSerializationException("Found invalid " + MAP_END + " character. Assure to open and close correctly.");
+          insideMap--;
+        }
+      }
+ else       if (c == LINK)       insideLinkPart=1;
+ else       if (insideLinkPart == 1 && c == ORID.SEPARATOR)       insideLinkPart=2;
+      if (insideLinkPart > 0 && c != '-' && !Character.isDigit(c) && c != ORID.SEPARATOR && c != LINK)       insideLinkPart=0;
+      if (insideParenthesis == 0 && insideCollection == 0 && insideMap == 0 && insideLinkPart == 0) {
+        if ((c == '\'' || c == '"') && previousChar != '\\') {
+          stringBeginChar=c;
+        }
+ else {
+          if (isCharPresent(c,iRecordSeparator)) {
+            parts.add(buffer.toString());
+            buffer.setLength(0);
+            continue;
+          }
+        }
+      }
+    }
+ else {
+      if ((c == '\'' || c == '"') && previousChar != '\\') {
+        if (stringBeginChar == c) {
+          stringBeginChar=' ';
+        }
+      }
+    }
+    previousChar=c;
+    if (iJumpChars.length > 0) {
+      if (isCharPresent(c,iJumpChars))       continue;
+    }
+    buffer.append(c);
+  }
+  parts.add(buffer.toString());
+  return parts;
+}

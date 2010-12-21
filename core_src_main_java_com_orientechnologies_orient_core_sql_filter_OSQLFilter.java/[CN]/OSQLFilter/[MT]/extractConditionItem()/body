@@ -46,19 +46,14 @@
     if (Character.isLetter(words[0].charAt(0)) && parPos > -1 && (sepPos == -1 || sepPos > parPos)) {
       int pos=words[0].indexOf(OStringSerializerHelper.PARENTHESIS_BEGIN);
       String funcName=words[0].substring(0,pos);
-      Class<? extends OSQLFunction> functionClass=OSQLParser.getInstance().getFunction(funcName);
-      if (functionClass == null)       throw new OCommandSQLParsingException("Unknow function " + funcName + "()");
-      final OSQLFunction function;
-      try {
-        function=functionClass.newInstance();
+      final OSQLFunction function=OSQLParser.getInstance().getFunction(funcName);
+      final List<String> funcParamsText=OStringSerializerHelper.getParameters(words[1]);
+      if (funcParamsText.size() < function.getMinParams() || funcParamsText.size() > function.getMaxParams())       throw new IllegalArgumentException("Syntax error. Expected: " + function.getSyntax());
+      final Object[] funcParams=new Object[funcParamsText.size()];
+      for (int i=0; i < funcParamsText.size(); ++i) {
+        funcParams[i]=OSQLHelper.parseValue(database,this,funcParamsText.get(i));
       }
- catch (      Exception e) {
-        throw new OConfigurationException("Function " + funcName + "() can be created. Something went wrong in construction. Has it the default constructor?");
-      }
-      final List<String> funcParams=OStringSerializerHelper.getParameters(words[1]);
-      if (funcParams.size() < function.getMinParams() || funcParams.size() > function.getMaxParams())       throw new IllegalArgumentException("Syntax error. Expected: " + function.getSyntax());
-      function.configure(database,funcParams);
-      return function;
+      return new OSQLFunctionRuntime((OSQLFunction)function,funcParams);
     }
  else {
       if (words[0].equals("NOT")) {

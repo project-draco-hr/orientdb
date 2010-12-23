@@ -11,14 +11,19 @@
           if (iDatabase != null)           node.record.setDatabase(iDatabase);
           boolean wasNew=node.record.getIdentity().isNew();
           node.save();
+          if (debug)           System.out.printf("\nSaved %s tree node %s: parent %s, left %s, right %s",wasNew ? "new" : "",node.record.getIdentity(),node.parentRid,node.leftRid,node.rightRid);
           if (wasNew) {
-            if (node.record.getIdentity().getClusterPosition() < -1)             cache.put(node.record.getIdentity().copy(),node);
- else             cache.put(node.record.getIdentity(),node);
+            if (node.record.getIdentity().getClusterPosition() < -1) {
+              if (cache.get(node.record) != node)               cache.put(node.record.getIdentity().copy(),node);
+            }
+ else             if (node.parent != null)             ((OMVRBTreeEntryPersistent<K,V>)node.parent).markDirty();
+            if (node.left != null)             ((OMVRBTreeEntryPersistent<K,V>)node.left).markDirty();
+            if (node.right != null)             ((OMVRBTreeEntryPersistent<K,V>)node.right).markDirty();
+            cache.put(node.record.getIdentity(),node);
           }
         }
         tmp.clear();
       }
-      recordsToCommit.clear();
     }
     if (record.isDirty()) {
       if (iDatabase != null)       record.setDatabase(iDatabase);

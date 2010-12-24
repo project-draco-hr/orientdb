@@ -5,28 +5,37 @@
   if (!word.toString().equals(KEYWORD_SELECT))   return -1;
   int fromPosition=textUpperCase.indexOf(KEYWORD_FROM,currentPos);
   if (fromPosition == -1)   throw new OQueryParsingException("Missed " + KEYWORD_FROM,text,currentPos);
-  final String projectionString=textUpperCase.substring(currentPos,fromPosition).trim();
+  final String projectionString=text.substring(currentPos,fromPosition).trim();
   if (projectionString.length() > 0 && !projectionString.equals("*")) {
     projections=new HashMap<String,Object>();
-    final String[] items=text.substring(currentPos,fromPosition).split(",");
+    final String[] items=projectionString.split(",");
     String fieldName;
     int pos;
-    for (    String i : items) {
-      i=i.trim();
-      pos=i.indexOf('.');
-      fieldName=pos > -1 ? i.substring(0,pos) : i;
-      fieldName=OSQLHelper.stringContent(fieldName);
-      for (int fieldIndex=2; projections.containsKey(fieldName); ++fieldIndex) {
-        fieldName+=fieldIndex;
+    for (    String projection : items) {
+      projection=projection.trim();
+      fieldName=null;
+      pos=projection.toUpperCase().indexOf(KEYWORD_AS);
+      if (pos > -1) {
+        fieldName=projection.substring(pos + KEYWORD_AS.length()).trim();
+        projection=projection.substring(0,pos).trim();
+        if (projections.containsKey(fieldName))         throw new OCommandSQLParsingException("Field '" + fieldName + "' is duplicated in current SELECT, choose a different name");
       }
-      if (i.toUpperCase().startsWith("FLATTEN(")) {
-        List<String> pars=OStringSerializerHelper.getParameters(i);
+ else {
+        pos=projection.indexOf('.');
+        fieldName=pos > -1 ? projection.substring(0,pos) : projection;
+        fieldName=OSQLHelper.stringContent(fieldName);
+        for (int fieldIndex=2; projections.containsKey(fieldName); ++fieldIndex) {
+          fieldName+=fieldIndex;
+        }
+      }
+      if (projection.startsWith("FLATTEN(")) {
+        List<String> pars=OStringSerializerHelper.getParameters(projection);
         if (pars.size() != 1)         throw new OCommandSQLParsingException("FLATTEN operator expects the field name as parameter. Example FLATTEN( outEdges )");
         flattenField=pars.get(0).trim();
         projections=null;
         continue;
       }
-      projections.put(fieldName,OSQLHelper.parseValue(database,this,i));
+      projections.put(fieldName,OSQLHelper.parseValue(database,this,projection));
     }
   }
   currentPos=fromPosition + KEYWORD_FROM.length() + 1;

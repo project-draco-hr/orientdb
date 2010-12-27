@@ -5,7 +5,7 @@
   if (rid == null)   throw new ODatabaseException("Can't create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   if (iRecord.getDatabase() == null)   iRecord.setDatabase(this);
   try {
-    final byte[] stream=iRecord.toStream();
+    byte[] stream=iRecord.toStream();
     boolean isNew=rid.isNew();
     final int clusterId;
     if (isNew)     clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
@@ -13,11 +13,11 @@
     if (stream.length > 0) {
       if (isNew) {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,clusterId);
-        callbackHooks(TYPE.BEFORE_CREATE,iRecord);
+        if (callbackHooks(TYPE.BEFORE_CREATE,iRecord))         stream=iRecord.toStream();
       }
  else {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName,clusterId);
-        callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
+        if (callbackHooks(TYPE.BEFORE_UPDATE,iRecord))         stream=iRecord.toStream();
       }
       if (!iRecord.isDirty()) {
         if (underlying.isUseCache())         getCache().pushRecord(iRecord.getIdentity().toString(),new ORawBuffer(iRecord.toStream(),iRecord.getVersion(),iRecordType));

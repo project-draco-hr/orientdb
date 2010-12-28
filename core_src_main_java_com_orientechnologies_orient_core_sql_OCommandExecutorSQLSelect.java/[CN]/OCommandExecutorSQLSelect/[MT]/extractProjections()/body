@@ -5,6 +5,7 @@
   if (!word.toString().equals(KEYWORD_SELECT))   return -1;
   int fromPosition=textUpperCase.indexOf(KEYWORD_FROM,currentPos);
   if (fromPosition == -1)   throw new OQueryParsingException("Missed " + KEYWORD_FROM,text,currentPos);
+  Object projectionValue;
   final String projectionString=text.substring(currentPos,fromPosition).trim();
   if (projectionString.length() > 0 && !projectionString.equals("*")) {
     projections=new HashMap<String,Object>();
@@ -35,7 +36,9 @@
         projections=null;
         continue;
       }
-      projections.put(fieldName,OSQLHelper.parseValue(database,this,projection));
+      projectionValue=OSQLHelper.parseValue(database,this,projection);
+      projections.put(fieldName,projectionValue);
+      if (!anyFunctionAggregates && projectionValue instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)projectionValue).aggregateResults())       anyFunctionAggregates=true;
     }
   }
   currentPos=fromPosition + KEYWORD_FROM.length() + 1;

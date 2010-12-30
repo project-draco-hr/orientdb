@@ -1,0 +1,46 @@
+{
+  if (record == null || this == tree.getRoot() || record.isDirty() && !iForceDirty)   return 0;
+  for (  OMVRBTreeEntryPersistent<K,V> entryPoint : pTree.entryPoints) {
+    if (entryPoint == this)     return 0;
+  }
+  if (pTree.cache.remove(record.getIdentity()) == null)   OLogManager.instance().warn(this,"Can't find current node into the cache. Is the cache invalid?");
+  int totalDisconnected=1;
+  if (tree.isDebug()) {
+    StringBuilder spaces=new StringBuilder();
+    for (int i=0; i < iLevel + 3; ++i)     spaces.append(" ");
+    System.out.printf("\n%sDisconnected tree node %s with parent %s, left %s, right %s (%s)...",spaces,this,parentRid,leftRid,rightRid,System.identityHashCode(this));
+  }
+  keys=null;
+  values=null;
+  serializedKeys=null;
+  serializedValues=null;
+  pTree=null;
+  record=null;
+  if (parent != null) {
+    if (parent.left == this) {
+      parent.left=null;
+    }
+ else     if (parent.right == this) {
+      parent.right=null;
+    }
+ else     OLogManager.instance().warn(this,"Current node's parent doesn't link it correctly");
+    parent=null;
+  }
+  if (left != null) {
+    left.parent=null;
+    int disconnected=left.disconnect(iForceDirty,iLevel + 1);
+    if (disconnected > 0) {
+      totalDisconnected+=disconnected;
+      left=null;
+    }
+  }
+  if (right != null) {
+    right.parent=null;
+    int disconnected=right.disconnect(iForceDirty,iLevel + 1);
+    if (disconnected > 0) {
+      totalDisconnected+=disconnected;
+      right=null;
+    }
+  }
+  return totalDisconnected;
+}

@@ -1,0 +1,22 @@
+{
+  final boolean locked=lock.acquireSharedLock();
+  try {
+    final List<OTransactionEntry> allEntries=new ArrayList<OTransactionEntry>();
+    final List<OTransactionEntry> tmpEntries=new ArrayList<OTransactionEntry>();
+    while (iTx.getEntries().iterator().hasNext()) {
+      for (      OTransactionEntry txEntry : iTx.getEntries())       tmpEntries.add(txEntry);
+      iTx.clearEntries();
+      for (      OTransactionEntry txEntry : tmpEntries)       commitEntry(iRequesterId,iTx.getId(),txEntry);
+      allEntries.addAll(tmpEntries);
+      tmpEntries.clear();
+    }
+    OTransactionAbstract.updateCacheFromEntries(this,iTx,allEntries);
+    allEntries.clear();
+  }
+ catch (  IOException e) {
+    rollback(iRequesterId,iTx);
+  }
+ finally {
+    lock.releaseSharedLock(locked);
+  }
+}

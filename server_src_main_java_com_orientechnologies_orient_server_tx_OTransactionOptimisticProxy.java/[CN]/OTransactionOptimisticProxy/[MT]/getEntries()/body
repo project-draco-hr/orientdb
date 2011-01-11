@@ -1,36 +1,36 @@
 {
-  return new Iterable<OTransactionEntryProxy>(){
-    public Iterator<OTransactionEntryProxy> iterator(){
-      return new Iterator<OTransactionEntryProxy>(){
+  return new Iterable<OTransactionEntry>(){
+    @Override public Iterator<OTransactionEntry> iterator(){
+      return new Iterator<OTransactionEntry>(){
         private int current=1;
-        public boolean hasNext(){
+        @Override public boolean hasNext(){
           if (exhausted)           return false;
           exhausted=current > size;
           return !exhausted;
         }
-        public OTransactionEntryProxy next(){
+        @Override public OTransactionEntryProxy next(){
           try {
             OTransactionEntryProxy entry=new OTransactionEntryProxy();
             if (entries.size() < size) {
               final ORecordId rid=(ORecordId)entry.getRecord().getIdentity();
               entry.status=channel.readByte();
               rid.clusterId=channel.readShort();
-              entry.getRecord().recordType=channel.readByte();
+              ((OTransactionRecordProxy)entry.getRecord()).setRecordType(channel.readByte());
 switch (entry.status) {
 case OTransactionEntry.CREATED:
                 rid.clusterPosition=-1;
               entry.clusterName=channel.readString();
-            entry.getRecord().stream=channel.readBytes();
+            entry.getRecord().fromStream(channel.readBytes());
           break;
 case OTransactionEntry.UPDATED:
         rid.clusterPosition=channel.readLong();
-      entry.getRecord().version=channel.readInt();
-    entry.getRecord().stream=channel.readBytes();
+      entry.getRecord().setVersion(channel.readInt());
+    entry.getRecord().fromStream(channel.readBytes());
   updatedRecords.put(rid,entry.getRecord());
 break;
 case OTransactionEntry.DELETED:
 rid.clusterPosition=channel.readLong();
-entry.getRecord().version=channel.readInt();
+entry.getRecord().setVersion(channel.readInt());
 break;
 default :
 throw new OTransactionException("Unrecognized tx command: " + entry.status);
@@ -45,7 +45,7 @@ return entry;
 throw new OSerializationException("Can't read transaction record from the network",e);
 }
 }
-public void remove(){
+@Override public void remove(){
 throw new UnsupportedOperationException("remove");
 }
 }

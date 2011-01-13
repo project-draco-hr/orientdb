@@ -21,9 +21,16 @@
   int bufferSize=iForce ? iSize : iSize <= DEF_BLOCK_SIZE ? DEF_BLOCK_SIZE : iSize;
   if (iBeginOffset + bufferSize > iFile.getFileSize())   bufferSize=iFile.getFileSize() - iBeginOffset;
   if (bufferSize <= 0)   throw new IllegalArgumentException("Invalid range requested for file " + iFile + ". Requested "+ iSize+ " bytes from the address "+ iBeginOffset+ " while the total file size is "+ iFile.getFileSize());
+  if (totalMemory + bufferSize > maxMemory) {
+    final int p=(position + 2) * -1;
+    if (p > -1 && p <= fileEntries.size()) {
+      final OMMapBufferEntry entry=fileEntries.get(p);
+      if (entry.beginOffset <= iBeginOffset && entry.beginOffset + entry.size >= iBeginOffset)       commitBuffer(entry);
+    }
+    return null;
+  }
   totalMemory+=bufferSize;
   OMMapBufferEntry entry=null;
-  boolean forceSucceed;
   do {
     if (totalMemory > maxMemory) {
       int pagesUnloaded=0;
@@ -36,24 +43,7 @@
       for (Iterator<OMMapBufferEntry> it=bufferPoolLRU.iterator(); it.hasNext(); ) {
         entry=it.next();
         if (!entry.pin) {
-          forceSucceed=false;
-          for (int i=0; i < FORCE_RETRY; ++i) {
-            try {
-              entry.buffer.force();
-              forceSucceed=true;
-              break;
-            }
- catch (            Exception e) {
-              OLogManager.instance().debug(entry.buffer,"Can't write memory buffer to disk. Retrying (" + (i + 1) + "/"+ FORCE_RETRY+ ")...");
-              try {
-                System.gc();
-                Thread.sleep(FORCE_DELAY);
-              }
- catch (              InterruptedException e1) {
-              }
-            }
-          }
-          if (!forceSucceed)           entry.buffer.force();
+          commitBuffer(entry);
           it.remove();
           bufferPoolPerFile.get(entry.file).remove(entry);
           pagesUnloaded++;

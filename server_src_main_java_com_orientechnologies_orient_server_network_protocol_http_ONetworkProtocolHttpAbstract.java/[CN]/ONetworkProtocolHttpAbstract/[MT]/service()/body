@@ -4,44 +4,48 @@
   data.commandInfo=null;
   data.commandDetail=null;
   long begin=System.currentTimeMillis();
-  final String command;
-  if (request.url.length() < 2) {
-    command="";
-  }
+  boolean isChain=false;
+  do {
+    final String command;
+    if (request.url.length() < 2) {
+      command="";
+    }
  else {
-    command=request.url.substring(1);
-  }
-  final String commandString=request.method + COMMAND_SEPARATOR + command;
-  OServerCommand cmd=exactCommands.get(commandString);
-  if (cmd == null) {
-    String partLeft, partRight;
-    for (    Entry<String,OServerCommand> entry : wildcardCommands.entrySet()) {
-      int wildcardPos=entry.getKey().indexOf("*");
-      partLeft=entry.getKey().substring(0,wildcardPos);
-      partRight=entry.getKey().substring(wildcardPos + 1);
-      if (commandString.startsWith(partLeft) && commandString.endsWith(partRight)) {
-        cmd=entry.getValue();
-        break;
+      command=request.url.substring(1);
+    }
+    final String commandString=request.method + COMMAND_SEPARATOR + command;
+    OServerCommand cmd=exactCommands.get(commandString);
+    if (cmd == null) {
+      String partLeft, partRight;
+      for (      Entry<String,OServerCommand> entry : wildcardCommands.entrySet()) {
+        int wildcardPos=entry.getKey().indexOf("*");
+        partLeft=entry.getKey().substring(0,wildcardPos);
+        partRight=entry.getKey().substring(wildcardPos + 1);
+        if (commandString.startsWith(partLeft) && commandString.endsWith(partRight)) {
+          cmd=entry.getValue();
+          break;
+        }
+      }
+    }
+    if (cmd != null)     try {
+      if (cmd.beforeExecute(request)) {
+        isChain=cmd.execute(request);
+      }
+    }
+ catch (    Exception e) {
+      handleError(e);
+    }
+ else {
+      try {
+        OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Command not found: "+ request.method+ "."+ command);
+        sendTextContent(OHttpUtils.STATUS_INVALIDMETHOD_CODE,OHttpUtils.STATUS_INVALIDMETHOD_DESCRIPTION,null,OHttpUtils.CONTENT_TEXT_PLAIN,"Command not found: " + command);
+      }
+ catch (      IOException e1) {
+        sendShutdown();
       }
     }
   }
-  if (cmd != null)   try {
-    if (cmd.beforeExecute(request)) {
-      cmd.execute(request);
-    }
-  }
- catch (  Exception e) {
-    handleError(e);
-  }
- else {
-    try {
-      OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Command not found: "+ request.method+ "."+ command);
-      sendTextContent(OHttpUtils.STATUS_INVALIDMETHOD_CODE,OHttpUtils.STATUS_INVALIDMETHOD_DESCRIPTION,null,OHttpUtils.CONTENT_TEXT_PLAIN,"Command not found: " + command);
-    }
- catch (    IOException e1) {
-      sendShutdown();
-    }
-  }
+ while (isChain);
   data.lastCommandInfo=data.commandInfo;
   data.lastCommandDetail=data.commandDetail;
   data.lastCommandExecutionTime=System.currentTimeMillis() - begin;

@@ -1,24 +1,47 @@
 {
-  for (  OMMapBufferEntry e : buffersLRU) {
-    if (iFile.equals(e.file) && iBeginOffset >= e.beginOffset && iBeginOffset + iSize <= e.beginOffset + e.size) {
-      OProfiler.getInstance().updateCounter("OMMapManager.usePage",1);
-      return e;
+  if (bufferPoolLRU.size() > 0) {
+    OMMapBufferEntry e;
+    final int min=Math.max(bufferPoolLRU.size() - 10,-1);
+    for (int i=bufferPoolLRU.size() - 1; i > min; --i) {
+      e=bufferPoolLRU.get(i);
+      if (e.file == iFile && iBeginOffset >= e.beginOffset && iBeginOffset + iSize <= e.beginOffset + e.size) {
+        OProfiler.getInstance().updateCounter("OMMapManager.usePage",1);
+        e.counter++;
+        return e;
+      }
     }
   }
+  List<OMMapBufferEntry> fileEntries=bufferPoolPerFile.get(iFile);
+  if (fileEntries == null) {
+    fileEntries=new ArrayList<OMMapBufferEntry>();
+    bufferPoolPerFile.put(iFile,fileEntries);
+  }
+  int position=searchEntry(fileEntries,iBeginOffset,iSize);
+  if (position > -1)   return fileEntries.get(position);
   int bufferSize=iForce ? iSize : iSize <= DEF_BLOCK_SIZE ? DEF_BLOCK_SIZE : iSize;
   if (iBeginOffset + bufferSize > iFile.getFileSize())   bufferSize=iFile.getFileSize() - iBeginOffset;
   if (bufferSize <= 0)   throw new IllegalArgumentException("Invalid range requested for file " + iFile + ". Requested "+ iSize+ " bytes from the address "+ iBeginOffset+ " while the total file size is "+ iFile.getFileSize());
   totalMemory+=bufferSize;
   OMMapBufferEntry entry=null;
+  boolean forceSucceed;
   do {
     if (totalMemory > maxMemory) {
       int pagesUnloaded=0;
-      for (Iterator<OMMapBufferEntry> it=buffersLRU.descendingIterator(); it.hasNext(); ) {
+      Collections.sort(bufferPoolLRU,new Comparator<OMMapBufferEntry>(){
+        public int compare(        final OMMapBufferEntry o1,        final OMMapBufferEntry o2){
+          return (int)(o1.counter - o2.counter);
+        }
+      }
+);
+      for (Iterator<OMMapBufferEntry> it=bufferPoolLRU.iterator(); it.hasNext(); ) {
         entry=it.next();
         if (!entry.pin) {
+          forceSucceed=false;
           for (int i=0; i < FORCE_RETRY; ++i) {
             try {
               entry.buffer.force();
+              forceSucceed=true;
+              break;
             }
  catch (            Exception e) {
               OLogManager.instance().debug(entry.buffer,"Can't write memory buffer to disk. Retrying (" + (i + 1) + "/"+ FORCE_RETRY+ ")...");
@@ -30,8 +53,9 @@
               }
             }
           }
-          entry.buffer.force();
+          if (!forceSucceed)           entry.buffer.force();
           it.remove();
+          bufferPoolPerFile.get(entry.file).remove(entry);
           pagesUnloaded++;
           entry.buffer=null;
           totalMemory-=entry.size;
@@ -39,6 +63,7 @@
         }
       }
       OProfiler.getInstance().updateCounter("OMMapManager.pagesUnloaded",pagesUnloaded);
+      position=searchEntry(fileEntries,iBeginOffset,iSize);
     }
     try {
       entry=mapBuffer(iFile,iBeginOffset,bufferSize);
@@ -50,6 +75,7 @@
   }
  while (entry == null && maxMemory > MIN_MEMORY);
   if (entry == null)   throw new OIOException("You can't access to the file portion " + iBeginOffset + "-"+ iBeginOffset+ iSize+ " bytes");
-  buffersLRU.addFirst(entry);
+  bufferPoolLRU.add(entry);
+  fileEntries.add((position + 1) * -1,entry);
   return entry;
 }

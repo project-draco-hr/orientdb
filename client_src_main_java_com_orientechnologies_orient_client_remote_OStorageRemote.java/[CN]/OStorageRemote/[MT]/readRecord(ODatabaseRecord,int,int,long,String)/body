@@ -19,8 +19,13 @@
         if (network.readByte() == 0)         return null;
         final ORawBuffer buffer=new ORawBuffer(network.readBytes(),network.readInt(),network.readByte());
         while (network.readByte() == 2) {
-          ORecordInternal<?> record=readRecordFromNetwork(iDatabase);
-          cache.pushRecord(record.getIdentity().toString(),new ORawBuffer(record.toStream(),record.getVersion(),record.getRecordType()));
+          final int classId=network.readInt();
+          if (classId == OChannelBinaryProtocol.RECORD_NULL)           break;
+          final byte recordType=network.readByte();
+          final String rid=ORecordId.generateString(network.readShort(),network.readLong());
+          final int recordVersion=network.readInt();
+          final byte[] recordContent=network.readBytes();
+          cache.pushRecord(rid,new ORawBuffer(recordContent,recordVersion,recordType));
         }
         return buffer;
       }

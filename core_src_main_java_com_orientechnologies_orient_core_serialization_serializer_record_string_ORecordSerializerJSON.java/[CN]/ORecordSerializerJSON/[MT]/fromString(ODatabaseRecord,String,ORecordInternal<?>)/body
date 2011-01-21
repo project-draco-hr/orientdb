@@ -5,11 +5,29 @@
   if (iRecord != null)   iRecord.reset();
   iSource=iSource.substring(1,iSource.length() - 1).trim();
   String[] fields=OStringParser.getWords(iSource,":,",true);
+  String fieldName;
+  String fieldValue;
+  String fieldValueAsString;
+  Map<String,Character> fieldTypes=null;
+  for (int i=0; i < fields.length; i+=2) {
+    fieldName=fields[i];
+    fieldName=fieldName.substring(1,fieldName.length() - 1);
+    fieldValue=fields[i + 1];
+    fieldValueAsString=fieldValue.length() >= 2 ? fieldValue.substring(1,fieldValue.length() - 1) : fieldValue;
+    if (fieldName.equals(ATTRIBUTE_FIELD_TYPES) && iRecord instanceof ODocument) {
+      final String[] fieldTypesParts=fieldValueAsString.split(",");
+      if (fieldTypesParts.length > 0) {
+        fieldTypes=new HashMap<String,Character>();
+        String[] part;
+        for (        String f : fieldTypesParts) {
+          part=f.split("=");
+          if (part.length == 2)           fieldTypes.put(part[0],part[1].charAt(0));
+        }
+      }
+    }
+  }
   try {
     if (fields != null && fields.length > 0) {
-      String fieldName;
-      String fieldValue;
-      String fieldValueAsString;
       for (int i=0; i < fields.length; i+=2) {
         fieldName=fields[i];
         fieldName=fieldName.substring(1,fieldName.length() - 1);
@@ -24,6 +42,7 @@
           }
         }
  else         if (fieldName.equals(ATTRIBUTE_CLASS) && iRecord instanceof ODocument)         ((ODocument)iRecord).setClassNameIfExists("null".equals(fieldValueAsString) ? null : fieldValueAsString);
+ else         if (fieldName.equals(ATTRIBUTE_FIELD_TYPES) && iRecord instanceof ODocument)         continue;
  else         if (fieldName.equals("value") && !(iRecord instanceof ODocument)) {
           if (iRecord instanceof ORecordColumn) {
             fieldValueAsString=fieldValueAsString.trim();
@@ -41,7 +60,7 @@
         }
  else {
           if (iRecord instanceof ODocument) {
-            final Object v=getValue((ODocument)iRecord,fieldName,fieldValue,fieldValueAsString,null,null);
+            final Object v=getValue((ODocument)iRecord,fieldName,fieldValue,fieldValueAsString,null,null,fieldTypes);
             if (v != null)             if (v instanceof Collection<?> && ((Collection<?>)v).size() > 0) {
               Object first=((Collection<?>)v).iterator().next();
               if (first != null && first instanceof ORecord<?> && !((ORecord<?>)first).getIdentity().isValid()) {

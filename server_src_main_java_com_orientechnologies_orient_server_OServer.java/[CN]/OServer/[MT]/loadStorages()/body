@@ -1,8 +1,21 @@
 {
   String type;
   for (  OServerStorageConfiguration stg : OServerMain.server().getConfiguration().storages)   if (stg.loadOnStartup) {
-    Orient.instance().loadStorage(stg.path);
+    if (stg.userName == null)     stg.userName="admin";
+    if (stg.userPassword == null)     stg.userPassword="admin";
     type=stg.path.substring(0,stg.path.indexOf(":"));
-    OLogManager.instance().info(this,"-> Loaded " + type + " database '"+ stg.name+ "'");
+    ODatabaseDocument db=null;
+    try {
+      db=new ODatabaseDocumentTx(stg.path);
+      if (db.exists())       db.open(stg.userName,stg.userPassword);
+ else       db.create();
+      OLogManager.instance().info(this,"-> Loaded " + type + " database '"+ stg.name+ "'");
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"-> Can't load " + type + " database '"+ stg.name+ "': "+ e);
+    }
+ finally {
+      if (db != null)       db.close();
+    }
   }
 }

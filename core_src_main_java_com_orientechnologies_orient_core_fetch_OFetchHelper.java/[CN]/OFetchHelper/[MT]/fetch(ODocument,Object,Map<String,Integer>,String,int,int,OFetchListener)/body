@@ -2,7 +2,6 @@
   if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)   return;
   Object fieldValue;
   Integer depthLevel;
-  int currentLevel;
   final Integer anyFieldDepthLevel=iFetchPlan != null ? iFetchPlan.get(ANY_FIELD) : -1;
   try {
     for (    String fieldName : iRootRecord.fieldNames()) {
@@ -11,17 +10,13 @@
       depthLevel=getDepthLevel(iRootRecord,iFetchPlan,fieldName);
       if (depthLevel == null)       depthLevel=anyFieldDepthLevel;
       if (depthLevel == 0)       continue;
-      if (fieldName.equals(iCurrentField)) {
-        currentLevel=iCurrentLevel + 1;
-        if (depthLevel >= currentLevel)         continue;
-      }
- else       currentLevel=0;
+      if (depthLevel > -1 && iCurrentLevel >= depthLevel)       continue;
       Object userObject;
       if (fieldValue instanceof ODocument) {
         final ODocument linked=(ODocument)fieldValue;
         try {
           userObject=iListener.fetchLinked(iRootRecord,iUserObject,fieldName,linked);
-          if (userObject != null)           fetch(linked,userObject,iFetchPlan,fieldName,currentLevel,iMaxFetch,iListener);
+          if (userObject != null)           fetch(linked,userObject,iFetchPlan,fieldName,iCurrentLevel + 1,iMaxFetch,iListener);
         }
  catch (        ORecordNotFoundException e) {
           OLogManager.instance().error(null,"Linked record %s was not found",linked);
@@ -31,14 +26,14 @@
         final Collection<ODocument> linked=(Collection<ODocument>)fieldValue;
         userObject=iListener.fetchLinked(iRootRecord,iUserObject,fieldName,linked);
         if (userObject != null)         for (        ODocument d : (Collection<ODocument>)userObject) {
-          fetch(d,d,iFetchPlan,fieldName,currentLevel,iMaxFetch,iListener);
+          fetch(d,d,iFetchPlan,fieldName,iCurrentLevel + 1,iMaxFetch,iListener);
         }
       }
  else       if (fieldValue instanceof Map<?,?>) {
         final Map<String,ODocument> linked=(Map<String,ODocument>)fieldValue;
         userObject=iListener.fetchLinked(iRootRecord,iUserObject,fieldName,linked);
         if (userObject != null)         for (        ODocument d : ((Map<String,ODocument>)userObject).values()) {
-          fetch(d,d,iFetchPlan,fieldName,currentLevel,iMaxFetch,iListener);
+          fetch(d,d,iFetchPlan,fieldName,iCurrentLevel + 1,iMaxFetch,iListener);
         }
       }
       if (iMaxFetch > -1 && iListener.size() >= iMaxFetch)       return;

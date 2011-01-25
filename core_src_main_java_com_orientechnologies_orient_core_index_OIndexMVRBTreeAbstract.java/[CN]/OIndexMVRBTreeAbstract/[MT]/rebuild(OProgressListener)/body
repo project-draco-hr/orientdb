@@ -1,0 +1,36 @@
+{
+  Object fieldValue;
+  ODocument doc;
+  clear();
+  acquireExclusiveLock();
+  try {
+    int documentIndexed=0;
+    int documentNum=0;
+    long documentTotal=0;
+    for (    String cluster : clustersToIndex)     documentTotal+=map.getDatabase().countClusterElements(cluster);
+    if (iProgressListener != null)     iProgressListener.onBegin(this,documentTotal);
+    for (    String clusterName : clustersToIndex)     for (    ORecord<?> record : map.getDatabase().browseCluster(clusterName)) {
+      if (record instanceof ODocument) {
+        doc=(ODocument)record;
+        fieldValue=callback.getDocumentValueToIndex(doc);
+        if (fieldValue != null) {
+          put(fieldValue,(ORecordId)doc.getIdentity());
+          ++documentIndexed;
+        }
+      }
+      documentNum++;
+      if (iProgressListener != null)       iProgressListener.onProgress(this,documentNum,documentNum * 100f / documentTotal);
+    }
+    lazySave();
+    if (iProgressListener != null)     iProgressListener.onCompletition(this,true);
+  }
+ catch (  Exception e) {
+    if (iProgressListener != null)     iProgressListener.onCompletition(this,false);
+    clear();
+    throw new OIndexException("Error on rebuilding the index for clusters: " + clustersToIndex,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+  return this;
+}

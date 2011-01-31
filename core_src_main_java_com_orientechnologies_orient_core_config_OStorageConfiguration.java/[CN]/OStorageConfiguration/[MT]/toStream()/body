@@ -9,6 +9,7 @@
   write(buffer,localeCountry);
   write(buffer,dateFormat);
   write(buffer,dateTimeFormat);
+  phySegmentToStream(buffer,fileTemplate);
   write(buffer,clusters.size());
   for (  OStorageClusterConfiguration c : clusters) {
     if (c == null) {
@@ -43,8 +44,27 @@
   write(buffer,txSegment.isSynchTx());
   write(buffer,properties.size());
   for (  OEntryConfiguration e : properties)   entryToStream(buffer,e);
-  if (fixedSize > 0 && buffer.length() > fixedSize)   throw new OConfigurationException("Configuration data exceeded size limit: " + fixedSize + " bytes");
-  buffer.append("|");
-  if (fixedSize > 0)   buffer.setLength(fixedSize);
-  return buffer.toString().getBytes();
+  if (fixedSize > 0 && buffer.length() > fixedSize) {
+    try {
+      final ByteArrayOutputStream compressedBuffer=new ByteArrayOutputStream();
+      compressedBuffer.write(1);
+      GZIPOutputStream compression=new GZIPOutputStream(compressedBuffer);
+      compression.write(buffer.toString().getBytes());
+      compression.close();
+      if (fixedSize > 0)       if (compressedBuffer.size() > fixedSize)       throw new OConfigurationException("Configuration data exceeded size limit: " + fixedSize + " bytes");
+ else       if (compressedBuffer.size() < fixedSize) {
+        for (int i=compressedBuffer.size(); i < fixedSize; ++i)         compressedBuffer.write(0);
+      }
+      return compressedBuffer.toByteArray();
+    }
+ catch (    IOException ex) {
+      throw new OConfigurationException("Error while compressing storage configuration",ex);
+    }
+  }
+ else {
+    buffer.insert(0,0);
+    buffer.append("|");
+    if (fixedSize > 0)     buffer.setLength(fixedSize);
+    return buffer.toString().getBytes();
+  }
 }

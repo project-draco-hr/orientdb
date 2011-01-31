@@ -1,5 +1,22 @@
 {
-  String[] values=new String(iStream).split("\\|");
+  final byte[] stream;
+  if (iStream[0] == 1) {
+    final ByteArrayInputStream compressedBuffer=new ByteArrayInputStream(iStream,1,iStream.length - 1);
+    try {
+      final GZIPInputStream compression=new GZIPInputStream(compressedBuffer);
+      final ByteArrayOutputStream tempBuffer=new ByteArrayOutputStream();
+      int length;
+      byte[] buffer=new byte[8192];
+      while ((length=compression.read(buffer,0,8192)) != -1)       tempBuffer.write(buffer,0,length);
+      compression.close();
+      stream=tempBuffer.toByteArray();
+    }
+ catch (    IOException ex) {
+      throw new OConfigurationException("Error while uncompressing storage configuration",ex);
+    }
+  }
+ else   stream=iStream;
+  String[] values=new String(stream).split("\\|");
   int index=0;
   version=Integer.parseInt(read(values[index++]));
   name=read(values[index++]);
@@ -11,6 +28,7 @@
   localeCountry=read(values[index++]);
   dateFormat=read(values[index++]);
   dateTimeFormat=read(values[index++]);
+  index=phySegmentFromStream(values,index,fileTemplate);
   int size=Integer.parseInt(read(values[index++]));
   String clusterType;
   int clusterId;

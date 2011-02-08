@@ -1,0 +1,32 @@
+{
+  database.open(DEFAULT_DB_USER,DEFAULT_DB_PASSWORD);
+  index=database.getMetadata().getSchema().getClass("Chunk").getProperty("hash").getIndex();
+  Assert.assertNotNull(index);
+  Set<Integer> alreadyLoaded=new HashSet<Integer>();
+  try {
+    for (int i=0; i < load; i++) {
+      int rand=(int)(Math.random() * count);
+      if (!alreadyLoaded.contains(rand))       alreadyLoaded.add(rand);
+ else       System.out.println("already loaded");
+      List result=index.getUnderlying().get("key" + Integer.toString(rand));
+      Assert.assertTrue(result.size() > 0);
+      if (result != null && result.size() > 0) {
+        ODocument doc=(ODocument)result.get(0);
+        System.out.println("loaded " + i + "("+ rand+ "), binary record: "+ doc.field("binary",ORID.class));
+        ORecordBytes record=doc.field("binary");
+        Assert.assertNotNull(record);
+        if (record != null) {
+          byte[] data=record.toStream();
+          Assert.assertTrue(data.length == size);
+        }
+      }
+ else {
+        System.out.println("key not found " + rand);
+      }
+      if (i % 100 == 0)       System.out.println("loaded " + i);
+    }
+  }
+  finally {
+    database.close();
+  }
+}

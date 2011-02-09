@@ -1,0 +1,29 @@
+{
+  listener.onMessage("\nImporting database indexes...");
+  String key;
+  String value;
+  final ODocument doc=new ODocument(database);
+  database.getMetadata().getIndexManager().load();
+  jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+  do {
+    final String indexName=jsonReader.readString(OJSONReader.FIELD_ASSIGNMENT);
+    listener.onMessage("\n- Index '" + indexName + "'...");
+    final OIndex index=database.getMetadata().getIndexManager().getIndex(indexName);
+    long tot=0;
+    jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+    String n;
+    do {
+      jsonReader.readNext(new char[]{':','}'});
+      if (jsonReader.lastChar() != '}') {
+        key=jsonReader.checkContent("\"key\"").readString(OJSONReader.COMMA_SEPARATOR);
+        value=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"value\"").readString(OJSONReader.NEXT_IN_OBJECT);
+        tot++;
+      }
+    }
+ while (jsonReader.lastChar() == ',');
+    if (index != null)     listener.onMessage("OK (" + tot + " entries)");
+ else     listener.onMessage("KO, the index wasn't found in configuration");
+    jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
+  }
+ while (jsonReader.lastChar() == ',');
+}

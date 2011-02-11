@@ -1,6 +1,33 @@
 {
-  super(iDatabase,-1);
-  channel=iChannel;
-  id=iChannel.readInt();
-  size=iChannel.readInt();
+  super(iDatabase,iChannel.readInt());
+  while (iChannel.readByte() == 1) {
+    try {
+      OTransactionEntryProxy entry=new OTransactionEntryProxy();
+      final ORecordId rid=(ORecordId)entry.getRecord().getIdentity();
+      entry.status=iChannel.readByte();
+      rid.clusterId=iChannel.readShort();
+      rid.clusterPosition=iChannel.readLong();
+      ((OTransactionRecordProxy)entry.getRecord()).setRecordType(iChannel.readByte());
+switch (entry.status) {
+case OTransactionEntry.CREATED:
+        entry.clusterName=iChannel.readString();
+      entry.getRecord().fromStream(iChannel.readBytes());
+    break;
+case OTransactionEntry.UPDATED:
+  entry.getRecord().setVersion(iChannel.readInt());
+entry.getRecord().fromStream(iChannel.readBytes());
+updatedRecords.put(rid,entry.getRecord());
+break;
+case OTransactionEntry.DELETED:
+entry.getRecord().setVersion(iChannel.readInt());
+break;
+default :
+throw new OTransactionException("Unrecognized tx command: " + entry.status);
+}
+entries.put((ORecordId)entry.getRecord().getIdentity(),entry);
+}
+ catch (IOException e) {
+throw new OSerializationException("Can't read transaction record from the network",e);
+}
+}
 }

@@ -338,12 +338,19 @@ case OChannelBinaryProtocol.REQUEST_TX_COMMIT:
 {
 data.commandInfo="Transaction commit";
 final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy((ODatabaseRecordTx)connection.database.getUnderlying(),channel);
-((OStorageLocal)connection.database.getStorage()).commit(connection.database.getId(),tx);
+connection.database.begin(tx);
+try {
+connection.database.commit();
 sendOk(lastClientTxId);
 channel.writeInt(tx.getUpdatedRecords().size());
 for (Entry<ORecordId,ORecord<?>> entry : tx.getUpdatedRecords().entrySet()) {
 channel.writeRID(entry.getKey());
 channel.writeInt(entry.getValue().getVersion());
+}
+}
+ catch (Exception e) {
+connection.database.rollback();
+sendError(lastClientTxId,e);
 }
 break;
 }

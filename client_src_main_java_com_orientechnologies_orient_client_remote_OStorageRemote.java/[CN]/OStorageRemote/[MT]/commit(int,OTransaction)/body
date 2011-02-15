@@ -4,20 +4,19 @@
     boolean locked=lock.acquireExclusiveLock();
     try {
       final int reqId;
-      final List<OTransactionEntry> allEntries=new ArrayList<OTransactionEntry>();
+      final Set<OTransactionEntry> allEntries=new HashSet<OTransactionEntry>();
       try {
         reqId=beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
         network.writeInt(iTx.getId());
         final List<OTransactionEntry> tmpEntries=new ArrayList<OTransactionEntry>();
         while (iTx.getEntries().iterator().hasNext()) {
-          for (          OTransactionEntry txEntry : iTx.getEntries())           tmpEntries.add(txEntry);
+          for (          OTransactionEntry txEntry : iTx.getEntries())           if (!allEntries.contains(txEntry))           tmpEntries.add(txEntry);
           iTx.clearEntries();
-          for (          OTransactionEntry txEntry : tmpEntries) {
-            network.writeByte((byte)1);
-            commitEntry(txEntry);
+          if (tmpEntries.size() > 0) {
+            for (            OTransactionEntry txEntry : tmpEntries)             commitEntry(txEntry);
+            allEntries.addAll(tmpEntries);
+            tmpEntries.clear();
           }
-          allEntries.addAll(tmpEntries);
-          tmpEntries.clear();
         }
         network.writeByte((byte)0);
       }

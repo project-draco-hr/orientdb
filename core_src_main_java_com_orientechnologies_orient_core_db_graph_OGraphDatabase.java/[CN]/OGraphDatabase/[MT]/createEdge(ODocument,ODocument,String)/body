@@ -1,22 +1,27 @@
 {
   final boolean safeMode=beginBlock();
   try {
+    iInVertex.setDatabase(this);
+    iOutVertex.setDatabase(this);
     final ODocument edge=new ODocument(this,iClassName != null ? iClassName : EDGE_CLASS_NAME);
-    edge.field(EDGE_FIELD_IN,iSourceVertex);
-    edge.field(EDGE_FIELD_OUT,iDestVertex);
-    ORecordLazyList outEdges=((ORecordLazyList)iSourceVertex.field(VERTEX_FIELD_OUT_EDGES));
+    edge.field(EDGE_FIELD_OUT,iOutVertex);
+    edge.field(EDGE_FIELD_IN,iInVertex);
+    ORecordLazySet outEdges=((ORecordLazySet)iOutVertex.field(VERTEX_FIELD_OUT_EDGES));
     if (outEdges == null) {
-      outEdges=new ORecordLazyList(underlying,ODocument.RECORD_TYPE);
-      iSourceVertex.field(VERTEX_FIELD_OUT_EDGES,outEdges);
+      outEdges=new ORecordLazySet(iOutVertex,ODocument.RECORD_TYPE);
+      iOutVertex.field(VERTEX_FIELD_OUT_EDGES,outEdges);
     }
     outEdges.add(edge);
-    ORecordLazyList inEdges=((ORecordLazyList)iDestVertex.field(VERTEX_FIELD_IN_EDGES));
+    ORecordLazySet inEdges=((ORecordLazySet)iInVertex.field(VERTEX_FIELD_IN_EDGES));
     if (inEdges == null) {
-      inEdges=new ORecordLazyList(underlying,ODocument.RECORD_TYPE);
-      iDestVertex.field(VERTEX_FIELD_IN_EDGES,inEdges);
+      inEdges=new ORecordLazySet(iInVertex,ODocument.RECORD_TYPE);
+      iInVertex.field(VERTEX_FIELD_IN_EDGES,inEdges);
     }
     inEdges.add(edge);
-    commitBlock(safeMode);
+    if (safeMode) {
+      save(edge);
+      commitBlock(safeMode);
+    }
     return edge;
   }
  catch (  RuntimeException e) {

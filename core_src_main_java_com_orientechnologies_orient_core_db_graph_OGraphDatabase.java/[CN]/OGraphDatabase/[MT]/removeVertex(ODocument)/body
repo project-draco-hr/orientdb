@@ -1,0 +1,39 @@
+{
+  final boolean safeMode=beginBlock();
+  try {
+    ODocument otherVertex;
+    Set<ODocument> otherEdges;
+    Set<ODocument> edges=iVertex.field(VERTEX_FIELD_OUT_EDGES);
+    if (edges != null) {
+      for (      ODocument edge : edges) {
+        otherVertex=edge.field(EDGE_FIELD_IN);
+        if (otherVertex != null) {
+          otherEdges=otherVertex.field(VERTEX_FIELD_IN_EDGES);
+          if (otherEdges != null && otherEdges.remove(edge))           save(otherVertex);
+        }
+        delete(edge);
+      }
+      edges.clear();
+      iVertex.field(VERTEX_FIELD_OUT_EDGES,edges);
+    }
+    edges=iVertex.field(VERTEX_FIELD_IN_EDGES);
+    if (edges != null) {
+      for (      ODocument edge : edges) {
+        otherVertex=edge.field(EDGE_FIELD_OUT);
+        if (otherVertex != null) {
+          otherEdges=otherVertex.field(VERTEX_FIELD_OUT_EDGES);
+          if (otherEdges != null && otherEdges.remove(edge))           save(otherVertex);
+        }
+        delete(edge);
+      }
+      edges.clear();
+      iVertex.field(VERTEX_FIELD_IN_EDGES,edges);
+    }
+    delete(iVertex);
+    commitBlock(safeMode);
+  }
+ catch (  RuntimeException e) {
+    rollbackBlock(safeMode);
+    throw e;
+  }
+}

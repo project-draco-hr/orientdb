@@ -24,20 +24,19 @@
     record.setDirty();
   }
   final long timer=OProfiler.getInstance().startChrono();
-  OMemoryOutputStream stream=new OMemoryOutputStream();
+  final OMemoryOutputStream outStream=new OMemoryOutputStream();
   try {
-    stream.add(pageSize);
-    stream.addAsFixed(parentRid.toStream());
-    stream.addAsFixed(leftRid.toStream());
-    stream.addAsFixed(rightRid.toStream());
-    stream.add(color);
-    stream.add(size);
-    serializeNewKeys();
-    serializeNewValues();
-    for (int i=0; i < size; ++i)     stream.add(serializedKeys[i]);
-    for (int i=0; i < size; ++i)     stream.add(serializedValues[i]);
-    stream.flush();
-    final byte[] buffer=stream.getByteArray();
+    outStream.add(pageSize);
+    outStream.addAsFixed(parentRid.toStream());
+    outStream.addAsFixed(leftRid.toStream());
+    outStream.addAsFixed(rightRid.toStream());
+    outStream.add(color);
+    outStream.add(size);
+    for (int i=0; i < size; ++i)     serializedKeys[i]=outStream.add(serializeNewKey(i));
+    for (int i=0; i < size; ++i)     serializedValues[i]=outStream.add(serializeNewValue(i));
+    outStream.flush();
+    final byte[] buffer=outStream.getByteArray();
+    inStream.setSource(buffer);
     record.fromStream(buffer);
     return buffer;
   }
@@ -45,7 +44,6 @@
     throw new OSerializationException("Can't marshall RB+Tree node",e);
   }
  finally {
-    stream.close();
     marshalledRecords.remove(identityRecord);
     checkEntryStructure();
     OProfiler.getInstance().stopChrono("OMVRBTreeEntryP.toStream",timer);

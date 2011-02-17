@@ -3,12 +3,15 @@
   ORawBuffer cachedBuffer;
   for (  OTransactionEntry txEntry : iEntries) {
     rid=txEntry.getRecord().getIdentity().toString();
-    cachedBuffer=iStorage.getCache().getRecord(rid);
-    if (cachedBuffer != null) {
-      cachedBuffer.buffer=txEntry.getRecord().toStream();
-      cachedBuffer.version=txEntry.getRecord().getVersion();
-      cachedBuffer.recordType=txEntry.getRecord().getRecordType();
+    if (txEntry.status == OTransactionEntry.DELETED)     iStorage.getCache().removeRecord(rid);
+ else     if (txEntry.status == OTransactionEntry.UPDATED) {
+      cachedBuffer=iStorage.getCache().getRecord(rid);
+      if (cachedBuffer != null) {
+        cachedBuffer.buffer=txEntry.getRecord().toStream();
+        cachedBuffer.version=txEntry.getRecord().getVersion();
+        cachedBuffer.recordType=txEntry.getRecord().getRecordType();
+      }
+ else       if (txEntry.getRecord().isPinned())       iStorage.getCache().pushRecord(rid,new ORawBuffer(txEntry.getRecord().toStream(),txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
     }
- else     if (txEntry.getRecord().isPinned())     iStorage.getCache().pushRecord(rid,new ORawBuffer(txEntry.getRecord().toStream(),txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
   }
 }

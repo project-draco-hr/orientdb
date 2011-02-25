@@ -1,35 +1,41 @@
 {
   checkForFields();
+  final StringBuilder buffer=new StringBuilder();
   final boolean saveDirtyStatus=_dirty;
-  StringBuilder buffer=new StringBuilder();
-  if (_clazz != null)   buffer.append(_clazz.getName());
-  if (_recordId != null) {
-    if (buffer.length() > 0)     buffer.append("@");
-    if (_recordId != null && _recordId.isValid())     buffer.append(_recordId);
-  }
-  boolean first=true;
-  ORecord<?> record;
-  for (  Entry<String,Object> f : _fieldValues.entrySet()) {
-    buffer.append(first ? "{" : ",");
-    buffer.append(f.getKey());
-    buffer.append(":");
-    if (f.getValue() instanceof Collection<?>) {
-      buffer.append("[");
-      buffer.append(((Collection<?>)f.getValue()).size());
-      buffer.append("]");
+  try {
+    if (_clazz != null)     buffer.append(_clazz.getName());
+    if (_recordId != null) {
+      if (buffer.length() > 0)       buffer.append('@');
+      if (_recordId != null && _recordId.isValid())       buffer.append(_recordId);
     }
- else     if (f.getValue() instanceof ORecord<?>) {
-      record=(ORecord<?>)f.getValue();
-      if (record.getIdentity() != null) {
-        buffer.append("#");
-        buffer.append(record.getIdentity());
+    boolean first=true;
+    ORecord<?> record;
+    for (    Entry<String,Object> f : _fieldValues.entrySet()) {
+      buffer.append(first ? '{' : ',');
+      buffer.append(f.getKey());
+      buffer.append(':');
+      if (f.getValue() instanceof Collection<?>) {
+        buffer.append('[');
+        buffer.append(((Collection<?>)f.getValue()).size());
+        buffer.append(']');
       }
- else       buffer.append(record.toString());
+ else       if (f.getValue() instanceof ORecord<?>) {
+        record=(ORecord<?>)f.getValue();
+        if (record.getIdentity() != null) {
+          buffer.append('#');
+          buffer.append(record.getIdentity());
+        }
+ else         buffer.append(record.toString());
+      }
+ else       buffer.append(f.getValue());
+      if (first)       first=false;
     }
- else     buffer.append(f.getValue());
-    if (first)     first=false;
+    if (!first)     buffer.append('}');
+    buffer.append(" v");
+    buffer.append(_version);
   }
-  if (!first)   buffer.append("}");
-  _dirty=saveDirtyStatus;
+  finally {
+    _dirty=saveDirtyStatus;
+  }
   return buffer.toString();
 }

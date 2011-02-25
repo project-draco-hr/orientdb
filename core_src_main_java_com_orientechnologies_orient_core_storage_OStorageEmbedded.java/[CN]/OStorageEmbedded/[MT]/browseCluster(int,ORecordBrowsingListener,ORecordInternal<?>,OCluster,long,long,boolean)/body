@@ -1,29 +1,37 @@
 {
+  ORecordInternal<?> record;
   ORawBuffer recordBuffer;
   long positionInPhyCluster;
   try {
     if (iLockEntireCluster)     cluster.lock();
     OClusterPositionIterator iterator=cluster.absoluteIterator(iBeginRange,iEndRange);
+    final ORecordId rid=new ORecordId(cluster.getId());
+    final ODatabaseRecord database=ioRecord.getDatabase();
+    ORecordInternal<?> recordToCheck;
     while (iterator.hasNext()) {
       positionInPhyCluster=iterator.next();
       if (positionInPhyCluster == -1)       continue;
-      recordBuffer=cache.getRecord(ORecordId.generateString(cluster.getId(),positionInPhyCluster));
-      if (recordBuffer == null) {
+      rid.clusterPosition=positionInPhyCluster;
+      record=database.getTransaction().getEntry(rid);
+      if (record == null)       record=database.getCache().findRecord(rid);
+      if (record != null && record.getRecordType() != ODocument.RECORD_TYPE)       continue;
+      if (record == null) {
         recordBuffer=readRecord(iRequesterId,cluster,positionInPhyCluster,!iLockEntireCluster);
         if (recordBuffer == null)         continue;
+        if (recordBuffer.recordType != ODocument.RECORD_TYPE)         continue;
+        if (ioRecord.getRecordType() != recordBuffer.recordType) {
+          final ORecordInternal<?> newRecord=ORecordFactory.newInstance(recordBuffer.recordType);
+          newRecord.setDatabase(ioRecord.getDatabase());
+          ioRecord=newRecord;
+        }
+ else         ioRecord.reset();
+        ioRecord.setVersion(recordBuffer.version);
+        ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
+        ioRecord.fromStream(recordBuffer.buffer);
+        recordToCheck=ioRecord;
       }
-      if (recordBuffer.recordType != ODocument.RECORD_TYPE && recordBuffer.recordType != ORecordColumn.RECORD_TYPE)       continue;
-      if (ioRecord == null)       ioRecord=ORecordFactory.newInstance(recordBuffer.recordType);
- else       if (ioRecord.getRecordType() != recordBuffer.recordType) {
-        final ORecordInternal<?> newRecord=ORecordFactory.newInstance(recordBuffer.recordType);
-        newRecord.setDatabase(ioRecord.getDatabase());
-        ioRecord=newRecord;
-      }
- else       ioRecord.reset();
-      ioRecord.setVersion(recordBuffer.version);
-      ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
-      ioRecord.fromStream(recordBuffer.buffer);
-      if (!iListener.foreach(ioRecord))       break;
+ else       recordToCheck=record;
+      if (!iListener.foreach(recordToCheck))       break;
     }
   }
   finally {

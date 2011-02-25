@@ -1,0 +1,29 @@
+{
+  if (maxSize == 0)   return null;
+  ORecordInternal<?> record;
+  acquireSharedLock();
+  try {
+    record=entries.get(iRID);
+  }
+  finally {
+    releaseSharedLock();
+  }
+  if (record == null) {
+    record=level2cache.popRecord(iRID);
+    if (record != null) {
+      if (record.isDirty())       record=null;
+ else {
+        record.setDatabase(database);
+        acquireExclusiveLock();
+        try {
+          entries.put(record.getIdentity(),record);
+        }
+  finally {
+          releaseExclusiveLock();
+        }
+      }
+    }
+  }
+  OProfiler.getInstance().updateCounter(record != null ? PROFILER_CACHE_FOUND : PROFILER_CACHE_NOTFOUND,+1);
+  return record;
+}

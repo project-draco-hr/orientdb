@@ -7,7 +7,7 @@
   try {
     byte[] stream=iRecord.toStream();
     boolean isNew=rid.isNew();
-    final int oldHashCode=isNew ? rid.hashCode() : 0;
+    if (isNew)     iRecord.onBeforeIdentityChanged(rid);
     final int clusterId;
     if (isNew)     clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
  else     clusterId=rid.clusterId;
@@ -21,7 +21,7 @@
         if (callbackHooks(TYPE.BEFORE_UPDATE,iRecord))         stream=iRecord.toStream();
       }
       if (!iRecord.isDirty()) {
-        if (underlying.isUseCache())         getCache().pushRecord(iRecord.getIdentity().toString(),new ORawBuffer(iRecord.toStream(),iRecord.getVersion(),iRecordType));
+        if (isUseCache())         getStorage().getCache().pushRecord(iRecord);
         return;
       }
     }
@@ -32,13 +32,14 @@
       iRecord.fill(iRecord.getDatabase(),clusterId,result,0);
       iRecord.setStatus(STATUS.LOADED);
       if (stream.length > 0)       callbackHooks(TYPE.AFTER_CREATE,iRecord);
-      iRecord.onIdentityChanged(iRecord,oldHashCode);
+      iRecord.onAfterIdentityChanged(iRecord);
     }
  else {
       iRecord.fill(iRecord.getDatabase(),clusterId,rid.getClusterPosition(),(int)result);
       iRecord.setStatus(STATUS.LOADED);
       if (stream.length > 0)       callbackHooks(TYPE.AFTER_UPDATE,iRecord);
     }
+    if (isUseCache())     getStorage().getCache().pushRecord(iRecord);
   }
  catch (  ODatabaseException e) {
     throw e;

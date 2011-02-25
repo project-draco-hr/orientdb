@@ -1,6 +1,6 @@
 {
   if (iLinked == null)   return null;
-  ORID resultRid=null;
+  Object resultRid=null;
   ORID rid;
   if (iLinked instanceof ORID) {
     rid=(ORID)iLinked;
@@ -15,8 +15,13 @@
     rid=iLinkedRecord.getIdentity();
     if (rid.isNew() || iLinkedRecord.isDirty()) {
       if (iLinkedRecord.getDatabase() == null)       iLinkedRecord.setDatabase(iParentRecord.getDatabase());
-      iLinkedRecord.getDatabase().save(iLinkedRecord);
+      if (iLinkedRecord instanceof ODocument) {
+        final OClass schemaClass=((ODocument)iLinkedRecord).getSchemaClass();
+        iLinkedRecord.getDatabase().save(iLinkedRecord,schemaClass != null ? iLinkedRecord.getDatabase().getClusterNameById(schemaClass.getDefaultClusterId()) : null);
+      }
+ else       iLinkedRecord.getDatabase().save(iLinkedRecord);
       iLinkedRecord.getDatabase().registerPojo(iLinkedRecord.getDatabase().getUserObjectByRecord(iLinkedRecord,null),iLinkedRecord);
+      resultRid=iLinkedRecord;
     }
     if (iParentRecord.getDatabase() instanceof ODatabaseRecord) {
       final ODatabaseRecord db=iParentRecord.getDatabase();

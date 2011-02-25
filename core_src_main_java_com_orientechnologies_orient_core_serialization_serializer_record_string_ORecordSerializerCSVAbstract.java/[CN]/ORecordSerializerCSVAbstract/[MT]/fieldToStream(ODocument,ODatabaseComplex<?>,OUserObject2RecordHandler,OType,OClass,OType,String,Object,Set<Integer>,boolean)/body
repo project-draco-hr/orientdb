@@ -3,15 +3,15 @@
 switch (iType) {
 case LINK:
 {
-      final ORID rid=linkToStream(buffer,iRecord,iValue);
-      if (rid != null)       iRecord.field(iName,rid);
+      final Object link=linkToStream(buffer,iRecord,iValue);
+      if (link != null)       iRecord.field(iName,link);
       break;
     }
 case LINKLIST:
 {
     buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
     if (iValue != null) {
-      ORID rid;
+      Object link;
       int items=0;
       List<Object> coll=(List<Object>)iValue;
       if (coll instanceof OLazyObjectList<?>) {
@@ -20,8 +20,8 @@ case LINKLIST:
       try {
         for (int i=0; i < coll.size(); ++i) {
           if (items++ > 0)           buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-          rid=linkToStream(buffer,iRecord,coll.get(i));
-          if (rid != null)           coll.set(i,rid);
+          link=linkToStream(buffer,iRecord,coll.get(i));
+          if (link != null)           coll.set(i,link);
         }
       }
   finally {
@@ -36,21 +36,22 @@ case LINKLIST:
 case LINKSET:
 {
   buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
-  ORID rid;
+  Object link;
   int items=0;
   Set<Object> coll=new HashSet<Object>((Collection<? extends Object>)iValue);
-  Map<Object,Object> objToReplace=null;
+  boolean invalidSet=false;
   for (  Object item : coll) {
     if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-    rid=linkToStream(buffer,iRecord,item);
-    if (rid != null) {
-      if (objToReplace == null)       objToReplace=new HashMap<Object,Object>();
-      objToReplace.put(item,rid);
-    }
+    link=linkToStream(buffer,iRecord,item);
+    if (link != null && !invalidSet)     invalidSet=true;
   }
-  if (objToReplace != null)   for (  Map.Entry<Object,Object> entry : objToReplace.entrySet()) {
-    coll.remove(entry.getKey());
-    coll.add(entry.getValue());
+  if (invalidSet) {
+    final ORecordLazySet newSet=new ORecordLazySet(iRecord,ODocument.RECORD_TYPE);
+    for (    Object item : coll) {
+      newSet.add(item);
+    }
+    coll.clear();
+    iRecord.field(iName,newSet);
   }
   buffer.append(OStringSerializerHelper.COLLECTION_END);
   break;
@@ -58,10 +59,10 @@ case LINKSET:
 case LINKMAP:
 {
 buffer.append(OStringSerializerHelper.MAP_BEGIN);
-ORID rid;
+Object link;
 int items=0;
 Map<String,Object> map=(Map<String,Object>)iValue;
-Map<String,Object> objToReplace=null;
+boolean invalidMap=false;
 if (map instanceof OLazyObjectMap<?>) {
   ((OLazyObjectMap<?>)map).setConvertToRecord(false);
 }
@@ -70,11 +71,8 @@ try {
     if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
     buffer.append(fieldTypeToString(iDatabase,OType.STRING,entry.getKey()));
     buffer.append(OStringSerializerHelper.ENTRY_SEPARATOR);
-    rid=linkToStream(buffer,iRecord,entry.getValue());
-    if (rid != null) {
-      if (objToReplace == null)       objToReplace=new HashMap<String,Object>();
-      objToReplace.put(entry.getKey(),rid);
-    }
+    link=linkToStream(buffer,iRecord,entry.getValue());
+    if (link != null && !invalidMap)     invalidMap=true;
   }
 }
   finally {
@@ -82,8 +80,13 @@ try {
     ((OLazyObjectMap<?>)map).setConvertToRecord(true);
   }
 }
-if (objToReplace != null) for (Map.Entry<String,Object> entry : objToReplace.entrySet()) {
-  map.put(entry.getKey(),entry.getValue());
+if (invalidMap) {
+  final ORecordLazyMap newMap=new ORecordLazyMap(iRecord,ODocument.RECORD_TYPE);
+  for (  Map.Entry<String,Object> entry : map.entrySet()) {
+    newMap.put(entry.getKey(),entry.getValue());
+  }
+  map.clear();
+  iRecord.field(iName,newMap);
 }
 buffer.append(OStringSerializerHelper.MAP_END);
 break;

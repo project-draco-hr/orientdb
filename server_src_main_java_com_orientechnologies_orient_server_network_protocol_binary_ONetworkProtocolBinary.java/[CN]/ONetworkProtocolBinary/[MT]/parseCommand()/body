@@ -167,7 +167,10 @@ OFetchHelper.fetch((ODocument)record,record,fetchPlan,null,0,-1,new OFetchListen
 return recordsToSend.size();
 }
 @Override public Object fetchLinked(final ODocument iRoot,final Object iUserObject,final String iFieldName,final Object iLinked){
-if (iLinked instanceof ODocument) return recordsToSend.add((ODocument)iLinked) ? iLinked : null;
+if (iLinked instanceof ODocument) {
+if (((ODocument)iLinked).getIdentity().isValid()) return recordsToSend.add((ODocument)iLinked) ? iLinked : null;
+return null;
+}
  else if (iLinked instanceof Collection<?>) return recordsToSend.addAll((Collection<? extends ODocument>)iLinked) ? iLinked : null;
  else if (iLinked instanceof Map<?,?>) return recordsToSend.addAll(((Map<String,? extends ODocument>)iLinked).values()) ? iLinked : null;
  else throw new IllegalArgumentException("Unrecognized type while fetching records: " + iLinked);
@@ -175,8 +178,10 @@ if (iLinked instanceof ODocument) return recordsToSend.add((ODocument)iLinked) ?
 }
 );
 for (ODocument doc : recordsToSend) {
+if (doc.getIdentity().isValid()) {
 channel.writeByte((byte)2);
 writeRecord(doc);
+}
 }
 }
 channel.writeByte((byte)0);

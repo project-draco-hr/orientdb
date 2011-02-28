@@ -148,17 +148,22 @@ data.commandInfo="Load record";
 final short clusterId=channel.readShort();
 final long clusterPosition=channel.readLong();
 final String fetchPlanString=channel.readString();
-final ORawBuffer buffer=underlyingDatabase.read(clusterId,clusterPosition,null);
+if (clusterId == 0 && clusterPosition == 0) {
 sendOk(lastClientTxId);
-if (buffer != null) {
 channel.writeByte((byte)1);
-channel.writeBytes(buffer.buffer);
-channel.writeInt(buffer.version);
-channel.writeByte(buffer.recordType);
+channel.writeBytes(underlyingDatabase.getStorage().getConfiguration().toStream());
+channel.writeInt(0);
+channel.writeByte(ORecordBytes.RECORD_TYPE);
+}
+ else {
+final ORecordInternal<?> record=connection.database.load(new ORecordId(clusterId,clusterPosition));
+sendOk(lastClientTxId);
+if (record != null) {
+channel.writeByte((byte)1);
+channel.writeBytes(record.toStream());
+channel.writeInt(record.getVersion());
+channel.writeByte(record.getRecordType());
 if (fetchPlanString.length() > 0) {
-final ORecordInternal<?> record=ORecordFactory.newInstance(buffer.recordType);
-record.fill(connection.database,clusterId,clusterPosition,buffer.version);
-record.fromStream(buffer.buffer);
 if (record instanceof ODocument) {
 final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
 final Set<ODocument> recordsToSend=new HashSet<ODocument>();
@@ -184,11 +189,10 @@ writeRecord(doc);
 }
 }
 }
+}
+}
+}
 channel.writeByte((byte)0);
-}
- else channel.writeByte((byte)0);
-}
- else channel.writeByte((byte)0);
 break;
 }
 case OChannelBinaryProtocol.REQUEST_RECORD_CREATE:

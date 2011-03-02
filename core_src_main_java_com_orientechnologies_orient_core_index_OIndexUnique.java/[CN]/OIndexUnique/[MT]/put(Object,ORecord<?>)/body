@@ -1,12 +1,18 @@
 {
-  Set<ORecord<?>> values=map.get(iKey);
-  if (values == null)   values=new HashSet<ORecord<?>>();
- else   if (values.size() == 1) {
-    if (!values.contains(iSingleValue))     throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "'");
- else     return this;
+  acquireExclusiveLock();
+  try {
+    Set<ORecord<?>> values=map.get(iKey);
+    if (values == null)     values=new HashSet<ORecord<?>>();
+ else     if (values.size() == 1) {
+      if (!values.contains(iSingleValue))       throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "'");
+ else       return this;
+    }
+ else     if (values.size() > 1)     throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "'");
+    values.add(iSingleValue);
+    map.put(iKey,values);
+    return this;
   }
- else   if (values.size() > 1)   throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "'");
-  values.add(iSingleValue);
-  map.put(iKey,values);
-  return this;
+  finally {
+    releaseExclusiveLock();
+  }
 }

@@ -2,12 +2,12 @@
   ORecordInternal<?> record;
   ORawBuffer recordBuffer;
   long positionInPhyCluster;
+  if (iLockEntireCluster)   cluster.lock();
   try {
-    if (iLockEntireCluster)     cluster.lock();
-    OClusterPositionIterator iterator=cluster.absoluteIterator(iBeginRange,iEndRange);
+    final OClusterPositionIterator iterator=cluster.absoluteIterator(iBeginRange,iEndRange);
     final ORecordId rid=new ORecordId(cluster.getId());
     final ODatabaseRecord database=ioRecord.getDatabase();
-    ORecordInternal<?> recordToCheck;
+    ORecordInternal<?> recordToCheck=null;
     while (iterator.hasNext()) {
       positionInPhyCluster=iterator.next();
       if (positionInPhyCluster == -1)       continue;
@@ -15,23 +15,28 @@
       record=database.getTransaction().getEntry(rid);
       if (record == null)       record=database.getCache().findRecord(rid);
       if (record != null && record.getRecordType() != ODocument.RECORD_TYPE)       continue;
-      if (record == null) {
-        recordBuffer=readRecord(iRequesterId,cluster,positionInPhyCluster,!iLockEntireCluster);
-        if (recordBuffer == null)         continue;
-        if (recordBuffer.recordType != ODocument.RECORD_TYPE)         continue;
-        if (ioRecord.getRecordType() != recordBuffer.recordType) {
-          final ORecordInternal<?> newRecord=ORecordFactory.newInstance(recordBuffer.recordType);
-          newRecord.setDatabase(ioRecord.getDatabase());
-          ioRecord=newRecord;
+      try {
+        if (record == null) {
+          recordBuffer=readRecord(iRequesterId,cluster,positionInPhyCluster,!iLockEntireCluster);
+          if (recordBuffer == null)           continue;
+          if (recordBuffer.recordType != ODocument.RECORD_TYPE)           continue;
+          if (ioRecord.getRecordType() != recordBuffer.recordType) {
+            final ORecordInternal<?> newRecord=ORecordFactory.newInstance(recordBuffer.recordType);
+            newRecord.setDatabase(ioRecord.getDatabase());
+            ioRecord=newRecord;
+          }
+ else           ioRecord.reset();
+          ioRecord.setVersion(recordBuffer.version);
+          ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
+          ioRecord.fromStream(recordBuffer.buffer);
+          recordToCheck=ioRecord;
         }
- else         ioRecord.reset();
-        ioRecord.setVersion(recordBuffer.version);
-        ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
-        ioRecord.fromStream(recordBuffer.buffer);
-        recordToCheck=ioRecord;
+ else         recordToCheck=record;
+        if (!iListener.foreach(recordToCheck))         break;
       }
- else       recordToCheck=record;
-      if (!iListener.foreach(recordToCheck))       break;
+ catch (      Exception e) {
+        OLogManager.instance().error(this,"Error on loading record %s. Cause: ",recordToCheck.getIdentity(),e.getMessage());
+      }
     }
   }
   finally {

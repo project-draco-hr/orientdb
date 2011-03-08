@@ -3,7 +3,9 @@
   try {
     StringBuffer buffer=new StringBuffer();
     currentPos=0;
+    historyBuffer=null;
     int historyNum=history.size();
+    boolean hintedHistory=false;
     while (true) {
       boolean escape=false;
       boolean ctrl=false;
@@ -59,7 +61,16 @@
                 cleaner.append(" ");
               }
               rewriteConsole(cleaner,true);
-              historyNum=historyNum > 0 ? historyNum - 1 : 0;
+              if (!hintedHistory && (historyNum == history.size() || !buffer.toString().equals(history.get(historyNum)))) {
+                if (buffer.length() > 0) {
+                  hintedHistory=true;
+                  historyBuffer=buffer.toString();
+                }
+ else {
+                  historyBuffer=null;
+                }
+              }
+              historyNum=getHintedHistoryIndexUp(historyNum);
               buffer=new StringBuffer(history.get(historyNum));
               currentPos=buffer.length();
               rewriteConsole(buffer,false);
@@ -72,9 +83,14 @@
                 cleaner.append(" ");
               }
               rewriteConsole(cleaner,true);
-              historyNum=historyNum < history.size() ? historyNum + 1 : history.size();
+              historyNum=getHintedHistoryIndexDown(historyNum);
               if (historyNum == history.size()) {
-                buffer=new StringBuffer("");
+                if (historyBuffer != null) {
+                  buffer=new StringBuffer(historyBuffer);
+                }
+ else {
+                  buffer=new StringBuffer("");
+                }
               }
  else {
                 buffer=new StringBuffer(history.get(historyNum));
@@ -187,6 +203,7 @@
           }
         }
         historyNum=history.size();
+        hintedHistory=false;
       }
     }
     consoleInput=buffer.toString();

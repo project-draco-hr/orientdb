@@ -1,10 +1,12 @@
 {
   ODocument record=(ODocument)iRecord;
+  boolean recordUpdated=false;
   Object v;
   for (  Map.Entry<String,Object> entry : setEntries.entrySet()) {
     v=entry.getValue();
     if (v instanceof OSQLFilterItem)     v=((OSQLFilterItem)v).getValue(record);
     record.field(entry.getKey(),v);
+    recordUpdated=true;
   }
   Collection<Object> coll;
   Object fieldValue;
@@ -27,7 +29,7 @@
     if (v instanceof OSQLFilterItem)     v=((OSQLFilterItem)v).getValue(record);
  else     if (v instanceof OSQLFunctionRuntime)     v=((OSQLFunctionRuntime)v).execute(record);
     coll.add(v);
-    record.setDirty();
+    recordUpdated=true;
   }
   Map<String,Object> map;
   OPair<String,Object> pair;
@@ -39,27 +41,31 @@
       if (pair.getValue() instanceof OSQLFilterItem)       pair.setValue(((OSQLFilterItem)pair.getValue()).getValue(record));
  else       if (pair.getValue() instanceof OSQLFunctionRuntime)       v=((OSQLFunctionRuntime)pair.getValue()).execute(record);
       map.put(pair.getKey(),pair.getValue());
-      record.setDirty();
+      recordUpdated=true;
     }
   }
   for (  Map.Entry<String,Object> entry : removeEntries.entrySet()) {
     v=entry.getValue();
-    if (v == EMPTY_VALUE)     record.removeField(entry.getKey());
+    if (v == EMPTY_VALUE) {
+      record.removeField(entry.getKey());
+      recordUpdated=true;
+    }
  else {
       fieldValue=record.field(entry.getKey());
       if (fieldValue instanceof Collection<?>) {
         coll=(Collection<Object>)fieldValue;
-        coll.remove(v);
-        record.setDirty();
+        if (coll.remove(v))         recordUpdated=true;
       }
  else       if (fieldValue instanceof Map<?,?>) {
         map=(Map<String,Object>)fieldValue;
-        map.remove(v);
-        record.setDirty();
+        if (map.remove(v) != null)         recordUpdated=true;
       }
     }
   }
-  record.save();
-  recordCount++;
+  if (recordUpdated) {
+    record.setDirty();
+    record.save();
+    recordCount++;
+  }
   return true;
 }

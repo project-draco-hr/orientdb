@@ -9,20 +9,21 @@
         try {
           final int oldSize=entries.size();
           if (oldSize == 0)           return;
-          final int threshold=(int)(maxSize > -1 ? maxSize * 0.7f : oldSize * 0.7f);
+          final int threshold=(int)(oldSize * 0.5f);
           if (entries.size() < threshold)           return;
           final ORID[] ridToRemove=new ORID[entries.size() - threshold];
           int i=0;
           for (          ORID rid : entries.keySet()) {
-            ridToRemove[i++]=rid;
+            if (i >= threshold)             ridToRemove[i++]=rid;
             if (i >= ridToRemove.length)             break;
           }
           for (          ORID rid : ridToRemove)           entries.remove(rid);
           OLogManager.instance().debug(this,"Low memory: auto reduce the record cache size from %d to %d",oldSize,threshold);
-          maxSize=threshold;
         }
-  finally {
-          System.err.println("Size after free: " + entries.size());
+ catch (        Exception e) {
+          OLogManager.instance().error(this,"Error while freeing resources",e);
+        }
+ finally {
           releaseExclusiveLock();
         }
       }
@@ -31,7 +32,13 @@
 );
   OProfiler.getInstance().registerHookValue(profilerPrefix + ".cache.current",new OProfilerHookValue(){
     public Object getValue(){
-      return entries.size();
+      acquireSharedLock();
+      try {
+        return entries.size();
+      }
+  finally {
+        releaseSharedLock();
+      }
     }
   }
 );

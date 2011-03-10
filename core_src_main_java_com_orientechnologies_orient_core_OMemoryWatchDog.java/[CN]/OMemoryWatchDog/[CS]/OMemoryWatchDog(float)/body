@@ -7,8 +7,9 @@
       if (n.getType().equals(MemoryNotificationInfo.MEMORY_THRESHOLD_EXCEEDED)) {
         alertTimes++;
         final long maxMemory=tenuredGenPool.getUsage().getMax();
-        final long usedMemory=tenuredGenPool.getUsage().getUsed();
-        OLogManager.instance().warn(this,"Low memory (%s of %s), calling listeners to free memory...",OFileUtils.getSizeAsString(usedMemory),OFileUtils.getSizeAsString(maxMemory));
+        long usedMemory=tenuredGenPool.getUsage().getUsed();
+        long freeMemory=maxMemory - usedMemory;
+        OLogManager.instance().warn(this,"Low memory %s%% (%s of %s), calling listeners to free memory in soft way...",freeMemory * 100 / maxMemory,OFileUtils.getSizeAsString(usedMemory),OFileUtils.getSizeAsString(maxMemory));
         final long timer=OProfiler.getInstance().startChrono();
         for (        Listener listener : listeners) {
           try {
@@ -17,8 +18,28 @@
  catch (          Exception e) {
             e.printStackTrace();
           }
-          OProfiler.getInstance().stopChrono("OMemoryWatchDog.freeResources",timer);
         }
+        System.gc();
+        try {
+          Thread.sleep(400);
+        }
+ catch (        InterruptedException e) {
+        }
+        usedMemory=maxMemory - Runtime.getRuntime().freeMemory();
+        freeMemory=maxMemory - usedMemory;
+        final long threshold=(long)(maxMemory * (1 - OGlobalConfiguration.MEMORY_OPTIMIZE_THRESHOLD.getValueAsFloat()));
+        if (freeMemory < threshold) {
+          OLogManager.instance().warn(this,"Low memory %s%% (%s of %s) while the threshold is %s, calling listeners to free memory in hard way...",usedMemory * 100 / maxMemory,OFileUtils.getSizeAsString(usedMemory),OFileUtils.getSizeAsString(maxMemory),OFileUtils.getSizeAsString(threshold));
+          for (          Listener listener : listeners) {
+            try {
+              listener.memoryUsageCritical(TYPE.JVM,usedMemory,maxMemory);
+            }
+ catch (            Exception e) {
+              e.printStackTrace();
+            }
+          }
+        }
+        OProfiler.getInstance().stopChrono("OMemoryWatchDog.freeResources",timer);
       }
     }
   }

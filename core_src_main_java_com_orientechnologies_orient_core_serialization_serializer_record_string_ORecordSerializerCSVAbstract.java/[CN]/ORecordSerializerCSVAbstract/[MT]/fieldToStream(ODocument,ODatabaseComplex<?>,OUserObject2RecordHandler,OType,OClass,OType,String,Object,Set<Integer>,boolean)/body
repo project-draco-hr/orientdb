@@ -43,22 +43,18 @@ case LINKLIST:
 case LINKSET:
 {
   buffer.append(OStringSerializerHelper.COLLECTION_BEGIN);
-  Object link;
   int items=0;
-  List<OIdentifiable> coll=new ArrayList<OIdentifiable>((Collection<? extends OIdentifiable>)iValue);
-  boolean invalidSet=false;
-  for (  Object item : coll) {
-    if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
-    link=linkToStream(buffer,iRecord,item);
-    if (link != null && !invalidSet)     invalidSet=true;
+  ORecordLazySet coll;
+  if (!(iValue instanceof ORecordLazySet)) {
+    coll=new ORecordLazySet(iRecord);
+    coll.addAll((Collection<? extends OIdentifiable>)iValue);
+    ((Collection<? extends OIdentifiable>)iValue).clear();
+    iRecord.field(iName,coll);
   }
-  if (invalidSet) {
-    final ORecordLazySet newSet=new ORecordLazySet(iRecord);
-    for (    OIdentifiable item : coll) {
-      newSet.add(item);
-    }
-    coll.clear();
-    iRecord.field(iName,newSet);
+ else   coll=(ORecordLazySet)iValue;
+  for (Iterator<OIdentifiable> it=coll.rawIterator(); it.hasNext(); ) {
+    if (items++ > 0)     buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+    linkToStream(buffer,iRecord,it.next());
   }
   buffer.append(OStringSerializerHelper.COLLECTION_END);
   break;

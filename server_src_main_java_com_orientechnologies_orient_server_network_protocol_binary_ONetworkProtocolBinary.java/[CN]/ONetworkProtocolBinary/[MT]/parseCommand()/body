@@ -215,16 +215,11 @@ case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
 data.commandInfo="Update record";
 final int clusterId=channel.readShort();
 final long clusterPosition=channel.readLong();
-final byte[] buffer=channel.readBytes();
-final int version=channel.readInt();
-final byte recordType=channel.readByte();
-ORecordInternal<?> record=ORecordFactory.newInstance(recordType);
-record.fill(connection.database,clusterId,clusterPosition,version,buffer);
-connection.database.save(record);
+long newVersion=underlyingDatabase.save(clusterId,clusterPosition,channel.readBytes(),channel.readInt(),channel.readByte());
 if (connection.database.getMetadata().getSchema().getDocument().getIdentity().getClusterId() == clusterId && connection.database.getMetadata().getSchema().getDocument().getIdentity().getClusterPosition() == clusterPosition) connection.database.getMetadata().loadSchema();
  else if (((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().getClusterId() == clusterId && ((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().getClusterPosition() == clusterPosition) ((ODictionaryLocal<?>)connection.database.getDictionary()).load();
 sendOk(lastClientTxId);
-channel.writeInt(record.getVersion());
+channel.writeInt((int)newVersion);
 break;
 case OChannelBinaryProtocol.REQUEST_RECORD_DELETE:
 data.commandInfo="Delete record";

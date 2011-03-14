@@ -1,18 +1,8 @@
 {
   if (iStrategy == STRATEGY.MMAP_NEVER)   return null;
   lastStrategy=iStrategy;
-  if (bufferPoolLRU.size() > 0) {
-    OMMapBufferEntry e;
-    final int min=Math.max(bufferPoolLRU.size() - 5,-1);
-    for (int i=bufferPoolLRU.size() - 1; i > min; --i) {
-      e=bufferPoolLRU.get(i);
-      if (e.file == iFile && iBeginOffset >= e.beginOffset && iBeginOffset + iSize <= e.beginOffset + e.size) {
-        OProfiler.getInstance().updateCounter("OMMapManager.reusedPageBetweenLast",1);
-        e.counter++;
-        return e;
-      }
-    }
-  }
+  OMMapBufferEntry entry=searchBetweenLastBlocks(iFile,iBeginOffset,iSize);
+  if (entry != null)   return entry;
   List<OMMapBufferEntry> fileEntries=bufferPoolPerFile.get(iFile);
   if (fileEntries == null) {
     fileEntries=new ArrayList<OMMapBufferEntry>();
@@ -20,29 +10,14 @@
   }
   int position=searchEntry(fileEntries,iBeginOffset,iSize);
   if (position > -1)   return fileEntries.get(position);
-  final int p=(position + 2) * -1;
-  if (p > -1 && p <= fileEntries.size()) {
-    OMMapBufferEntry entry=fileEntries.get(p);
-    boolean overlaps=entry.beginOffset <= iBeginOffset && entry.beginOffset + entry.size >= iBeginOffset;
-    if (!overlaps && p < fileEntries.size() - 1) {
-      entry=fileEntries.get(p);
-      overlaps=iBeginOffset + iSize >= entry.beginOffset;
-    }
-    if (overlaps) {
-      OProfiler.getInstance().updateCounter("OMMapManager.overlappedPageUsingChannel",1);
-      commitBuffer(entry);
-      OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
-      return null;
-    }
-  }
-  int bufferSize=iForce ? iSize : iSize <= blockSize ? blockSize : iSize;
-  if (iBeginOffset + bufferSize > iFile.getFileSize())   bufferSize=(int)(iFile.getFileSize() - iBeginOffset);
-  if (bufferSize <= 0)   throw new IllegalArgumentException("Invalid range requested for file " + iFile + ". Requested "+ iSize+ " bytes from the address "+ iBeginOffset+ " while the total file size is "+ iFile.getFileSize());
+  int p=(position + 2) * -1;
+  if (isOverlapping(iBeginOffset,iSize,fileEntries,p))   return null;
+  int bufferSize=computeBestEntrySize(iFile,iBeginOffset,iSize,iForce,fileEntries,p);
   if (totalMemory + bufferSize > maxMemory && (iStrategy == STRATEGY.MMAP_ONLY_AVAIL_POOL || iOperationType == OPERATION_TYPE.READ && iStrategy == STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_AVAIL_POOL)) {
     OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
     return null;
   }
-  OMMapBufferEntry entry=null;
+  entry=null;
   do {
     if (totalMemory + bufferSize > maxMemory) {
       final long memoryThreshold=(long)(maxMemory * 0.75);
@@ -79,6 +54,9 @@
   if (entry == null)   throw new OIOException("You can't access to the file portion " + iBeginOffset + "-"+ iBeginOffset+ iSize+ " bytes");
   totalMemory+=bufferSize;
   bufferPoolLRU.add(entry);
-  fileEntries.add((position + 1) * -1,entry);
+  p=(position + 2) * -1;
+  if (p < 0)   p=0;
+  fileEntries.add(p,entry);
+  getOverlappedBlocks(iFile);
   return entry;
 }

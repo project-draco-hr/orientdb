@@ -20,17 +20,20 @@
   }
   int position=searchEntry(fileEntries,iBeginOffset,iSize);
   if (position > -1)   return fileEntries.get(position);
-  if (iOperationType == OPERATION_TYPE.READ && iStrategy == STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_IN_MEM) {
-    final int p=(position + 2) * -1;
-    if (p > -1 && p <= fileEntries.size()) {
-      final OMMapBufferEntry entry=fileEntries.get(p);
-      if (entry.beginOffset <= iBeginOffset && entry.beginOffset + entry.size >= iBeginOffset) {
-        OProfiler.getInstance().updateCounter("OMMapManager.overlappedPageUsingChannel",1);
-        commitBuffer(entry);
-      }
+  final int p=(position + 2) * -1;
+  if (p > -1 && p <= fileEntries.size()) {
+    OMMapBufferEntry entry=fileEntries.get(p);
+    boolean overlaps=entry.beginOffset <= iBeginOffset && entry.beginOffset + entry.size >= iBeginOffset;
+    if (!overlaps && p < fileEntries.size() - 1) {
+      entry=fileEntries.get(p);
+      overlaps=iBeginOffset + iSize >= entry.beginOffset;
     }
-    OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
-    return null;
+    if (overlaps) {
+      OProfiler.getInstance().updateCounter("OMMapManager.overlappedPageUsingChannel",1);
+      commitBuffer(entry);
+      OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
+      return null;
+    }
   }
   int bufferSize=iForce ? iSize : iSize <= blockSize ? blockSize : iSize;
   if (iBeginOffset + bufferSize > iFile.getFileSize())   bufferSize=(int)(iFile.getFileSize() - iBeginOffset);

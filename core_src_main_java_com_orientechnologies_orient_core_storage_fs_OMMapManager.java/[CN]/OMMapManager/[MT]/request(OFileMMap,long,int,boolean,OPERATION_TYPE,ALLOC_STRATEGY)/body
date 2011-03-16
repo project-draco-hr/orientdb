@@ -1,5 +1,5 @@
 {
-  if (iStrategy == STRATEGY.MMAP_NEVER)   return null;
+  if (iStrategy == ALLOC_STRATEGY.MMAP_NEVER)   return null;
   lastStrategy=iStrategy;
   OMMapBufferEntry entry=searchBetweenLastBlocks(iFile,iBeginOffset,iSize);
   if (entry != null)   return entry;
@@ -11,9 +11,12 @@
   int position=searchEntry(fileEntries,iBeginOffset,iSize);
   if (position > -1)   return fileEntries.get(position);
   int p=(position + 2) * -1;
-  if (isOverlapping(iBeginOffset,iSize,fileEntries,p))   return null;
+  if (!allocIfOverlaps(iBeginOffset,iSize,fileEntries,p)) {
+    OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
+    return null;
+  }
   int bufferSize=computeBestEntrySize(iFile,iBeginOffset,iSize,iForce,fileEntries,p);
-  if (totalMemory + bufferSize > maxMemory && (iStrategy == STRATEGY.MMAP_ONLY_AVAIL_POOL || iOperationType == OPERATION_TYPE.READ && iStrategy == STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_AVAIL_POOL)) {
+  if (totalMemory + bufferSize > maxMemory && (iStrategy == ALLOC_STRATEGY.MMAP_ONLY_AVAIL_POOL || iOperationType == OPERATION_TYPE.READ && iStrategy == ALLOC_STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_AVAIL_POOL)) {
     OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
     return null;
   }
@@ -57,6 +60,5 @@
   p=(position + 2) * -1;
   if (p < 0)   p=0;
   fileEntries.add(p,entry);
-  getOverlappedBlocks(iFile);
   return entry;
 }

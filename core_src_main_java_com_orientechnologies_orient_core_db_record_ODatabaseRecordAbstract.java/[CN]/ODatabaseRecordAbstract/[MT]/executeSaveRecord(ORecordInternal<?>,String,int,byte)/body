@@ -28,21 +28,22 @@
     }
     final int realVersion=iVersion == -1 ? -1 : iRecord.getVersion();
     long result=underlying.save(clusterId,rid.getClusterPosition(),stream,realVersion,iRecord.getRecordType());
-    if (stream != null && stream.length > 0)     iRecord.unsetDirty();
     if (isNew) {
       iRecord.fill(iRecord.getDatabase(),clusterId,result,0,stream);
-      iRecord.setStatus(STATUS.LOADED);
       if (stream != null && stream.length > 0)       callbackHooks(TYPE.AFTER_CREATE,iRecord);
       iRecord.onAfterIdentityChanged(iRecord);
     }
  else {
       iRecord.fill(iRecord.getDatabase(),clusterId,rid.getClusterPosition(),(int)result,stream);
-      iRecord.setStatus(STATUS.LOADED);
       if (stream != null && stream.length > 0)       callbackHooks(TYPE.AFTER_UPDATE,iRecord);
     }
+    if (stream != null && stream.length > 0)     iRecord.unsetDirty();
     if (isUseCache())     getCache().updateRecord(iRecord);
   }
  catch (  ODatabaseException e) {
+    throw e;
+  }
+catch (  OConcurrentModificationException e) {
     throw e;
   }
 catch (  Throwable t) {

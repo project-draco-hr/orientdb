@@ -1,0 +1,37 @@
+{
+  String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: allocation/<database>");
+  iRequest.data.commandInfo="Storage allocation";
+  iRequest.data.commandDetail=urlParts[2];
+  ODatabaseDocumentTx db=null;
+  try {
+    db=getProfiledDatabaseInstance(iRequest);
+    final List<OPhysicalPosition> holes=((OStorageLocal)db.getStorage()).getHoles();
+    Collections.sort(holes);
+    final StringWriter buffer=new StringWriter();
+    final OJSONWriter json=new OJSONWriter(buffer);
+    json.beginObject();
+    long current=0;
+    for (    OPhysicalPosition h : holes) {
+      if (current < h.dataPosition) {
+        json.beginObject(1,true,null);
+        json.writeAttribute(2,false,"type","d");
+        json.writeAttribute(2,false,"offset",current);
+        json.writeAttribute(2,false,"size",h.dataPosition - current);
+        json.endObject(1);
+      }
+      json.beginObject(1,true,null);
+      json.writeAttribute(2,false,"type","h");
+      json.writeAttribute(2,false,"offset",h.dataPosition);
+      json.writeAttribute(2,false,"size",h.recordSize + ODataLocal.RECORD_FIX_SIZE);
+      json.endObject(1);
+      current=h.dataPosition + h.recordSize + ODataLocal.RECORD_FIX_SIZE;
+    }
+    json.endObject();
+    json.flush();
+    sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_JSON,buffer.toString());
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.release(db);
+  }
+  return false;
+}

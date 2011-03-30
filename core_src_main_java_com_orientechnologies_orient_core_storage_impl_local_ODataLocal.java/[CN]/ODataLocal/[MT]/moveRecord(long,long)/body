@@ -1,0 +1,20 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final long[] pos=getRelativePosition(iSourcePosition);
+  final OFile file=files[(int)pos[0]];
+  final int recordSize=file.readInt(pos[1]);
+  if (recordSize < 0)   return -1;
+  final short clusterId=file.readShort(pos[1] + OConstants.SIZE_INT);
+  final long clusterPosition=file.readLong(pos[1] + OConstants.SIZE_INT + OConstants.SIZE_SHORT);
+  byte[] content=new byte[recordSize];
+  file.read(pos[1] + RECORD_FIX_SIZE,content,recordSize);
+  if (clusterId > -1) {
+    final OCluster cluster=storage.getClusterById(clusterId);
+    final OPhysicalPosition ppos=cluster.getPhysicalPosition(clusterPosition,new OPhysicalPosition());
+    if (ppos.dataPosition != iSourcePosition)     throw new OStorageException("Found corrupted record hole for rid " + clusterId + ":"+ clusterPosition+ ": data position is wrong: "+ ppos.dataPosition+ "<->"+ iSourcePosition);
+    cluster.setPhysicalPosition(clusterPosition,iDestinationPosition);
+  }
+  writeRecord(getRelativePosition(iDestinationPosition),clusterId,clusterPosition,content);
+  OProfiler.getInstance().stopChrono("Storage.data.move",timer);
+  return recordSize + RECORD_FIX_SIZE;
+}

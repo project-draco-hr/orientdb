@@ -1,0 +1,47 @@
+{
+  if (txEntry.status != OTransactionEntry.DELETED && !txEntry.getRecord().isDirty())   return;
+  final ORecordId rid=(ORecordId)txEntry.getRecord().getIdentity();
+  final OCluster cluster=txEntry.clusterName != null ? storage.getClusterByName(txEntry.clusterName) : storage.getClusterById(rid.clusterId);
+  if (!(cluster instanceof OClusterLocal))   return;
+  if (txEntry.getRecord() instanceof OTxListener)   ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.BEFORE_COMMIT);
+switch (txEntry.status) {
+case OTransactionEntry.LOADED:
+    break;
+case OTransactionEntry.CREATED:
+{
+    byte[] stream=txEntry.getRecord().toStream();
+    if (iUseLog) {
+      if (rid.isNew()) {
+        if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_CREATE,txEntry.getRecord()))         stream=txEntry.getRecord().toStream();
+        rid.clusterPosition=createRecord(iRequesterId,iTx.getId(),cluster,stream,txEntry.getRecord().getRecordType());
+        rid.clusterId=cluster.getId();
+        iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_CREATE,txEntry.getRecord());
+      }
+ else {
+        txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTx.getId(),cluster,rid.clusterPosition,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+      }
+    }
+ else {
+      iTx.getDatabase().getStorage().createRecord(cluster.getId(),stream,txEntry.getRecord().getRecordType());
+    }
+    break;
+  }
+case OTransactionEntry.UPDATED:
+{
+  byte[] stream=txEntry.getRecord().toStream();
+  if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_UPDATE,txEntry.getRecord()))   stream=txEntry.getRecord().toStream();
+  txEntry.getRecord().setVersion(updateRecord(iRequesterId,iTx.getId(),cluster,rid.clusterPosition,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+  iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_UPDATE,txEntry.getRecord());
+  break;
+}
+case OTransactionEntry.DELETED:
+{
+iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,txEntry.getRecord());
+deleteRecord(iRequesterId,iTx.getId(),cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
+iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_DELETE,txEntry.getRecord());
+}
+break;
+}
+txEntry.getRecord().unsetDirty();
+if (txEntry.getRecord() instanceof OTxListener) ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.AFTER_COMMIT);
+}

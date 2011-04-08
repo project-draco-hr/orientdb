@@ -1,0 +1,20 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final OCluster cluster=getClusterById(iRid.clusterId);
+  final boolean locked=lock.acquireSharedLock();
+  try {
+    final OPhysicalPosition ppos=cluster.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
+    if (ppos == null)     return false;
+    if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't update record #" + iRid + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
+    cluster.removePhysicalPosition(iRid.clusterPosition,null);
+    data.deleteRecord(ppos.dataPosition);
+    return true;
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on delete record #" + iRid,e);
+  }
+ finally {
+    lock.releaseSharedLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageMemory.deleteRecord",timer);
+  }
+}

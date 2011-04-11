@@ -1,26 +1,23 @@
 {
-  if (maxHoleSize > -1 && iRecordSize > maxHoleSize)   return -1;
+  if (maxHoleSize > -1 && iRecordSize + ODataLocal.RECORD_FIX_SIZE + 50 > maxHoleSize)   return -1;
   final long timer=OProfiler.getInstance().startChrono();
-  int tempMaxHoleSize=0;
-  int holes=getHoles();
-  for (int pos=0; pos < holes; ++pos) {
-    final long recycledPosition=file.readLong(pos * RECORD_SIZE);
-    if (recycledPosition > -1) {
-      final int recordSize=file.readInt(pos * RECORD_SIZE + OConstants.SIZE_LONG);
-      if (recordSize > tempMaxHoleSize)       tempMaxHoleSize=recordSize;
-      if (recordSize == iRecordSize) {
-        OProfiler.getInstance().stopChrono("Storage.data.recycled.complete",timer);
-        deleteHole(pos);
-        return recycledPosition;
-      }
- else       if (recordSize > iRecordSize + ODataLocal.RECORD_FIX_SIZE + 50) {
-        OProfiler.getInstance().stopChrono("Storage.data.recycled.partial",timer);
-        updateHole(pos,recycledPosition + iRecordSize,recordSize - iRecordSize);
-        return recycledPosition;
-      }
+  if (availableHoles.size() > 0) {
+    cursor.size=iRecordSize;
+    ODataHoleInfo hole=availableHoles.get(cursor);
+    if (hole != null && hole.size == iRecordSize) {
+      OProfiler.getInstance().stopChrono("Storage.data.recycled.complete",timer);
+      final long pos=hole.dataOffset;
+      deleteHole(hole.holeOffset);
+      return pos;
+    }
+    hole=availableHoles.lastKey();
+    if (hole.size > iRecordSize + ODataLocal.RECORD_FIX_SIZE + 50) {
+      final long pos=hole.dataOffset;
+      OProfiler.getInstance().stopChrono("Storage.data.recycled.partial",timer);
+      updateHole(hole.holeOffset,hole.dataOffset + iRecordSize,hole.size - iRecordSize);
+      return pos;
     }
   }
-  maxHoleSize=tempMaxHoleSize;
   OProfiler.getInstance().stopChrono("Storage.data.recycled.notfound",timer);
   return -1;
 }

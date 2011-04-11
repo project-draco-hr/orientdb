@@ -1,17 +1,21 @@
 {
-  long recycledPosition=-1;
-  int holes=getHoles();
-  for (int pos=0; pos < holes; ++pos) {
-    if (file.readLong(pos * RECORD_SIZE) == -1) {
-      recycledPosition=pos * RECORD_SIZE;
-      break;
-    }
+  final int recycledPosition;
+  final ODataHoleInfo hole;
+  if (freeHoles.size() > 0) {
+    recycledPosition=freeHoles.remove(0);
+    hole=availableHolesList.get(recycledPosition);
+    hole.dataOffset=iRecordOffset;
+    hole.size=iRecordSize;
   }
-  if (recycledPosition == -1) {
-    recycledPosition=holes * RECORD_SIZE;
+ else {
+    recycledPosition=getHoles();
+    hole=new ODataHoleInfo(iRecordSize,iRecordOffset,recycledPosition);
+    availableHolesList.add(hole);
     file.allocateSpace(RECORD_SIZE);
+    availableHoles.put(hole,hole);
   }
-  file.writeLong(recycledPosition,iRecordOffset);
-  file.writeInt(recycledPosition + OConstants.SIZE_LONG,iRecordSize);
   if (maxHoleSize < iRecordSize)   maxHoleSize=iRecordSize;
+  final long p=recycledPosition * RECORD_SIZE;
+  file.writeLong(p,iRecordOffset);
+  file.writeInt(p + OConstants.SIZE_LONG,iRecordSize);
 }

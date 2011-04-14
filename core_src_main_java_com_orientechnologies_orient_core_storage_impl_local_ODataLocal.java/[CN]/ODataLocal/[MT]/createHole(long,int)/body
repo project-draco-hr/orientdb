@@ -3,96 +3,62 @@
   try {
     long holePositionOffset=iRecordOffset;
     int holeSize=iRecordSize + RECORD_FIX_SIZE;
-    final int defragHoleDistance;
-    if (defragMaxHoleDistance > 0)     defragHoleDistance=defragMaxHoleDistance;
- else {
-      final long size=getSize();
-      defragHoleDistance=Math.max(32768 * (int)(size / 10000000),32768);
+    final long timer=OProfiler.getInstance().startChrono();
+    long[] pos=getRelativePosition(iRecordOffset);
+    final OFile file=files[(int)pos[0]];
+    final ODataHoleInfo closestHole=getCloserHole(iRecordOffset,iRecordSize,file,pos);
+    OProfiler.getInstance().stopChrono(PROFILER_HOLE_FIND_CLOSER,timer);
+    if (closestHole == null)     holeSegment.createHole(iRecordOffset,holeSize);
+ else     if (closestHole.dataOffset + closestHole.size == iRecordOffset) {
+      holeSize+=closestHole.size;
+      holeSegment.updateHole(closestHole,closestHole.dataOffset,holeSize);
     }
-    final int holes=holeSegment.getHoles();
-    if (holes > 0) {
-      final long timer=OProfiler.getInstance().startChrono();
-      long[] pos=getRelativePosition(iRecordOffset);
-      final OFile file=files[(int)pos[0]];
-      final SortedMap<ODataHoleInfo,ODataHoleInfo> closestHoles=holeSegment.getCloserHole(iRecordOffset,defragHoleDistance);
-      final int[] fileRanges;
-      if (pos[0] == 0)       fileRanges=new int[]{0,file.getFilledUpTo()};
- else       fileRanges=new int[]{files[(int)pos[0] - 1].getFileSize(),file.getFilledUpTo()};
-      ODataHoleInfo closestHole=null;
-      long closestHoleOffset=Integer.MAX_VALUE;
-      for (      Entry<ODataHoleInfo,ODataHoleInfo> h : closestHoles.entrySet()) {
-        final ODataHoleInfo hole=h.getKey();
-        if (hole.dataOffset == -1)         continue;
-        boolean closest=false;
-        if (hole.dataOffset >= fileRanges[0] && hole.dataOffset < fileRanges[1])         if (iRecordOffset > hole.dataOffset) {
-          if (closestHole == null || iRecordOffset - (hole.dataOffset + hole.size) < Math.abs(closestHoleOffset)) {
-            closestHoleOffset=(hole.dataOffset + hole.size) - iRecordOffset;
-            closest=true;
-          }
-        }
- else {
-          if (closestHole == null || hole.dataOffset - (iRecordOffset + iRecordSize) < Math.abs(closestHoleOffset)) {
-            closestHoleOffset=hole.dataOffset - (iRecordOffset + iRecordSize);
-            closest=true;
-          }
-        }
-        if (closest)         closestHole=hole;
-      }
-      OProfiler.getInstance().stopChrono(PROFILER_HOLE_FIND_CLOSER,timer);
-      if (closestHole != null)       if (closestHole.dataOffset + closestHole.size == iRecordOffset) {
-        holeSize+=closestHole.size;
-        holeSegment.updateHole(closestHole.holeOffset,closestHole.dataOffset,holeSize);
-      }
- else       if (holePositionOffset + holeSize == closestHole.dataOffset) {
-        holeSize+=closestHole.size;
-        holeSegment.updateHole(closestHole.holeOffset,holePositionOffset,holeSize);
-      }
- else {
-        if (Math.abs(closestHoleOffset) < defragHoleDistance) {
-          if (closestHoleOffset < 0) {
-            closestHoleOffset*=-1;
-            long moveFrom=closestHole.dataOffset + closestHole.size;
-            int recordSize;
-            final long offsetLimit=iRecordOffset;
-            final List<long[]> segmentPositions=new ArrayList<long[]>();
-            while (moveFrom < offsetLimit) {
-              pos=getRelativePosition(moveFrom);
-              if (pos[1] >= file.getFilledUpTo())               break;
-              recordSize=file.readInt(pos[1]) + RECORD_FIX_SIZE;
-              segmentPositions.add(0,new long[]{moveFrom,recordSize});
-              moveFrom+=recordSize;
-            }
-            long gap=offsetLimit + holeSize;
-            for (            long[] item : segmentPositions) {
-              final int sizeMoved=moveRecord(item[0],gap - item[1]);
-              if (sizeMoved != item[1])               throw new IllegalStateException("Corrupted holes: Found size " + sizeMoved + " instead of "+ item[1]);
-              gap-=sizeMoved;
-            }
-            holePositionOffset=closestHole.dataOffset;
-            holeSize+=closestHole.size;
-          }
- else {
-            long moveFrom=iRecordOffset + iRecordSize + RECORD_FIX_SIZE;
-            long moveTo=iRecordOffset;
-            final long moveUpTo=closestHole.dataOffset;
-            while (moveFrom < moveUpTo) {
-              final int sizeMoved=moveRecord(moveFrom,moveTo);
-              moveFrom+=sizeMoved;
-              moveTo+=sizeMoved;
-            }
-            if (moveFrom != moveUpTo)             throw new IllegalStateException("Corrupted holes: Found offset " + moveFrom + " instead of "+ moveUpTo);
-            holePositionOffset=moveTo;
-            holeSize+=closestHole.size;
-          }
-          holeSegment.updateHole(closestHole.holeOffset,holePositionOffset,holeSize);
-        }
- else {
-          holeSegment.createHole(iRecordOffset,holeSize);
-        }
-      }
+ else     if (holePositionOffset + holeSize == closestHole.dataOffset) {
+      holeSize+=closestHole.size;
+      holeSegment.updateHole(closestHole,holePositionOffset,holeSize);
     }
- else     holeSegment.createHole(iRecordOffset,holeSize);
-    final long[] pos=getRelativePosition(holePositionOffset);
+ else {
+      long closestHoleOffset;
+      if (iRecordOffset > closestHole.dataOffset)       closestHoleOffset=(closestHole.dataOffset + closestHole.size) - iRecordOffset;
+ else       closestHoleOffset=closestHole.dataOffset - (iRecordOffset + iRecordSize);
+      if (closestHoleOffset < 0) {
+        closestHoleOffset*=-1;
+        long moveFrom=closestHole.dataOffset + closestHole.size;
+        int recordSize;
+        final long offsetLimit=iRecordOffset;
+        final List<long[]> segmentPositions=new ArrayList<long[]>();
+        while (moveFrom < offsetLimit) {
+          pos=getRelativePosition(moveFrom);
+          if (pos[1] >= file.getFilledUpTo())           break;
+          recordSize=file.readInt(pos[1]) + RECORD_FIX_SIZE;
+          segmentPositions.add(0,new long[]{moveFrom,recordSize});
+          moveFrom+=recordSize;
+        }
+        long gap=offsetLimit + holeSize;
+        for (        long[] item : segmentPositions) {
+          final int sizeMoved=moveRecord(item[0],gap - item[1]);
+          if (sizeMoved != item[1])           throw new IllegalStateException("Corrupted holes: Found size " + sizeMoved + " instead of "+ item[1]);
+          gap-=sizeMoved;
+        }
+        holePositionOffset=closestHole.dataOffset;
+        holeSize+=closestHole.size;
+      }
+ else {
+        long moveFrom=iRecordOffset + holeSize;
+        long moveTo=iRecordOffset;
+        final long moveUpTo=closestHole.dataOffset;
+        while (moveFrom < moveUpTo) {
+          final int sizeMoved=moveRecord(moveFrom,moveTo);
+          moveFrom+=sizeMoved;
+          moveTo+=sizeMoved;
+        }
+        if (moveFrom != moveUpTo)         throw new IllegalStateException("Corrupted holes: Found offset " + moveFrom + " instead of "+ moveUpTo);
+        holePositionOffset=moveTo;
+        holeSize+=closestHole.size;
+      }
+      holeSegment.updateHole(closestHole,holePositionOffset,holeSize);
+    }
+    pos=getRelativePosition(holePositionOffset);
     files[(int)pos[0]].writeInt(pos[1],holeSize * -1);
   }
   finally {

@@ -1,0 +1,28 @@
+{
+  assert(Thread.holdsLock(this));
+  SharedLockEntry<REQUESTER_TYPE> previous=null;
+  SharedLockEntry<REQUESTER_TYPE> next=iRoot;
+  while (!iRequester.equals(next.requester)) {
+    previous=next;
+    next=next.nextSharedLock;
+    if (next == null) {
+      throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iRoot.resource);
+    }
+  }
+  if (next == iRoot) {
+    iRoot.countSharedLocks--;
+    if (next.nextSharedLock != null && iRoot.countExclLocks == 0 && iRoot.countSharedLocks == 0) {
+      iRoot.requester=iRoot.nextSharedLock.requester;
+      iRoot.countSharedLocks=iRoot.nextSharedLock.countSharedLocks;
+      iRoot.nextSharedLock=next.nextSharedLock.nextSharedLock;
+    }
+  }
+ else {
+    if (next.countSharedLocks == 1) {
+      previous.nextSharedLock=next.nextSharedLock;
+    }
+ else {
+      next.countSharedLocks--;
+    }
+  }
+}

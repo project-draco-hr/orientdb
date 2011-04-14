@@ -1,51 +1,37 @@
 {
   OProfiler.getInstance().updateCounter("LockMgr.tryToAcquire",+1);
-  REQUESTER_TYPE client=exclusiveLocks.get(iResourceId);
-  if (client != null) {
-    if (client.equals(iRequester))     return true;
-    OProfiler.getInstance().updateCounter("LockMgr.tryToAcquire.locked",+1);
-    return false;
-  }
-  final Object sharedLock=sharedLocks.get(iResourceId);
-  List<REQUESTER_TYPE> clients;
-  if (iLockType == LOCK.SHARED) {
-    if (sharedLock == null) {
-      sharedLocks.put(iResourceId,iRequester);
-      return true;
-    }
-    if (sharedLock instanceof List<?>) {
-      clients=(List<REQUESTER_TYPE>)sharedLock;
-    }
+  LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> currentLock=lookForEntry(iResourceId);
+  if (currentLock == null)   return addEntry(new LockEntry(iLockType,iRequester,iResourceId,LOCK_STATUS.LIVE));
+  SharedLockEntry<REQUESTER_TYPE> curentSharedLock=currentLock;
+  do {
+    if (curentSharedLock.requester.equals(iRequester)) {
+      if (iLockType == LOCK.EXCLUSIVE) {
+        if (currentLock.nextSharedLock == null) {
+          currentLock.countExclLocks++;
+          return currentLock;
+        }
  else {
-      clients=new ArrayList<REQUESTER_TYPE>(concurrencyLevel);
-      sharedLocks.put(iResourceId,clients);
-      clients.add((REQUESTER_TYPE)sharedLock);
-    }
-    clients.add(iRequester);
-    return true;
-  }
- else {
-    if (sharedLock == null) {
-      exclusiveLocks.put(iResourceId,iRequester);
-      return true;
-    }
-    if (sharedLock instanceof List<?>) {
-      clients=(List<REQUESTER_TYPE>)sharedLock;
-      if (clients.size() == 0) {
-        exclusiveLocks.put(iResourceId,iRequester);
-        return true;
+          return addWaitingEntry(currentLock,curentSharedLock,iLockType,iRequester,iResourceId);
+        }
       }
-      if (clients.size() == 1 && clients.get(0).equals(iRequester)) {
-        promoteLock(iRequester,iResourceId,sharedLock);
-        return true;
+ else {
+        curentSharedLock.countSharedLocks++;
+        return currentLock;
       }
     }
+    curentSharedLock=curentSharedLock.nextSharedLock;
+  }
+ while (curentSharedLock != null);
+  if (currentLock.countExclLocks > 0) {
+    return addWaitingEntry(currentLock,null,iLockType,iRequester,iResourceId);
+  }
  else {
-      if (sharedLock.equals(iRequester)) {
-        promoteLock(iRequester,iResourceId,sharedLock);
-        return true;
-      }
+    if (iLockType == LOCK.SHARED) {
+      addSharedLockEntry(currentLock,iRequester);
+      return currentLock;
+    }
+ else {
+      return addWaitingEntry(currentLock,null,iLockType,iRequester,iResourceId);
     }
   }
-  return false;
 }

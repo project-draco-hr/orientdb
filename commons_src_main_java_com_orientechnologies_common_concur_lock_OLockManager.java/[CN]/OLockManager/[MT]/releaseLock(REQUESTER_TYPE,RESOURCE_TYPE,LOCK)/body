@@ -1,12 +1,57 @@
 {
-  if (iLockType == LOCK.SHARED) {
-    final Object sharedLock=sharedLocks.get(iResourceId);
-    if (sharedLock == null)     throw new OLockException("Error on releasing a non acquired SHARED lock by the requester " + iRequester + " on resource: "+ iResourceId);
-    downsizeSharedLock(iResourceId,sharedLock);
+  LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> currentLock=removeLockEntry(iResourceId);
+  if (currentLock == null)   throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iResourceId);
+  try {
+    if (iLockType == LOCK.SHARED) {
+      removeSharedLockEntry(currentLock,iRequester);
+    }
+ else {
+      if (!iRequester.equals(currentLock.requester))       throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iResourceId);
+      currentLock.countExclLocks--;
+    }
+  }
+ catch (  OLockException e) {
+    while (currentLock != null) {
+      if (currentLock.requester.equals(iRequester) && currentLock.status == LOCK_STATUS.EXPIRED)       return;
+      currentLock=currentLock.nextWaiter;
+    }
+    throw e;
+  }
+  if (currentLock.nextSharedLock != null || currentLock.countExclLocks > 0 || currentLock.countSharedLocks > 0) {
+    addEntry(currentLock);
   }
  else {
-    final REQUESTER_TYPE exclusiveLock=exclusiveLocks.remove(iResourceId);
-    if (exclusiveLock == null)     throw new OLockException("Error on releasing a non acquired EXCLUSIVE lock by the requester " + iRequester + " on resource: "+ iResourceId);
-  }
-  lockQueue.wakeupWaiters(iResourceId);
+    LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> nextWaiter=currentLock.nextWaiter;
+    if (nextWaiter != null) {
+      boolean wait=false;
+      waiting:       while (true) {
+        if (wait)         Thread.yield();
+synchronized (nextWaiter) {
+switch (nextWaiter.status) {
+case WAITING:
+            wait=true;
+          continue waiting;
+case SLEEPING:
+        addEntry(nextWaiter);
+      nextWaiter.status=LOCK_STATUS.LIVE;
+    nextWaiter.notify();
+  break waiting;
+case LIVE:
+System.out.println("OLockManager LIVE status should nether occured here...");
+addEntry(nextWaiter);
+break waiting;
+case EXPIRED:
+if (nextWaiter.nextWaiter != null) {
+wait=false;
+nextWaiter=nextWaiter.nextWaiter;
+continue waiting;
+}
+ else {
+break waiting;
+}
+}
+}
+}
+}
+}
 }

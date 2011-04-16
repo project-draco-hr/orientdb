@@ -1,7 +1,7 @@
 {
   final long timer=OProfiler.getInstance().startChrono();
   try {
-    if (root == null)     return;
+    if (root == null)     return 0;
     OLogManager.instance().debug(this,"Starting optimization of MVRB+Tree with %d items in memory...",cache.size());
     OMVRBTreeEntryPersistent<K,V> pRoot=(OMVRBTreeEntryPersistent<K,V>)root;
     if (entryPoints.size() == 0)     entryPoints.add(pRoot);
@@ -22,7 +22,7 @@
       }
     }
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Found %d nodes in memory, %d items on disk, threshold=%d, entryPoints=%d",nodes,size,(entryPointsSize * optimizeEntryPointsFactor),entryPoints.size());
-    if (!iForce && nodes < entryPointsSize * optimizeEntryPointsFactor)     return;
+    if (!iForce && nodes < entryPointsSize * optimizeEntryPointsFactor)     return 0;
     if (debug)     System.out.printf("\n------------\nOptimizing: total items %d, root is %s...",size(),pRoot.toString());
     final int distance;
     if (nodes <= entryPointsSize)     distance=1;
@@ -71,8 +71,9 @@
         if (debug)         System.out.printf(entryPoint.record.getIdentity() + " ");
       }
     }
+    int totalDisconnected=0;
     for (    OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
-      entryPoint.disconnectLinked(false);
+      totalDisconnected+=entryPoint.disconnectLinked(false);
     }
     if (isRuntimeCheckEnabled()) {
       for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
@@ -83,6 +84,7 @@
       }
     }
     OLogManager.instance().debug(this,"Optimization done: MVRB-Tree nodes reduced to %d items",cache.size());
+    return totalDisconnected;
   }
   finally {
     if (isRuntimeCheckEnabled()) {

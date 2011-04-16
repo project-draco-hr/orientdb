@@ -12,7 +12,11 @@ case LINK:
 case LINKLIST:
 {
     iOutput.append(OStringSerializerHelper.COLLECTION_BEGIN);
-    if (iValue != null) {
+    if (iValue instanceof ORecordLazyList && ((ORecordLazyList)iValue).getStreamedContent() != null) {
+      iOutput.append(((ORecordLazyList)iValue).getStreamedContent());
+      OProfiler.getInstance().updateCounter("serializer.rec.str.linkList2string.cached",+1);
+    }
+ else {
       Object link;
       int items=0;
       List<Object> coll=(List<Object>)iValue;
@@ -22,7 +26,6 @@ case LINKLIST:
       boolean autoConvert=false;
       if (coll instanceof ORecordLazyMultiValue) {
         autoConvert=((ORecordLazyMultiValue)coll).isAutoConvertToRecord();
-        ((ORecordLazyMultiValue)coll).convertRecords2Links();
         ((ORecordLazyMultiValue)coll).setAutoConvertToRecord(false);
       }
       try {
@@ -46,22 +49,27 @@ case LINKLIST:
 case LINKSET:
 {
   iOutput.append(OStringSerializerHelper.COLLECTION_BEGIN);
-  int items=0;
-  ORecordLazySet coll;
-  if (!(iValue instanceof ORecordLazySet)) {
-    coll=new ORecordLazySet(iRecord);
-    coll.addAll((Collection<? extends OIdentifiable>)iValue);
-    ((Collection<? extends OIdentifiable>)iValue).clear();
-    iRecord.field(iName,coll);
+  if (iValue instanceof ORecordLazySet && ((ORecordLazySet)iValue).getStreamedContent() != null) {
+    iOutput.append(((ORecordLazySet)iValue).getStreamedContent());
+    OProfiler.getInstance().updateCounter("serializer.rec.str.linkSet2string.cached",+1);
   }
- else   coll=(ORecordLazySet)iValue;
-  boolean containsNew=false;
-  for (Iterator<OIdentifiable> it=coll.rawIterator(); it.hasNext(); ) {
-    if (items++ > 0)     iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
-    final OIdentifiable item=it.next();
-    linkToStream(iOutput,iRecord,item);
+ else {
+    int items=0;
+    ORecordLazySet coll;
+    if (!(iValue instanceof ORecordLazySet)) {
+      coll=new ORecordLazySet(iRecord);
+      coll.addAll((Collection<? extends OIdentifiable>)iValue);
+      ((Collection<? extends OIdentifiable>)iValue).clear();
+      iRecord.field(iName,coll);
+    }
+ else     coll=(ORecordLazySet)iValue;
+    for (Iterator<OIdentifiable> it=coll.rawIterator(); it.hasNext(); ) {
+      if (items++ > 0)       iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
+      final OIdentifiable item=it.next();
+      linkToStream(iOutput,iRecord,item);
+    }
+    coll.convertRecords2Links();
   }
-  coll.savedAllNewItems();
   iOutput.append(OStringSerializerHelper.COLLECTION_END);
   OProfiler.getInstance().stopChrono("serializer.rec.str.linkSet2string",timer);
   break;

@@ -28,6 +28,13 @@
           contentLength=Integer.parseInt(lineUpperCase.substring(OHttpUtils.CONTENT_LENGTH.length()));
           if (contentLength > requestMaxContentLength)           OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Error on content size "+ contentLength+ ": the maximum allowed is "+ requestMaxContentLength);
         }
+ else         if (lineUpperCase.startsWith(OHttpUtils.CONTENT_TYPE)) {
+          String contentType=lineUpperCase.substring(OHttpUtils.CONTENT_TYPE.length());
+          if (contentType.startsWith(OHttpUtils.CONTENT_TYPE_MULTIPART)) {
+            iRequest.isMultipart=true;
+            iRequest.boundary=new String(contentType.substring(OHttpUtils.CONTENT_TYPE_MULTIPART.length() + 2 + OHttpUtils.BOUNDARY.length()+ 1).toLowerCase());
+          }
+        }
       }
       in=channel.inStream.read();
       if (in == -1)       break;
@@ -39,11 +46,18 @@
       request.setLength(0);
     }
  else     if (endOfHeaders && request.length() == 0 && currChar != '\r' && currChar != '\n') {
-      byte[] buffer=new byte[contentLength];
-      buffer[0]=(byte)currChar;
-      channel.read(buffer,1,contentLength - 1);
-      iRequest.content=new String(buffer);
-      return;
+      if (iRequest.isMultipart) {
+        iRequest.content="";
+        iRequest.multipartStream=new OHttpMultipartBaseInputStream(channel.inStream,in,contentLength);
+        return;
+      }
+ else {
+        byte[] buffer=new byte[contentLength];
+        buffer[0]=(byte)currChar;
+        channel.read(buffer,1,contentLength - 1);
+        iRequest.content=new String(buffer);
+        return;
+      }
     }
  else     request.append(currChar);
   }

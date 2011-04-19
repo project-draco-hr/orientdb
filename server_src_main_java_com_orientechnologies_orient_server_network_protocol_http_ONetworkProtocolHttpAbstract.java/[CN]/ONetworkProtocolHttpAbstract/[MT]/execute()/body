@@ -6,12 +6,14 @@
   data.commandInfo="Listening";
   data.commandDetail=null;
   try {
+    channel.socket.setSoTimeout(socketTimeout);
     data.lastCommandReceived=-1;
     char c=(char)channel.inStream.read();
     if (channel.inStream.available() == 0) {
       connectionClosed();
       return;
     }
+    channel.socket.setSoTimeout(socketTimeout);
     data.lastCommandReceived=OProfiler.getInstance().startChrono();
     requestContent.setLength(0);
     if (c != '\n')     requestContent.append(c);
@@ -21,6 +23,9 @@
         String[] words=requestContent.toString().split(" ");
         if (words.length < 3) {
           OLogManager.instance().warn(this,"->" + channel.socket.getInetAddress().getHostAddress() + ": Error on invalid content:\n"+ requestContent);
+          while (channel.inStream.available() > 0) {
+            channel.inStream.read();
+          }
           break;
         }
         channel.inStream.read();

@@ -4,14 +4,12 @@
   OSerializableStream command=iCommand;
   Object result=null;
   do {
-    boolean locked=lock.acquireExclusiveLock();
     OStorageRemoteThreadLocal.INSTANCE.set(Boolean.TRUE);
     try {
       final OCommandRequestText aquery=iCommand;
       final boolean asynch=iCommand instanceof OCommandRequestAsynch;
-      final int reqId;
       try {
-        reqId=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
+        beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
         network.writeByte((byte)(asynch ? 'a' : 's'));
         network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(iCommand.getDatabase(),command));
       }
@@ -19,7 +17,7 @@
         endRequest();
       }
       try {
-        beginResponse(reqId);
+        beginResponse();
         if (asynch) {
           byte status;
           while ((status=network.readByte()) > 0) {
@@ -76,7 +74,6 @@ handleException("Error on executing command: " + iCommand,e);
 }
  finally {
 OStorageRemoteThreadLocal.INSTANCE.set(Boolean.FALSE);
-lock.releaseExclusiveLock(locked);
 }
 }
  while (true);

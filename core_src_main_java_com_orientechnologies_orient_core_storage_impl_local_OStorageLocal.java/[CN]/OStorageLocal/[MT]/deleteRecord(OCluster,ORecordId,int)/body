@@ -1,0 +1,27 @@
+{
+  final long timer=OProfiler.getInstance().startChrono();
+  final boolean locked=lock.acquireSharedLock();
+  try {
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    try {
+      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
+      if (!checkForRecordValidity(ppos))       return false;
+      if (iVersion > -1 && ppos.version != iVersion)       throw new OConcurrentModificationException("Can't delete the record " + iRid + " because it was modified by another user in the meanwhile of current transaction. Use pessimistic locking instead of optimistic or simply re-execute the transaction");
+      iClusterSegment.removePhysicalPosition(iRid.clusterPosition,ppos);
+      if (ppos.dataPosition > -1)       getDataSegment(ppos.dataSegment).deleteRecord(ppos.dataPosition);
+      incrementVersion();
+      return true;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on deleting record " + iRid + "( cluster: "+ iClusterSegment+ ")",e);
+  }
+ finally {
+    lock.releaseSharedLock(locked);
+    OProfiler.getInstance().stopChrono(PROFILER_DELETE_RECORD,timer);
+  }
+  return false;
+}

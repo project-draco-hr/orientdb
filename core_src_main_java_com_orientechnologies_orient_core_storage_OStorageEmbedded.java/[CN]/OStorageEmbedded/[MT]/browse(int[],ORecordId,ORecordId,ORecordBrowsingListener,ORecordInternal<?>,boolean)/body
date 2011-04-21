@@ -1,0 +1,25 @@
+{
+  checkOpeness();
+  final long timer=OProfiler.getInstance().startChrono();
+  final boolean locked=lock.acquireSharedLock();
+  try {
+    OCluster cluster;
+    long beginClusterPosition;
+    long endClusterPosition;
+    for (    int clusterId : iClusterId) {
+      if (iBeginRange != null)       if (clusterId < iBeginRange.getClusterId())       continue;
+      if (iEndRange != null)       if (clusterId > iEndRange.getClusterId())       break;
+      cluster=getClusterById(clusterId);
+      beginClusterPosition=iBeginRange != null && iBeginRange.getClusterId() == clusterId ? iBeginRange.getClusterPosition() : 0;
+      endClusterPosition=iEndRange != null && iEndRange.getClusterId() == clusterId ? iEndRange.getClusterPosition() : -1;
+      ioRecord=browseCluster(iListener,ioRecord,cluster,beginClusterPosition,endClusterPosition,iLockEntireCluster);
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on browsing elements of cluster: " + iClusterId,e);
+  }
+ finally {
+    lock.releaseSharedLock(locked);
+    OProfiler.getInstance().stopChrono("OStorageLocal.foreach",timer);
+  }
+}

@@ -1,0 +1,38 @@
+{
+  acquireExclusiveLock();
+  try {
+    int size=(file.getFilledUpTo() / RECORD_SIZE);
+    byte status;
+    int txId;
+    int offset;
+    int recordFreed=0;
+    for (int i=0; i < size; ++i) {
+      offset=i * RECORD_SIZE;
+      status=file.readByte(offset);
+      if (status == STATUS_COMMITTING) {
+        offset+=OConstants.SIZE_BYTE + OConstants.SIZE_BYTE;
+        txId=file.readInt(offset);
+        if (txId == iTxId) {
+          file.writeByte(i * RECORD_SIZE,STATUS_FREE);
+          recordFreed++;
+        }
+      }
+    }
+    int lastRecord=size - 1;
+    for (int i=size - 1; i > -1 && recordFreed > 0; --i) {
+      offset=i * RECORD_SIZE;
+      status=file.readByte(offset);
+      offset+=OConstants.SIZE_BYTE;
+      offset+=OConstants.SIZE_BYTE;
+      txId=file.readShort(offset);
+      if (txId != iTxId)       break;
+      lastRecord=i;
+      recordFreed--;
+    }
+    if (lastRecord > -1)     file.shrink(lastRecord * RECORD_SIZE);
+    synchTx();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

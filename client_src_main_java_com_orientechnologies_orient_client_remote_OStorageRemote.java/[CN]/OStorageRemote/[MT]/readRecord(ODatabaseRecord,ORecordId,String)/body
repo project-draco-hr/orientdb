@@ -1,0 +1,34 @@
+{
+  checkConnection();
+  if (OStorageRemoteThreadLocal.INSTANCE.get())   return null;
+  do {
+    try {
+      try {
+        beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_LOAD);
+        network.writeRID(iRid);
+        network.writeString(iFetchPlan != null ? iFetchPlan : "");
+      }
+  finally {
+        endRequest();
+      }
+      try {
+        beginResponse();
+        if (network.readByte() == 0)         return null;
+        final ORawBuffer buffer=new ORawBuffer(network.readBytes(),network.readInt(),network.readByte());
+        ORecordInternal<?> record;
+        while (network.readByte() == 2) {
+          record=(ORecordInternal<?>)readRecordFromNetwork(iDatabase);
+          level2cache.pushRecord(record);
+        }
+        return buffer;
+      }
+  finally {
+        endResponse();
+      }
+    }
+ catch (    Exception e) {
+      handleException("Error on read record #" + iRid,e);
+    }
+  }
+ while (true);
+}

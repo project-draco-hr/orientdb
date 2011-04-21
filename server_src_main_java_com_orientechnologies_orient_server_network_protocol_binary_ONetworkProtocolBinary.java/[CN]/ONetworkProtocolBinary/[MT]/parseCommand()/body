@@ -34,8 +34,8 @@ case OChannelBinaryProtocol.REQUEST_DB_OPEN:
   String dbName=dbURL.substring(dbURL.lastIndexOf(":") + 1);
   user=channel.readString();
   passwd=channel.readString();
-  connection.database=openDatabase(dbName,user,passwd);
-  if (!(underlyingDatabase.getStorage() instanceof OStorageEmbedded) && !loadUserFromSchema(user,passwd)) {
+  openDatabase(dbName,user,passwd);
+  if (!(connection.database.getStorage() instanceof OStorageEmbedded) && !loadUserFromSchema(user,passwd)) {
     sendError(lastClientTxId,new OSecurityAccessException(connection.database.getName(),"Access denied to database '" + connection.database.getName() + "' for user: "+ user));
   }
  else {
@@ -72,6 +72,9 @@ break;
 case OChannelBinaryProtocol.REQUEST_DB_EXIST:
 {
 data.commandInfo="Exists database";
+String dbName=channel.readString();
+checkServerAccess("database.exists");
+connection.database=getDatabaseInstance(dbName,"local");
 sendOk(lastClientTxId);
 channel.writeByte((byte)(connection.database.exists() ? 1 : 0));
 break;
@@ -161,7 +164,7 @@ final String fetchPlanString=channel.readString();
 if (clusterId == 0 && clusterPosition == 0) {
 sendOk(lastClientTxId);
 channel.writeByte((byte)1);
-channel.writeBytes(underlyingDatabase.getStorage().getConfiguration().toStream());
+channel.writeBytes(connection.database.getStorage().getConfiguration().toStream());
 channel.writeInt(0);
 channel.writeByte(ORecordBytes.RECORD_TYPE);
 }
@@ -209,7 +212,7 @@ case OChannelBinaryProtocol.REQUEST_RECORD_CREATE:
 {
 data.commandInfo="Create record";
 final ORecordId rid=new ORecordId(channel.readShort(),ORID.CLUSTER_POS_INVALID);
-final long location=underlyingDatabase.save(rid,channel.readBytes(),-1,channel.readByte());
+final long location=connection.rawDatabase.save(rid,channel.readBytes(),-1,channel.readByte());
 sendOk(lastClientTxId);
 channel.writeLong(location);
 break;
@@ -218,7 +221,7 @@ case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
 {
 data.commandInfo="Update record";
 final ORecordId rid=channel.readRID();
-long newVersion=underlyingDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
+long newVersion=connection.rawDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
 if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().loadSchema();
  else if (((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().equals(rid)) ((ODictionaryLocal<?>)connection.database.getDictionary()).load();
 sendOk(lastClientTxId);
@@ -229,7 +232,7 @@ case OChannelBinaryProtocol.REQUEST_RECORD_DELETE:
 {
 data.commandInfo="Delete record";
 final ORecordId rid=new ORecordId(channel.readShort(),channel.readLong());
-underlyingDatabase.delete(rid,channel.readInt());
+connection.rawDatabase.delete(rid,channel.readInt());
 sendOk(lastClientTxId);
 channel.writeByte((byte)1);
 break;

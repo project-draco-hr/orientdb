@@ -17,30 +17,35 @@ case LINKLIST:
       OProfiler.getInstance().updateCounter("serializer.rec.str.linkList2string.cached",+1);
     }
  else {
-      Object link;
-      int items=0;
-      List<Object> coll=(List<Object>)iValue;
-      if (coll instanceof OLazyObjectList<?>) {
-        ((OLazyObjectList<?>)coll).setConvertToRecord(false);
+      final ORecordLazyList coll;
+      final Iterator<OIdentifiable> it;
+      if (!(iValue instanceof ORecordLazyList)) {
+        coll=new ORecordLazyList(iRecord);
+        coll.addAll((Collection<? extends OIdentifiable>)iValue);
+        ((Collection<? extends OIdentifiable>)iValue).clear();
+        iRecord.field(iName,coll);
+        it=coll.rawIterator();
       }
-      boolean autoConvert=false;
-      if (coll instanceof ORecordLazyMultiValue) {
-        autoConvert=((ORecordLazyMultiValue)coll).isAutoConvertToRecord();
-        ((ORecordLazyMultiValue)coll).setAutoConvertToRecord(false);
-      }
-      try {
-        for (int i=0; i < coll.size(); ++i) {
-          if (items++ > 0)           iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
-          link=linkToStream(iOutput,iRecord,coll.get(i));
-          if (link != null)           coll.set(i,link);
+ else {
+        coll=(ORecordLazyList)iValue;
+        if (coll.getStreamedContent() != null) {
+          iOutput.append(coll.getStreamedContent());
+          OProfiler.getInstance().updateCounter("serializer.rec.str.linkList2string.cached",+1);
+          it=coll.newItemsIterator();
         }
+ else         it=coll.rawIterator();
       }
-  finally {
-        if (coll instanceof OLazyObjectList<?>) {
-          ((OLazyObjectList<?>)coll).setConvertToRecord(true);
+      if (it != null && it.hasNext()) {
+        final StringBuilder buffer=new StringBuilder();
+        for (int items=0; it.hasNext(); items++) {
+          if (items > 0)           buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+          final OIdentifiable item=it.next();
+          linkToStream(buffer,iRecord,item);
         }
+        coll.convertRecords2Links();
+        iOutput.append(buffer);
+        coll.setStreamedContent(buffer);
       }
-      if (coll instanceof ORecordLazyMultiValue)       ((ORecordLazyMultiValue)coll).setAutoConvertToRecord(autoConvert);
     }
     iOutput.append(OStringSerializerHelper.COLLECTION_END);
     OProfiler.getInstance().stopChrono("serializer.rec.str.linkList2string",timer);
@@ -48,29 +53,15 @@ case LINKLIST:
   }
 case LINKSET:
 {
-  iOutput.append(OStringSerializerHelper.COLLECTION_BEGIN);
-  if (iValue instanceof ORecordLazySet && ((ORecordLazySet)iValue).getStreamedContent() != null) {
-    iOutput.append(((ORecordLazySet)iValue).getStreamedContent());
-    OProfiler.getInstance().updateCounter("serializer.rec.str.linkSet2string.cached",+1);
+  final ORecordLazySet coll;
+  if (!(iValue instanceof ORecordLazySet)) {
+    coll=new ORecordLazySet(iRecord);
+    coll.addAll((Collection<? extends OIdentifiable>)iValue);
+    ((Collection<? extends OIdentifiable>)iValue).clear();
+    iRecord.field(iName,coll);
   }
- else {
-    int items=0;
-    ORecordLazySet coll;
-    if (!(iValue instanceof ORecordLazySet)) {
-      coll=new ORecordLazySet(iRecord);
-      coll.addAll((Collection<? extends OIdentifiable>)iValue);
-      ((Collection<? extends OIdentifiable>)iValue).clear();
-      iRecord.field(iName,coll);
-    }
- else     coll=(ORecordLazySet)iValue;
-    for (Iterator<OIdentifiable> it=coll.rawIterator(); it.hasNext(); ) {
-      if (items++ > 0)       iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
-      final OIdentifiable item=it.next();
-      linkToStream(iOutput,iRecord,item);
-    }
-    coll.convertRecords2Links();
-  }
-  iOutput.append(OStringSerializerHelper.COLLECTION_END);
+ else   coll=(ORecordLazySet)iValue;
+  linkSetToStream(iOutput,iRecord,coll);
   OProfiler.getInstance().stopChrono("serializer.rec.str.linkSet2string",timer);
   break;
 }

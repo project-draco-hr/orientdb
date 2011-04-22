@@ -1,30 +1,26 @@
 {
   try {
-    context=JAXBContext.newInstance(rootClass);
-    Unmarshaller unmarshaller=context.createUnmarshaller();
-    unmarshaller.setSchema(null);
-    final OServerConfiguration obj;
-    if (file != null) {
-      if (file.exists())       obj=rootClass.cast(unmarshaller.unmarshal(file));
- else       return rootClass.getConstructor(OServerConfigurationLoaderXml.class,String.class).newInstance(this,file);
-      obj.location=file.getAbsolutePath();
-    }
- else {
-      obj=rootClass.cast(unmarshaller.unmarshal(new StringReader(configurationText)));
-      obj.location="memory";
-    }
-    OGlobalConfiguration config;
-    for (    OServerEntryConfiguration prop : obj.properties) {
-      try {
-        config=OGlobalConfiguration.findByKey(prop.name);
-        if (config != null) {
-          config.setValue(prop.value);
+    if (file.exists()) {
+      context=JAXBContext.newInstance(rootClass);
+      Unmarshaller unmarshaller=context.createUnmarshaller();
+      Schema schema=null;
+      unmarshaller.setSchema(schema);
+      OServerConfiguration obj=rootClass.cast(unmarshaller.unmarshal(file));
+      obj.location=filePath;
+      OGlobalConfiguration config;
+      for (      OServerEntryConfiguration prop : obj.properties) {
+        try {
+          config=OGlobalConfiguration.findByKey(prop.name);
+          if (config != null) {
+            config.setValue(prop.value);
+          }
+        }
+ catch (        Exception e) {
         }
       }
- catch (      Exception e) {
-      }
+      return obj;
     }
-    return obj;
+ else     return rootClass.getConstructor(OServerConfigurationLoaderXml.class,String.class).newInstance(this,filePath);
   }
  catch (  Exception e) {
     OLogManager.instance().error(this,"Invalid syntax. Below an example of how it should be:",e);

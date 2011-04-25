@@ -1,0 +1,28 @@
+{
+  final boolean locked=lock.acquireExclusiveLock();
+  OChannelBinaryClient network=null;
+  try {
+    network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
+    endRequest(network);
+    getResponse(network);
+    OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
+    if (!checkForClose(iForce))     return;
+    if (serviceThread != null) {
+      serviceThread.sendShutdown();
+      serviceThread.interrupt();
+    }
+    for (    OChannelBinaryClient n : networkPool) {
+      n.close();
+    }
+    networkPool.clear();
+    level2cache.shutdown();
+    Orient.instance().unregisterStorage(this);
+    open=false;
+  }
+ catch (  Exception e) {
+    OLogManager.instance().debug(this,"Error on closing remote connection: %s",network);
+  }
+ finally {
+    lock.releaseExclusiveLock(locked);
+  }
+}

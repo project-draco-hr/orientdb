@@ -3,15 +3,15 @@
   do {
     try {
       final Set<OTransactionEntry> allEntries=new HashSet<OTransactionEntry>();
+      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
       try {
-        beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
         network.writeInt(((OTransactionRealAbstract)iTx).getId());
         final List<OTransactionEntry> tmpEntries=new ArrayList<OTransactionEntry>();
         while (iTx.getEntries().iterator().hasNext()) {
           for (          OTransactionEntry txEntry : iTx.getEntries())           if (!allEntries.contains(txEntry))           tmpEntries.add(txEntry);
           iTx.clearEntries();
           if (tmpEntries.size() > 0) {
-            for (            OTransactionEntry txEntry : tmpEntries)             commitEntry(txEntry);
+            for (            OTransactionEntry txEntry : tmpEntries)             commitEntry(network,txEntry);
             allEntries.addAll(tmpEntries);
             tmpEntries.clear();
           }
@@ -19,10 +19,10 @@
         network.writeByte((byte)0);
       }
   finally {
-        endRequest();
+        endRequest(network);
       }
       try {
-        beginResponse();
+        beginResponse(network);
         final int updatedRecords=network.readInt();
         ORecordId rid;
         for (int i=0; i < updatedRecords; ++i) {
@@ -36,7 +36,7 @@
         }
       }
   finally {
-        endResponse();
+        endResponse(network);
       }
       OTransactionAbstract.updateCacheFromEntries(this,iTx,allEntries);
       break;

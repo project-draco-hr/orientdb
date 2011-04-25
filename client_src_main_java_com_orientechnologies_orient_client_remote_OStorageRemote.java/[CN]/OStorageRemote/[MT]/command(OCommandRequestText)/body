@@ -4,24 +4,24 @@
   OSerializableStream command=iCommand;
   Object result=null;
   do {
-    OStorageRemoteThreadLocal.INSTANCE.set(Boolean.TRUE);
+    OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
     try {
       final OCommandRequestText aquery=iCommand;
       final boolean asynch=iCommand instanceof OCommandRequestAsynch;
+      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
       try {
-        beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
         network.writeByte((byte)(asynch ? 'a' : 's'));
         network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(iCommand.getDatabase(),command));
       }
   finally {
-        endRequest();
+        endRequest(network);
       }
       try {
-        beginResponse();
+        beginResponse(network);
         if (asynch) {
           byte status;
           while ((status=network.readByte()) > 0) {
-            ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork(iCommand.getDatabase());
+            ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork(network,iCommand.getDatabase());
             if (record == null)             break;
 switch (status) {
 case 1:
@@ -47,13 +47,13 @@ case 'n':
       result=null;
     break;
 case 'r':
-  result=readRecordFromNetwork(iCommand.getDatabase());
+  result=readRecordFromNetwork(network,iCommand.getDatabase());
 break;
 case 'l':
 final int tot=network.readInt();
 final Collection<OIdentifiable> list=new ArrayList<OIdentifiable>();
 for (int i=0; i < tot; ++i) {
-list.add(readRecordFromNetwork(iCommand.getDatabase()));
+list.add(readRecordFromNetwork(network,iCommand.getDatabase()));
 }
 result=list;
 break;
@@ -66,14 +66,14 @@ break;
 break;
 }
   finally {
-endResponse();
+endResponse(network);
 }
 }
  catch (Exception e) {
 handleException("Error on executing command: " + iCommand,e);
 }
  finally {
-OStorageRemoteThreadLocal.INSTANCE.set(Boolean.FALSE);
+OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=false;
 }
 }
  while (true);

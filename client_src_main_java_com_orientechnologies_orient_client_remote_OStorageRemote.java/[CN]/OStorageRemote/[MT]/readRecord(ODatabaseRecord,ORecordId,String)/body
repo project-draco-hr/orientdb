@@ -1,29 +1,29 @@
 {
   checkConnection();
-  if (OStorageRemoteThreadLocal.INSTANCE.get())   return null;
+  if (OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting)   return null;
   do {
     try {
+      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_LOAD);
       try {
-        beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_LOAD);
         network.writeRID(iRid);
         network.writeString(iFetchPlan != null ? iFetchPlan : "");
       }
   finally {
-        endRequest();
+        endRequest(network);
       }
       try {
-        beginResponse();
+        beginResponse(network);
         if (network.readByte() == 0)         return null;
         final ORawBuffer buffer=new ORawBuffer(network.readBytes(),network.readInt(),network.readByte());
         ORecordInternal<?> record;
         while (network.readByte() == 2) {
-          record=(ORecordInternal<?>)readRecordFromNetwork(iDatabase);
+          record=(ORecordInternal<?>)readRecordFromNetwork(network,iDatabase);
           level2cache.pushRecord(record);
         }
         return buffer;
       }
   finally {
-        endResponse();
+        endResponse(network);
       }
     }
  catch (    Exception e) {

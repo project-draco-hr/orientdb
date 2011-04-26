@@ -1,7 +1,16 @@
 {
-  if (networkPool.size() == 0) {
-    final OChannelBinaryClient firstChannel=createNetworkConnection();
-    networkPool.add(firstChannel);
-    serviceThread=new OStorageRemoteServiceThread(new OStorageRemoteThread(this),firstChannel);
+  final boolean locked=lock.acquireExclusiveLock();
+  try {
+    if (networkPool.size() == 0) {
+      minPool=OGlobalConfiguration.CLIENT_CHANNEL_MIN_POOL.getValueAsInteger();
+      maxPool=OGlobalConfiguration.CLIENT_CHANNEL_MAX_POOL.getValueAsInteger();
+      final OChannelBinaryClient firstChannel=createNetworkConnection();
+      networkPool.add(firstChannel);
+      serviceThread=new OStorageRemoteServiceThread(new OStorageRemoteThread(this),firstChannel);
+      for (int i=1; i < minPool; ++i)       networkPool.add(createNetworkConnection());
+    }
+  }
+  finally {
+    lock.releaseExclusiveLock(locked);
   }
 }

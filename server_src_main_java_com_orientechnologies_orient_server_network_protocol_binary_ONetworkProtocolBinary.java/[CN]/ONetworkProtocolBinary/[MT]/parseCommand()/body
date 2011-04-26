@@ -161,10 +161,9 @@ break;
 case OChannelBinaryProtocol.REQUEST_RECORD_LOAD:
 {
 data.commandInfo="Load record";
-final short clusterId=channel.readShort();
-final long clusterPosition=channel.readLong();
+final ORecordId rid=channel.readRID();
 final String fetchPlanString=channel.readString();
-if (clusterId == 0 && clusterPosition == 0) {
+if (rid.clusterId == 0 && rid.clusterPosition == 0) {
 sendOk(lastClientTxId);
 channel.writeByte((byte)1);
 channel.writeBytes(connection.database.getStorage().getConfiguration().toStream());
@@ -172,7 +171,8 @@ channel.writeInt(0);
 channel.writeByte(ORecordBytes.RECORD_TYPE);
 }
  else {
-final ORecordInternal<?> record=connection.database.load(new ORecordId(clusterId,clusterPosition));
+final ORecordInternal<?> record=connection.database.load(rid);
+if (rid.equals(connection.database.getMetadata().getSchema().getDocument().getIdentity())) connection.database.getMetadata().getSchema().reload();
 sendOk(lastClientTxId);
 if (record != null) {
 channel.writeByte((byte)1);
@@ -225,7 +225,8 @@ case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
 data.commandInfo="Update record";
 final ORecordId rid=channel.readRID();
 long newVersion=connection.rawDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
-if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().loadSchema();
+if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().getSchema().reload();
+ else if (connection.database.getMetadata().getIndexManager().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().getIndexManager().reload();
  else if (((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().equals(rid)) ((ODictionaryLocal<?>)connection.database.getDictionary()).load();
 sendOk(lastClientTxId);
 channel.writeInt((int)newVersion);

@@ -1,22 +1,24 @@
 {
   OLogManager.instance().info(this,"Sending configuration to distributed server node %s:%d...",networkAddress,networkPort);
-  channel.acquireExclusiveLock();
   try {
-    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG);
-    channel.writeInt(clientTxId);
-    channel.writeBytes(manager.getClusterConfiguration(iDatabaseName).toStream());
-    channel.flush();
+    channel.acquireExclusiveLock();
     try {
-      beginResponse();
+      channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG);
+      channel.writeInt(clientTxId);
+      channel.writeBytes(manager.getClusterConfiguration(iDatabaseName).toStream());
+      channel.flush();
+      try {
+        beginResponse();
+      }
+  finally {
+        endResponse();
+      }
     }
   finally {
-      endResponse();
+      channel.releaseExclusiveLock();
     }
   }
  catch (  Exception e) {
-    e.printStackTrace();
-  }
- finally {
-    channel.releaseExclusiveLock();
+    OLogManager.instance().warn(this,"Error on sending configuration to server node",toString());
   }
 }

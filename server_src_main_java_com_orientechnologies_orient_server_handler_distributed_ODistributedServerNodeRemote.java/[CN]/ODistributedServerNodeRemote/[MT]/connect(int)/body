@@ -3,16 +3,22 @@
   channel=new OChannelBinaryClient(networkAddress,networkPort,configuration);
   OChannelBinaryProtocol.checkProtocolVersion(channel);
   OLogManager.instance().warn(this,"Joining the server node %s:%d to the cluster...",networkAddress,networkPort);
+  clientTxId=serialClientId.decrementAndGet();
   channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_CONNECT);
   channel.writeInt(clientTxId);
-  channel.writeString(database);
-  if (database != null) {
-    channel.writeString(manager.getClusterDbSecurity(database)[0]);
-    channel.writeString(manager.getClusterDbSecurity(database)[1]);
-  }
   channel.flush();
   channel.readStatus();
-  dbVersion=channel.readLong();
+  for (  OServerNodeDatabaseEntry entry : databases.values()) {
+    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN);
+    channel.writeInt(clientTxId);
+    channel.writeString(entry.databaseName);
+    channel.writeString(entry.userName);
+    channel.writeString(entry.userPassword);
+    channel.flush();
+    channel.readStatus();
+    entry.sessionId=channel.readInt();
+    entry.version=channel.readLong();
+  }
   if (status == STATUS.CONNECTING)   OLogManager.instance().info(this,"Server node %s:%d has joined the cluster",networkAddress,networkPort);
  else   OLogManager.instance().info(this,"Server node %s:%d has re-joined the cluster after %d secs",networkAddress,networkPort,(System.currentTimeMillis() - lastHeartBeat) / 1000);
   lastHeartBeat=System.currentTimeMillis();

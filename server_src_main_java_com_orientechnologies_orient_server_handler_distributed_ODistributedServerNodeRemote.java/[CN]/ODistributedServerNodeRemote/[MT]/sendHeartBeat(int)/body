@@ -4,23 +4,19 @@
   channel.acquireExclusiveLock();
   try {
     channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
-    channel.writeInt(-1);
+    channel.writeInt(clientTxId);
     channel.flush();
     long remoteVersion=-1;
     try {
-      channel.beginResponse(-1);
-      remoteVersion=channel.readLong();
+      channel.beginResponse(clientTxId);
     }
   finally {
       channel.endResponse();
     }
     lastHeartBeat=System.currentTimeMillis();
-    if (remoteVersion != dbVersion) {
-      OLogManager.instance().warn(this,"Database version doesn't match between current node (" + dbVersion + ") and remote ("+ remoteVersion+ ")");
-      throw new ODistributedException("Database version doesn't match between current node (" + dbVersion + ") and remote ("+ remoteVersion+ ")");
-    }
   }
  catch (  Exception e) {
+    OLogManager.instance().warn(this,"Error on sending heartbeat to server node",e,toString());
     return false;
   }
  finally {

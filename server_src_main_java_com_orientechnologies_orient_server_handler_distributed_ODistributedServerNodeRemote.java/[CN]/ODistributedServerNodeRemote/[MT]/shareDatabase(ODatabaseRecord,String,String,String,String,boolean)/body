@@ -6,7 +6,7 @@
     status=STATUS.SYNCHRONIZING;
     OLogManager.instance().info(this,"Sharing database '" + dbName + "' to remote server "+ iRemoteServerName+ "...");
     channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER);
-    channel.writeInt(0);
+    channel.writeInt(clientTxId);
     channel.writeString(dbName);
     channel.writeString(iDbUser);
     channel.writeString(iDbPasswd);
@@ -14,9 +14,15 @@
     OLogManager.instance().info(this,"Exporting database '%s' via streaming to remote server node: %s...",iDatabase.getName(),iRemoteServerName);
     new ODatabaseExport(iDatabase,new OChannelBinaryOutputStream(channel),this).exportDatabase();
     OLogManager.instance().info(this,"Database exported correctly");
+    final OServerNodeDatabaseEntry databaseEntry=new OServerNodeDatabaseEntry();
+    databaseEntry.databaseName=dbName;
+    databaseEntry.userName=iDbUser;
+    databaseEntry.userPassword=iDbPasswd;
     try {
-      clientTxId=channel.beginResponse(0);
-      dbVersion=channel.readLong();
+      channel.beginResponse(clientTxId);
+      databaseEntry.sessionId=channel.readInt();
+      databaseEntry.version=channel.readLong();
+      databases.put(dbName,databaseEntry);
     }
   finally {
       channel.endResponse();
@@ -26,6 +32,4 @@
     channel.releaseExclusiveLock();
   }
   status=STATUS.CONNECTED;
-  database=dbName;
-  manager.setClusterDbSecurity(dbName,iDbUser,iDbPasswd);
 }

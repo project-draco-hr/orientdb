@@ -10,19 +10,16 @@ case OTransactionEntry.LOADED:
 case OTransactionEntry.CREATED:
 {
     byte[] stream=txEntry.getRecord().toStream();
-    if (iUseLog) {
-      if (rid.isNew()) {
-        if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_CREATE,txEntry.getRecord()))         stream=txEntry.getRecord().toStream();
-        rid.clusterId=cluster.getId();
-        createRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getRecordType());
-        iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_CREATE,txEntry.getRecord());
-      }
- else {
-        txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
-      }
+    if (rid.isNew()) {
+      if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_CREATE,txEntry.getRecord()))       stream=txEntry.getRecord().toStream();
+      rid.clusterId=cluster.getId();
+      if (iUseLog)       createRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getRecordType());
+ else       iTx.getDatabase().getStorage().createRecord(rid,stream,txEntry.getRecord().getRecordType());
+      iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_CREATE,txEntry.getRecord());
     }
  else {
-      iTx.getDatabase().getStorage().createRecord(rid,stream,txEntry.getRecord().getRecordType());
+      if (iUseLog)       txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+ else       txEntry.getRecord().setVersion(iTx.getDatabase().getStorage().updateRecord(rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
     }
     break;
   }

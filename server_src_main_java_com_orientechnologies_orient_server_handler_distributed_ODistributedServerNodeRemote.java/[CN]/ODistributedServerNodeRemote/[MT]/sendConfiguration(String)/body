@@ -1,14 +1,16 @@
 {
   OLogManager.instance().info(this,"Sending configuration to distributed server node %s:%d...",networkAddress,networkPort);
+  final OServerNodeDatabaseEntry dbEntry=databases.get(iDatabaseName);
+  if (dbEntry == null)   throw new IllegalArgumentException("Database name '" + iDatabaseName + "' is not configured as distributed");
   try {
     channel.acquireExclusiveLock();
     try {
       channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG);
-      channel.writeInt(clientTxId);
+      channel.writeInt(dbEntry.sessionId);
       channel.writeBytes(manager.getClusterConfiguration(iDatabaseName).toStream());
       channel.flush();
       try {
-        beginResponse();
+        beginResponse(dbEntry.sessionId);
       }
   finally {
         endResponse();

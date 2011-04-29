@@ -8,7 +8,8 @@
   channel.writeInt(clientTxId);
   channel.flush();
   channel.readStatus();
-  for (  OServerNodeDatabaseEntry entry : databases.values()) {
+  final List<OServerNodeDatabaseEntry> servers=new ArrayList<OServerNodeDatabaseEntry>(databases.values());
+  for (  OServerNodeDatabaseEntry entry : servers) {
     channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN);
     channel.writeInt(clientTxId);
     channel.writeString(entry.databaseName);
@@ -17,7 +18,12 @@
     channel.flush();
     channel.readStatus();
     entry.sessionId=channel.readInt();
-    entry.version=channel.readLong();
+    final long version=channel.readLong();
+    if (version != entry.version) {
+      OLogManager.instance().warn(this,"Remote database '" + entry.databaseName + "' has different version than Leader node ("+ entry.version+ ") and remote ("+ version+ "). Removing database from shared list.");
+      databases.remove(entry.databaseName);
+    }
+ else     sendConfiguration(entry.databaseName);
   }
   if (status == STATUS.CONNECTING)   OLogManager.instance().info(this,"Server node %s:%d has joined the cluster",networkAddress,networkPort);
  else   OLogManager.instance().info(this,"Server node %s:%d has re-joined the cluster after %d secs",networkAddress,networkPort,(System.currentTimeMillis() - lastHeartBeat) / 1000);

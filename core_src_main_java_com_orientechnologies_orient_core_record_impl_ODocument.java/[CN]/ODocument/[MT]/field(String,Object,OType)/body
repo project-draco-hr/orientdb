@@ -1,4 +1,5 @@
 {
+  iPropertyName=checkFieldName(iPropertyName);
   checkForLoading();
   checkForFields();
   final boolean knownProperty=_fieldValues.containsKey(iPropertyName);
@@ -14,14 +15,12 @@
       OLogManager.instance().warn(this,"Error on checking the value of property %s against the record %s",e,iPropertyName,getIdentity());
     }
   }
-  if (_clazz != null) {
-    OProperty prop=_clazz.getProperty(iPropertyName);
-    if (prop != null) {
-      if (iPropertyValue instanceof Enum)       if (prop.getType().isAssignableFrom(1))       iPropertyValue=((Enum<?>)iPropertyValue).ordinal();
- else       iPropertyValue=((Enum<?>)iPropertyValue).name();
-      if (!(iPropertyValue instanceof String) && !prop.getType().isAssignableFrom(iPropertyValue))       throw new IllegalArgumentException("Property '" + iPropertyName + "' of type '"+ prop.getType()+ "' can't accept value of type: "+ iPropertyValue.getClass());
-    }
+  if (iType != null)   setFieldType(iPropertyName,iType);
+ else   if (_clazz != null) {
+    final OProperty prop=_clazz.getProperty(iPropertyName);
+    if (prop != null)     iType=prop.getType();
   }
+  if (iType != null)   convertField(iPropertyName,iType.getDefaultJavaType(),iPropertyValue);
   if (_status != STATUS.UNMARSHALLING) {
     setDirty();
     if (knownProperty && _trackingChanges) {
@@ -29,7 +28,7 @@
       if (!_fieldOriginalValues.containsKey(iPropertyName))       _fieldOriginalValues.put(iPropertyName,oldValue);
     }
   }
-  if (oldValue != null) {
+  if (oldValue != null && iType != null) {
     if (oldValue instanceof ORecord<?> && iPropertyValue instanceof String)     iPropertyValue=new ORecordId((String)iPropertyValue);
  else     if (oldValue instanceof Collection<?> && iPropertyValue instanceof String) {
       final List<ODocument> newValue=new ArrayList<ODocument>();
@@ -51,6 +50,5 @@
     if (iPropertyValue instanceof Enum)     iPropertyValue=iPropertyValue.toString();
   }
   _fieldValues.put(iPropertyName,iPropertyValue);
-  setFieldType(iPropertyName,iType);
   return this;
 }

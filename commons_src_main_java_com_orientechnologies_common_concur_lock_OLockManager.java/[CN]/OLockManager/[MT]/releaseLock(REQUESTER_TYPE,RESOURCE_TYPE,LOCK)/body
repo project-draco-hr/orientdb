@@ -1,57 +1,11 @@
 {
-  LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> currentLock=removeLockEntry(iResourceId);
-  if (currentLock == null)   throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iResourceId);
-  try {
-    if (iLockType == LOCK.SHARED) {
-      removeSharedLockEntry(currentLock,iRequester);
-    }
- else {
-      if (!iRequester.equals(currentLock.requester))       throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iResourceId);
-      currentLock.countExclLocks--;
-    }
+  CountableLock lock;
+synchronized (map) {
+    lock=map.get(iResourceId);
+    if (lock == null)     throw new OLockException("Error on releasing a non acquired lock by the requester " + iRequester + " on resource: "+ iResourceId);
+    lock.countLocks--;
+    if (lock.countLocks == 0)     map.remove(iResourceId);
   }
- catch (  OLockException e) {
-    while (currentLock != null) {
-      if (currentLock.requester.equals(iRequester) && currentLock.status == LOCK_STATUS.EXPIRED)       return;
-      currentLock=currentLock.nextWaiter;
-    }
-    throw e;
-  }
-  if (currentLock.nextSharedLock != null || currentLock.countExclLocks > 0 || currentLock.countSharedLocks > 0) {
-    addEntry(currentLock);
-  }
- else {
-    LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> nextWaiter=currentLock.nextWaiter;
-    if (nextWaiter != null) {
-      boolean wait=false;
-      waiting:       while (true) {
-        if (wait)         Thread.yield();
-synchronized (nextWaiter) {
-switch (nextWaiter.status) {
-case WILLWAIT:
-            wait=true;
-          continue waiting;
-case WAITING:
-        addEntry(nextWaiter);
-      nextWaiter.status=LOCK_STATUS.LIVE;
-    nextWaiter.notify();
-  break waiting;
-case LIVE:
-System.out.println("OLockManager LIVE status should nether occured here...");
-addEntry(nextWaiter);
-break waiting;
-case EXPIRED:
-if (nextWaiter.nextWaiter != null) {
-wait=false;
-nextWaiter=nextWaiter.nextWaiter;
-continue waiting;
-}
- else {
-break waiting;
-}
-}
-}
-}
-}
-}
+  if (iLockType == LOCK.SHARED)   lock.readLock().unlock();
+ else   lock.writeLock().unlock();
 }

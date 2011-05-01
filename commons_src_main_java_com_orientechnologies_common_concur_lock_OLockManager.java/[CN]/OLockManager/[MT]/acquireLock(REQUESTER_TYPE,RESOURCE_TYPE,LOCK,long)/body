@@ -1,20 +1,22 @@
 {
-  LockEntry<RESOURCE_TYPE,REQUESTER_TYPE> lock=tryToAcquireLock(iRequester,iResourceId,iLockType);
-  if (lock.status == LOCK_STATUS.LIVE)   return;
-synchronized (lock) {
-    lock.status=LOCK_STATUS.WAITING;
-    long time=iTimeout > 0 ? System.currentTimeMillis() : 0;
-    do {
-      try {
-        lock.wait(iTimeout <= 0 ? Long.MAX_VALUE : iTimeout);
-      }
- catch (      InterruptedException e) {
-      }
+  CountableLock lock;
+synchronized (map) {
+    lock=map.get(iResourceId);
+    if (lock == null) {
+      lock=new CountableLock();
+      map.put(iResourceId,lock);
     }
- while (lock.status == LOCK_STATUS.WAITING && (iTimeout > 0 && time + iTimeout > System.currentTimeMillis()));
-    if (lock.status == LOCK_STATUS.WAITING) {
-      lock.status=LOCK_STATUS.EXPIRED;
-      throw new OLockException("Resource " + iResourceId + " is locked");
+    lock.countLocks++;
+  }
+  try {
+    if (iLockType == LOCK.SHARED)     lock.readLock().lock();
+ else     lock.writeLock().lock();
+  }
+ catch (  RuntimeException e) {
+synchronized (map) {
+      lock.countLocks--;
+      if (lock.countLocks == 0)       map.remove(iResourceId);
     }
+    throw e;
   }
 }

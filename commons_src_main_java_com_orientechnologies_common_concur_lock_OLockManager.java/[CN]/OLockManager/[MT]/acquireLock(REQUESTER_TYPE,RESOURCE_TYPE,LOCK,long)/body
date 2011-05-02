@@ -3,14 +3,29 @@
 synchronized (map) {
     lock=map.get(iResourceId);
     if (lock == null) {
-      lock=new CountableLock();
+      lock=new CountableLock(iTimeout > 0);
       map.put(iResourceId,lock);
     }
     lock.countLocks++;
   }
   try {
-    if (iLockType == LOCK.SHARED)     lock.readLock().lock();
- else     lock.writeLock().lock();
+    if (iTimeout <= 0) {
+      if (iLockType == LOCK.SHARED)       lock.readLock().lock();
+ else       lock.writeLock().lock();
+    }
+ else {
+      try {
+        if (iLockType == LOCK.SHARED) {
+          if (!lock.readLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Resource " + iResourceId + " is locked");
+        }
+ else {
+          if (!lock.writeLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Resource " + iResourceId + " is locked");
+        }
+      }
+ catch (      InterruptedException e) {
+        throw new OLockException("Thread interrupted while waiting for resource " + iResourceId);
+      }
+    }
   }
  catch (  RuntimeException e) {
 synchronized (map) {

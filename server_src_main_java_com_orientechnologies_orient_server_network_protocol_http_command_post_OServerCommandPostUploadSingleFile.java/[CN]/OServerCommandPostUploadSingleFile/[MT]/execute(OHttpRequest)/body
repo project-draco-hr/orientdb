@@ -7,12 +7,28 @@
   }
  else {
     database=getProfiledDatabaseInstance(iRequest);
-    buffer=new StringWriter();
-    writer=new OJSONWriter(buffer);
-    writer.beginObject();
-    parse(iRequest,new OHttpMultipartContentBaseParser(),new OHttpMultipartFileToRecordContentParser(),database);
-    saveRecord(iRequest);
-    sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_JSON,buffer.toString());
+    try {
+      buffer=new StringWriter();
+      writer=new OJSONWriter(buffer);
+      writer.beginObject();
+      parse(iRequest,new OHttpMultipartContentBaseParser(),new OHttpMultipartFileToRecordContentParser(),database);
+      saveRecord(iRequest);
+      writer.flush();
+      sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_JSON,buffer.toString());
+    }
+  finally {
+      if (database != null)       database.close();
+      database=null;
+      if (buffer != null)       buffer.close();
+      buffer=null;
+      if (writer != null)       writer.close();
+      writer=null;
+      fileDocument=null;
+      fileName=null;
+      fileType=null;
+      if (fileRID != null)       fileRID.reset();
+      fileRID=null;
+    }
   }
   return false;
 }

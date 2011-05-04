@@ -229,7 +229,6 @@ final ORecordId rid=channel.readRID();
 long newVersion=connection.rawDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
 if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().getSchema().reload();
  else if (connection.database.getMetadata().getIndexManager().getDocument().getIdentity().equals(rid)) connection.database.getMetadata().getIndexManager().reload();
- else if (((ODictionaryLocal<?>)connection.database.getDictionary()).getTree().getRecord().getIdentity().equals(rid)) ((ODictionaryLocal<?>)connection.database.getDictionary()).load();
 sendOk(lastClientTxId);
 channel.writeInt((int)newVersion);
 break;
@@ -334,54 +333,6 @@ ORecordSerializerStringAbstract.fieldTypeToString(value,connection.database,OTyp
 channel.writeString(value.toString());
 }
 }
-break;
-}
-case OChannelBinaryProtocol.REQUEST_INDEX_LOOKUP:
-{
-data.commandInfo="Index lookup";
-final String key=channel.readString();
-ORecordAbstract<?> value=(ORecordAbstract<?>)connection.database.getDictionary().get(key);
-if (value != null) value=((ODatabaseRecordTx)connection.database.getUnderlying()).load(value);
-sendOk(lastClientTxId);
-writeRecord(value);
-break;
-}
-case OChannelBinaryProtocol.REQUEST_INDEX_PUT:
-{
-data.commandInfo="Index put";
-String key=channel.readString();
-ORecordInternal<?> value=ORecordFactory.newInstance(channel.readByte());
-final ORecordId rid=channel.readRID();
-value.setIdentity(rid);
-value.setDatabase(connection.database);
-value=connection.database.getDictionary().putRecord(key,value);
-if (value != null) ((ODatabaseRecordTx)connection.database.getUnderlying()).load(value);
-sendOk(lastClientTxId);
-writeRecord(value);
-break;
-}
-case OChannelBinaryProtocol.REQUEST_INDEX_REMOVE:
-{
-data.commandInfo="Index remove";
-final String key=channel.readString();
-final ORecordInternal<?> value=connection.database.getDictionary().remove(key);
-if (value != null) ((ODatabaseRecordTx)connection.database.getUnderlying()).load(value);
-sendOk(lastClientTxId);
-writeRecord(value);
-break;
-}
-case OChannelBinaryProtocol.REQUEST_INDEX_SIZE:
-{
-data.commandInfo="Index size";
-sendOk(lastClientTxId);
-channel.writeInt(connection.database.getDictionary().size());
-break;
-}
-case OChannelBinaryProtocol.REQUEST_INDEX_KEYS:
-{
-data.commandInfo="Index keys";
-sendOk(lastClientTxId);
-channel.writeCollectionString(connection.database.getDictionary().keySet());
 break;
 }
 case OChannelBinaryProtocol.REQUEST_TX_COMMIT:

@@ -1,0 +1,43 @@
+{
+  final Object[] result=new Object[iExpectedWords];
+  for (int i=0; i < iExpectedWords; ++i) {
+    String[] words=nextValue(true);
+    if (words == null)     break;
+    if (words[0].length() > 0 && words[0].charAt(0) == OStringSerializerHelper.PARENTHESIS_BEGIN) {
+      braces++;
+      currentPos=currentPos - words[0].length() + 1;
+      OSQLFilterCondition subCondition=extractConditions(null);
+      if (!jumpWhiteSpaces() || text.charAt(currentPos) == ')')       braces--;
+      currentPos++;
+      result[i]=subCondition;
+    }
+ else     if (words[0].charAt(0) == OStringSerializerHelper.COLLECTION_BEGIN) {
+      currentPos=currentPos - words[0].length();
+      final List<String> stringItems=new ArrayList<String>();
+      currentPos=OStringSerializerHelper.getCollection(text,currentPos,stringItems);
+      final List<Object> coll=new ArrayList<Object>();
+      for (      String s : stringItems) {
+        coll.add(OSQLHelper.parseValue(this,database,this,s));
+      }
+      currentPos++;
+      result[i]=coll;
+    }
+ else     if (words[0].startsWith(OSQLFilterItemFieldAll.NAME + OStringSerializerHelper.PARENTHESIS_BEGIN)) {
+      result[i]=new OSQLFilterItemFieldAll(this,words[1]);
+    }
+ else     if (words[0].startsWith(OSQLFilterItemFieldAny.NAME + OStringSerializerHelper.PARENTHESIS_BEGIN)) {
+      result[i]=new OSQLFilterItemFieldAny(this,words[1]);
+    }
+ else {
+      if (words[0].equals("NOT")) {
+        String[] nextWord=nextValue(true);
+        if (nextWord != null && nextWord.length == 2) {
+          words[1]=words[1] + " " + nextWord[1];
+          if (words[1].endsWith(")"))           words[1]=words[1].substring(0,words[1].length() - 1);
+        }
+      }
+      result[i]=OSQLHelper.parseValue(this,database,this,words[1]);
+    }
+  }
+  return iExpectedWords == 1 ? result[0] : result;
+}

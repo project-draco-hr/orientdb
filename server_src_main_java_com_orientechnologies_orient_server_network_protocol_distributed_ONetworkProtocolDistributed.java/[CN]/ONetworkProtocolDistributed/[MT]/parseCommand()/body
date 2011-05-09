@@ -6,7 +6,10 @@ case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
 {
         data.commandInfo="Update record";
         final ORecordId rid=channel.readRID();
-        final long newVersion=connection.rawDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
+        final byte[] content=channel.readBytes();
+        final byte recordType=channel.readByte();
+        final int version=channel.readInt();
+        final long newVersion=connection.rawDatabase.save(rid,content,-1,recordType);
         if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid))         connection.database.getMetadata().getSchema().reload();
  else         if (connection.database.getMetadata().getIndexManager().getDocument().getIdentity().equals(rid))         connection.database.getMetadata().getIndexManager().reload();
         sendOk(lastClientTxId);
@@ -42,7 +45,7 @@ final String dbName=channel.readString();
 final String dbUser=channel.readString();
 final String dbPassword=channel.readString();
 final String remoteServerName=channel.readString();
-final boolean synchronousMode=channel.readByte() == 1;
+final boolean synchronousMode=recordType == 1;
 checkServerAccess("database.share");
 openDatabase(dbName,dbUser,dbPassword);
 final String engineName=connection.database.getStorage() instanceof OStorageLocal ? "local" : "memory";
@@ -85,7 +88,7 @@ break;
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
 {
 data.commandInfo="Update db configuration from server node leader";
-final ODocument config=(ODocument)new ODocument().fromStream(channel.readBytes());
+final ODocument config=(ODocument)new ODocument().fromStream(content);
 manager.getClusterConfiguration(connection.database.getName(),config);
 OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",config.toJSON("indent:2"));
 sendOk(lastClientTxId);

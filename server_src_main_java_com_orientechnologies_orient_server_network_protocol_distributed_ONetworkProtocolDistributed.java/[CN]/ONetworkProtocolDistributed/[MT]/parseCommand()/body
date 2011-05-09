@@ -1,9 +1,18 @@
 {
-  if (lastRequestType < 80) {
-    super.parseCommand();
-    return;
-  }
+  ODistributedRequesterThreadLocal.INSTANCE.set(channel.toString());
+  try {
 switch (lastRequestType) {
+case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
+{
+        data.commandInfo="Update record";
+        final ORecordId rid=channel.readRID();
+        final long newVersion=connection.rawDatabase.save(rid,channel.readBytes(),channel.readInt(),channel.readByte());
+        if (connection.database.getMetadata().getSchema().getDocument().getIdentity().equals(rid))         connection.database.getMetadata().getSchema().reload();
+ else         if (connection.database.getMetadata().getIndexManager().getDocument().getIdentity().equals(rid))         connection.database.getMetadata().getIndexManager().reload();
+        sendOk(lastClientTxId);
+        channel.writeInt((int)newVersion);
+        break;
+      }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
     data.commandInfo="Keep-alive";
   manager.updateHeartBeatTime();
@@ -84,5 +93,9 @@ break;
 }
 default :
 super.parseCommand();
+}
+}
+  finally {
+ODistributedRequesterThreadLocal.INSTANCE.remove();
 }
 }

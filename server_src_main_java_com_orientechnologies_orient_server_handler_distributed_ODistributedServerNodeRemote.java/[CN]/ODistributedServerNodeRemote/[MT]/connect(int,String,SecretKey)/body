@@ -12,20 +12,26 @@
   channel.readStatus();
   final List<OServerNodeDatabaseEntry> servers=new ArrayList<OServerNodeDatabaseEntry>(databases.values());
   for (  OServerNodeDatabaseEntry entry : servers) {
-    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN);
-    channel.writeInt(clientTxId);
-    channel.writeString(entry.databaseName);
-    channel.writeString(entry.userName);
-    channel.writeString(entry.userPassword);
-    channel.flush();
-    channel.readStatus();
-    entry.sessionId=channel.readInt();
-    final long version=channel.readLong();
-    if (version != entry.version) {
-      OLogManager.instance().warn(this,"Remote database '" + entry.databaseName + "' has different version than Leader node ("+ entry.version+ ") and remote ("+ version+ "). Removing database from shared list.");
-      databases.remove(entry.databaseName);
+    try {
+      channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN);
+      channel.writeInt(clientTxId);
+      channel.writeString(entry.databaseName);
+      channel.writeString(entry.userName);
+      channel.writeString(entry.userPassword);
+      channel.flush();
+      channel.readStatus();
+      entry.sessionId=channel.readInt();
+      final long version=channel.readLong();
+      if (version != entry.version) {
+        OLogManager.instance().warn(this,"Remote database '" + entry.databaseName + "' has different version than Leader node ("+ entry.version+ ") and remote ("+ version+ "). Removing database from shared list.");
+        databases.remove(entry.databaseName);
+      }
+ else       sendConfiguration(entry.databaseName);
     }
- else     sendConfiguration(entry.databaseName);
+ catch (    Exception e) {
+      databases.remove(entry.databaseName);
+      OLogManager.instance().warn(this,"Database '" + entry.databaseName + "' is not present on remote server. Removing database from shared list.");
+    }
   }
   if (status == STATUS.CONNECTING)   OLogManager.instance().info(this,"Server node %s:%d has joined the cluster",networkAddress,networkPort);
  else   OLogManager.instance().info(this,"Server node %s:%d has re-joined the cluster after %d secs",networkAddress,networkPort,(System.currentTimeMillis() - lastHeartBeat) / 1000);

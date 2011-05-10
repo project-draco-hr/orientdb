@@ -5,13 +5,14 @@
   if (rid == null)   throw new ODatabaseException("Can't create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   if (iRecord.getDatabase() == null)   iRecord.setDatabase(this);
   try {
+    boolean wasNew=rid.isNew();
     byte[] stream=iRecord.toStream();
     boolean isNew=rid.isNew();
     if (isNew)     iRecord.onBeforeIdentityChanged(rid);
  else     if (stream.length == 0)     return;
     if (isNew)     rid.clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
     if (stream != null && stream.length > 0) {
-      if (isNew) {
+      if (wasNew) {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,rid.clusterId);
         if (callbackHooks(TYPE.BEFORE_CREATE,iRecord))         stream=iRecord.toStream();
       }
@@ -28,13 +29,12 @@
     final long result=underlying.save(rid,stream,realVersion,iRecord.getRecordType());
     if (isNew) {
       iRecord.fill(iRecord.getDatabase(),rid,0,stream);
-      if (stream != null && stream.length > 0)       callbackHooks(TYPE.AFTER_CREATE,iRecord);
       iRecord.onAfterIdentityChanged(iRecord);
     }
  else {
       iRecord.fill(iRecord.getDatabase(),rid,(int)result,stream);
-      if (stream != null && stream.length > 0)       callbackHooks(TYPE.AFTER_UPDATE,iRecord);
     }
+    if (stream != null && stream.length > 0)     callbackHooks(wasNew ? TYPE.AFTER_CREATE : TYPE.AFTER_UPDATE,iRecord);
     if (stream != null && stream.length > 0)     iRecord.unsetDirty();
     if (isUseCache())     getLevel1Cache().updateRecord(iRecord);
   }

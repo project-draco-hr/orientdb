@@ -1,10 +1,27 @@
 {
   final OIndex index=database.getMetadata().getIndexManager().getIndex(compiledFilter.getTargetIndex());
   if (index == null)   throw new OCommandExecutionException("Target index '" + compiledFilter.getTargetIndex() + "' not found");
-  if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))   throw new OCommandExecutionException("'Key' field is required for queries against indexes");
-  final Object keyValue=compiledFilter.getRootCondition().getRight();
-  final Set<OIdentifiable> result=index.get(keyValue);
-  for (  OIdentifiable r : result) {
-    addResult((ORecord<?>)r);
+  if (compiledFilter.getRootCondition() != null) {
+    if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))     throw new OCommandExecutionException("'Key' field is required for queries against indexes");
+    final Object right=compiledFilter.getRootCondition().getRight();
+    Collection<OIdentifiable> result=null;
+    if (compiledFilter.getRootCondition().getOperator() instanceof OQueryOperatorBetween) {
+      final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
+      result=index.getBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
+    }
+ else     result=index.get(OSQLHelper.getValue(right));
+    if (result != null)     for (    OIdentifiable r : result) {
+      addResult((ORecord<?>)r);
+    }
+  }
+ else {
+    if (anyFunctionAggregates) {
+      for (      Entry<String,Object> projection : projections.entrySet()) {
+        if (projection.getValue() instanceof OSQLFunctionRuntime) {
+          final OSQLFunctionRuntime f=(OSQLFunctionRuntime)projection.getValue();
+          f.setResult(index.getSize());
+        }
+      }
+    }
   }
 }

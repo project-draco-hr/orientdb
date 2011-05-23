@@ -1,13 +1,25 @@
 {
   if (fieldNames == null)   throw new OCommandExecutionException("Can't execute the command because it hasn't been parsed yet");
-  ODocument doc=className != null ? new ODocument(database,className) : new ODocument(database);
-  Object v;
-  for (int i=0; i < fieldNames.size(); ++i) {
-    v=fieldValues[i];
-    if (v instanceof OSQLFilterItem)     v=((OSQLFilterItem)v).getValue(doc);
-    doc.field(fieldNames.get(i),v);
+  if (indexName != null) {
+    final OIndex index=database.getMetadata().getIndexManager().getIndex(indexName);
+    if (index == null)     throw new OCommandExecutionException("Target index '" + indexName + "' not found");
+    Object key=null;
+    OIdentifiable value=null;
+    for (int i=0; i < fieldNames.size(); ++i) {
+      final String fieldName=fieldNames.get(i);
+      if (fieldName.equalsIgnoreCase("KEY"))       key=fieldValues[i];
+ else       if (fieldName.equalsIgnoreCase("VALUE"))       value=(OIdentifiable)fieldValues[i];
+    }
+    index.put(key,value);
+    return null;
   }
-  if (clusterName != null)   doc.save(clusterName);
- else   doc.save();
-  return doc;
+ else {
+    ODocument doc=className != null ? new ODocument(database,className) : new ODocument(database);
+    for (int i=0; i < fieldNames.size(); ++i) {
+      doc.field(fieldNames.get(i),OSQLHelper.getValue(fieldValues[i],doc));
+    }
+    if (clusterName != null)     doc.save(clusterName);
+ else     doc.save();
+    return doc;
+  }
 }

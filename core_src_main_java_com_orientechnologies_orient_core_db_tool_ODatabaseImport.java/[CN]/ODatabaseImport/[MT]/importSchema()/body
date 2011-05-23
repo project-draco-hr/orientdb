@@ -9,7 +9,7 @@
   int classDefClusterId;
   String classClusterIds;
   String classSuper=null;
-  OClass cls;
+  OClassImpl cls;
   try {
     do {
       jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
@@ -17,11 +17,11 @@
       classId=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"id\"").readInteger(OJSONReader.COMMA_SEPARATOR);
       classDefClusterId=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"default-cluster-id\"").readInteger(OJSONReader.COMMA_SEPARATOR);
       classClusterIds=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"cluster-ids\"").readString(OJSONReader.NEXT_IN_OBJECT).trim();
-      cls=database.getMetadata().getSchema().getClass(className);
+      cls=(OClassImpl)database.getMetadata().getSchema().getClass(className);
       if (cls != null) {
         if (cls.getDefaultClusterId() != classDefClusterId)         cls.setDefaultClusterId(classDefClusterId);
       }
- else       cls=database.getMetadata().getSchema().createClass(className,classDefClusterId);
+ else       cls=(OClassImpl)database.getMetadata().getSchema().createClass(className,classDefClusterId);
       if (classId != cls.getId())       throw new OSchemaException("Imported class '" + className + "' has id="+ cls.getId()+ " different from the original: "+ classId);
       if (classClusterIds != null) {
         classClusterIds=classClusterIds.substring(1,classClusterIds.length() - 1);
@@ -55,12 +55,11 @@
     }
  while (jsonReader.lastChar() == ',');
     for (    Map.Entry<OClass,String> entry : superClasses.entrySet()) {
-      entry.getKey().setSuperClass(database.getMetadata().getSchema().getClass(entry.getValue()));
+      ((OClassImpl)entry.getKey()).setSuperClass(database.getMetadata().getSchema().getClass(entry.getValue()));
     }
-    for (    Map.Entry<OProperty,String> entry : linkedClasses.entrySet()) {
+    for (    Map.Entry<OPropertyImpl,String> entry : linkedClasses.entrySet()) {
       entry.getKey().setLinkedClass(database.getMetadata().getSchema().getClass(entry.getValue()));
     }
-    database.getMetadata().getSchema().save();
     listener.onMessage("OK (" + classImported + " classes)");
     jsonReader.readNext(OJSONReader.END_OBJECT);
     jsonReader.readNext(OJSONReader.COMMA_SEPARATOR);

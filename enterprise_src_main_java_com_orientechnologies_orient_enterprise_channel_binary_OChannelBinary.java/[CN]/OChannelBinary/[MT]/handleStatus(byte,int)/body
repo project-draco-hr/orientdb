@@ -3,22 +3,21 @@
   }
  else   if (iResult == OChannelBinaryProtocol.RESPONSE_STATUS_ERROR) {
     StringBuilder buffer=new StringBuilder();
-    String rootClassName=null;
+    final List<OPair<String,String>> exceptions=new ArrayList<OPair<String,String>>();
     while (readByte() == 1) {
       final String excClassName=readString();
       final String excMessage=readString();
-      if (rootClassName == null)       rootClassName=excClassName;
- else {
-        buffer.append("\n-> ");
-        buffer.append(excClassName);
-        buffer.append(": ");
-      }
-      buffer.append(excMessage);
+      exceptions.add(new OPair<String,String>(excClassName,excMessage));
     }
-    if (rootClassName != null)     throw createException(rootClassName,buffer.toString());
- else {
-      throw new ONetworkProtocolException("Network response error: " + buffer.toString());
+    Exception previous=null;
+    for (int i=exceptions.size() - 1; i > -1; --i) {
+      previous=createException(exceptions.get(i).getKey(),exceptions.get(i).getValue(),previous);
     }
+    if (previous != null) {
+      if (previous instanceof RuntimeException)       throw (RuntimeException)previous;
+ else       throw new ODatabaseException("Generic error, see the underlying cause",previous);
+    }
+ else     throw new ONetworkProtocolException("Network response error: " + buffer.toString());
   }
  else {
     throw new ONetworkProtocolException("Error on reading response from the server");

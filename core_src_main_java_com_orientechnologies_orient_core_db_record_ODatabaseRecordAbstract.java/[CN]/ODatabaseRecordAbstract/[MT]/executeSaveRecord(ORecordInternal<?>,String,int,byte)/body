@@ -10,7 +10,7 @@
     boolean isNew=rid.isNew();
     if (isNew)     iRecord.onBeforeIdentityChanged(rid);
  else     if (stream.length == 0)     return;
-    if (isNew)     rid.clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
+    if (isNew && rid.clusterId < 0)     rid.clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
     if (stream != null && stream.length > 0) {
       if (wasNew) {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName,rid.clusterId);
@@ -25,7 +25,7 @@
         return;
       }
     }
-    final int realVersion=iVersion == -1 ? -1 : iRecord.getVersion();
+    final int realVersion=iVersion == -1 || !mvcc ? -1 : iRecord.getVersion();
     final long result=underlying.save(rid,stream,realVersion,iRecord.getRecordType());
     if (isNew) {
       iRecord.fill(iRecord.getDatabase(),rid,0,stream);
@@ -38,10 +38,7 @@
     if (stream != null && stream.length > 0)     iRecord.unsetDirty();
     if (isUseCache())     getLevel1Cache().updateRecord(iRecord);
   }
- catch (  ODatabaseException e) {
-    throw e;
-  }
-catch (  OConcurrentModificationException e) {
+ catch (  OException e) {
     throw e;
   }
 catch (  Throwable t) {

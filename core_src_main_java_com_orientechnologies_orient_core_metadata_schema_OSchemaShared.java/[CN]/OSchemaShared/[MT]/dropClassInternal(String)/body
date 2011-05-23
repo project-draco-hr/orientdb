@@ -1,0 +1,18 @@
+{
+  getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_DELETE);
+  final String key=iClassName.toLowerCase();
+  lock.acquireExclusiveLock();
+  try {
+    final OClass cls=classes.get(key);
+    if (cls == null)     throw new OSchemaException("Class " + iClassName + " was not found in current database");
+    if (cls.getBaseClasses() != null)     throw new OSchemaException("Class " + iClassName + " can't be dropped since has sub classes. Remove the dependencies before to drop it again");
+    if (cls.getSuperClass() != null) {
+      ((OClassImpl)cls.getSuperClass()).baseClasses.remove(cls);
+    }
+    classes.remove(key);
+    saveInternal();
+  }
+  finally {
+    lock.releaseExclusiveLock();
+  }
+}

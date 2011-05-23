@@ -21,7 +21,7 @@
         if (asynch) {
           byte status;
           while ((status=network.readByte()) > 0) {
-            ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readRecordFromNetwork(network,iCommand.getDatabase());
+            ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readIdentifiable(network,iCommand.getDatabase());
             if (record == null)             break;
 switch (status) {
 case 1:
@@ -36,7 +36,7 @@ case 1:
               }
             break;
 case 2:
-          iCommand.getDatabase().getLevel1Cache().pushRecord(record);
+          iCommand.getDatabase().getLevel2Cache().pushRecord(record);
       }
     }
   }
@@ -47,13 +47,13 @@ case 'n':
       result=null;
     break;
 case 'r':
-  result=readRecordFromNetwork(network,iCommand.getDatabase());
+  result=readIdentifiable(network,iCommand.getDatabase());
 break;
 case 'l':
 final int tot=network.readInt();
 final Collection<OIdentifiable> list=new ArrayList<OIdentifiable>();
 for (int i=0; i < tot; ++i) {
-list.add(readRecordFromNetwork(network,iCommand.getDatabase()));
+list.add(readIdentifiable(network,iCommand.getDatabase()));
 }
 result=list;
 break;
@@ -69,7 +69,10 @@ break;
 endResponse(network);
 }
 }
- catch (Exception e) {
+ catch (OException e) {
+throw e;
+}
+catch (Exception e) {
 handleException("Error on executing command: " + iCommand,e);
 }
  finally {

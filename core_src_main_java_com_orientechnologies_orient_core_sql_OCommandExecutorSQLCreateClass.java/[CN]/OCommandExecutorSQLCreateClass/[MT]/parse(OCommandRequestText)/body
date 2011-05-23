@@ -5,11 +5,35 @@
   int oldPos=0;
   int pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
   if (pos == -1 || !word.toString().equals(KEYWORD_CREATE))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_CREATE + " not found",text,oldPos);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
   if (pos == -1 || !word.toString().equals(KEYWORD_CLASS))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_CLASS + " not found",text,oldPos);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
-  if (pos == -1)   throw new OCommandSQLParsingException("Expected <class>",text,pos);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,false);
+  if (pos == -1)   throw new OCommandSQLParsingException("Expected <class>",text,oldPos);
   className=word.toString();
-  if (className == null)   throw new OCommandSQLParsingException("Class " + className + " already exists",text,pos);
+  if (className == null)   throw new OCommandSQLParsingException("Class " + className + " already exists",text,oldPos);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
+  if (pos > -1) {
+    if (word.toString().equals(KEYWORD_EXTENDS)) {
+      oldPos=pos;
+      pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,false);
+      if (pos == -1)       throw new OCommandSQLParsingException("Syntax error after EXTENDS for class " + className + ". Expected the super-class name ",text,oldPos);
+      if (!database.getMetadata().getSchema().existsClass(word.toString()))       throw new OCommandSQLParsingException("Super-class " + word + " not exists",text,oldPos);
+      superClass=database.getMetadata().getSchema().getClass(word.toString());
+      oldPos=pos;
+      pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,false);
+    }
+    if (pos > -1) {
+      final String[] clusterIdsAsStrings=word.toString().split(",");
+      if (clusterIdsAsStrings.length > 0) {
+        clusterIds=new int[clusterIdsAsStrings.length];
+        for (int i=0; i < clusterIdsAsStrings.length; ++i) {
+          clusterIds[i]=Integer.parseInt(clusterIdsAsStrings[i]);
+        }
+      }
+    }
+  }
   return this;
 }

@@ -2,23 +2,18 @@
   iRequest.data.commandInfo="Get static content";
   iRequest.data.commandDetail=iRequest.url;
   if (wwwPath == null)   wwwPath=iRequest.configuration.getValueAsString("orientdb.www.path","src/site");
-  if (cache == null && OGlobalConfiguration.SERVER_CACHE_FILE_STATIC.getValueAsBoolean())   cache=new HashMap<String,OStaticContentCachedEntry>();
+  if (cacheContents == null && OGlobalConfiguration.SERVER_CACHE_FILE_STATIC.getValueAsBoolean())   cacheContents=new HashMap<String,OStaticContentCachedEntry>();
   InputStream is=null;
   long contentSize=0;
   String type=null;
   try {
-    String url;
-    if (OHttpUtils.URL_SEPARATOR.equals(iRequest.url))     url="/www/index.htm";
- else {
-      int pos=iRequest.url.indexOf('?');
-      if (pos > -1)       url=iRequest.url.substring(0,pos);
- else       url=iRequest.url;
-    }
-    if (url.startsWith("/www"))     url=wwwPath + url.substring("/www".length(),url.length());
- else     url=wwwPath + url;
-    if (cache != null) {
-synchronized (cache) {
-        final OStaticContentCachedEntry cachedEntry=cache.get(url);
+    final String url=getResource(iRequest);
+    String filePath;
+    if (url.startsWith("/www"))     filePath=wwwPath + url.substring("/www".length(),url.length());
+ else     filePath=wwwPath + url;
+    if (cacheContents != null) {
+synchronized (cacheContents) {
+        final OStaticContentCachedEntry cachedEntry=cacheContents.get(filePath);
         if (cachedEntry != null) {
           is=new ByteArrayInputStream(cachedEntry.content);
           contentSize=cachedEntry.size;
@@ -27,18 +22,18 @@ synchronized (cache) {
       }
     }
     if (is == null) {
-      File inputFile=new File(url);
+      File inputFile=new File(filePath);
       if (!inputFile.exists()) {
-        OLogManager.instance().debug(this,"Static resource not found: %s",url);
+        OLogManager.instance().debug(this,"Static resource not found: %s",filePath);
         sendBinaryContent(iRequest,404,"File not found",null,null,0);
         return false;
       }
       if (inputFile.isDirectory()) {
-        inputFile=new File(url + "/index.htm");
-        if (inputFile.exists())         url=url + "/index.htm";
+        inputFile=new File(filePath + "/index.htm");
+        if (inputFile.exists())         filePath=url + "/index.htm";
  else {
           inputFile=new File(url + "/index.html");
-          if (inputFile.exists())           url=url + "/index.html";
+          if (inputFile.exists())           filePath=url + "/index.html";
         }
       }
       if (url.endsWith(".htm") || url.endsWith(".html"))       type="text/html";
@@ -48,14 +43,14 @@ synchronized (cache) {
  else       if (url.endsWith(".css"))       type="text/css";
       is=new BufferedInputStream(new FileInputStream(inputFile));
       contentSize=inputFile.length();
-      if (cache != null) {
+      if (cacheContents != null) {
         final byte[] buffer=new byte[(int)contentSize];
         for (int i=0; i < contentSize; ++i)         buffer[i]=(byte)is.read();
         OStaticContentCachedEntry cachedEntry=new OStaticContentCachedEntry();
         cachedEntry.content=buffer;
         cachedEntry.size=contentSize;
         cachedEntry.type=type;
-        cache.put(url,cachedEntry);
+        cacheContents.put(url,cachedEntry);
         is=new ByteArrayInputStream(cachedEntry.content);
       }
     }

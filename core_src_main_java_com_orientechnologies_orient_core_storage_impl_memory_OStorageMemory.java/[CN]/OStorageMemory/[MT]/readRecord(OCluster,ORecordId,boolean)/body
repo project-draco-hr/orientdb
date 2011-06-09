@@ -2,9 +2,15 @@
   final long timer=OProfiler.getInstance().startChrono();
   final boolean locked=lock.acquireSharedLock();
   try {
-    final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
-    if (ppos == null)     return null;
-    return new ORawBuffer(data.readRecord(ppos.dataPosition),ppos.version,ppos.type);
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.SHARED);
+    try {
+      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
+      if (ppos == null)       return null;
+      return new ORawBuffer(data.readRecord(ppos.dataPosition),ppos.version,ppos.type);
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.SHARED);
+    }
   }
  catch (  IOException e) {
     throw new OStorageException("Error on read record in cluster: " + iClusterSegment.getId(),e);

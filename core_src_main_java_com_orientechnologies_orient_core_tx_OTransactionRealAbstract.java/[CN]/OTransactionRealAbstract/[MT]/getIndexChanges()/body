@@ -1,0 +1,27 @@
+{
+  final StringBuilder value=new StringBuilder();
+  final ODocument doc=new ODocument();
+  for (  Entry<String,OTransactionIndexChanges> indexEntry : indexEntries.entrySet()) {
+    final List<ODocument> indexDocs=new ArrayList<ODocument>();
+    doc.field(indexEntry.getKey(),indexDocs);
+    if (indexEntry.getValue().cleared)     doc.field("clear",Boolean.TRUE);
+    for (    OTransactionIndexChangesPerKey entry : indexEntry.getValue().changesPerKey.values()) {
+      final ODocument indexDoc=new ODocument();
+      value.setLength(0);
+      ORecordSerializerStringAbstract.fieldTypeToString(value,null,OType.getTypeByClass(entry.key.getClass()),entry.key);
+      final String key=value.toString();
+      if (entry.entries != null && !entry.entries.isEmpty()) {
+        indexDoc.field("k",key);
+        for (        OTransactionIndexEntry e : entry.entries) {
+          final ODocument changeDoc=new ODocument();
+          changeDoc.field("o",e.operation.ordinal());
+          value.setLength(0);
+          ORecordSerializerStringAbstract.fieldTypeToString(value,null,OType.getTypeByClass(e.value.getClass()),e.value);
+          changeDoc.field("v",value.toString());
+        }
+      }
+      indexDocs.add(indexDoc);
+    }
+  }
+  return doc;
+}

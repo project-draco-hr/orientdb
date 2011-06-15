@@ -2,13 +2,20 @@
   if (iDocument == null)   return;
   acquireExclusiveLock();
   try {
-    if ((Boolean)iDocument.field("clear"))     clear();
-    for (    Entry<String,Object> entry : iDocument) {
+    final Boolean clearAll=(Boolean)iDocument.field("clear");
+    if (clearAll != null && clearAll)     clear();
+    final ODocument entries=iDocument.field("entries");
+    for (    Entry<String,Object> entry : entries) {
       final Object key=entry.getKey();
-      final int operation=(Integer)((ODocument)entry.getValue()).field("o");
-      final OIdentifiable value=((ODocument)entry.getValue()).field("v");
-      if (operation == OPERATION.PUT.ordinal())       put(key,value);
- else       if (operation == OPERATION.REMOVE.ordinal())       remove(key,value);
+      final List<ODocument> operations=(List<ODocument>)entry.getValue();
+      if (operations != null) {
+        for (        ODocument op : operations) {
+          final int operation=(Integer)op.rawField("o");
+          final OIdentifiable value=op.field("v");
+          if (operation == OPERATION.PUT.ordinal())           put(key,value);
+ else           if (operation == OPERATION.REMOVE.ordinal())           remove(key,value);
+        }
+      }
     }
   }
   finally {

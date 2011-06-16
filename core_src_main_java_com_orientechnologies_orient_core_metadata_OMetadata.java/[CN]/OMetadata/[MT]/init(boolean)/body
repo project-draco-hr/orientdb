@@ -1,0 +1,28 @@
+{
+  schemaClusterId=database.getClusterIdByName(OStorage.CLUSTER_INTERNAL_NAME);
+  indexManager=new OIndexManagerProxy(database.getStorage().getResource(OIndexManager.class.getSimpleName(),new Callable<OIndexManager>(){
+    public OIndexManager call(){
+      if (database.getStorage() instanceof OStorageEmbedded)       return new OIndexManagerShared(database);
+ else       return new OIndexManagerRemote(database);
+    }
+  }
+),database);
+  schema=new OSchemaProxy(database.getStorage().getResource(OSchema.class.getSimpleName(),new Callable<OSchemaShared>(){
+    public OSchemaShared call(){
+      final OSchemaShared instance=new OSchemaShared(schemaClusterId);
+      if (iLoad)       instance.load();
+      return instance;
+    }
+  }
+),database);
+  Boolean enableSecurity=(Boolean)database.getProperty(ODatabase.OPTIONS.SECURITY.toString());
+  if (enableSecurity != null && !enableSecurity)   security=new OSecurityNull();
+ else   security=new OSecurityProxy(database.getStorage().getResource(OSecurity.class.getSimpleName(),new Callable<OSecurityShared>(){
+    public OSecurityShared call(){
+      final OSecurityShared instance=new OSecurityShared();
+      if (iLoad)       instance.load();
+      return instance;
+    }
+  }
+),database);
+}

@@ -1,13 +1,18 @@
 {
-  String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: command/<database>/sql/[<command-text>]");
+  final String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: command/<database>/<language>/<command-text>[/limit]");
+  final String language=urlParts.length > 2 ? urlParts[2].trim() : "sql";
   final String text=urlParts.length > 3 ? urlParts[3].trim() : iRequest.content;
+  final int limit=urlParts.length > 4 ? Integer.parseInt(urlParts[4].trim()) : -1;
   iRequest.data.commandInfo="Command";
   iRequest.data.commandDetail=text;
   ODatabaseDocumentTx db=null;
   final Object response;
   try {
     db=getProfiledDatabaseInstance(iRequest);
-    response=db.command(new OCommandSQL(text)).execute();
+    final OCommandRequestText cmd=(OCommandRequestText)OCommandManager.instance().getRequester(language);
+    cmd.setText(text);
+    cmd.setLimit(limit);
+    response=db.command(cmd).execute();
   }
   finally {
     if (db != null)     OSharedDocumentDatabase.release(db);

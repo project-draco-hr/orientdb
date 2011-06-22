@@ -1,0 +1,32 @@
+{
+  byte status;
+  byte operation;
+  int txId;
+  long oldDataOffset;
+  int offset;
+  OPhysicalPosition ppos=new OPhysicalPosition();
+  int size=(file.getFilledUpTo() / RECORD_SIZE);
+  int recordsRecovered=0;
+  final ORecordId rid=new ORecordId();
+  for (int i=0; i < size; ++i) {
+    offset=i * RECORD_SIZE;
+    status=file.readByte(offset);
+    offset+=OConstants.SIZE_BYTE;
+    if (status != STATUS_FREE) {
+      operation=file.readByte(offset);
+      offset+=OConstants.SIZE_BYTE;
+      txId=file.readInt(offset);
+      if (txId == iTxId) {
+        offset+=OConstants.SIZE_INT;
+        rid.clusterId=file.readShort(offset);
+        offset+=OConstants.SIZE_SHORT;
+        rid.clusterPosition=file.readLong(offset);
+        offset+=OConstants.SIZE_LONG;
+        oldDataOffset=file.readLong(offset);
+        recordsRecovered++;
+        file.writeByte(i * RECORD_SIZE + OConstants.SIZE_SHORT + OConstants.SIZE_INT,STATUS_FREE);
+      }
+    }
+  }
+  return recordsRecovered;
+}

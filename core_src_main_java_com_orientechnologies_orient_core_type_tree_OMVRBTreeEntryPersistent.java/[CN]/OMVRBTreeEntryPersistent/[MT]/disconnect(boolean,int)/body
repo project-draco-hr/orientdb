@@ -1,33 +1,12 @@
 {
   if (record == null)   return 1;
-  if (this == tree.getRoot() || record.isDirty() && !iForceDirty)   return 0;
-  boolean isEntryPoint=false;
-  for (  OMVRBTreeEntryPersistent<K,V> entryPoint : pTree.entryPoints) {
-    if (entryPoint == this) {
-      isEntryPoint=true;
-      break;
-    }
-  }
   int totalDisconnected=0;
-  if (!isEntryPoint) {
-    if (pTree.cache.remove(record.getIdentity()) == null)     OLogManager.instance().debug(this,"Can't find current node into the cache. Is the cache invalid?");
-    totalDisconnected=1;
-    if (tree.isDebug()) {
-      final StringBuilder spaces=new StringBuilder();
-      for (int i=0; i < iLevel + 3; ++i)       spaces.append(" ");
-      System.out.printf("\n%sDisconnected tree node %s with parent %s, left %s, right %s (%s)...",spaces,this,parentRid,leftRid,rightRid,System.identityHashCode(this));
+  if ((!record.isDirty() || iForceDirty)) {
+    if (!pTree.isEntryPoint(this)) {
+      if (pTree.cache.remove(record.getIdentity()) == null)       OLogManager.instance().debug(this,"Can't find current node into the cache. Is the cache invalid?");
+      totalDisconnected=1;
+      clear();
     }
-    keys=null;
-    if (inStream != null) {
-      inStream.close();
-      values=null;
-      inStream=null;
-    }
-    serializedKeys=null;
-    serializedValues=null;
-    pTree=null;
-    record=null;
-    size=0;
   }
   if (parent != null) {
     if (parent.left == this) {
@@ -37,21 +16,20 @@
       parent.right=null;
     }
  else     OLogManager.instance().warn(this,"Current node's parent doesn't link it correctly");
+    totalDisconnected+=parent.disconnect(iForceDirty,iLevel + 1);
     parent=null;
   }
   if (left != null) {
-    int disconnected=left.disconnect(iForceDirty,iLevel + 1);
-    if (disconnected > 0) {
-      totalDisconnected+=disconnected;
-      left=null;
-    }
+    if (left.parent == this)     left.parent=null;
+ else     OLogManager.instance().warn(this,"Current node's right doesn't link it correctly");
+    totalDisconnected+=left.disconnect(iForceDirty,iLevel + 1);
+    left=null;
   }
   if (right != null) {
-    int disconnected=right.disconnect(iForceDirty,iLevel + 1);
-    if (disconnected > 0) {
-      totalDisconnected+=disconnected;
-      right=null;
-    }
+    if (right.parent == this)     right.parent=null;
+ else     OLogManager.instance().warn(this,"Current node's left doesn't link it correctly");
+    totalDisconnected+=right.disconnect(iForceDirty,iLevel + 1);
+    right=null;
   }
   return totalDisconnected;
 }

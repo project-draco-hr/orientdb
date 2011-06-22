@@ -66,18 +66,28 @@
       }
  else       if (cmp == 0)       break;
     }
-    entryPoints.clear();
-    entryPoints=newEntryPoints;
-    if (debug) {
-      System.out.printf("\nEntrypoints (%d): ",entryPoints.size());
-      for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
-        if (debug)         System.out.printf(entryPoint.record.getIdentity() + " ");
+    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
+      if (entryPoint.parent == null && entryPoint.left == null && entryPoint.right == null && entryPoint != root) {
+        boolean found=false;
+        for (        OMVRBTreeEntryPersistent<K,V> e : newEntryPoints) {
+          if (e == entryPoint) {
+            found=true;
+            break;
+          }
+        }
+        if (!found) {
+          cache.remove(entryPoint.record.getIdentity());
+          entryPoint.clear();
+        }
       }
     }
+    final List<OMVRBTreeEntryPersistent<K,V>> oldEntryPoints=entryPoints;
+    entryPoints=newEntryPoints;
     int totalDisconnected=0;
-    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
+    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : oldEntryPoints) {
       totalDisconnected+=entryPoint.disconnectLinked(false);
     }
+    oldEntryPoints.clear();
     if (isRuntimeCheckEnabled()) {
       for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
       if (OLogManager.instance().isDebugEnabled()) {

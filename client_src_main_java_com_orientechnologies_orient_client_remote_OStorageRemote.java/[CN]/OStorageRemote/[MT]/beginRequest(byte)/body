@@ -1,16 +1,22 @@
 {
   OChannelBinaryClient network=null;
-  lock.acquireSharedLock();
-  try {
+  if (debug)   System.out.println("-> req: " + getSessionId());
+synchronized (this) {
     while (network == null) {
-      if (networkPoolCursor >= networkPool.size())       networkPoolCursor=0;
       network=networkPool.get(networkPoolCursor);
       if (network.getLockWrite().tryLock())       break;
+      network=null;
       networkPoolCursor++;
+      if (networkPoolCursor >= networkPool.size()) {
+        networkPoolCursor=0;
+        if (debug)         System.out.println("-> req (waiting) : " + getSessionId());
+        try {
+          wait(1000);
+        }
+ catch (        InterruptedException e) {
+        }
+      }
     }
-  }
-  finally {
-    lock.releaseSharedLock();
   }
   network.writeByte(iCommand);
   network.writeInt(getSessionId());

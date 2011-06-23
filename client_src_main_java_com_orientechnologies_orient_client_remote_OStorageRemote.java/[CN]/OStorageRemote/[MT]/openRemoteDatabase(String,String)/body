@@ -1,16 +1,18 @@
 {
   createConnectionPool();
-  final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_OPEN);
+  OChannelBinaryClient network=null;
   try {
+    network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_OPEN);
     network.writeString(name).writeString(iUserName).writeString(iUserPassword);
   }
   finally {
     endRequest(network);
   }
+  final int sessionId;
   try {
     beginResponse(network);
-    final int sessionId=network.readInt();
-    setSessionId(sessionId);
+    sessionId=network.readInt();
+    if (debug)     System.out.println("new sess: " + sessionId);
     OLogManager.instance().debug(null,"Client connected with session id: " + sessionId);
     int tot=network.readInt();
     String clusterName;
@@ -24,6 +26,7 @@
   finally {
     endResponse(network);
   }
+  setSessionId(sessionId);
   defaultClusterId=clustersIds.get(OStorage.CLUSTER_DEFAULT_NAME);
   open=true;
 }

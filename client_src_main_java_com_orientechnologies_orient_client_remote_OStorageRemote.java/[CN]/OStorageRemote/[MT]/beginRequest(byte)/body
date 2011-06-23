@@ -1,19 +1,32 @@
 {
   OChannelBinaryClient network=null;
   if (debug)   System.out.println("-> req: " + getSessionId());
-synchronized (this) {
+synchronized (networkPool) {
+    final int beginCursor=networkPoolCursor;
     while (network == null) {
       network=networkPool.get(networkPoolCursor);
       if (network.getLockWrite().tryLock())       break;
       network=null;
       networkPoolCursor++;
-      if (networkPoolCursor >= networkPool.size()) {
-        networkPoolCursor=0;
-        if (debug)         System.out.println("-> req (waiting) : " + getSessionId());
-        try {
-          wait(1000);
+      if (networkPoolCursor >= networkPool.size())       networkPoolCursor=0;
+      if (networkPoolCursor == beginCursor) {
+        if (networkPool.size() < maxPool) {
+          network=createNetworkConnection();
+          network.getLockWrite().lock();
+          networkPool.add(network);
+          System.out.println("Created new connection " + networkPool.size());
         }
- catch (        InterruptedException e) {
+ else {
+          if (debug)           System.out.println("-> req (waiting) : " + getSessionId());
+          final long startToWait=System.currentTimeMillis();
+          try {
+            networkPool.wait(5000);
+          }
+ catch (          InterruptedException e) {
+            OProfiler.getInstance().updateCounter("network.connectionPool.timeout",+1);
+          }
+          final long elapsed=OProfiler.getInstance().stopChrono("network.connectionPool.waitingTime",startToWait);
+          if (debug)           System.out.println("Waiting for connection = elapsed: " + elapsed);
         }
       }
     }

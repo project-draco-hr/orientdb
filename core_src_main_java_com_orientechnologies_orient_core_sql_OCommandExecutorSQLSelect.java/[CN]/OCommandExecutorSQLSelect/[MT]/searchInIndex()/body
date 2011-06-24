@@ -8,11 +8,18 @@
     Collection<OIdentifiable> result=null;
     if (compiledFilter.getRootCondition().getOperator() instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
-      result=index.getBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
+      if (projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
+        result=index.getValuesBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
+        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+      }
+ else {
+        final Collection<ODocument> entries=index.getEntriesBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
+        for (        OIdentifiable r : entries)         addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
+      }
     }
- else     result=index.get(keyValue);
-    if (result != null)     for (    OIdentifiable r : result) {
-      addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
+ else {
+      result=index.get(keyValue);
+      for (      OIdentifiable r : result)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
     }
   }
  else {

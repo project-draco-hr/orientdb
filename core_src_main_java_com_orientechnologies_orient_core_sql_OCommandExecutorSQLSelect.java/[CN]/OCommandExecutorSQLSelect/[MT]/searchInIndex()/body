@@ -4,19 +4,21 @@
   if (compiledFilter.getRootCondition() != null) {
     if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))     throw new OCommandExecutionException("'Key' field is required for queries against indexes");
     final Object right=compiledFilter.getRootCondition().getRight();
+    final Object keyValue=OSQLHelper.getValue(right);
     Collection<OIdentifiable> result=null;
     if (compiledFilter.getRootCondition().getOperator() instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
       result=index.getBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
     }
- else     result=index.get(OSQLHelper.getValue(right));
+ else     result=index.get(keyValue);
     if (result != null)     for (    OIdentifiable r : result) {
-      addResult((ORecord<?>)r);
+      addResult(createIndexEntryAsDocument(keyValue,r));
     }
   }
  else {
     for (Iterator<Entry<Object,Set<OIdentifiable>>> it=index.iterator(); it.hasNext(); ) {
-      for (Iterator<OIdentifiable> collIt=((ORecordLazySet)it.next().getValue()).rawIterator(); collIt.hasNext(); )       addResult(collIt.next());
+      final Entry<Object,Set<OIdentifiable>> current=it.next();
+      for (Iterator<OIdentifiable> collIt=((ORecordLazySet)current.getValue()).rawIterator(); collIt.hasNext(); )       addResult(createIndexEntryAsDocument(current.getKey(),collIt.next()));
     }
   }
   if (anyFunctionAggregates) {

@@ -1,0 +1,31 @@
+{
+  iRequest.getDatabase().checkSecurity(ODatabaseSecurityResources.COMMAND,ORole.PERMISSION_UPDATE);
+  init(iRequest.getDatabase(),iRequest.getText());
+  StringBuilder word=new StringBuilder();
+  int oldPos=0;
+  int pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
+  if (pos == -1 || !word.toString().equals(KEYWORD_ALTER))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_ALTER + " not found",text,oldPos);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
+  if (pos == -1 || !word.toString().equals(KEYWORD_CLUSTER))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_CLUSTER + " not found",text,oldPos);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,false);
+  if (pos == -1)   throw new OCommandSQLParsingException("Expected <class>",text,oldPos);
+  clusterName=word.toString();
+  Pattern p=Pattern.compile("([0-9]*)");
+  Matcher m=p.matcher(clusterName);
+  if (m.matches())   clusterId=Integer.parseInt(clusterName);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
+  if (pos == -1)   throw new OCommandSQLParsingException("Missed the class's attribute to change",text,oldPos);
+  final String attributeAsString=word.toString();
+  try {
+    attribute=OCluster.ATTRIBUTES.valueOf(attributeAsString.toUpperCase());
+  }
+ catch (  IllegalArgumentException e) {
+    throw new OCommandSQLParsingException("Unknown class's attribute '" + attributeAsString + "'. Supported attributes are: "+ Arrays.toString(OCluster.ATTRIBUTES.values()),text,oldPos);
+  }
+  value=text.substring(pos + 1).trim();
+  if (value.length() == 0)   throw new OCommandSQLParsingException("Missed the property's value to change for attribute '" + attribute + "'",text,oldPos);
+  return this;
+}

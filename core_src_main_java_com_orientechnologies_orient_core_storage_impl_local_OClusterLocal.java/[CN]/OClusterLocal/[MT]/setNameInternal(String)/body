@@ -1,0 +1,34 @@
+{
+  if (storage.getClusterIdByName(iNewName) > -1)   throw new IllegalArgumentException("Cluster with name '" + iNewName + "' already exists");
+  acquireExclusiveLock();
+  try {
+    for (int i=0; i < files.length; i++) {
+      final File osFile=files[i].getOsFile();
+      if (osFile.getName().startsWith(name)) {
+        final File newFile=new File(storage.getStoragePath() + "/" + iNewName+ osFile.getName().substring(osFile.getName().lastIndexOf(name) + name.length()));
+        for (        OStorageFileConfiguration conf : config.infoFiles) {
+          if (conf.parent.name.equals(name))           conf.parent.name=iNewName;
+          if (conf.path.endsWith(osFile.getName()))           conf.path=new String(conf.path.replace(osFile.getName(),newFile.getName()));
+        }
+        boolean renamed=osFile.renameTo(newFile);
+        while (!renamed) {
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+          System.gc();
+          renamed=osFile.renameTo(newFile);
+        }
+      }
+    }
+    config.name=iNewName;
+    holeSegment.rename(name,iNewName);
+    storage.renameCluster(name,iNewName);
+    name=iNewName;
+    storage.getConfiguration().update();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

@@ -1,7 +1,7 @@
 {
   if (destField == null)   throw new OCommandExecutionException("Can't execute the command because it hasn't been parsed yet");
-  if (!(database instanceof ODatabaseDocumentTx))   throw new OCommandSQLParsingException("This command supports only the database type ODatabaseDocumentTx and type '" + database.getClass() + "' was found");
-  final ODatabaseDocumentTx db=(ODatabaseDocumentTx)database;
+  if (!(database.getDatabaseOwner() instanceof ODatabaseDocumentTx))   throw new OCommandSQLParsingException("This command supports only the database type ODatabaseDocumentTx and type '" + database.getClass() + "' was found");
+  final ODatabaseDocumentTx db=(ODatabaseDocumentTx)database.getDatabaseOwner();
   OClass sourceClass=database.getMetadata().getSchema().getClass(sourceClassName);
   if (sourceClass == null)   throw new OCommandExecutionException("Source class '" + sourceClassName + "' not found");
   OClass destClass=database.getMetadata().getSchema().getClass(destClassName);
@@ -27,46 +27,42 @@
  else         if (value instanceof Collection<?>) {
         }
  else {
-          if (value instanceof String) {
-            target=null;
-            if (((String)value).length() == 0)             value=null;
+          target=null;
+          if (value instanceof String)           if (((String)value).length() == 0)           value=null;
+ else           value="'" + value + "'";
+          result=database.<OCommandRequest>command(new OSQLSynchQuery<ODocument>(cmd + value)).execute();
+          if (result == null || result.size() == 0)           value=null;
+ else           if (result.size() > 1)           throw new OCommandExecutionException("Can't create link because multiple records was found in class '" + destClass.getName() + "' with value "+ value+ " in field '"+ destField+ "'");
  else {
-              value="'" + value + "'";
-              result=database.<OCommandRequest>command(new OSQLSynchQuery<ODocument>(cmd + value)).execute();
-              if (result == null || result.size() == 0)               value=null;
- else               if (result.size() > 1)               throw new OCommandExecutionException("Can't create link because multiple records was found in class '" + destClass.getName() + "' with value "+ value+ " in field '"+ destField+ "'");
- else {
-                target=result.get(0);
-                value=target;
-              }
-            }
-            if (target != null && inverse) {
-              oldValue=target.field(linkName);
-              if (oldValue != null) {
-                if (!multipleRelationship)                 multipleRelationship=true;
-                Collection<ODocument> coll;
-                if (oldValue instanceof Collection) {
-                  coll=(Collection<ODocument>)oldValue;
-                  target.setDirty();
-                }
- else {
-                  coll=new ArrayList<ODocument>(2);
-                  target.field(linkName,coll);
-                  coll.add((ODocument)oldValue);
-                }
-                coll.add(doc);
-              }
- else {
-                target.field(linkName,doc);
-              }
-              target.save();
-            }
- else {
-              doc.field(linkName,value);
-              doc.save();
-            }
-            total++;
+            target=result.get(0);
+            value=target;
           }
+          if (target != null && inverse) {
+            oldValue=target.field(linkName);
+            if (oldValue != null) {
+              if (!multipleRelationship)               multipleRelationship=true;
+              Collection<ODocument> coll;
+              if (oldValue instanceof Collection) {
+                coll=(Collection<ODocument>)oldValue;
+                target.setDirty();
+              }
+ else {
+                coll=new ArrayList<ODocument>(2);
+                target.field(linkName,coll);
+                coll.add((ODocument)oldValue);
+              }
+              coll.add(doc);
+            }
+ else {
+              target.field(linkName,doc);
+            }
+            target.save();
+          }
+ else {
+            doc.field(linkName,value);
+            doc.save();
+          }
+          total++;
         }
       }
       if (progressListener != null)       progressListener.onProgress(this,currRecord,currRecord * 100f / totRecords);

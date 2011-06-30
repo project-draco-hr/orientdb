@@ -1,21 +1,39 @@
 {
   if (iItem == null || !(iItem instanceof OSQLFilterItemField))   return false;
-  OSQLFilterItemField item=(OSQLFilterItemField)iItem;
+  final OSQLFilterItemField item=(OSQLFilterItemField)iItem;
   final OProperty prop=iSchemaClass.getProperty(item.getName());
   if (prop != null && prop.isIndexed()) {
     OIndex idx=prop.getIndex().getUnderlying();
     idx=idx.getInternal();
-    if (((idx instanceof OIndexUnique || idx instanceof OIndexNotUnique) && iCondition.getOperator() instanceof OQueryOperatorEquals) || idx instanceof OIndexFullText && iCondition.getOperator() instanceof OQueryOperatorContainsText) {
-      Object value=iCondition.getLeft() == iItem ? iCondition.getRight() : iCondition.getLeft();
-      if (value != null) {
-        if (value instanceof OSQLFilterItemParameter)         value=((OSQLFilterItemParameter)value).getValue(null);
-        final Collection<?> resultSet=prop.getIndex().getUnderlying().get(value);
-        if (resultSet != null && resultSet.size() > 0)         for (        Object o : resultSet) {
-          if (o instanceof ORID)           iResultSet.add(database.load((ORID)o));
- else           iResultSet.add((ORecord<?>)o);
-        }
-        return true;
-      }
+    final boolean indexCanBeUsedInEqualityOperators=(idx instanceof OIndexUnique || idx instanceof OIndexNotUnique);
+    final Object origValue=iCondition.getLeft() == iItem ? iCondition.getRight() : iCondition.getLeft();
+    final OIndex underlyingIndex=prop.getIndex().getUnderlying();
+    if (indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorBetween) {
+      final Object[] betweenValues=(Object[])origValue;
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.getValuesBetween(OSQLHelper.getValue(betweenValues[0]),OSQLHelper.getValue(betweenValues[2])));
+      return true;
+    }
+    final Object value=OSQLHelper.getValue(origValue);
+    if (value == null)     return false;
+    if ((indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorEquals) || idx instanceof OIndexFullText && iCondition.getOperator() instanceof OQueryOperatorContainsText) {
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.get(value));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorMajor) {
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.getValuesMajor(value,false));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorMajorEquals) {
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.getValuesMajor(value,true));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorMinor) {
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.getValuesMinor(value,false));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && iCondition.getOperator() instanceof OQueryOperatorMinorEquals) {
+      fillSearchIndexResultSet(iResultSet,underlyingIndex.getValuesMinor(value,true));
+      return true;
     }
   }
   return false;

@@ -1,0 +1,28 @@
+{
+  database.open("admin","admin");
+  if (database.getStorage() instanceof OStorageRemote || database.getStorage() instanceof OStorageRemoteThread) {
+    database.close();
+    return;
+  }
+  final boolean oldRecording=OProfiler.getInstance().isRecording();
+  if (!oldRecording) {
+    OProfiler.getInstance().startRecording();
+  }
+  long indexQueries=OProfiler.getInstance().getCounter("Query.indexUsage");
+  if (indexQueries < 0) {
+    indexQueries=0;
+  }
+  final List<Profile> result=database.command(new OSQLSynchQuery<Profile>("select * from Profile where nick >= 'ZZZJayLongNickIndex3'")).execute();
+  final List<String> expectedNicks=new ArrayList<String>(Arrays.asList("ZZZJayLongNickIndex3","ZZZJayLongNickIndex4","ZZZJayLongNickIndex5"));
+  if (!oldRecording) {
+    OProfiler.getInstance().stopRecording();
+  }
+  Assert.assertEquals(result.size(),3);
+  for (  Profile profile : result) {
+    expectedNicks.remove(profile.getNick());
+  }
+  Assert.assertEquals(expectedNicks.size(),0);
+  long newIndexQueries=OProfiler.getInstance().getCounter("Query.indexUsage");
+  Assert.assertEquals(newIndexQueries,indexQueries + 1);
+  database.close();
+}

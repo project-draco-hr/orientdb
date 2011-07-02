@@ -1,0 +1,18 @@
+{
+  database.command(new OCommandSQL("create index equalityIdx unique")).execute();
+  database.getMetadata().getIndexManager().reload();
+  Assert.assertNotNull(database.getMetadata().getIndexManager().getIndex("equalityIdx"));
+  for (int key=0; key <= 5; key++) {
+    database.command(new OCommandSQL("insert into index:equalityIdx (key,rid) values (" + key + ",#10:"+ key+ ")")).execute();
+  }
+  final OIndex index=database.getMetadata().getIndexManager().getIndex("equalityIdx");
+  final Collection<Integer> betweenResults=new ArrayList<Integer>(Arrays.asList(1,2,3));
+  Collection<ODocument> indexCollection=index.getEntriesBetween(1,3);
+  Assert.assertEquals(indexCollection.size(),3);
+  for (  ODocument doc : indexCollection) {
+    betweenResults.remove(doc.<Integer>field("key"));
+    Assert.assertEquals(doc.<ORecordId>rawField("rid"),new ORecordId(10,doc.<Integer>field("key").longValue()));
+  }
+  Assert.assertEquals(betweenResults.size(),0);
+  database.command(new OCommandSQL("drop index equalityIdx")).execute();
+}

@@ -1,0 +1,22 @@
+{
+  final String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: index/<database>/<index-name>/<key>[/<value>]");
+  iRequest.data.commandInfo="Index put";
+  ODatabaseDocumentTx db=null;
+  try {
+    db=getProfiledDatabaseInstance(iRequest);
+    final OIndex index=db.getMetadata().getIndexManager().getIndex(urlParts[2]);
+    if (index == null)     throw new IllegalArgumentException("Index name '" + urlParts[2] + "' not found");
+    final OIdentifiable record;
+    if (urlParts.length > 4)     record=new ORecordId(urlParts[4]);
+ else {
+      if (iRequest.content == null || iRequest.content.length() == 0)       throw new IllegalArgumentException("Index's entry value is null");
+      record=new ODocument(db).fromJSON(iRequest.content);
+    }
+    index.put(urlParts[3],record);
+    sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Key '" + urlParts[3] + "' correctly inserted into the index "+ urlParts[2]+ ".");
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.release(db);
+  }
+  return false;
+}

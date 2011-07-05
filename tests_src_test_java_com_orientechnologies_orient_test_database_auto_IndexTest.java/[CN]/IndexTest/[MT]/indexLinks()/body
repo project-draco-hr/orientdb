@@ -1,0 +1,23 @@
+{
+  database.getMetadata().getSchema().getClass("Whiz").getProperty("account").createIndex(INDEX_TYPE.NOTUNIQUE);
+  final List<Account> result=database.command(new OSQLSynchQuery<Profile>("select * from Account limit 1")).execute();
+  OIndex idx=database.getMetadata().getIndexManager().getIndex("Whiz.account");
+  for (int i=0; i < 5; i++) {
+    ODocument whiz=new ODocument(database.getUnderlying(),"Whiz");
+    whiz.field("id",i);
+    whiz.field("text","This is a test");
+    whiz.field("account",result.get(0).getRid());
+    whiz.save();
+  }
+  Assert.assertEquals(idx.getSize(),1);
+  List<ODocument> indexedResult=database.getUnderlying().command(new OSQLSynchQuery<Profile>("select * from Whiz where account = ?")).execute(result.get(0).getRid());
+  Assert.assertEquals(indexedResult.size(),5);
+  ODocument whiz=new ODocument(database.getUnderlying(),"Whiz");
+  whiz.field("id",100);
+  whiz.field("text","This is a test!");
+  whiz.field("account",new ODocument(database.getUnderlying(),"Company").field("id",9999));
+  whiz.save();
+  Assert.assertTrue(((ODocument)whiz.field("account")).getIdentity().isValid());
+  ((ODocument)whiz.field("account")).delete();
+  whiz.delete();
+}

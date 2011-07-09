@@ -1,0 +1,43 @@
+{
+  if (!(iCurrentRecord instanceof ODocument))   return null;
+  final ODocument document=(ODocument)iCurrentRecord;
+  final ScriptEngine engine=new GremlinScriptEngine();
+  final OrientGraph graph=new OrientGraph(iCurrentRecord.getDatabase().getURL());
+  engine.getBindings(ScriptContext.ENGINE_SCOPE).put("g",graph);
+  final OrientElement graphElement;
+  if (document.getSchemaClass().isSubClassOf(OGraphDatabase.VERTEX_CLASS_NAME))   graphElement=new OrientVertex(graph,document);
+ else   if (document.getSchemaClass().isSubClassOf(OGraphDatabase.VERTEX_CLASS_NAME))   graphElement=new OrientVertex(graph,document);
+ else   return null;
+  engine.getBindings(ScriptContext.ENGINE_SCOPE).put("current",graphElement);
+  final Object scriptResult;
+  try {
+    scriptResult=engine.eval((String)iParameters[0]);
+  }
+ catch (  ScriptException e) {
+    return new OCommandExecutionException("Error on execution of the GREMLIN function",e);
+  }
+  if (result == null)   result=new ArrayList<Object>();
+  if (scriptResult instanceof GremlinPipeline) {
+    final Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
+    Object finalResult=null;
+    List<Object> resultCollection=null;
+    while (it.hasNext()) {
+      final Object current=it.next();
+      if (finalResult != null) {
+        if (resultCollection == null)         resultCollection=new ArrayList<Object>();
+        resultCollection.add(current);
+      }
+ else       finalResult=current;
+    }
+    if (resultCollection != null) {
+      result.addAll(resultCollection);
+      return resultCollection;
+    }
+ else {
+      if (finalResult != null)       result.add(finalResult);
+      return finalResult;
+    }
+  }
+ else   if (scriptResult != null)   result.add(scriptResult);
+  return scriptResult;
+}

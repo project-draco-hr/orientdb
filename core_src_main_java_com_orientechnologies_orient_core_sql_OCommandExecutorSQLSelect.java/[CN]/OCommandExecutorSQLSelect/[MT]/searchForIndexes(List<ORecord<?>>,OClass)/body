@@ -1,3 +1,37 @@
 {
-  return analyzeQueryBranch(iResultSet,iSchemaClass,compiledFilter.getRootCondition());
+  final List<OSearchInIndexTriple> searchInIndexTriples=new LinkedList<OSearchInIndexTriple>();
+  analyzeQueryBranch(iSchemaClass,compiledFilter.getRootCondition(),searchInIndexTriples);
+  if (searchInIndexTriples.isEmpty())   return false;
+  for (  OSearchInIndexTriple indexTriple : searchInIndexTriples) {
+    final OIndex idx=indexTriple.index.getInternal();
+    final OQueryOperator operator=indexTriple.indexOperator;
+    final Object key=indexTriple.key;
+    final boolean indexCanBeUsedInEqualityOperators=(idx instanceof OIndexUnique || idx instanceof OIndexNotUnique);
+    if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorBetween) {
+      final Object[] betweenKeys=(Object[])key;
+      fillSearchIndexResultSet(iResultSet,indexTriple.index.getValuesBetween(OSQLHelper.getValue(betweenKeys[0]),OSQLHelper.getValue(betweenKeys[2])));
+      return true;
+    }
+    if ((indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorEquals) || idx instanceof OIndexFullText && operator instanceof OQueryOperatorContainsText) {
+      fillSearchIndexResultSet(iResultSet,indexTriple.index.get(key));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorMajor) {
+      fillSearchIndexResultSet(iResultSet,idx.getValuesMajor(key,false));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorMajorEquals) {
+      fillSearchIndexResultSet(iResultSet,idx.getValuesMajor(key,true));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorMinor) {
+      fillSearchIndexResultSet(iResultSet,idx.getValuesMinor(key,false));
+      return true;
+    }
+    if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorMinorEquals) {
+      fillSearchIndexResultSet(iResultSet,idx.getValuesMinor(key,true));
+      return true;
+    }
+  }
+  return false;
 }

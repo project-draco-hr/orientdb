@@ -3,10 +3,14 @@
   configuration.setValue(OGlobalConfiguration.NETWORK_SOCKET_TIMEOUT,iNetworkTimeout);
   OLogManager.instance().debug(this,"Sending keepalive message to distributed server node %s:%d...",networkAddress,networkPort);
   try {
-    channel.acquireExclusiveLock();
-    channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
-    channel.writeInt(clientTxId);
-    channel.flush();
+    channel.beginRequest();
+    try {
+      channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT);
+      channel.writeInt(clientTxId);
+    }
+  finally {
+      channel.endRequest();
+    }
     try {
       channel.beginResponse(clientTxId);
     }
@@ -18,9 +22,6 @@
  catch (  Exception e) {
     OLogManager.instance().debug(this,"Error on sending heartbeat to server node",e,toString());
     return false;
-  }
- finally {
-    channel.releaseExclusiveLock();
   }
   return true;
 }

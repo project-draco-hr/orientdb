@@ -3,21 +3,20 @@
   if (dbEntry == null)   return;
   OLogManager.instance().info(this,"Sending distributed configuration for database '%s' to server node %s:%d...",iDatabaseName,networkAddress,networkPort);
   try {
-    channel.acquireExclusiveLock();
     try {
+      channel.beginRequest();
       channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG);
       channel.writeInt(dbEntry.sessionId);
       channel.writeBytes(manager.getClusterConfiguration(iDatabaseName).toStream());
-      channel.flush();
-      try {
-        beginResponse(dbEntry.sessionId);
-      }
-  finally {
-        endResponse();
-      }
     }
   finally {
-      channel.releaseExclusiveLock();
+      channel.endRequest();
+    }
+    try {
+      beginResponse(dbEntry.sessionId);
+    }
+  finally {
+      endResponse();
     }
   }
  catch (  Exception e) {

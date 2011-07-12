@@ -1,0 +1,29 @@
+{
+  Throwable lastException=null;
+  for (  String serverAddress : iServerAddresses) {
+    final String key=getNodeName(serverAddress,iServerPort);
+    final ODistributedServerNodeRemote node;
+    lock.acquireExclusiveLock();
+    try {
+      if (nodes.containsKey(key)) {
+        node=nodes.get(key);
+      }
+ else {
+        node=new ODistributedServerNodeRemote(this,serverAddress,iServerPort);
+        nodes.put(key,node);
+      }
+    }
+  finally {
+      lock.releaseExclusiveLock();
+    }
+    try {
+      node.connect(networkTimeoutNode,name,securityKey);
+      node.startSynchronization();
+      return;
+    }
+ catch (    Exception e) {
+      lastException=e;
+    }
+  }
+  OLogManager.instance().error(this,"Can't connect to distributed server node using addresses %s:%d and %s:%d",lastException,iServerAddresses[0],iServerPort,iServerAddresses[1],iServerPort);
+}

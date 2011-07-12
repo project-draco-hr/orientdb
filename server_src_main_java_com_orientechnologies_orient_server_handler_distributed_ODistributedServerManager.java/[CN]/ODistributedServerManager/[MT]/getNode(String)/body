@@ -1,9 +1,19 @@
 {
   lock.acquireSharedLock();
   try {
-    final ODistributedServerNodeRemote node=nodes.get(iNodeName);
-    if (node == null)     throw new IllegalArgumentException("Node '" + iNodeName + "' is not configured on server: "+ getId());
-    return node;
+    ODistributedServerNodeRemote node=nodes.get(iNodeName);
+    if (node != null)     return node;
+    final String[] parts=iNodeName.split(":");
+    if (parts.length == 2)     try {
+      final InetAddress address=InetAddress.getByName(parts[0]);
+      if (address != null) {
+        node=nodes.get(address.getHostAddress() + ":" + parts[1]);
+        if (node != null)         return node;
+      }
+    }
+ catch (    UnknownHostException e) {
+    }
+    throw new IllegalArgumentException("Node '" + iNodeName + "' is not configured on server: "+ getId());
   }
   finally {
     lock.releaseSharedLock();

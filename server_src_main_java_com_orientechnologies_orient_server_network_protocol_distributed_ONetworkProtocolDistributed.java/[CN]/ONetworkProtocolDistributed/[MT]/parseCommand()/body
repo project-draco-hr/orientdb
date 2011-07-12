@@ -11,9 +11,31 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_CONNECT:
 data.commandInfo="Cluster connection";
 final String clusterName=channel.readString();
 final byte[] encodedSecurityKey=channel.readBytes();
+final long runningSince=channel.readLong();
 if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getSecurityKey())) throw new OSecurityException("Invalid combination of cluster name and key received");
-manager.receivedLeaderConnection(this);
+channel.acquireExclusiveLock();
+try {
 sendOk(lastClientTxId);
+if (manager.isLeader()) {
+OLogManager.instance().warn(this,"Received remote connection from the leader node %s, but current node is leader itself: split network problem?",channel.socket.getRemoteSocketAddress());
+if (runningSince > manager.getRunningSince()) {
+  OLogManager.instance().warn(this,"Current node becames Non-Leader since the other node is running since longer time");
+  manager.receivedLeaderConnection(this);
+  channel.writeByte((byte)1);
+}
+ else {
+  OLogManager.instance().warn(this,"Current node remains Leader since it's running since longer time");
+  channel.writeByte((byte)0);
+}
+}
+ else {
+manager.receivedLeaderConnection(this);
+channel.writeByte((byte)1);
+}
+}
+  finally {
+channel.releaseExclusiveLock();
+}
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN:
@@ -23,9 +45,15 @@ data.commandInfo="Open database connection";
 final String dbUrl=channel.readString();
 openDatabase(dbUrl,channel.readString(),channel.readString());
 ODistributedRequesterThreadLocal.INSTANCE.set(true);
+channel.acquireExclusiveLock();
+try {
 sendOk(lastClientTxId);
 channel.writeInt(connection.id);
 channel.writeLong(connection.database.getStorage().getVersion());
+}
+  finally {
+channel.releaseExclusiveLock();
+}
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_SENDER:
@@ -41,7 +69,13 @@ openDatabase(dbUrl,dbUser,dbPassword);
 final String engineName=connection.database.getStorage() instanceof OStorageLocal ? "local" : "memory";
 final ODistributedServerNodeRemote remoteServerNode=manager.getNode(remoteServerName);
 remoteServerNode.shareDatabase(connection.database,remoteServerName,dbUser,dbPassword,engineName,synchronousMode);
+channel.acquireExclusiveLock();
+try {
 sendOk(lastClientTxId);
+}
+  finally {
+channel.releaseExclusiveLock();
+}
 manager.addServerInConfiguration(dbUrl,remoteServerName,synchronousMode);
 break;
 }
@@ -65,11 +99,17 @@ connection.database.delete();
 createDatabase(connection.database,dbUser,dbPasswd);
 if (connection.database.isClosed()) connection.database.open(dbUser,dbPasswd);
 OLogManager.instance().info(this,"Importing database '%s' via streaming from remote server node...",dbName);
+channel.acquireExclusiveLock();
+try {
 new ODatabaseImport(connection.database,new OChannelBinaryInputStream(channel),this).importDatabase();
 OLogManager.instance().info(this,"Database imported correctly",dbName);
 sendOk(lastClientTxId);
 channel.writeInt(connection.id);
 channel.writeLong(connection.database.getStorage().getVersion());
+}
+  finally {
+channel.releaseExclusiveLock();
+}
 }
   finally {
 manager.updateHeartBeatTime();
@@ -84,10 +124,23 @@ data.commandInfo="Update db configuration from server node leader";
 final ODocument config=(ODocument)new ODocument().fromStream(channel.readBytes());
 manager.setClusterConfiguration(connection.database.getName(),config);
 OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",config.toJSON(""));
+channel.acquireExclusiveLock();
+try {
 sendOk(lastClientTxId);
+}
+  finally {
+channel.releaseExclusiveLock();
+}
 break;
 }
 default :
 super.parseCommand();
+return;
+}
+try {
+channel.flush();
+}
+ catch (Throwable t) {
+OLogManager.instance().debug(this,"Error on send data over the network",t);
 }
 }

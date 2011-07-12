@@ -8,8 +8,15 @@
   channel.writeInt(clientTxId);
   channel.writeString(iClusterName);
   channel.writeBytes(iSecurityKey.getEncoded());
+  channel.writeLong(manager.getRunningSince());
   channel.flush();
   channel.readStatus();
+  final boolean connected=channel.readByte() == 1;
+  if (!connected) {
+    OLogManager.instance().warn(this,"Remote server node %s:%d has refused the connection because it's the new Leader",networkAddress,networkPort);
+    manager.abandonLeadership();
+    return false;
+  }
   final List<OServerNodeDatabaseEntry> servers=new ArrayList<OServerNodeDatabaseEntry>(databases.values());
   for (  OServerNodeDatabaseEntry entry : servers) {
     try {
@@ -36,4 +43,5 @@
   if (status == STATUS.CONNECTING)   OLogManager.instance().info(this,"Server node %s:%d has joined the cluster",networkAddress,networkPort);
  else   OLogManager.instance().info(this,"Server node %s:%d has re-joined the cluster after %d secs",networkAddress,networkPort,(System.currentTimeMillis() - lastHeartBeat) / 1000);
   lastHeartBeat=System.currentTimeMillis();
+  return true;
 }

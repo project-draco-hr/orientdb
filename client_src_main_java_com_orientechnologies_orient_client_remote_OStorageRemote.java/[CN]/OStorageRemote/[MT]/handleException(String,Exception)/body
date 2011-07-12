@@ -1,7 +1,8 @@
 {
   if (iException instanceof OException)   throw (OException)iException;
   if (!(iException instanceof IOException))   throw new OStorageException(iMessage,iException);
-  while (retry < connectionRetry) {
+  final long lostConnectionTime=System.currentTimeMillis();
+  for (retry=0; retry < connectionRetry; ++retry) {
     try {
       Thread.sleep(connectionRetryDelay);
     }
@@ -9,15 +10,12 @@
     }
     try {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + retry + "/"+ connectionRetry+ "...");
-      openRemoteDatabase(null,null,null);
-      retry=0;
-      OLogManager.instance().info(this,"Connection re-acquired in transparent way: no errors will be thrown at application level");
+      openRemoteDatabase();
+      OLogManager.instance().info(this,"Connection re-acquired in transparent way after %dms and %d retries: no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1);
       return;
     }
  catch (    Throwable t) {
-      ++retry;
     }
   }
-  retry=0;
   throw new OStorageException(iMessage,iException);
 }

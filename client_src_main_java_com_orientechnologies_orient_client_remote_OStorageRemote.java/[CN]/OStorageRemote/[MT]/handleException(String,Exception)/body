@@ -2,19 +2,31 @@
   if (iException instanceof OException)   throw (OException)iException;
   if (!(iException instanceof IOException))   throw new OStorageException(iMessage,iException);
   final long lostConnectionTime=System.currentTimeMillis();
-  for (retry=0; retry < connectionRetry; ++retry) {
-    try {
-      Thread.sleep(connectionRetryDelay);
+  final int currentMaxRetry;
+  final int currentRetryDelay;
+  if (clusterConfiguration != null) {
+    currentMaxRetry=1;
+    currentRetryDelay=0;
+  }
+ else {
+    currentMaxRetry=connectionRetry;
+    currentRetryDelay=connectionRetryDelay;
+  }
+  for (retry=0; retry < currentMaxRetry; ++retry) {
+    if (currentRetryDelay > 0)     try {
+      Thread.sleep(currentRetryDelay);
     }
  catch (    InterruptedException e) {
     }
     try {
-      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + retry + "/"+ connectionRetry+ "...");
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + retry + "/"+ currentMaxRetry+ "...");
       openRemoteDatabase();
       OLogManager.instance().info(this,"Connection re-acquired in transparent way after %dms and %d retries: no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1);
       return;
     }
  catch (    Throwable t) {
+    }
+    if (clusterConfiguration != null) {
     }
   }
   throw new OStorageException(iMessage,iException);

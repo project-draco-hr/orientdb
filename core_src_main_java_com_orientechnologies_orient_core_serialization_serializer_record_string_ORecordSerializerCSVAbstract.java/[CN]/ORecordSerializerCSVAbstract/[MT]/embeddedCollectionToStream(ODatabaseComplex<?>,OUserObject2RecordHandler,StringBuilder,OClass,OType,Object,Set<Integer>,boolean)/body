@@ -8,25 +8,33 @@
  else     o=Array.get(iValue,i);
     if (i > 0)     iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
     if (o == null)     continue;
-    ODocument document=null;
+    OIdentifiable id=null;
+    ODocument doc=null;
     final OClass linkedClass;
-    if (!(o instanceof ORecord<?>)) {
+    if (!(o instanceof OIdentifiable)) {
       final String fieldBound=OObjectSerializerHelper.getDocumentBoundField(o.getClass());
       if (fieldBound != null) {
         OObjectSerializerHelper.invokeCallback(o,null,OBeforeSerialization.class);
-        document=(ODocument)OObjectSerializerHelper.getFieldValue(o,fieldBound);
-        OObjectSerializerHelper.invokeCallback(o,document,OAfterSerialization.class);
+        doc=(ODocument)OObjectSerializerHelper.getFieldValue(o,fieldBound);
+        OObjectSerializerHelper.invokeCallback(o,doc,OAfterSerialization.class);
+        id=doc;
       }
       linkedClass=iLinkedClass;
     }
  else {
-      document=(ODocument)o;
-      if (document.getIdentity().isTemporary())       document.save();
-      linkedClass=document.getSchemaClass();
+      id=(OIdentifiable)o;
+      if (iLinkedType == null)       if (id.getIdentity().isValid())       iLinkedType=OType.LINK;
+ else       iLinkedType=OType.EMBEDDED;
+      if (id instanceof ODocument) {
+        doc=(ODocument)id;
+        if (id.getIdentity().isTemporary())         doc.save();
+        linkedClass=doc.getSchemaClass();
+      }
+ else       linkedClass=null;
     }
-    if (document != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_BEGIN);
-    if (iLinkedType != OType.LINK && (linkedClass != null || document != null)) {
-      if (document == null)       document=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+    if (id != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_BEGIN);
+    if (iLinkedType != OType.LINK && (linkedClass != null || doc != null)) {
+      if (id == null)       id=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
         public Object getUserObjectByRecord(        ORecordInternal<?> iRecord,        final String iFetchPlan){
           return iRecord;
         }
@@ -40,12 +48,12 @@
         }
       }
 ,null,iSaveOnlyDirty);
-      toString(document,iOutput,null,iObjHandler,iMarshalledRecords,false);
+      toString(doc,iOutput,null,iObjHandler,iMarshalledRecords,false);
     }
  else {
       fieldTypeToString(iOutput,iDatabase,iLinkedType,o);
     }
-    if (document != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_END);
+    if (id != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_END);
   }
   iOutput.append(OStringSerializerHelper.COLLECTION_END);
   return iOutput;

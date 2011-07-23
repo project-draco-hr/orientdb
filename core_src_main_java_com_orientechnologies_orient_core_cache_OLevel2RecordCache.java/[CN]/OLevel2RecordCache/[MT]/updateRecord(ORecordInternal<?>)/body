@@ -1,0 +1,19 @@
+{
+  if (!enabled || iRecord == null || iRecord.isDirty() || iRecord.getIdentity().isNew())   return;
+  acquireExclusiveLock();
+  try {
+    if (iRecord.isPinned()) {
+      final ORecordInternal<?> prevEntry=entries.get(iRecord.getIdentity());
+      if (prevEntry != null && prevEntry.getVersion() >= iRecord.getVersion())       return;
+      if (iRecord.getDatabase() == null || iRecord.getDatabase().isClosed()) {
+        iRecord.detach();
+        entries.put(iRecord.getIdentity(),iRecord);
+      }
+ else       entries.put(iRecord.getIdentity(),(ORecordInternal<?>)iRecord.flatCopy());
+    }
+ else     entries.remove(iRecord.getIdentity());
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

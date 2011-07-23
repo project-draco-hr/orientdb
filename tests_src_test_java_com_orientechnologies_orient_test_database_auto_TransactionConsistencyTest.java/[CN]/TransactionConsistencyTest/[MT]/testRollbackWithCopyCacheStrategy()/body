@@ -1,0 +1,37 @@
+{
+  database1=new ODatabaseDocumentTx(url).open("admin","admin");
+  database2=new ODatabaseDocumentTx(url).open("admin","admin");
+  database1.getLevel2Cache().setStrategy(STRATEGY.COPY_RECORD);
+  ODocument vDocA_db1=database1.newInstance();
+  vDocA_db1.field(NAME,"docA");
+  vDocA_db1.save();
+  ORID vDocA_Rid=vDocA_db1.getIdentity().copy();
+  database2.begin(TXTYPE.OPTIMISTIC);
+  try {
+    ODocument vDocA_db2=database2.load(vDocA_Rid);
+    vDocA_db2.field(NAME,"docA_v2");
+    vDocA_db2.save();
+    database1.begin(TXTYPE.OPTIMISTIC);
+    try {
+      vDocA_db1.field(NAME,"docA_v3");
+      vDocA_db1.save();
+      database1.commit();
+    }
+ catch (    OConcurrentModificationException e) {
+      Assert.fail("Should not failed here...");
+    }
+    Assert.assertEquals(vDocA_db1.field(NAME),"docA_v3");
+    database2.commit();
+    Assert.fail("Should throw OConcurrentModificationException");
+  }
+ catch (  OConcurrentModificationException e) {
+    database2.rollback();
+  }
+  database1.close();
+  database2.close();
+  database2=new ODatabaseDocumentTx(url).open("admin","admin");
+  ODocument vDocB_db2=database2.load(vDocA_Rid);
+  Assert.assertEquals(vDocB_db2.field(NAME),"docA_v3");
+  database1.close();
+  database2.close();
+}

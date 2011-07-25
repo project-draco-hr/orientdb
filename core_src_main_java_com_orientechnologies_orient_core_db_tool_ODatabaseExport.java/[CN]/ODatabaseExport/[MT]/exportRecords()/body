@@ -4,22 +4,25 @@
   listener.onMessage("\nExporting records...");
   writer.beginCollection(level,true,"records");
   int exportedClusters=0;
-  int totalClusters=database.getClusterNames().size();
+  int totalClusters=database.getClusters();
   for (int i=0; exportedClusters < totalClusters; ++i) {
     String clusterName=database.getClusterNameById(i);
-    if (clusterName == null)     continue;
     exportedClusters++;
-    if (includeClusters != null) {
-      if (!includeClusters.contains(clusterName))       continue;
-    }
- else     if (excludeClusters != null) {
+    final long recordTot;
+    if (clusterName != null) {
+      if (includeClusters != null) {
+        if (!includeClusters.contains(clusterName))         continue;
+      }
+ else       if (excludeClusters != null) {
+        if (excludeClusters.contains(clusterName))         continue;
+      }
       if (excludeClusters.contains(clusterName))       continue;
+      recordTot=database.countClusterElements(clusterName);
     }
-    if (excludeClusters.contains(clusterName))     continue;
-    long recordTot=database.countClusterElements(clusterName);
-    listener.onMessage("\n- Cluster '" + clusterName + "'...");
+ else     recordTot=0;
+    listener.onMessage("\n- Cluster " + (clusterName != null ? "'" + clusterName + "'" : "NULL") + " (id="+ i+ ")...");
     long recordNum=0;
-    for (    ORecordInternal<?> rec : database.browseCluster(clusterName)) {
+    if (clusterName != null)     for (    ORecordInternal<?> rec : database.browseCluster(clusterName)) {
       if (rec instanceof ODocument) {
         ODocument doc=(ODocument)rec;
         if (includeClasses != null) {

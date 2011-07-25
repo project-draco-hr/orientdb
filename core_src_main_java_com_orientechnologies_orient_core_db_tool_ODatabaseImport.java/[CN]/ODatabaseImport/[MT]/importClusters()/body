@@ -6,7 +6,8 @@
   while (jsonReader.lastChar() != ']') {
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
     String name=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"name\"").readString(OJSONReader.COMMA_SEPARATOR);
-    if (includeClusters != null) {
+    if (name.length() == 0)     name=null;
+    if (name != null)     if (includeClusters != null) {
       if (!includeClusters.contains(name)) {
         jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
         continue;
@@ -24,11 +25,11 @@
       rid=new ORecordId(jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"rid\"").readString(OJSONReader.NEXT_IN_OBJECT));
     }
  else     rid=null;
-    listener.onMessage("\n- Creating cluster " + name + "...");
-    int clusterId=database.getClusterIdByName(name);
+    listener.onMessage("\n- Creating cluster " + (name != null ? "'" + name + "'" : "NULL") + "...");
+    int clusterId=name != null ? database.getClusterIdByName(name) : -1;
     if (clusterId == -1) {
-      if (type.equals("PHYSICAL"))       clusterId=database.addPhysicalCluster(name,name,-1);
- else       if (type.equals("LOGICAL"))       clusterId=database.addLogicalCluster(name,database.getClusterIdByName(OStorage.CLUSTER_INTERNAL_NAME));
+      if (type.equals("LOGICAL"))       clusterId=database.addLogicalCluster(name,database.getClusterIdByName(OStorage.CLUSTER_INTERNAL_NAME));
+ else       clusterId=database.addPhysicalCluster(name,name,-1);
     }
     if (clusterId != id)     throw new OConfigurationException("Imported cluster '" + name + "' has id="+ clusterId+ " different from the original: "+ id);
     listener.onMessage("OK, assigned id=" + clusterId);

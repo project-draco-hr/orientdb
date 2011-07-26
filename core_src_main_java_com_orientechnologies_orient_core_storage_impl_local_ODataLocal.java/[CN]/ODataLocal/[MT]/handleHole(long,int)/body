@@ -30,14 +30,17 @@
         while (moveFrom < offsetLimit) {
           pos=getRelativePosition(moveFrom);
           if (pos[1] >= file.getFilledUpTo())           break;
-          recordSize=file.readInt(pos[1]) + RECORD_FIX_SIZE;
+          int recordContentSize=file.readInt(pos[1]);
+          if (recordContentSize < 0)           break;
+          recordSize=recordContentSize + RECORD_FIX_SIZE;
           segmentPositions.add(0,new long[]{moveFrom,recordSize});
           moveFrom+=recordSize;
         }
         long gap=offsetLimit + holeSize;
         for (        long[] item : segmentPositions) {
           final int sizeMoved=moveRecord(item[0],gap - item[1]);
-          if (sizeMoved != item[1])           throw new IllegalStateException("Corrupted hole at position " + item[0] + ": found size "+ sizeMoved+ " instead of "+ item[1]);
+          if (sizeMoved < 0)           throw new IllegalStateException("Can't move record at position " + moveFrom + ": found hole");
+ else           if (sizeMoved != item[1])           throw new IllegalStateException("Corrupted hole at position " + item[0] + ": found size "+ sizeMoved+ " instead of "+ item[1]);
           gap-=sizeMoved;
         }
         holePositionOffset=closestHole.dataOffset;
@@ -49,6 +52,7 @@
         final long moveUpTo=closestHole.dataOffset;
         while (moveFrom < moveUpTo) {
           final int sizeMoved=moveRecord(moveFrom,moveTo);
+          if (sizeMoved < 0)           throw new IllegalStateException("Can't move record at position " + moveFrom + ": found hole");
           moveFrom+=sizeMoved;
           moveTo+=sizeMoved;
         }

@@ -1,36 +1,5 @@
 {
   super(iDatabase);
+  channel=iChannel;
   clientTxId=iChannel.readInt();
-  setUsingLog(iChannel.readByte() == 1);
-  while (iChannel.readByte() == 1) {
-    try {
-      final byte recordStatus=iChannel.readByte();
-      final ORecordId rid=iChannel.readRID();
-      final OTransactionEntryProxy entry=new OTransactionEntryProxy(iChannel.readByte());
-      entry.status=recordStatus;
-switch (entry.status) {
-case OTransactionRecordEntry.CREATED:
-        entry.clusterName=iChannel.readString();
-      entry.getRecord().fill(iDatabase,rid,0,iChannel.readBytes(),true);
-    if (entry.getRecord() instanceof ODocument)     ((ODocument)entry.getRecord()).deserializeFields();
-  createdRecords.put(rid.copy(),entry.getRecord());
-break;
-case OTransactionRecordEntry.UPDATED:
-entry.getRecord().fill(iDatabase,rid,iChannel.readInt(),iChannel.readBytes(),true);
-if (entry.getRecord() instanceof ODocument) ((ODocument)entry.getRecord()).deserializeFields();
-updatedRecords.put(rid,entry.getRecord());
-break;
-case OTransactionRecordEntry.DELETED:
-entry.getRecord().fill(iDatabase,rid,iChannel.readInt(),null,false);
-break;
-default :
-throw new OTransactionException("Unrecognized tx command: " + entry.status);
-}
-recordEntries.put((ORecordId)entry.getRecord().getIdentity(),entry);
-}
- catch (IOException e) {
-throw new OSerializationException("Can't read transaction record from the network",e);
-}
-}
-remoteIndexEntries=new ODocument(iChannel.readBytes());
 }

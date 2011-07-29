@@ -1,14 +1,27 @@
 {
   lock.acquireExclusiveLock();
   try {
-    txManager.commitAllPendingRecords((OTransaction)iTx);
-    incrementVersion();
-    if (OGlobalConfiguration.TX_COMMIT_SYNCH.getValueAsBoolean())     synch();
+    try {
+      txManager.commitAllPendingRecords(iTx);
+      incrementVersion();
+      if (OGlobalConfiguration.TX_COMMIT_SYNCH.getValueAsBoolean())       synch();
+    }
+ catch (    RuntimeException e) {
+      rollback(iTx);
+      throw e;
+    }
+catch (    IOException e) {
+      rollback(iTx);
+      throw new OException(e);
+    }
+    try {
+      txManager.clearLogEntries(iTx);
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"Clear tx log entries failed",e);
+    }
   }
- catch (  IOException e) {
-    rollback(iTx);
-  }
- finally {
+  finally {
     lock.releaseExclusiveLock();
   }
 }

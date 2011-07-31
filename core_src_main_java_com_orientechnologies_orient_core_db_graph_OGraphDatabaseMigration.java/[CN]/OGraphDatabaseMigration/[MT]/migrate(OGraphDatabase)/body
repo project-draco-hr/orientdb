@@ -1,0 +1,36 @@
+{
+  System.out.println("Migration of database started...");
+  final long start=System.currentTimeMillis();
+  try {
+    if (db.getVertexBaseClass().existsProperty(OGraphDatabase.VERTEX_FIELD_OUT_EDGES)) {
+      db.getVertexBaseClass().dropProperty(OGraphDatabase.VERTEX_FIELD_OUT_EDGES);
+      db.getVertexBaseClass().createProperty(OGraphDatabase.VERTEX_FIELD_OUT,OType.LINKSET,db.getEdgeBaseClass());
+    }
+    if (db.getVertexBaseClass().existsProperty(OGraphDatabase.VERTEX_FIELD_IN_EDGES)) {
+      db.getVertexBaseClass().dropProperty(OGraphDatabase.VERTEX_FIELD_IN_EDGES);
+      db.getVertexBaseClass().createProperty(OGraphDatabase.VERTEX_FIELD_IN,OType.LINKSET,db.getEdgeBaseClass());
+    }
+    long convertedVertices=0;
+    for (    ODocument doc : db.browseVertices()) {
+      boolean converted=false;
+      if (doc.containsField(OGraphDatabase.VERTEX_FIELD_IN_EDGES)) {
+        doc.field(OGraphDatabase.VERTEX_FIELD_IN,doc.field(OGraphDatabase.VERTEX_FIELD_IN_EDGES));
+        doc.removeField(OGraphDatabase.VERTEX_FIELD_IN_EDGES);
+        converted=true;
+      }
+      if (doc.containsField(OGraphDatabase.VERTEX_FIELD_OUT_EDGES)) {
+        doc.field(OGraphDatabase.VERTEX_FIELD_OUT,doc.field(OGraphDatabase.VERTEX_FIELD_OUT_EDGES));
+        doc.removeField(OGraphDatabase.VERTEX_FIELD_OUT_EDGES);
+        converted=true;
+      }
+      if (converted) {
+        doc.save();
+        convertedVertices++;
+      }
+    }
+    System.out.println(String.format("Migration complete in %d seconds. Vertices converted: %d",(System.currentTimeMillis() - start) / 1000,convertedVertices));
+  }
+  finally {
+    db.close();
+  }
+}

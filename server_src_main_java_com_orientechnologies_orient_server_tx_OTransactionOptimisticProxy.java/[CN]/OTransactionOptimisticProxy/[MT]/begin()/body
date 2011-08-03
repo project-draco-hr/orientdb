@@ -11,12 +11,10 @@ switch (entry.status) {
 case OTransactionRecordEntry.CREATED:
         entry.clusterName=channel.readString();
       entry.getRecord().fill(database,rid,0,channel.readBytes(),true);
-    if (entry.getRecord() instanceof ODocument)     ((ODocument)entry.getRecord()).deserializeFields();
-  createdRecords.put(rid.copy(),entry.getRecord());
-break;
+    createdRecords.put(rid.copy(),entry.getRecord());
+  break;
 case OTransactionRecordEntry.UPDATED:
 entry.getRecord().fill(database,rid,channel.readInt(),channel.readBytes(),true);
-if (entry.getRecord() instanceof ODocument) ((ODocument)entry.getRecord()).deserializeFields();
 updatedRecords.put(rid,entry.getRecord());
 break;
 case OTransactionRecordEntry.DELETED:
@@ -28,6 +26,8 @@ throw new OTransactionException("Unrecognized tx command: " + entry.status);
 recordEntries.put((ORecordId)entry.getRecord().getIdentity(),entry);
 }
 remoteIndexEntries=new ODocument(channel.readBytes());
+for (ORecord<?> record : createdRecords.values()) unmarshallRecord(record);
+for (ORecord<?> record : updatedRecords.values()) unmarshallRecord(record);
 }
  catch (IOException e) {
 rollback();

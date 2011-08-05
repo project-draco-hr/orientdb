@@ -1,22 +1,30 @@
 {
   final Map<OProperty,Object> indexedProperties=getIndexedProperties(iRecord);
   if (indexedProperties != null) {
-    final Set<String> dirtyFields=iRecord.getDirtyFields();
+    final String[] dirtyFields=iRecord.getDirtyFields();
     OIndex index;
-    if (dirtyFields.size() > 0) {
+    if (dirtyFields.length > 0) {
       for (      Entry<OProperty,Object> propEntry : indexedProperties.entrySet()) {
-        if (dirtyFields.contains(propEntry.getKey().getName())) {
+        for (        String f : dirtyFields)         if (f.equals(propEntry.getKey().getName())) {
           index=propEntry.getKey().getIndex().getUnderlying();
           index.remove(propEntry.getValue(),iRecord);
           index.lazySave();
+          break;
         }
       }
     }
     for (    Entry<OProperty,Object> propEntry : indexedProperties.entrySet()) {
-      if (iRecord.containsField(propEntry.getKey().getName()) && (dirtyFields == null || !dirtyFields.contains(propEntry.getKey().getName()))) {
-        index=propEntry.getKey().getIndex().getUnderlying();
-        index.remove(propEntry.getValue(),iRecord);
-        index.lazySave();
+      if (iRecord.containsField(propEntry.getKey().getName())) {
+        boolean found=false;
+        for (        String f : dirtyFields)         if (f.equals(propEntry.getKey().getName())) {
+          found=true;
+          break;
+        }
+        if (!found) {
+          index=propEntry.getKey().getIndex().getUnderlying();
+          index.remove(propEntry.getValue(),iRecord);
+          index.lazySave();
+        }
       }
     }
   }

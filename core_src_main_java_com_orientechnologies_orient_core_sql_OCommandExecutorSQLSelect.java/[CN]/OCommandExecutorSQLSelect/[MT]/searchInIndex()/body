@@ -1,5 +1,5 @@
 {
-  final OIndex index=database.getMetadata().getIndexManager().getIndex(compiledFilter.getTargetIndex());
+  final OIndex<Object> index=database.getMetadata().getIndexManager().getIndex(compiledFilter.getTargetIndex());
   if (index == null)   throw new OCommandExecutionException("Target index '" + compiledFilter.getTargetIndex() + "' not found");
   if (compiledFilter.getRootCondition() != null) {
     if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))     throw new OCommandExecutionException("'Key' field is required for queries against indexes");
@@ -63,14 +63,16 @@
       }
     }
  else {
-      result=index.get(keyValue);
-      for (      OIdentifiable r : result)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
+      Object res=index.get(keyValue);
+      if (res != null)       if (res instanceof Collection<?>)       for (      OIdentifiable r : (Collection<OIdentifiable>)res)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
+ else       addResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()));
     }
   }
  else {
-    for (Iterator<Entry<Object,Set<OIdentifiable>>> it=index.iterator(); it.hasNext(); ) {
-      final Entry<Object,Set<OIdentifiable>> current=it.next();
-      for (Iterator<OIdentifiable> collIt=((ORecordLazySet)current.getValue()).rawIterator(); collIt.hasNext(); )       addResult(createIndexEntryAsDocument(current.getKey(),collIt.next().getIdentity()));
+    for (Iterator<Entry<Object,Object>> it=index.iterator(); it.hasNext(); ) {
+      final Entry<Object,Object> current=it.next();
+      if (current.getValue() instanceof Collection<?>)       for (Iterator<OIdentifiable> collIt=((ORecordLazySet)current.getValue()).rawIterator(); collIt.hasNext(); )       addResult(createIndexEntryAsDocument(current.getKey(),collIt.next().getIdentity()));
+ else       addResult(createIndexEntryAsDocument(current.getKey(),(OIdentifiable)current.getValue()));
     }
   }
   if (anyFunctionAggregates) {

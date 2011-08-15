@@ -1,11 +1,28 @@
 {
+  optimize();
   final long timer=OProfiler.getInstance().startChrono();
   try {
-    V v=super.remove(key);
-    commitChanges();
-    return v;
+    for (int i=0; i < 10; ++i) {
+      try {
+        V v=super.remove(key);
+        commitChanges();
+        return v;
+      }
+ catch (      OLowMemoryException e) {
+        OLogManager.instance().warn(this,"Optimization required during remove %d/10",i);
+        optimize(true);
+        System.gc();
+        if (i > 0)         try {
+          Thread.sleep(300 * i);
+        }
+ catch (        InterruptedException e1) {
+        }
+        optimization=-1;
+      }
+    }
   }
   finally {
     OProfiler.getInstance().stopChrono("OMVRBTreePersistent.remove",timer);
   }
+  throw new OLowMemoryException("OMVRBTreePersistent.remove()");
 }

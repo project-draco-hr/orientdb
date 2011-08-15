@@ -8,11 +8,26 @@
     rec=(ORecord<?>)value;
     if (!rec.getIdentity().isValid())     rec.save();
   }
-  final V previous=super.put(key,value);
-  if (optimizeThreshold > -1 && insertionCounter > optimizeThreshold) {
-    insertionCounter=0;
-    optimize(false);
+  for (int i=0; i < 10; ++i) {
+    try {
+      final V previous=super.put(key,value);
+      if (optimizeThreshold > -1 && ++insertionCounter >= optimizeThreshold) {
+        insertionCounter=0;
+        optimization=2;
+        optimize(true);
+      }
+      return previous;
+    }
+ catch (    OLowMemoryException e) {
+      OLogManager.instance().warn(this,"Optimization required during put %d/10",i);
+      optimize(true);
+      System.gc();
+      if (i > 0)       try {
+        Thread.sleep(300 * i);
+      }
+ catch (      InterruptedException e1) {
+      }
+    }
   }
- else   ++insertionCounter;
-  return previous;
+  throw new OLowMemoryException("OMVRBTreePersistent.put()");
 }

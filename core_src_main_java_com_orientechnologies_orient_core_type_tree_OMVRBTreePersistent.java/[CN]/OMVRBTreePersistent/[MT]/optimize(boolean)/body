@@ -1,107 +1,49 @@
 {
+  if (optimization == -1)   return 0;
+  if (!iForce && optimization == 0)   return 0;
+  optimization=-1;
   final long timer=OProfiler.getInstance().startChrono();
   try {
     if (root == null)     return 0;
-    OLogManager.instance().debug(this,"Starting optimization of MVRB+Tree with %d items in memory...",cache.size());
-    OMVRBTreeEntryPersistent<K,V> pRoot=(OMVRBTreeEntryPersistent<K,V>)root;
-    if (entryPoints.size() == 0)     entryPoints.add(pRoot);
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Starting optimization of MVRB+Tree with %d items in memory...",cache.size());
+    if (entryPoints.size() == 0)     addNodeAsEntrypoint((OMVRBTreeEntryPersistent<K,V>)root);
     config();
-    int nodes=0;
-    List<OMVRBTreeEntryPersistent<K,V>> tmp=null;
-    if (isRuntimeCheckEnabled())     tmp=new ArrayList<OMVRBTreeEntryPersistent<K,V>>();
-    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
-      for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory()) {
-        if (isRuntimeCheckEnabled()) {
-          for (          OMVRBTreeEntryPersistent<K,V> t : tmp)           if (t != e && t.record.getIdentity().equals(e.record.getIdentity())) {
-            OLogManager.instance().error(this,"Found Node loaded in memory twice with different instances: " + e);
-            continue;
-          }
-          tmp.add(e);
-        }
-        ++nodes;
-      }
-    }
-    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Found %d nodes in memory, %d items on disk, threshold=%d, entryPoints=%d",nodes,size,(entryPointsSize * optimizeEntryPointsFactor),entryPoints.size());
-    if (!iForce && nodes < entryPointsSize * optimizeEntryPointsFactor)     return 0;
-    if (debug)     System.out.printf("\n------------\nOptimizing: total items %d, root is %s...",size(),pRoot.toString());
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Found %d items on disk, threshold=%f, entryPoints=%d, nodesInCache=%d",size,(entryPointsSize * optimizeEntryPointsFactor),entryPoints.size(),cache.size());
+    final int nodesInMemory=cache.size();
+    if (!iForce && nodesInMemory < entryPointsSize * optimizeEntryPointsFactor)     return 0;
     lastSearchFound=false;
     lastSearchKey=null;
     lastSearchNode=null;
-    final int distance;
-    if (nodes <= entryPointsSize)     distance=1;
- else     distance=nodes / entryPointsSize + 1;
-    final List<OMVRBTreeEntryPersistent<K,V>> newEntryPoints=new ArrayList<OMVRBTreeEntryPersistent<K,V>>(entryPointsSize + 1);
-    OLogManager.instance().debug(this,"Compacting nodes with distance = %d",distance);
-    int nodeCounter=0;
-    OMVRBTreeEntryPersistent<K,V> lastNode=null;
-    OMVRBTreeEntryPersistent<K,V> currNode;
-    for (int i=0; i < entryPoints.size(); ++i) {
-      currNode=entryPoints.get(i);
-      for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)currNode.getFirstInMemory(); e != null; e=e.getNextInMemory()) {
-        boolean alreadyPresent=false;
-        for (int k=i + 1; k < entryPoints.size(); ++k)         if (e == entryPoints.get(k)) {
-          alreadyPresent=true;
-          break;
-        }
-        if (alreadyPresent)         continue;
-        ++nodeCounter;
-        if (newEntryPoints.size() == 0 || nodeCounter % distance == 0) {
-          for (          OMVRBTreeEntryPersistent<K,V> ep : newEntryPoints)           if (ep == e) {
-            alreadyPresent=true;
-            break;
-          }
-          if (alreadyPresent)           --nodeCounter;
- else           newEntryPoints.add(e);
-        }
-        lastNode=e;
-      }
-    }
-    if (newEntryPoints.size() > 1 && newEntryPoints.get(newEntryPoints.size() - 1) != lastNode)     newEntryPoints.add(lastNode);
-    int cmp;
-    for (int i=0; i < newEntryPoints.size(); ++i) {
-      cmp=((Comparable<K>)pRoot.getFirstKey()).compareTo(newEntryPoints.get(i).getFirstKey());
-      if (cmp < 0) {
-        newEntryPoints.add(i,pRoot);
-        break;
-      }
- else       if (cmp == 0)       break;
-    }
-    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints) {
-      if (entryPoint.parent == null && entryPoint.left == null && entryPoint.right == null && entryPoint != root) {
-        boolean found=false;
-        for (        OMVRBTreeEntryPersistent<K,V> e : newEntryPoints) {
-          if (e == entryPoint) {
-            found=true;
-            break;
-          }
-        }
-        if (!found) {
-          cache.remove(entryPoint.record.getIdentity());
-          entryPoint.clear();
-        }
-      }
-    }
-    final List<OMVRBTreeEntryPersistent<K,V>> oldEntryPoints=entryPoints;
-    entryPoints=newEntryPoints;
     int totalDisconnected=0;
-    for (    OMVRBTreeEntryPersistent<K,V> entryPoint : oldEntryPoints) {
-      totalDisconnected+=entryPoint.disconnectLinked(false);
-    }
-    oldEntryPoints.clear();
-    if (isRuntimeCheckEnabled()) {
-      for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
-      if (OLogManager.instance().isDebugEnabled()) {
-        nodes=0;
-        for (        OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)         for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())         ++nodes;
-        OLogManager.instance().debug(this,"Now Found %d nodes in memory and threshold=%d. EntryPoints=%d",nodes,(entryPointsSize * optimizeEntryPointsFactor),entryPoints.size());
+    if (nodesInMemory > entryPointsSize) {
+      final int distance=nodesInMemory / entryPointsSize + 1;
+      final Set<OMVRBTreeEntryPersistent<K,V>> entryPointsToRemove=new HashSet<OMVRBTreeEntryPersistent<K,V>>(nodesInMemory - entryPointsSize + 2);
+      int currNode=0;
+      for (final Iterator<OMVRBTreeEntryPersistent<K,V>> it=entryPoints.values().iterator(); it.hasNext(); ) {
+        final OMVRBTreeEntryPersistent<K,V> currentNode=it.next();
+        if (currentNode != root && currentNode != lastSearchNode)         if (++currNode % distance != 0) {
+          entryPointsToRemove.add(currentNode);
+          it.remove();
+        }
       }
+      addNodeAsEntrypoint((OMVRBTreeEntryPersistent<K,V>)lastSearchNode);
+      addNodeAsEntrypoint((OMVRBTreeEntryPersistent<K,V>)root);
+      for (      OMVRBTreeEntryPersistent<K,V> currentNode : entryPointsToRemove)       totalDisconnected+=currentNode.disconnectLinked(false);
     }
-    OLogManager.instance().debug(this,"Optimization done: MVRB-Tree nodes reduced to %d items",cache.size());
+    if (isRuntimeCheckEnabled()) {
+      for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints.values())       for (OMVRBTreeEntryPersistent<K,V> e=(OMVRBTreeEntryPersistent<K,V>)entryPoint.getFirstInMemory(); e != null; e=e.getNextInMemory())       e.checkEntryStructure();
+    }
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"After optimization: %d items on disk, threshold=%f, entryPoints=%d, nodesInCache=%d",size,(entryPointsSize * optimizeEntryPointsFactor),entryPoints.size(),cache.size());
+    if (debug) {
+      int i=0;
+      for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints.values())       System.out.println("- Entrypoint " + ++i + "/"+ entryPoints.size()+ ": "+ entryPoint);
+    }
     return totalDisconnected;
   }
   finally {
+    optimization=0;
     if (isRuntimeCheckEnabled()) {
-      if (entryPoints.size() > 0)       for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints)       checkTreeStructure(entryPoint.getFirstInMemory());
+      if (entryPoints.size() > 0)       for (      OMVRBTreeEntryPersistent<K,V> entryPoint : entryPoints.values())       checkTreeStructure(entryPoint.getFirstInMemory());
  else       checkTreeStructure(root);
     }
     OProfiler.getInstance().stopChrono("OMVRBTreePersistent.optimize",timer);

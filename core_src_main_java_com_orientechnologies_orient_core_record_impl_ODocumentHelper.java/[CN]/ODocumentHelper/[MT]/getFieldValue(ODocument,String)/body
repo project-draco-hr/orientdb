@@ -1,0 +1,100 @@
+{
+  int separatorPos=0;
+  final int fieldNameLength=iFieldName.length();
+  Object value=null;
+  do {
+    char separator=' ';
+    for (; separatorPos < fieldNameLength; ++separatorPos) {
+      separator=iFieldName.charAt(separatorPos);
+      if (separator == '.' || separator == '[')       break;
+    }
+    final String fieldName;
+    if (separatorPos < fieldNameLength)     fieldName=iFieldName.substring(0,separatorPos);
+ else     fieldName=iFieldName;
+    if (separator == '.') {
+      value=current._fieldValues.get(fieldName);
+      if (value == null || !(value instanceof ODocument))       return null;
+      current=(ODocument)value;
+      if (current.getInternalStatus() == STATUS.NOT_LOADED)       current.reload();
+    }
+ else     if (separator == '[') {
+      if (value == null)       value=current._fieldValues.get(fieldName);
+      final int end=iFieldName.indexOf(']',separatorPos);
+      if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
+      final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(separatorPos + 1,end));
+      separatorPos=end + 1;
+      if (value == null)       return null;
+ else       if (value instanceof ODocument) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        if (indexParts.size() == 1)         value=((ODocument)value).field(index);
+ else {
+          final Object[] values=new Object[indexParts.size()];
+          for (int i=0; i < indexParts.size(); ++i) {
+            values[i]=((ODocument)value).field(indexParts.get(i));
+          }
+          value=values;
+        }
+      }
+ else       if (value instanceof Map<?,?>) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        if (indexParts.size() == 1)         value=((Map<?,?>)value).get(index);
+ else {
+          final Object[] values=new Object[indexParts.size()];
+          for (int i=0; i < indexParts.size(); ++i) {
+            values[i]=((Map<?,?>)value).get(indexParts.get(i));
+          }
+          value=values;
+        }
+      }
+ else       if (value instanceof List<?>) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        final List<String> indexRanges=OStringSerializerHelper.smartSplit(index,'-');
+        if (indexParts.size() == 1 && indexRanges.size() == 1)         value=((List<?>)value).get(Integer.parseInt(index));
+ else {
+          final Object[] values;
+          if (indexParts.size() > 1) {
+            values=new Object[indexParts.size()];
+            for (int i=0; i < indexParts.size(); ++i) {
+              values[i]=((List<?>)value).get(Integer.parseInt(indexParts.get(i)));
+            }
+          }
+ else {
+            final int rangeFrom=Integer.parseInt(indexRanges.get(0));
+            final int rangeTo=Integer.parseInt(indexRanges.get(1));
+            values=new Object[rangeTo - rangeFrom + 1];
+            for (int i=rangeFrom; i <= rangeTo; ++i) {
+              values[i - rangeFrom]=((List<?>)value).get(i);
+            }
+          }
+          value=values;
+        }
+      }
+ else       if (value.getClass().isArray()) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        final List<String> indexRanges=OStringSerializerHelper.smartSplit(index,'-');
+        if (indexParts.size() == 1 && indexRanges.size() == 1)         value=Array.get(value,Integer.parseInt(index));
+ else {
+          final Object[] values;
+          if (indexParts.size() > 1) {
+            values=new Object[indexParts.size()];
+            for (int i=0; i < indexParts.size(); ++i) {
+              values[i]=Array.get(value,Integer.parseInt(indexParts.get(i)));
+            }
+          }
+ else {
+            final int rangeFrom=Integer.parseInt(indexRanges.get(0));
+            final int rangeTo=Integer.parseInt(indexRanges.get(1));
+            values=new Object[rangeTo - rangeFrom + 1];
+            for (int i=rangeFrom; i <= rangeTo; ++i) {
+              values[i - rangeFrom]=Array.get(value,i);
+            }
+          }
+          value=values;
+        }
+      }
+    }
+ else     value=current._fieldValues.get(fieldName);
+  }
+ while (separatorPos < fieldNameLength);
+  return (RET)value;
+}

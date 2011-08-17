@@ -1,49 +1,31 @@
 {
-  final int beginParenthesis=iText.indexOf('(');
-  int separatorPos=iText.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR);
-  if (beginParenthesis > -1 && separatorPos > -1 && separatorPos > beginParenthesis) {
-    final List<String> functionParams=new ArrayList<String>();
-    final int endParenthesis=OStringSerializerHelper.getParameters(iText,beginParenthesis,functionParams) - 1;
-    if (endParenthesis > separatorPos)     separatorPos=iText.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR,endParenthesis);
-  }
-  if (separatorPos > -1) {
-    setRoot(iQueryToParse,iText.substring(0,separatorPos));
-    String part=iText;
-    String partUpperCase=part.toUpperCase();
-    boolean operatorFound;
-    while (separatorPos > -1) {
-      part=part.substring(separatorPos + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length());
-      partUpperCase=partUpperCase.substring(separatorPos + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length());
-      operatorFound=false;
-      for (      OSQLFilterFieldOperator op : OSQLFilterFieldOperator.OPERATORS)       if (partUpperCase.startsWith(op.keyword + "(")) {
-        final List<String> arguments;
-        if (op.minArguments > 0) {
-          arguments=OStringSerializerHelper.getParameters(part);
-          if (arguments.size() < op.minArguments || arguments.size() > op.maxArguments)           throw new OQueryParsingException(iQueryToParse.text,"Syntax error: field operator '" + op.keyword + "' needs "+ (op.minArguments == op.maxArguments ? op.minArguments : op.minArguments + "-" + op.maxArguments)+ " argument(s) while has been received "+ arguments.size(),iQueryToParse.currentPos + separatorPos);
+  final List<String> parts=OStringSerializerHelper.smartSplit(iText,'.');
+  setRoot(iQueryToParse,parts.get(0));
+  if (parts.size() > 1) {
+    operationsChain=new ArrayList<OPair<Integer,List<String>>>();
+    for (int i=1; i < parts.size(); ++i) {
+      String part=parts.get(i);
+      String partUpperCase=part.toUpperCase();
+      if (part.indexOf('(') > -1) {
+        boolean operatorFound=false;
+        for (        OSQLFilterFieldOperator op : OSQLFilterFieldOperator.OPERATORS)         if (partUpperCase.startsWith(op.keyword + "(")) {
+          final List<String> arguments;
+          if (op.minArguments > 0) {
+            arguments=OStringSerializerHelper.getParameters(part);
+            if (arguments.size() < op.minArguments || arguments.size() > op.maxArguments)             throw new OQueryParsingException(iQueryToParse.text,"Syntax error: field operator '" + op.keyword + "' needs "+ (op.minArguments == op.maxArguments ? op.minArguments : op.minArguments + "-" + op.maxArguments)+ " argument(s) while has been received "+ arguments.size(),0);
+          }
+ else           arguments=null;
+          operationsChain.add(new OPair<Integer,List<String>>(op.id,arguments));
+          operatorFound=true;
+          break;
         }
- else         arguments=null;
-        if (operationsChain == null)         operationsChain=new ArrayList<OPair<Integer,List<String>>>();
-        operationsChain.add(new OPair<Integer,List<String>>(op.id,arguments));
-        separatorPos=partUpperCase.indexOf(OStringSerializerHelper.PARENTHESIS_END) + OSQLFilterFieldOperator.CHAIN_SEPARATOR.length();
-        operatorFound=true;
-        break;
+        if (!operatorFound)         throw new OQueryParsingException(iQueryToParse.text,"Syntax error: field operator not recognized between the supported ones: " + Arrays.toString(OSQLFilterFieldOperator.OPERATORS),0);
       }
-      if (!operatorFound) {
-        separatorPos=partUpperCase.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR,0);
-        int posOpenBrace=part.indexOf('(');
-        if (posOpenBrace == -1 || posOpenBrace > separatorPos && separatorPos > -1) {
-          String chainedFieldName=separatorPos > -1 ? part.substring(0,separatorPos) : part;
-          if (operationsChain == null)           operationsChain=new ArrayList<OPair<Integer,List<String>>>();
-          final List<String> list=new ArrayList<String>();
-          list.add(chainedFieldName);
-          if (chainedFieldName.charAt(0) == '@')           operationsChain.add(new OPair<Integer,List<String>>(OSQLFilterFieldOperator.ATTRIB.id,list));
- else           operationsChain.add(new OPair<Integer,List<String>>(OSQLFilterFieldOperator.FIELD.id,list));
-        }
- else         throw new OQueryParsingException(iQueryToParse.text,"Syntax error: field operator not recognized between the supported ones: " + Arrays.toString(OSQLFilterFieldOperator.OPERATORS),iQueryToParse.currentPos + separatorPos);
+ else {
+        final List<String> list=new ArrayList<String>();
+        list.add(part);
+        operationsChain.add(new OPair<Integer,List<String>>(OSQLFilterFieldOperator.FIELD.id,list));
       }
-      if (separatorPos >= partUpperCase.length())       return;
-      separatorPos=partUpperCase.indexOf(OSQLFilterFieldOperator.CHAIN_SEPARATOR,separatorPos);
     }
   }
- else   setRoot(iQueryToParse,iText);
 }

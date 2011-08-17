@@ -1,7 +1,8 @@
 {
-  int separatorPos=0;
   final int fieldNameLength=iFieldName.length();
   Object value=null;
+  int beginPos=0;
+  int separatorPos=0;
   do {
     char separator=' ';
     for (; separatorPos < fieldNameLength; ++separatorPos) {
@@ -9,21 +10,21 @@
       if (separator == '.' || separator == '[')       break;
     }
     final String fieldName;
-    if (separatorPos < fieldNameLength)     fieldName=iFieldName.substring(0,separatorPos);
- else     fieldName=iFieldName;
+    if (separatorPos < fieldNameLength)     fieldName=iFieldName.substring(beginPos,separatorPos);
+ else     fieldName=iFieldName.substring(beginPos);
     if (separator == '.') {
-      value=current._fieldValues.get(fieldName);
+      value=getIdentifiableValue(current,fieldName);
       if (value == null || !(value instanceof ODocument))       return null;
       current=(ODocument)value;
       if (current.getInternalStatus() == STATUS.NOT_LOADED)       current.reload();
     }
  else     if (separator == '[') {
-      if (value == null)       value=current._fieldValues.get(fieldName);
+      if (value == null)       value=getIdentifiableValue(current,fieldName);
       if (value == null)       return null;
       final int end=iFieldName.indexOf(']',separatorPos);
       if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
       final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(separatorPos + 1,end));
-      separatorPos=end + 1;
+      separatorPos=end;
       if (value instanceof ODocument) {
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
         if (indexParts.size() == 1)         value=((ODocument)value).field(index);
@@ -50,7 +51,7 @@
         final boolean isArray=value.getClass().isArray();
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
         final List<String> indexRanges=OStringSerializerHelper.smartSplit(index,'-');
-        final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=');
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=',' ');
         if (indexParts.size() == 1 && indexRanges.size() == 1 && indexCondition.size() == 1) {
           if (isArray)           value=Array.get(value,Integer.parseInt(index));
  else           value=((List<?>)value).get(Integer.parseInt(index));
@@ -83,12 +84,10 @@
           for (          Object v : (Collection<Object>)value) {
             if (v instanceof ODocument) {
               final ODocument doc=(ODocument)v;
-              if (doc.containsField(conditionFieldName)) {
-                Object fieldValue=doc.field(conditionFieldName);
-                fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
-                if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
-                  values.add(doc);
-                }
+              Object fieldValue=doc.field(conditionFieldName);
+              fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
+              if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
+                values.add(doc);
               }
             }
           }
@@ -98,7 +97,8 @@
         }
       }
     }
- else     value=current._fieldValues.get(fieldName);
+ else     value=getIdentifiableValue(current,fieldName);
+    beginPos=++separatorPos;
   }
  while (separatorPos < fieldNameLength);
   return (RET)value;

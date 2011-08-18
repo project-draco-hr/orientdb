@@ -1,7 +1,6 @@
 {
   final OCluster cluster=storage.getClusterById(iRid.clusterId);
   if (!(cluster instanceof OClusterLocal))   return;
-  final OClusterLocal logCluster=(OClusterLocal)cluster;
   OLogManager.instance().debug(this,"Recovering tx <%d>. Operation <%d> was in status <%d> on record %s in data space %d...",iTxId,iOperation,iStatus,iRid,iOldDataOffset);
 switch (iOperation) {
 case OPERATION_CREATE:
@@ -12,15 +11,13 @@ cluster.getPhysicalPosition(iRid.clusterPosition,ppos);
 long oldPosition=ppos.dataPosition;
 int oldSize=storage.getDataSegment(ppos.dataSegment).getRecordSize(ppos.dataPosition);
 ppos.dataPosition=iOldDataOffset;
-ppos.recordSize=storage.getDataSegment(ppos.dataSegment).getRecordSize(iOldDataOffset);
+ppos.recordSize=storage.getDataSegment(iOldDataId).getRecordSize(iOldDataOffset);
 cluster.setPhysicalPosition(iRid.clusterPosition,ppos.dataSegment,iOldDataOffset,ppos.type,--ppos.version);
-storage.getDataSegment(ppos.dataSegment).updateRid(iOldDataOffset,iRid);
+storage.getDataSegment(iOldDataId).updateRid(iOldDataOffset,iRid);
 storage.getDataSegment(ppos.dataSegment).handleHole(oldPosition,oldSize);
 break;
 case OPERATION_DELETE:
-cluster.getPhysicalPosition(iRid.clusterPosition,ppos);
-cluster.updateVersion(iRid.clusterPosition,0);
-logCluster.removeHole(iRid.clusterPosition);
+cluster.updateVersion(iRid.clusterPosition,iRecordVersion);
 break;
 }
 }

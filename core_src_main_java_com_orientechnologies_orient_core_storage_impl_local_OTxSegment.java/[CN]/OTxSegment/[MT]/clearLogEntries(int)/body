@@ -21,36 +21,31 @@
           offset+=OConstants.SIZE_SHORT;
           rid.clusterPosition=file.readLong(offset);
           offset+=OConstants.SIZE_LONG;
+          final int oldDataId=file.readInt(offset);
+          offset+=OConstants.SIZE_INT;
           final long oldDataOffset=file.readLong(offset);
           offset+=OConstants.SIZE_LONG;
-switch (operation) {
-case OPERATION_DELETE:
-case OPERATION_CREATE:
-            break;
-case OPERATION_UPDATE:
-          storage.getDataSegment(0).handleHole(oldDataOffset,storage.getDataSegment(0).getRecordSize(oldDataOffset));
-        break;
+          finalizeTransactionEntry(operation,rid,oldDataId,oldDataOffset);
+          file.writeByte(offset,STATUS_FREE);
+          recordFreed++;
+        }
+      }
     }
-    file.writeByte(offset,STATUS_FREE);
-    recordFreed++;
+    int lastRecord=size - 1;
+    for (int i=size - 1; i > -1 && recordFreed > 0; --i) {
+      offset=i * RECORD_SIZE;
+      status=file.readByte(offset);
+      offset+=OConstants.SIZE_BYTE;
+      offset+=OConstants.SIZE_BYTE;
+      txId=file.readInt(offset);
+      if (txId != iTxId)       break;
+      lastRecord=i;
+      recordFreed--;
+    }
+    if (lastRecord > -1)     file.shrink(lastRecord * RECORD_SIZE);
+    synchTx();
   }
-}
-}
-int lastRecord=size - 1;
-for (int i=size - 1; i > -1 && recordFreed > 0; --i) {
-offset=i * RECORD_SIZE;
-status=file.readByte(offset);
-offset+=OConstants.SIZE_BYTE;
-offset+=OConstants.SIZE_BYTE;
-txId=file.readInt(offset);
-if (txId != iTxId) break;
-lastRecord=i;
-recordFreed--;
-}
-if (lastRecord > -1) file.shrink(lastRecord * RECORD_SIZE);
-synchTx();
-}
   finally {
-releaseExclusiveLock();
-}
+    releaseExclusiveLock();
+  }
 }

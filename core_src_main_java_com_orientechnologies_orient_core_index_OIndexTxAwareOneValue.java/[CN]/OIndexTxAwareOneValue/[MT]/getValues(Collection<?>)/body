@@ -1,0 +1,36 @@
+{
+  final Collection<?> keys=new ArrayList<Object>(iKeys);
+  final Set<OIdentifiable> result=new HashSet<OIdentifiable>();
+  final OTransactionIndexChanges indexChanges=database.getTransaction().getIndexChanges(delegate.getName());
+  if (indexChanges == null) {
+    result.addAll(super.getValues(keys));
+    return result;
+  }
+  final Set<Object> keysToRemove=new HashSet<Object>();
+  for (  final Object key : keys) {
+    if (indexChanges.cleared)     keysToRemove.add(key);
+    OIdentifiable keyResult=null;
+    if (indexChanges.containsChangesPerKey(key)) {
+      final OTransactionIndexChangesPerKey value=indexChanges.getChangesPerKey(key);
+      if (value != null) {
+        for (        final OTransactionIndexEntry entry : value.entries) {
+          if (entry.operation == OPERATION.REMOVE) {
+            if (entry.value == null) {
+              keysToRemove.add(key);
+              keyResult=null;
+              break;
+            }
+          }
+ else           if (entry.operation == OPERATION.PUT) {
+            keyResult=entry.value;
+            keysToRemove.add(key);
+          }
+        }
+      }
+    }
+    if (keyResult != null)     result.add(keyResult);
+  }
+  keys.removeAll(keysToRemove);
+  if (!keys.isEmpty())   result.addAll(super.getValues(keys));
+  return result;
+}

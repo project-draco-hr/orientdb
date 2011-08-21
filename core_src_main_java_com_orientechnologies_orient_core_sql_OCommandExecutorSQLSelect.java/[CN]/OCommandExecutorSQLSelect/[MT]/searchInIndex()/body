@@ -3,68 +3,85 @@
   if (index == null)   throw new OCommandExecutionException("Target index '" + compiledFilter.getTargetIndex() + "' not found");
   if (compiledFilter.getRootCondition() != null) {
     if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))     throw new OCommandExecutionException("'Key' field is required for queries against indexes");
-    final Object right=compiledFilter.getRootCondition().getRight();
-    final Object keyValue=OSQLHelper.getValue(right);
     Collection<OIdentifiable> result=null;
     final OQueryOperator indexOperator=compiledFilter.getRootCondition().getOperator();
     if (indexOperator instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
       if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
         result=index.getValuesBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
-        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
       }
  else {
         final Collection<ODocument> entries=index.getEntriesBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
-        for (        OIdentifiable r : entries)         addResult(r);
+        for (        final OIdentifiable r : entries)         addResult(r);
       }
     }
  else     if (indexOperator instanceof OQueryOperatorMajor) {
       final Object value=compiledFilter.getRootCondition().getRight();
       if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
         result=index.getValuesMajor(OSQLHelper.getValue(value),false);
-        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
       }
  else {
         final Collection<ODocument> entries=index.getEntriesMajor(OSQLHelper.getValue(value),false);
-        for (        ODocument document : entries)         addResult(document);
+        for (        final ODocument document : entries)         addResult(document);
       }
     }
  else     if (indexOperator instanceof OQueryOperatorMajorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
       if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
         result=index.getValuesMajor(OSQLHelper.getValue(value),true);
-        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
       }
  else {
         final Collection<ODocument> entries=index.getEntriesMajor(OSQLHelper.getValue(value),true);
-        for (        ODocument document : entries)         addResult(document);
+        for (        final ODocument document : entries)         addResult(document);
       }
     }
  else     if (indexOperator instanceof OQueryOperatorMinor) {
       final Object value=compiledFilter.getRootCondition().getRight();
       if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
         result=index.getValuesMinor(OSQLHelper.getValue(value),false);
-        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
       }
  else {
         final Collection<ODocument> entries=index.getEntriesMinor(OSQLHelper.getValue(value),false);
-        for (        ODocument document : entries)         addResult(document);
+        for (        final ODocument document : entries)         addResult(document);
       }
     }
  else     if (indexOperator instanceof OQueryOperatorMinorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
       if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
         result=index.getValuesMinor(OSQLHelper.getValue(value),true);
-        for (        OIdentifiable e : result)         addResult(e.getIdentity());
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
       }
  else {
         final Collection<ODocument> entries=index.getEntriesMinor(OSQLHelper.getValue(value),true);
-        for (        ODocument document : entries)         addResult(document);
+        for (        final ODocument document : entries)         addResult(document);
+      }
+    }
+ else     if (indexOperator instanceof OQueryOperatorIn) {
+      final List origValues=(List)compiledFilter.getRootCondition().getRight();
+      final List values=new ArrayList(origValues.size());
+      for (      Object val : origValues) {
+        val=OSQLHelper.getValue(val);
+        val=OType.convert(val,index.getKeyType().getDefaultJavaType());
+        values.add(val);
+      }
+      if (projections != null && projections.size() == 1 && projections.keySet().iterator().next().equalsIgnoreCase("@rid")) {
+        result=index.getValues(values);
+        for (        final OIdentifiable e : result)         addResult(e.getIdentity());
+      }
+ else {
+        final Collection<ODocument> entries=index.getEntries(values);
+        for (        final ODocument document : entries)         addResult(document);
       }
     }
  else {
-      Object res=index.get(keyValue);
-      if (res != null)       if (res instanceof Collection<?>)       for (      OIdentifiable r : (Collection<OIdentifiable>)res)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
+      final Object right=compiledFilter.getRootCondition().getRight();
+      final Object keyValue=OSQLHelper.getValue(right);
+      final Object res=index.get(keyValue);
+      if (res != null)       if (res instanceof Collection<?>)       for (      final OIdentifiable r : (Collection<OIdentifiable>)res)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
  else       addResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()));
     }
   }
@@ -76,7 +93,7 @@
     }
   }
   if (anyFunctionAggregates) {
-    for (    Entry<String,Object> projection : projections.entrySet()) {
+    for (    final Entry<String,Object> projection : projections.entrySet()) {
       if (projection.getValue() instanceof OSQLFunctionRuntime) {
         final OSQLFunctionRuntime f=(OSQLFunctionRuntime)projection.getValue();
         f.setResult(index.getSize());

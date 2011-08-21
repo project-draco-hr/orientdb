@@ -1,0 +1,24 @@
+{
+  final List<Comparable> sortedKeys=new ArrayList<Comparable>((Collection<? extends Comparable>)iKeys);
+  Collections.sort(sortedKeys);
+  final Set<ODocument> result=new HashSet<ODocument>();
+  acquireExclusiveLock();
+  try {
+    for (    final Object key : sortedKeys) {
+      final ORecordLazySet values=(ORecordLazySet)map.get(key);
+      if (values != null)       values.setDatabase(ODatabaseRecordThreadLocal.INSTANCE.get());
+      if (values == null)       continue;
+      for (      final OIdentifiable value : values) {
+        final ODocument document=new ODocument();
+        document.field("key",key);
+        document.field("rid",value.getIdentity());
+        document.unsetDirty();
+        result.add(document);
+      }
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+  return result;
+}

@@ -11,7 +11,21 @@
     final Object origValue=iCondition.getLeft() == iItem ? iCondition.getRight() : iCondition.getLeft();
     final OIndex<?> underlyingIndex=prop.getIndex().getUnderlying();
     if (iCondition.getOperator() instanceof OQueryOperatorBetween) {
+      final Object[] betweenKeys=(Object[])origValue;
+      betweenKeys[0]=OType.convert(betweenKeys[0],underlyingIndex.getKeyType().getDefaultJavaType());
+      betweenKeys[2]=OType.convert(betweenKeys[2],underlyingIndex.getKeyType().getDefaultJavaType());
       iSearchInIndexTriples.add(new OSearchInIndexTriple(iCondition.getOperator(),origValue,underlyingIndex));
+      return true;
+    }
+    if (iCondition.getOperator() instanceof OQueryOperatorIn) {
+      final List origValues=(List)origValue;
+      final List values=new ArrayList(origValues.size());
+      for (      Object val : origValues) {
+        val=OSQLHelper.getValue(val);
+        val=OType.convert(val,underlyingIndex.getKeyType().getDefaultJavaType());
+        values.add(val);
+      }
+      iSearchInIndexTriples.add(new OSearchInIndexTriple(iCondition.getOperator(),values,underlyingIndex));
       return true;
     }
     Object value=OSQLHelper.getValue(origValue);

@@ -1,0 +1,31 @@
+{
+  final OProperty nickProperty=database.getMetadata().getSchema().getClass("Profile").getProperty("nick");
+  Assert.assertEquals(nickProperty.getIndex().getUnderlying().getType(),INDEX_TYPE.NOTUNIQUE.toString());
+  final boolean localStorage=!(database.getStorage() instanceof OStorageRemote || database.getStorage() instanceof OStorageRemoteThread);
+  boolean oldRecording=true;
+  long indexQueries=0L;
+  if (localStorage) {
+    oldRecording=OProfiler.getInstance().isRecording();
+    if (!oldRecording) {
+      OProfiler.getInstance().startRecording();
+    }
+    indexQueries=OProfiler.getInstance().getCounter("Query.indexUsage");
+    if (indexQueries < 0) {
+      indexQueries=0;
+    }
+  }
+  final List<Profile> result=database.command(new OSQLSynchQuery<Profile>("SELECT * FROM Profile WHERE nick in ['ZZZJayLongNickIndex0' ,'ZZZJayLongNickIndex1', 'ZZZJayLongNickIndex2']")).execute();
+  final List<String> expectedSurnames=new ArrayList<String>(Arrays.asList("NolteIndex0","NolteIndex1","NolteIndex2"));
+  if (localStorage && !oldRecording) {
+    OProfiler.getInstance().stopRecording();
+  }
+  Assert.assertEquals(result.size(),3);
+  for (  final Profile profile : result) {
+    expectedSurnames.remove(profile.getSurname());
+  }
+  Assert.assertEquals(expectedSurnames.size(),0);
+  if (localStorage) {
+    final long newIndexQueries=OProfiler.getInstance().getCounter("Query.indexUsage");
+    Assert.assertEquals(newIndexQueries,indexQueries + 1);
+  }
+}

@@ -1,0 +1,17 @@
+{
+  database.command(new OCommandSQL("create index inIdx notunique")).execute();
+  database.getMetadata().getIndexManager().reload();
+  Assert.assertNotNull(database.getMetadata().getIndexManager().getIndex("inIdx"));
+  for (int i=0; i < 2; i++)   for (int key=0; key <= 2; key++) {
+    database.command(new OCommandSQL("insert into index:inIdx (key,rid) values (" + key + ",#10:"+ (i + key * 2)+ ")")).execute();
+  }
+  final OIndex<?> index=database.getMetadata().getIndexManager().getIndex("inIdx");
+  final Collection<Integer> multiGetResults=new ArrayList<Integer>(Arrays.asList(0,0,2,2));
+  final Collection<ODocument> indexCollection=index.getEntries(Arrays.asList(0,2));
+  Assert.assertEquals(indexCollection.size(),4);
+  for (  final ODocument doc : indexCollection) {
+    multiGetResults.remove(doc.<Integer>field("key"));
+  }
+  Assert.assertEquals(multiGetResults.size(),0);
+  database.command(new OCommandSQL("drop index inIdx")).execute();
+}

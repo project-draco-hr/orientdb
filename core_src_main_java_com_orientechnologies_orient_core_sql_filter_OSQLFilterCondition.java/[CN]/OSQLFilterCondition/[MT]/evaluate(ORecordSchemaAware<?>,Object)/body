@@ -1,19 +1,26 @@
 {
-  if (iValue instanceof OSQLFilterItem) {
-    if (iRecord.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED) {
-      try {
-        iRecord=(ORecordSchemaAware<?>)iRecord.load();
-      }
- catch (      ORecordNotFoundException e) {
-        return null;
-      }
+  if (iRecord.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED) {
+    try {
+      iRecord=(ORecordSchemaAware<?>)iRecord.load();
     }
-    return ((OSQLFilterItem)iValue).getValue(iRecord);
+ catch (    ORecordNotFoundException e) {
+      return null;
+    }
   }
-  if (iValue instanceof OSQLFilterCondition)   return ((OSQLFilterCondition)iValue).evaluate(iRecord);
-  if (iValue instanceof OSQLFunctionRuntime) {
+  if (iValue instanceof OSQLFilterItem)   return ((OSQLFilterItem)iValue).getValue(iRecord);
+ else   if (iValue instanceof OSQLFilterCondition)   return ((OSQLFilterCondition)iValue).evaluate(iRecord);
+ else   if (iValue instanceof OSQLFunctionRuntime) {
     final OSQLFunctionRuntime f=(OSQLFunctionRuntime)iValue;
     return f.execute(iRecord);
+  }
+  final Object firstValue=OMultiValue.getFirstValue(iValue);
+  if (firstValue != null && firstValue instanceof OSQLFilterItem) {
+    final ArrayList<Object> result=new ArrayList<Object>(OMultiValue.getSize(iValue));
+    for (    Object value : OMultiValue.getMultiValueIterable(iValue)) {
+      if (value instanceof OSQLFilterItem)       result.add(((OSQLFilterItem)value).getValue(iRecord));
+ else       result.add(value);
+    }
+    return result;
   }
   return iValue;
 }

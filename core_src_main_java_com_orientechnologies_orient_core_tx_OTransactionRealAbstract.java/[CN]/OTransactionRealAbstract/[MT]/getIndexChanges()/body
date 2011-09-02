@@ -2,11 +2,11 @@
   final StringBuilder value=new StringBuilder();
   final ODocument result=new ODocument();
   for (  Entry<String,OTransactionIndexChanges> indexEntry : indexEntries.entrySet()) {
-    final ODocument indexDoc=new ODocument();
-    result.field(indexEntry.getKey(),indexDoc);
+    final ODocument indexDoc=new ODocument().addOwner(result);
+    result.field(indexEntry.getKey(),indexDoc,OType.EMBEDDED);
     if (indexEntry.getValue().cleared)     indexDoc.field("clear",Boolean.TRUE);
     final List<ODocument> entries=new ArrayList<ODocument>();
-    indexDoc.field("entries",entries);
+    indexDoc.field("entries",entries,OType.EMBEDDEDLIST);
     for (    OTransactionIndexChangesPerKey entry : indexEntry.getValue().changesPerKey.values()) {
       value.setLength(0);
       if (entry.key != null)       ORecordSerializerStringAbstract.fieldTypeToString(value,null,OType.getTypeByClass(entry.key.getClass()),entry.key);
@@ -15,14 +15,14 @@
       final List<ODocument> operations=new ArrayList<ODocument>();
       if (entry.entries != null && !entry.entries.isEmpty()) {
         for (        OTransactionIndexEntry e : entry.entries) {
-          final ODocument changeDoc=new ODocument();
+          final ODocument changeDoc=new ODocument().addOwner(indexDoc);
           changeDoc.field("o",e.operation.ordinal());
           if (e.value instanceof ORecord<?> && e.value.getIdentity().isNew())           ((ORecord<?>)e.value).save();
           changeDoc.field("v",e.value.getIdentity());
           operations.add(changeDoc);
         }
       }
-      entries.add(new ODocument().field("k",OStringSerializerHelper.encode(key)).field("ops",operations));
+      entries.add(new ODocument().addOwner(indexDoc).field("k",OStringSerializerHelper.encode(key)).field("ops",operations,OType.EMBEDDEDLIST));
     }
   }
   indexEntries.clear();

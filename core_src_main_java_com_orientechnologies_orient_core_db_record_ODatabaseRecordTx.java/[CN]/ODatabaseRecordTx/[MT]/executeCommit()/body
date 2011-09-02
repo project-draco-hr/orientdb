@@ -1,25 +1,28 @@
 {
-  final List<String> involvedIndexes=currentTx.getInvolvedIndexes();
-  List<OIndexMVRBTreeAbstract<?>> lockedIndexes=null;
-  try {
-    if (involvedIndexes != null)     for (    String indexName : involvedIndexes) {
-      final OIndexMVRBTreeAbstract<?> index=(OIndexMVRBTreeAbstract<?>)getMetadata().getIndexManager().getIndexInternal(indexName);
-      if (lockedIndexes == null)       lockedIndexes=new ArrayList<OIndexMVRBTreeAbstract<?>>();
-      index.acquireExclusiveLock();
-      lockedIndexes.add(index);
-    }
-    getStorage().commit(currentTx);
-    final ODocument indexEntries=currentTx.getIndexChanges();
-    if (indexEntries != null) {
-      for (      Entry<String,Object> indexEntry : indexEntries) {
-        final OIndex<?> index=getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
-        index.commit((ODocument)indexEntry.getValue());
+  if (!(getStorage() instanceof OStorageEmbedded))   getStorage().commit(currentTx);
+ else {
+    final List<String> involvedIndexes=currentTx.getInvolvedIndexes();
+    List<OIndexMVRBTreeAbstract<?>> lockedIndexes=null;
+    try {
+      if (involvedIndexes != null)       for (      String indexName : involvedIndexes) {
+        final OIndexMVRBTreeAbstract<?> index=(OIndexMVRBTreeAbstract<?>)getMetadata().getIndexManager().getIndexInternal(indexName);
+        if (lockedIndexes == null)         lockedIndexes=new ArrayList<OIndexMVRBTreeAbstract<?>>();
+        index.acquireExclusiveLock();
+        lockedIndexes.add(index);
+      }
+      getStorage().commit(currentTx);
+      final ODocument indexEntries=currentTx.getIndexChanges();
+      if (indexEntries != null) {
+        for (        Entry<String,Object> indexEntry : indexEntries) {
+          final OIndex<?> index=getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
+          index.commit((ODocument)indexEntry.getValue());
+        }
       }
     }
-  }
   finally {
-    if (lockedIndexes != null)     for (    OIndexMVRBTreeAbstract index : lockedIndexes) {
-      index.releaseExclusiveLock();
+      if (lockedIndexes != null)       for (      OIndexMVRBTreeAbstract index : lockedIndexes) {
+        index.releaseExclusiveLock();
+      }
     }
   }
 }

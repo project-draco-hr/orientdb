@@ -2,9 +2,9 @@
   if (destField == null)   throw new OCommandExecutionException("Can't execute the command because it hasn't been parsed yet");
   if (!(database.getDatabaseOwner() instanceof ODatabaseDocumentTx))   throw new OCommandSQLParsingException("This command supports only the database type ODatabaseDocumentTx and type '" + database.getClass() + "' was found");
   final ODatabaseDocumentTx db=(ODatabaseDocumentTx)database.getDatabaseOwner();
-  OClass sourceClass=database.getMetadata().getSchema().getClass(sourceClassName);
+  final OClass sourceClass=database.getMetadata().getSchema().getClass(sourceClassName);
   if (sourceClass == null)   throw new OCommandExecutionException("Source class '" + sourceClassName + "' not found");
-  OClass destClass=database.getMetadata().getSchema().getClass(destClassName);
+  final OClass destClass=database.getMetadata().getSchema().getClass(destClassName);
   if (destClass == null)   throw new OCommandExecutionException("Destination class '" + destClassName + "' not found");
   Object value;
   String cmd="select from " + destClassName + " where "+ destField+ " = ";
@@ -13,8 +13,9 @@
   Object oldValue;
   long total=0;
   if (linkName == null)   linkName=sourceField;
-  boolean inverse=linkType != null && linkType.equalsIgnoreCase("inverse");
-  boolean multipleRelationship=false;
+  boolean multipleRelationship;
+  if (linkType != null)   multipleRelationship=linkType == OType.LINKSET || linkType == OType.LINKLIST;
+ else   multipleRelationship=false;
   long totRecords=db.countClass(sourceClass.getName());
   long currRecord=0;
   if (progressListener != null)   progressListener.onBegin(this,totRecords);
@@ -54,7 +55,17 @@
               coll.add(doc);
             }
  else {
-              target.field(linkName,doc);
+              if (linkType != null)               if (linkType == OType.LINKSET) {
+                value=new ORecordLazySet(target);
+                ((ORecordLazySet)value).add(doc);
+              }
+ else               if (linkType == OType.LINKLIST) {
+                value=new ORecordLazyList(target);
+                ((ORecordLazyList)value).add(doc);
+              }
+ else               value=doc;
+ else               value=doc;
+              target.field(linkName,value);
             }
             target.save();
           }
@@ -71,7 +82,8 @@
       if (inverse) {
         OProperty prop=destClass.getProperty(linkName);
         if (prop != null)         destClass.dropProperty(linkName);
-        destClass.createProperty(linkName,multipleRelationship ? OType.LINKLIST : OType.LINK,sourceClass);
+        if (linkType == null)         linkType=multipleRelationship ? OType.LINKSET : OType.LINK;
+        destClass.createProperty(linkName,linkType,sourceClass);
       }
  else {
         OProperty prop=sourceClass.getProperty(linkName);

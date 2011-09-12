@@ -5,16 +5,27 @@
   int oldPos=0;
   int pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
   if (pos == -1 || !word.toString().equals(KEYWORD_CREATE))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_CREATE + " not found",text,oldPos);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
   if (pos == -1 || !word.toString().equals(KEYWORD_LINK))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_LINK + " not found",text,oldPos);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
+  oldPos=pos;
+  pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,false);
   if (pos == -1)   throw new OCommandSQLParsingException("Keyword " + KEYWORD_FROM + " not found",text,oldPos);
   if (!word.toString().equalsIgnoreCase(KEYWORD_FROM)) {
     linkName=word.toString();
     if (OStringSerializerHelper.contains(linkName,' '))     throw new OCommandSQLParsingException("Link name '" + linkName + "' contains not valid characters",text,oldPos);
-    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-    if (pos == -1 || !word.toString().equals(KEYWORD_FROM))     throw new OCommandSQLParsingException("Keyword " + KEYWORD_FROM + " not found",text,oldPos);
+    oldPos=pos;
+    pos=OSQLHelper.nextWord(text,textUpperCase,oldPos,word,true);
   }
+  if (word.toString().equalsIgnoreCase(KEYWORD_TYPE)) {
+    oldPos=pos;
+    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+    if (pos == -1)     throw new OCommandSQLParsingException("Link type missed",text,oldPos);
+    linkType=OType.valueOf(word.toString().toUpperCase());
+    oldPos=pos;
+    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
+  }
+  if (pos == -1 || !word.toString().equals(KEYWORD_FROM))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_FROM + " not found",text,oldPos);
   pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,false);
   if (pos == -1)   throw new OCommandSQLParsingException("Expected <class>.<property>",text,pos);
   String[] parts=word.toString().split("\\.");
@@ -33,6 +44,7 @@
   destField=parts[1];
   pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
   if (pos == -1)   return this;
-  linkType=word.toString();
+  if (!word.toString().equalsIgnoreCase("INVERSE"))   throw new OCommandSQLParsingException("Missed 'INVERSE'",text,pos);
+  inverse=true;
   return this;
 }

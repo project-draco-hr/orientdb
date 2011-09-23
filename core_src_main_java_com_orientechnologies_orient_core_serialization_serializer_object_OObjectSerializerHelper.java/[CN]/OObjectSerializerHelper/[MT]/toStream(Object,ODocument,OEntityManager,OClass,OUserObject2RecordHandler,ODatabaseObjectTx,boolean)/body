@@ -7,9 +7,9 @@
   OProperty schemaProperty;
   final Class<?> pojoClass=iPojo.getClass();
   final List<Field> properties=getClassFields(pojoClass);
-  final String idFieldName=fieldIds.get(pojoClass);
-  if (idFieldName != null) {
-    Object id=getFieldValue(iPojo,idFieldName);
+  final Field idField=fieldIds.get(pojoClass);
+  if (idField != null) {
+    Object id=getFieldValue(iPojo,idField.getName());
     if (id != null) {
       if (id instanceof ORecordId) {
         iRecord.setIdentity((ORecordId)id);
@@ -23,11 +23,11 @@
  else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Id field has been declared as %s while the supported are: ORID, Number, String, Object",id.getClass());
     }
   }
-  final String vFieldName=fieldVersions.get(pojoClass);
+  final Field vField=fieldVersions.get(pojoClass);
   boolean versionConfigured=false;
-  if (vFieldName != null) {
+  if (vField != null) {
     versionConfigured=true;
-    Object ver=getFieldValue(iPojo,vFieldName);
+    Object ver=getFieldValue(iPojo,vField.getName());
     if (ver != null) {
       if (ver instanceof Number) {
         iRecord.setVersion(((Number)ver).intValue());
@@ -44,7 +44,8 @@
   invokeCallback(iPojo,iRecord,OBeforeSerialization.class);
   for (  Field p : properties) {
     fieldName=p.getName();
-    if (fieldName.equals(idFieldName) || fieldName.equals(vFieldName))     continue;
+    if (idField != null && fieldName.equals(idField.getName()))     continue;
+    if (vField != null && fieldName.equals(vField.getName()))     continue;
     fieldValue=serializeFieldValue(iPojo,fieldName,getFieldValue(iPojo,fieldName));
     schemaProperty=schemaClass != null ? schemaClass.getProperty(fieldName) : null;
     if (fieldValue != null && getEmbeddetTypesByJPAAnnotation(iPojo.getClass(),fieldValue.getClass(),fieldName,iEntityManager) != null && getEmbeddetTypesByJPAAnnotation(iPojo.getClass(),fieldValue.getClass(),fieldName,iEntityManager).equals(OType.EMBEDDED)) {

@@ -1,0 +1,25 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx(database.getURL());
+  db.open("admin","admin");
+  if (!db.getMetadata().getSchema().existsClass("TestClass")) {
+    OClass testClass=db.getMetadata().getSchema().createClass("TestClass");
+    OClass testLinkClass=db.getMetadata().getSchema().createClass("TestLinkClass");
+    testClass.createProperty("testLink",OType.LINK,testLinkClass).createIndex(INDEX_TYPE.NOTUNIQUE);
+    testClass.createProperty("name",OType.STRING).createIndex(INDEX_TYPE.UNIQUE);
+    testLinkClass.createProperty("testBoolean",OType.BOOLEAN);
+    testLinkClass.createProperty("testString",OType.STRING);
+    db.getMetadata().getSchema().save();
+  }
+  ODocument testClassDocument=db.newInstance("TestClass");
+  testClassDocument.field("name","Test Class 1");
+  ODocument testLinkClassDocument=new ODocument(db,"TestLinkClass");
+  testLinkClassDocument.field("testString","Test Link Class 1");
+  testLinkClassDocument.field("testBoolean",true);
+  testClassDocument.field("testLink",testLinkClassDocument);
+  testClassDocument.save();
+  List<ODocument> result=db.query(new OSQLSynchQuery<ODocument>("select from TestClass where testLink.testBoolean = true"));
+  Assert.assertEquals(result.size(),1);
+  result=db.query(new OSQLSynchQuery<ODocument>("select from TestClass where testLink.testString = 'Test Link Class 1'"));
+  Assert.assertEquals(result.size(),1);
+  db.close();
+}

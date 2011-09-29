@@ -1,13 +1,7 @@
 {
   if (!record.isDirty())   return this;
   final boolean isNew=record.getIdentity().isNew();
-  if (record.isDirty()) {
-    record.setDatabase(ODatabaseRecordThreadLocal.INSTANCE.get());
-    if (record.getDatabase() == null) {
-      throw new IllegalStateException("Current thread has no database setted and the tree can't be saved correctly. Assure to close the database before the application if off.");
-    }
-    record.save(pTree.getClusterName());
-  }
+  saveRecord();
   if (isNew) {
     final ORecordId rid=(ORecordId)record.getIdentity();
     if (left != null) {
@@ -24,6 +18,11 @@
  else       if (parent.right == this)       parent.rightRid=rid;
       parent.markDirty();
     }
+  }
+  if (parent != null)   if (!parent.record.getIdentity().equals(parentRid))   OLogManager.instance().error(this,"[save]: Tree node %s has parentRid '%s' different by the rid of the assigned parent node: %s",record.getIdentity(),parentRid,parent.record.getIdentity());
+  checkEntryStructure();
+  if (pTree.searchNodeInCache(record.getIdentity()) != this) {
+    pTree.addNodeInCache(this);
   }
   return this;
 }

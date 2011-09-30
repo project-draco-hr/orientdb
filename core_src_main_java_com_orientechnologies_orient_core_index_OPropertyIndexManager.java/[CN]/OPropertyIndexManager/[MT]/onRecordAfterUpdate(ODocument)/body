@@ -3,21 +3,23 @@
   if (indexedProperties != null) {
     final String[] dirtyFields=iRecord.getDirtyFields();
     if (dirtyFields.length > 0) {
-      Object originalValue=null;
+      Object originalValue;
       OIndex<?> index;
       for (      Entry<OProperty,Object> propEntry : indexedProperties.entrySet()) {
-        for (        String f : dirtyFields)         if (f.equals(propEntry.getKey().getName())) {
-          originalValue=iRecord.getOriginalValue(propEntry.getKey().getName());
-          index=propEntry.getKey().getIndex().getUnderlying();
-          index.remove(originalValue,iRecord);
-          break;
-        }
-      }
-      for (      Entry<OProperty,Object> propEntry : indexedProperties.entrySet()) {
-        for (        String f : dirtyFields)         if (f.equals(propEntry.getKey().getName())) {
-          index=propEntry.getKey().getIndex().getUnderlying();
-          index.put(propEntry.getValue(),iRecord.placeholder());
-          break;
+        for (        String f : dirtyFields) {
+          if (f.equals(propEntry.getKey().getName())) {
+            originalValue=iRecord.getOriginalValue(propEntry.getKey().getName());
+            Object newValue=propEntry.getValue();
+            index=propEntry.getKey().getIndex().getUnderlying();
+            if (isCollection(originalValue) || isCollection(newValue)) {
+              updateCollectionIndex(index,originalValue,newValue,iRecord);
+            }
+ else {
+              index.remove(originalValue,iRecord);
+              index.put(propEntry.getValue(),iRecord.placeholder());
+            }
+            break;
+          }
         }
       }
     }

@@ -1,32 +1,15 @@
 {
   ORecordInternal<?> record;
-  ORawBuffer recordBuffer;
-  long positionInPhyCluster;
   if (iLockEntireCluster)   cluster.lock();
   try {
-    final OClusterPositionIterator iterator=cluster.absoluteIterator(iBeginRange,iEndRange);
-    final ORecordId rid=new ORecordId(cluster.getId());
-    final ODatabaseRecord database=ioRecord.getDatabase();
+    final ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    ORecordIteratorCluster<ORecordInternal<?>> iterator=new ORecordIteratorCluster<ORecordInternal<?>>(db,(ODatabaseRecordAbstract)db,cluster.getId(),iBeginRange,iEndRange);
     while (iterator.hasNext()) {
-      positionInPhyCluster=iterator.next();
-      if (positionInPhyCluster == -1)       continue;
-      rid.clusterPosition=positionInPhyCluster;
-      record=database.load(rid);
+      record=iterator.next();
       if (record != null && record.getRecordType() != ODocument.RECORD_TYPE)       continue;
       ORecordInternal<?> recordToCheck=null;
       try {
-        if (record == null) {
-          recordBuffer=readRecord(cluster,rid,!iLockEntireCluster);
-          if (recordBuffer == null)           continue;
-          if (recordBuffer.recordType != ODocument.RECORD_TYPE)           continue;
-          if (ioRecord.getRecordType() != recordBuffer.recordType)           ioRecord=Orient.instance().getRecordFactoryManager().newInstance(ioRecord.getDatabase(),recordBuffer.recordType);
- else           ioRecord.reset();
-          ioRecord.setVersion(recordBuffer.version);
-          ioRecord.setIdentity(cluster.getId(),positionInPhyCluster);
-          ioRecord.fromStream(recordBuffer.buffer);
-          recordToCheck=ioRecord;
-        }
- else         recordToCheck=record;
+        recordToCheck=record;
         if (!iListener.foreach(recordToCheck))         break;
       }
  catch (      OCommandExecutionException e) {

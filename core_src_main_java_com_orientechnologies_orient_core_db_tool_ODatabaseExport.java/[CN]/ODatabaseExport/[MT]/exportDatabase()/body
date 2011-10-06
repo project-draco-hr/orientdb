@@ -1,23 +1,29 @@
 {
-  try {
-    listener.onMessage("\nStarted export of database '" + database.getName() + "' to "+ fileName+ "...");
-    database.getLevel1Cache().setEnable(false);
-    database.getLevel2Cache().setEnable(false);
-    long time=System.currentTimeMillis();
-    if (includeInfo)     exportInfo();
-    exportClusters();
-    if (includeSchema)     exportSchema();
-    exportRecords();
-    if (includeIndexes)     exportIndexes();
-    listener.onMessage("\n\nDatabase export completed in " + (System.currentTimeMillis() - time) + "ms");
-    writer.flush();
-  }
- catch (  Exception e) {
-    e.printStackTrace();
-    throw new ODatabaseExportException("Error on exporting database '" + database.getName() + "' to: "+ fileName,e);
-  }
+  database.callInLock(new Callable<Object>(){
+    public Object call(){
+      try {
+        listener.onMessage("\nStarted export of database '" + database.getName() + "' to "+ fileName+ "...");
+        database.getLevel1Cache().setEnable(false);
+        database.getLevel2Cache().setEnable(false);
+        long time=System.currentTimeMillis();
+        if (includeInfo)         exportInfo();
+        exportClusters();
+        if (includeSchema)         exportSchema();
+        exportRecords();
+        if (includeIndexes)         exportIndexes();
+        listener.onMessage("\n\nDatabase export completed in " + (System.currentTimeMillis() - time) + "ms");
+        writer.flush();
+      }
+ catch (      Exception e) {
+        e.printStackTrace();
+        throw new ODatabaseExportException("Error on exporting database '" + database.getName() + "' to: "+ fileName,e);
+      }
  finally {
-    close();
+        close();
+      }
+      return null;
+    }
   }
+,false);
   return this;
 }

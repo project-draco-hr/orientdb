@@ -1,31 +1,37 @@
 {
-  String remoteHost;
-  String[] remotePorts;
   int dbPos=url.indexOf('/');
   if (dbPos == -1) {
+    addHost(getDefaultHost());
     name=url;
-    remoteHost=getDefaultHost();
-    remotePorts=getDefaultPort();
   }
  else {
     name=url.substring(dbPos + 1);
-    int startPos=0;
-    int endPos=0;
-    while (endPos < dbPos) {
-      if (url.indexOf(ADDRESS_SEPARATOR,startPos) > -1)       endPos=url.indexOf(ADDRESS_SEPARATOR,startPos);
- else       endPos=dbPos;
-      int posRemotePort=url.indexOf(':',startPos);
-      if (posRemotePort != -1 && posRemotePort < endPos) {
-        remoteHost=url.substring(startPos,posRemotePort);
-        remotePorts=url.substring(posRemotePort + 1,endPos).split("_");
-        startPos=endPos + 1;
+    for (    String host : url.substring(0,dbPos).split(ADDRESS_SEPARATOR))     host=addHost(host);
+  }
+  if (serverURLs.size() == 1 && OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_ENABLED.getValueAsBoolean()) {
+    final String primaryServer=serverURLs.get(0);
+    try {
+      final Hashtable<String,String> env=new Hashtable<String,String>();
+      env.put("java.naming.factory.initial","com.sun.jndi.dns.DnsContextFactory");
+      env.put("com.sun.jndi.ldap.connect.timeout",OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsString());
+      final DirContext ictx=new InitialDirContext(env);
+      final String hostName=primaryServer.indexOf(":") == -1 ? primaryServer : primaryServer.substring(0,primaryServer.indexOf(":"));
+      final Attributes attrs=ictx.getAttributes(hostName,new String[]{"TXT"});
+      final Attribute attr=attrs.get("TXT");
+      if (attr != null) {
+        String configuration=(String)attr.get();
+        if (configuration.startsWith(""))         configuration=configuration.substring(1,configuration.length() - 1);
+        if (configuration != null) {
+          final String[] parts=configuration.split(" ");
+          for (          String part : parts) {
+            if (part.startsWith("s=")) {
+              addHost(part.substring("s=".length()));
+            }
+          }
+        }
       }
- else {
-        remoteHost=url.substring(startPos,endPos);
-        remotePorts=getDefaultPort();
-        startPos=endPos + 1;
-      }
-      serverURLs.add(new OPair<String,String[]>(remoteHost,remotePorts));
+    }
+ catch (    NamingException e) {
     }
   }
 }

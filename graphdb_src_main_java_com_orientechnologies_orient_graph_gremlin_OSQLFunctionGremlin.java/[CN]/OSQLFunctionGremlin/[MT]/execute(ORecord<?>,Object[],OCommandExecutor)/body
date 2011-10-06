@@ -16,10 +16,17 @@
  else   if (document.getSchemaClass().isSubClassOf(OGraphDatabase.EDGE_CLASS_NAME))   graphElement=new OrientEdge(graph,document);
  else   return null;
   engine.getBindings(ScriptContext.ENGINE_SCOPE).put("current",graphElement);
+  String output=null;
   if (iRequester != null) {
     final Map<Object,Object> params=iRequester.getParameters();
     if (params != null) {
-      for (      Entry<Object,Object> param : params.entrySet())       engine.getBindings(ScriptContext.ENGINE_SCOPE).put(param.getKey().toString(),param.getValue());
+      for (      Entry<Object,Object> param : params.entrySet()) {
+        if (param.getKey().toString().trim().equals("output")) {
+          output=param.getValue().toString();
+          continue;
+        }
+        engine.getBindings(ScriptContext.ENGINE_SCOPE).put(param.getKey().toString(),param.getValue());
+      }
     }
   }
   final Object scriptResult;
@@ -30,6 +37,16 @@
     return new OCommandExecutionException("Error on execution of the GREMLIN function",e);
   }
   if (result == null)   result=new ArrayList<Object>();
+  if (output != null) {
+    if (scriptResult instanceof GremlinPipeline) {
+      Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
+      while (it.hasNext())       it.next();
+    }
+    Map<String,Object> map=(Map<String,Object>)engine.get(output);
+    ODocument oDocument=new ODocument(map);
+    result.add(oDocument);
+    return oDocument;
+  }
   if (scriptResult instanceof GremlinPipeline) {
     final Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
     Object finalResult=null;

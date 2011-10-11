@@ -39,40 +39,54 @@ case OChannelBinaryProtocol.REQUEST_CONNECT:
     }
     break;
   }
-case OChannelBinaryProtocol.REQUEST_DB_OPEN:
+case OChannelBinaryProtocol.REQUEST_DB_LIST:
 {
-  data.commandInfo="Open database";
-  String dbURL=channel.readString();
-  user=channel.readString();
-  passwd=channel.readString();
-  openDatabase(dbURL,user,passwd);
-  if (!(connection.database.getStorage() instanceof OStorageEmbedded) && !loadUserFromSchema(user,passwd)) {
-    sendError(lastClientTxId,new OSecurityAccessException(connection.database.getName(),"User or password not valid for database: '" + connection.database.getName() + "'"));
+  data.commandInfo="List databases";
+  ODocument doc=listDatabases();
+  channel.acquireExclusiveLock();
+  try {
+    sendOk(lastClientTxId);
+    channel.writeBytes(doc.toStream());
   }
- else {
-    channel.acquireExclusiveLock();
-    try {
-      sendOk(lastClientTxId);
-      channel.writeInt(connection.id);
-      sendDatabaseInformation();
-      if (getClass().equals(ONetworkProtocolBinary.class))       channel.writeBytes(null);
-    }
   finally {
-      channel.releaseExclusiveLock();
-    }
+    channel.releaseExclusiveLock();
   }
   break;
+}
+case OChannelBinaryProtocol.REQUEST_DB_OPEN:
+{
+data.commandInfo="Open database";
+String dbURL=channel.readString();
+user=channel.readString();
+passwd=channel.readString();
+openDatabase(dbURL,user,passwd);
+if (!(connection.database.getStorage() instanceof OStorageEmbedded) && !loadUserFromSchema(user,passwd)) {
+  sendError(lastClientTxId,new OSecurityAccessException(connection.database.getName(),"User or password not valid for database: '" + connection.database.getName() + "'"));
+}
+ else {
+  channel.acquireExclusiveLock();
+  try {
+    sendOk(lastClientTxId);
+    channel.writeInt(connection.id);
+    sendDatabaseInformation();
+    if (getClass().equals(ONetworkProtocolBinary.class))     channel.writeBytes(null);
+  }
+  finally {
+    channel.releaseExclusiveLock();
+  }
+}
+break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_RELOAD:
 {
 data.commandInfo="Reload database information";
 channel.acquireExclusiveLock();
 try {
-  sendOk(lastClientTxId);
-  sendDatabaseInformation();
+sendOk(lastClientTxId);
+sendDatabaseInformation();
 }
   finally {
-  channel.releaseExclusiveLock();
+channel.releaseExclusiveLock();
 }
 break;
 }

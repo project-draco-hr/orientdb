@@ -1,0 +1,60 @@
+{
+  if (objectToClone instanceof Map) {
+    Map recycledMap=(Map)previousClone;
+    if (recycledMap == null)     recycledMap=new HashMap();
+ else     recycledMap.clear();
+    recycledMap.putAll((Map)objectToClone);
+    return recycledMap;
+  }
+ else   if (objectToClone instanceof Collection) {
+    Collection recycledCollection=(Collection)previousClone;
+    if (recycledCollection == null)     recycledCollection=new ArrayList();
+ else     recycledCollection.clear();
+    recycledCollection.addAll((Collection)objectToClone);
+    return recycledCollection;
+  }
+ else   if (objectToClone instanceof String) {
+    return objectToClone;
+  }
+ else   if (objectToClone instanceof Date) {
+    Date clonedDate=(Date)((Date)objectToClone).clone();
+    return clonedDate;
+  }
+ else {
+    try {
+      Object newClone=null;
+      for (Class obj=objectToClone.getClass(); !obj.equals(Object.class); obj=obj.getSuperclass()) {
+        Method m[]=obj.getDeclaredMethods();
+        for (int i=0; i < m.length; i++) {
+          if (m[i].getName().equals("clone")) {
+            m[i].setAccessible(true);
+            newClone=m[i].invoke(objectToClone);
+            System.out.println(objectToClone.getClass() + " cloned by Reflection. Performance can be improved by adding the class to the list of known types");
+            return newClone;
+          }
+        }
+      }
+      throw new Exception("Method clone not found");
+    }
+ catch (    Throwable e1) {
+      try {
+        ByteArrayOutputStream bytes=new ByteArrayOutputStream(){
+          public synchronized byte[] toByteArray(){
+            return buf;
+          }
+        }
+;
+        ObjectOutputStream out=new ObjectOutputStream(bytes);
+        out.writeObject(objectToClone);
+        out.close();
+        ObjectInputStream in=new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()));
+        System.out.println(objectToClone.getClass() + " cloned by Serialization. Performance can be improved by adding the class to the list of known types");
+        return in.readObject();
+      }
+ catch (      Throwable e2) {
+        e2.printStackTrace();
+        return null;
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  database.command(new OCommandSQL("CREATE INDEX DropPropertyIndexCompositeIndex ON DropPropertyIndexTestClass (prop1, prop2) UNIQUE")).execute();
+  database.getMetadata().getIndexManager().reload();
+  OIndex index=database.getMetadata().getSchema().getClass("DropPropertyIndexTestClass").getClassIndex("DropPropertyIndexCompositeIndex");
+  Assert.assertNotNull(index);
+  try {
+    database.command(new OCommandSQL("DROP PROPERTY DropPropertyIndexTestClass.prop1")).execute();
+    Assert.fail();
+  }
+ catch (  OCommandExecutionException e) {
+    Assert.assertEquals(e.getMessage(),"Property contains in indexes (" + "DropPropertyIndexCompositeIndex" + ").Please, drop this indexes before removing property or use FORCE parameter.");
+  }
+  database.getMetadata().getIndexManager().reload();
+  index=database.getMetadata().getSchema().getClass("DropPropertyIndexTestClass").getClassIndex("DropPropertyIndexCompositeIndex");
+  Assert.assertNotNull(index);
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  Assert.assertTrue(indexDefinition instanceof OCompositeIndexDefinition);
+  Assert.assertEquals(indexDefinition.getFields(),Arrays.asList("prop1","prop2"));
+  Assert.assertEquals(indexDefinition.getTypes(),new OType[]{EXPECTED_PROP1_TYPE,EXPECTED_PROP2_TYPE});
+  Assert.assertEquals(index.getType(),"UNIQUE");
+}

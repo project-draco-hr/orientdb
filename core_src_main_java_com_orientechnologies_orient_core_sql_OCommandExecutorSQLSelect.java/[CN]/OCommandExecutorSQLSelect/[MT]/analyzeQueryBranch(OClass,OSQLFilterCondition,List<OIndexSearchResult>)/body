@@ -1,0 +1,31 @@
+{
+  if (iCondition == null)   return null;
+  final OQueryOperator operator=iCondition.getOperator();
+  if (operator == null)   if (iCondition.getLeft() != null && iCondition.getRight() == null) {
+    return analyzeQueryBranch(iSchemaClass,(OSQLFilterCondition)iCondition.getLeft(),iIndexSearchResults);
+  }
+ else {
+    return null;
+  }
+  final OIndexReuseType indexReuseType=operator.getIndexReuseType(iCondition.getLeft(),iCondition.getRight());
+  if (indexReuseType.equals(OIndexReuseType.INDEX_INTERSECTION)) {
+    final OIndexSearchResult leftResult=analyzeQueryBranch(iSchemaClass,(OSQLFilterCondition)iCondition.getLeft(),iIndexSearchResults);
+    final OIndexSearchResult rightResult=analyzeQueryBranch(iSchemaClass,(OSQLFilterCondition)iCondition.getRight(),iIndexSearchResults);
+    if (leftResult != null && rightResult != null) {
+      if (leftResult.canBeMerged(rightResult)) {
+        final OIndexSearchResult mergeResult=leftResult.merge(rightResult);
+        if (iSchemaClass.areIndexed(mergeResult.fields()))         iIndexSearchResults.add(mergeResult);
+        return leftResult.merge(rightResult);
+      }
+    }
+    return null;
+  }
+ else   if (indexReuseType.equals(OIndexReuseType.INDEX_METHOD)) {
+    OIndexSearchResult result=createIndexedProperty(iCondition,iCondition.getLeft());
+    if (result == null)     result=createIndexedProperty(iCondition,iCondition.getRight());
+    if (result == null)     return null;
+    if (iSchemaClass.areIndexed(result.fields()))     iIndexSearchResults.add(result);
+    return result;
+  }
+  return null;
+}

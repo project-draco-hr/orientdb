@@ -1,0 +1,25 @@
+{
+  acquireExclusiveLock();
+  try {
+    indexes.put(index.getName().toLowerCase(),index);
+    final OIndexDefinition indexDefinition=index.getDefinition();
+    if (indexDefinition == null || indexDefinition.getClassName() == null)     return;
+    Map<OMultiKey,Set<OIndex<?>>> propertyIndex=classPropertyIndex.get(indexDefinition.getClassName().toLowerCase());
+    if (propertyIndex == null) {
+      propertyIndex=new HashMap<OMultiKey,Set<OIndex<?>>>();
+      classPropertyIndex.put(indexDefinition.getClassName().toLowerCase(),propertyIndex);
+    }
+    final int paramCount=indexDefinition.getParamCount();
+    for (int i=1; i <= paramCount; i++) {
+      final List<String> fields=indexDefinition.getFields().subList(0,i);
+      final OMultiKey multiKey=new OMultiKey(normalizeFieldNames(fields));
+      Set<OIndex<?>> indexSet=propertyIndex.get(multiKey);
+      if (indexSet == null)       indexSet=new HashSet<OIndex<?>>();
+      indexSet.add(index);
+      propertyIndex.put(multiKey,indexSet);
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

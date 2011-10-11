@@ -1,0 +1,34 @@
+{
+  if (database.isClosed())   database.open("admin","admin");
+  final OSchema schema=database.getMetadata().getSchema();
+  final OClass oClass=schema.createClass("sqlSelectIndexReuseTestClass");
+  oClass.createProperty("prop1",OType.INTEGER);
+  oClass.createProperty("prop2",OType.INTEGER);
+  oClass.createProperty("prop3",OType.INTEGER);
+  oClass.createProperty("prop4",OType.INTEGER);
+  oClass.createProperty("prop5",OType.INTEGER);
+  oClass.createProperty("prop6",OType.INTEGER);
+  oClass.createProperty("prop7",OType.STRING);
+  oClass.createIndex("indexone",OClass.INDEX_TYPE.UNIQUE,"prop1","prop2");
+  oClass.createIndex("indextwo",OClass.INDEX_TYPE.UNIQUE,"prop3");
+  oClass.createIndex("indexthree",OClass.INDEX_TYPE.NOTUNIQUE,"prop1","prop2","prop4");
+  oClass.createIndex("indexfour",OClass.INDEX_TYPE.NOTUNIQUE,"prop4","prop1","prop3");
+  oClass.createIndex("indexfive",OClass.INDEX_TYPE.NOTUNIQUE,"prop6","prop1","prop3");
+  oClass.createIndex("indexsix",OClass.INDEX_TYPE.FULLTEXT,"prop7");
+  schema.save();
+  final String fullTextIndexStrings[]={"Alice : What is the use of a book, without pictures or conversations?","Rabbit : Oh my ears and whiskers, how late it's getting!","Alice : If it had grown up, it would have made a dreadfully ugly child; but it makes rather a handsome pig, I think","The Cat : We're all mad here.","The Hatter : Why is a raven like a writing desk?","The Hatter : Twinkle, twinkle, little bat! How I wonder what you're at.","The Queen : Off with her head!","The Duchess : Tut, tut, child! Everything's got a moral, if only you can find it.","The Duchess : Take care of the sense, and the sounds will take care of themselves.","The King : Begin at the beginning and go on till you come to the end: then stop."};
+  for (int i=0; i < 10; i++)   for (int j=0; j < 10; j++) {
+    final ODocument document=new ODocument(database,"sqlSelectIndexReuseTestClass");
+    document.field("prop1",i);
+    document.field("prop2",j);
+    document.field("prop3",i * 10 + j);
+    document.field("prop4",i);
+    document.field("prop5",i);
+    document.field("prop6",j);
+    document.field("prop7",fullTextIndexStrings[i]);
+    document.save();
+  }
+  profiler=getProfilerInstance();
+  database.close();
+  if (!profiler.isRecording())   profiler.startRecording();
+}

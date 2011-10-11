@@ -3,11 +3,19 @@
   final OClass cls=compiledFilter.getTargetClasses().keySet().iterator().next();
   database.checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_READ,cls.getName());
   clusterIds=cls.getPolymorphicClusterIds();
-  for (  int clusterId : clusterIds)   database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,database.getClusterNameById(clusterId));
+  for (  final int clusterId : clusterIds)   database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,database.getClusterNameById(clusterId));
   final List<ORecord<?>> resultSet=new ArrayList<ORecord<?>>();
   if (searchForIndexes(resultSet,cls)) {
     OProfiler.getInstance().updateCounter("Query.indexUsage",1);
     for (    ORecord<?> record : resultSet) {
+      if (record.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED) {
+        try {
+          record=record.<ORecord>load();
+        }
+ catch (        ORecordNotFoundException e) {
+          throw new OException("Error during loading record with id : " + record.getIdentity());
+        }
+      }
       if (filter((ORecordInternal<?>)record)) {
         final boolean continueResultParsing=addResult(record);
         if (!continueResultParsing)         break;

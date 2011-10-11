@@ -2,9 +2,10 @@
   final OMemoryInputStream buffer=new OMemoryInputStream(iStream);
   try {
     text=buffer.getAsString();
-    byte[] paramBuffer=buffer.getAsByteArray();
-    if (paramBuffer.length == 0)     parameters=null;
- else {
+    parameters=null;
+    final boolean simpleParams=buffer.getAsBoolean();
+    if (simpleParams) {
+      final byte[] paramBuffer=buffer.getAsByteArray();
       final ODocument param=new ODocument(database);
       param.fromStream(paramBuffer);
       Map<String,Object> params=param.field("params");
@@ -13,6 +14,19 @@
         final Object value;
         if (p.getValue() instanceof String)         value=ORecordSerializerStringAbstract.getTypeValue((String)p.getValue());
  else         value=p.getValue();
+        if (Character.isDigit(p.getKey().charAt(0)))         parameters.put(Integer.parseInt(p.getKey()),value);
+ else         parameters.put(p.getKey(),value);
+      }
+    }
+    final boolean compositeKeyParamsPresent=buffer.getAsBoolean();
+    if (compositeKeyParamsPresent) {
+      final byte[] paramBuffer=buffer.getAsByteArray();
+      final ODocument param=new ODocument(database);
+      param.fromStream(paramBuffer);
+      final Map<String,Object> compositeKeyParams=param.field("compositeKeyParams");
+      if (parameters == null)       parameters=new HashMap<Object,Object>();
+      for (      final Entry<String,Object> p : compositeKeyParams.entrySet()) {
+        final Object value=OCompositeKeySerializer.INSTANCE.fromStream(database,OBase64Utils.decode(p.getValue().toString()));
         if (Character.isDigit(p.getKey().charAt(0)))         parameters.put(Integer.parseInt(p.getKey()),value);
  else         parameters.put(p.getKey(),value);
       }

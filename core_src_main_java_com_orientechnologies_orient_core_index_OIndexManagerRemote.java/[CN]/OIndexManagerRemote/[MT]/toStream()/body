@@ -1,15 +1,22 @@
 {
-  document.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+  acquireExclusiveLock();
   try {
-    ORecordTrackedSet idxs=new ORecordTrackedSet(document);
-    for (    OIndexInternal<?> i : indexes.values()) {
-      idxs.add(i.updateConfiguration());
+    document.setDatabase(getDatabase());
+    document.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+    try {
+      ORecordTrackedSet idxs=new ORecordTrackedSet(document);
+      for (      OIndexInternal<?> i : indexes.values()) {
+        idxs.add(i.updateConfiguration());
+      }
+      document.field(CONFIG_INDEXES,idxs,OType.EMBEDDEDSET);
     }
-    document.field(CONFIG_INDEXES,idxs,OType.EMBEDDEDSET);
+  finally {
+      document.setInternalStatus(ORecordElement.STATUS.LOADED);
+    }
+    document.setDirty();
+    return document;
   }
   finally {
-    document.setInternalStatus(ORecordElement.STATUS.LOADED);
+    releaseExclusiveLock();
   }
-  document.setDirty();
-  return document;
 }

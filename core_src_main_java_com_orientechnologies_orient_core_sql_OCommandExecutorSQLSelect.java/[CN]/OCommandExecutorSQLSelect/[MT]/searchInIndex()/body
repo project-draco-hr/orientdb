@@ -6,7 +6,7 @@
     final OQueryOperator indexOperator=compiledFilter.getRootCondition().getOperator();
     if (indexOperator instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesBetween(OSQLHelper.getValue(values[0]),OSQLHelper.getValue(values[2]));
+      final Collection<ODocument> entries=index.getEntriesBetween(getIndexKey(index.getDefinition(),values[0]),getIndexKey(index.getDefinition(),values[2]));
       for (      final OIdentifiable r : entries) {
         final boolean continueResultParsing=addResult(r);
         if (!continueResultParsing)         break;
@@ -14,30 +14,32 @@
     }
  else     if (indexOperator instanceof OQueryOperatorMajor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(OSQLHelper.getValue(value),false);
+      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),false);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMajorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(OSQLHelper.getValue(value),true);
+      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),true);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMinor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(OSQLHelper.getValue(value),false);
+      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),false);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMinorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(OSQLHelper.getValue(value),true);
+      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),true);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorIn) {
-      final List<Object> origValues=(List<Object>)compiledFilter.getRootCondition().getRight();
-      final List<Object> values=new ArrayList<Object>(origValues.size());
+      final List origValues=(List)compiledFilter.getRootCondition().getRight();
+      final List values=new ArrayList(origValues.size());
       for (      Object val : origValues) {
-        val=OSQLHelper.getValue(val);
-        val=OType.convert(val,index.getKeyType().getDefaultJavaType());
+        if (index.getDefinition() instanceof OCompositeIndexDefinition) {
+          throw new OCommandExecutionException("Operator IN not supported yet.");
+        }
+        val=getIndexKey(index.getDefinition(),val);
         values.add(val);
       }
       final Collection<ODocument> entries=index.getEntries(values);
@@ -45,8 +47,15 @@
     }
  else {
       final Object right=compiledFilter.getRootCondition().getRight();
-      final Object keyValue=OSQLHelper.getValue(right);
-      final Object res=index.get(keyValue);
+      final Object keyValue=getIndexKey(index.getDefinition(),right);
+      final Object res;
+      if (index.getDefinition().getParamCount() == 1) {
+        res=index.get(keyValue);
+      }
+ else {
+        final Object secondKey=getIndexKey(index.getDefinition(),right);
+        res=index.getValuesBetween(keyValue,secondKey);
+      }
       if (res != null)       if (res instanceof Collection<?>)       for (      final OIdentifiable r : (Collection<OIdentifiable>)res)       addResult(createIndexEntryAsDocument(keyValue,r.getIdentity()));
  else       addResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()));
     }

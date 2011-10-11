@@ -2,6 +2,26 @@
   if (fieldName == null)   throw new OCommandExecutionException("Can't execute the command because it hasn't been parsed yet");
   final OClassImpl sourceClass=(OClassImpl)database.getMetadata().getSchema().getClass(className);
   if (sourceClass == null)   throw new OCommandExecutionException("Source class '" + className + "' not found");
+  final List<OIndex<?>> indexes=relatedIndexes(fieldName);
+  if (!indexes.isEmpty()) {
+    if (force) {
+      dropRelatedIndexes(indexes);
+    }
+ else {
+      final StringBuilder indexNames=new StringBuilder();
+      boolean first=true;
+      for (      final OIndex index : sourceClass.getClassInvolvedIndexes(fieldName)) {
+        if (!first) {
+          indexNames.append(", ");
+        }
+ else {
+          first=false;
+        }
+        indexNames.append(index.getName());
+      }
+      throw new OCommandExecutionException("Property contains in indexes (" + indexNames.toString() + ")."+ "Please, drop this indexes before removing property or use FORCE parameter.");
+    }
+  }
   sourceClass.dropPropertyInternal(fieldName);
   sourceClass.saveInternal();
   return null;

@@ -1,0 +1,58 @@
+{
+  final OrientGraph graph=OGremlinHelper.global().acquireGraph(iDatabase);
+  try {
+    final GremlinScriptEngine engine=OGremlinHelper.global().acquireEngine();
+    try {
+      engine.getBindings(ScriptContext.ENGINE_SCOPE).put("g",graph);
+      final String output=iArgs != null ? OGremlinHelper.bindParameters(engine,iArgs) : null;
+      if (iBeforeExecution != null)       if (!iBeforeExecution.call(engine,graph))       return null;
+      final Object scriptResult=engine.eval(iText);
+      if (iAfterExecution != null)       if (!iAfterExecution.call(engine,graph))       return null;
+      if (output != null) {
+        if (scriptResult instanceof GremlinPipeline) {
+          Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
+          while (it.hasNext())           it.next();
+        }
+        final Map<String,Object> map=(Map<String,Object>)engine.get(output);
+        ODocument oDocument=new ODocument(map);
+        iResult.add(oDocument);
+        return oDocument;
+      }
+      if (scriptResult instanceof GremlinPipeline) {
+        final Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
+        Object finalResult=null;
+        List<Object> resultCollection=null;
+        while (it.hasNext()) {
+          Object current=it.next();
+          if (finalResult != null) {
+            if (resultCollection == null) {
+              resultCollection=new ArrayList<Object>();
+              resultCollection.add(finalResult);
+            }
+            resultCollection.add(current);
+          }
+ else           finalResult=current;
+        }
+        if (resultCollection != null) {
+          iResult.addAll(resultCollection);
+          return resultCollection;
+        }
+ else {
+          if (finalResult != null)           iResult.add(finalResult);
+          return finalResult;
+        }
+      }
+ else       if (scriptResult != null)       iResult.add(scriptResult);
+      return scriptResult;
+    }
+ catch (    Exception e) {
+      throw new OCommandExecutionException("Error on execution of the GREMLIN script",e);
+    }
+ finally {
+      OGremlinHelper.global().releaseEngine(engine);
+    }
+  }
+  finally {
+    OGremlinHelper.global().releaseGraph(graph);
+  }
+}

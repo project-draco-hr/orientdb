@@ -1,77 +1,18 @@
 {
-  if (!(iCurrentRecord instanceof ODocument))   return null;
-  final ODocument document=(ODocument)iCurrentRecord;
-  if (engine == null) {
-    try {
-      engine=new GremlinScriptEngine();
-    }
- catch (    Throwable e) {
-      throw new OConfigurationException("Error on loading Gremlin engine",e);
-    }
-    graph=new OrientGraph(iCurrentRecord.getDatabase().getURL());
-    engine.getBindings(ScriptContext.ENGINE_SCOPE).put("g",graph);
-  }
-  final OrientElement graphElement;
-  if (document.getSchemaClass().isSubClassOf(OGraphDatabase.VERTEX_CLASS_NAME))   graphElement=new OrientVertex(graph,document);
- else   if (document.getSchemaClass().isSubClassOf(OGraphDatabase.EDGE_CLASS_NAME))   graphElement=new OrientEdge(graph,document);
- else   return null;
-  engine.getBindings(ScriptContext.ENGINE_SCOPE).put("current",graphElement);
-  String output=null;
-  if (iRequester != null) {
-    final Map<Object,Object> params=iRequester.getParameters();
-    if (params != null) {
-      for (      Entry<Object,Object> param : params.entrySet()) {
-        if (param.getKey().toString().trim().equals("output")) {
-          output=param.getValue().toString();
-          continue;
-        }
-        engine.getBindings(ScriptContext.ENGINE_SCOPE).put(param.getKey().toString(),param.getValue());
-      }
-    }
-  }
-  final Object scriptResult;
-  try {
-    scriptResult=engine.eval((String)iParameters[0]);
-  }
- catch (  ScriptException e) {
-    return new OCommandExecutionException("Error on execution of the GREMLIN function",e);
-  }
+  if (!(iCurrentRecord instanceof ODocument) || !(iCurrentRecord.getDatabase().getDatabaseOwner() instanceof OGraphDatabase))   return null;
+  final OGraphDatabase db=(OGraphDatabase)iCurrentRecord.getDatabase().getDatabaseOwner();
   if (result == null)   result=new ArrayList<Object>();
-  if (output != null) {
-    if (scriptResult instanceof GremlinPipeline) {
-      Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
-      while (it.hasNext())       it.next();
-    }
-    Map<String,Object> map=(Map<String,Object>)engine.get(output);
-    ODocument oDocument=new ODocument(map);
-    result.add(oDocument);
-    return oDocument;
-  }
-  if (scriptResult instanceof GremlinPipeline) {
-    final Iterator<?> it=((GremlinPipeline<?,?>)scriptResult).iterator();
-    Object finalResult=null;
-    List<Object> resultCollection=null;
-    while (it.hasNext()) {
-      Object current=it.next();
-      if (current instanceof OrientElement)       current=((OrientElement)current).getRawElement();
-      if (finalResult != null) {
-        if (resultCollection == null) {
-          resultCollection=new ArrayList<Object>();
-          resultCollection.add(finalResult);
-        }
-        resultCollection.add(current);
-      }
- else       finalResult=current;
-    }
-    if (resultCollection != null) {
-      result.addAll(resultCollection);
-      return resultCollection;
-    }
- else {
-      if (finalResult != null)       result.add(finalResult);
-      return finalResult;
+  final Object scriptResult=OGremlinHelper.execute(db,(String)iParameters[0],iRequester != null ? iRequester.getParameters() : null,result,new OGremlinHelper.OGremlinCallback(){
+    @Override public boolean call(    GremlinScriptEngine iEngine,    OrientGraph iGraph){
+      final OrientElement graphElement;
+      final ODocument document=(ODocument)iCurrentRecord;
+      if (db.isVertex(document))       graphElement=new OrientVertex(iGraph,document);
+ else       if (db.isEdge(document))       graphElement=new OrientEdge(iGraph,document);
+ else       return false;
+      iEngine.getBindings(ScriptContext.ENGINE_SCOPE).put("current",graphElement);
+      return true;
     }
   }
- else   if (scriptResult != null)   result.add(scriptResult);
+,null);
   return scriptResult;
 }

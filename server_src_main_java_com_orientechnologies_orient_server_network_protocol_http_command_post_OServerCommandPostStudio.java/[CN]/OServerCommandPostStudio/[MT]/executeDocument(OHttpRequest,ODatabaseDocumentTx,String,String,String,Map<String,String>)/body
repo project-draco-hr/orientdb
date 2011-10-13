@@ -7,29 +7,28 @@
     Object oldValue;
     Object newValue;
     for (    Entry<String,String> f : fields.entrySet()) {
-      oldValue=doc.field(f.getKey());
+      oldValue=doc.rawField(f.getKey());
       newValue=f.getValue();
       if (oldValue != null) {
-        if (oldValue instanceof ORecord<?>) {
-          ORecord<?> rec=(ORecord<?>)oldValue;
-          String parsedRid=f.getValue();
-          if (parsedRid != null && parsedRid.charAt(0) == '#')           parsedRid=parsedRid.substring(1);
-          if (!rec.getIdentity().toString().equals(parsedRid)) {
-            rec.reset();
-            ((ORecordId)rec.getIdentity()).fromString(parsedRid);
-            rec.load();
+        if (oldValue instanceof ORID) {
+          final ORID oldRid=(ORID)oldValue;
+          final ORID newRid=new ORecordId(f.getValue());
+          if (!oldRid.equals(newRid)) {
+            if (newRid.getRecord() == null)             throw new ORecordNotFoundException("Linked record " + oldRid + " was not found in database");
+            newValue=newRid;
           }
-          newValue=oldValue;
+ else           continue;
         }
  else         if (oldValue instanceof Collection<?>) {
           newValue=new ArrayList<ODocument>();
           if (f.getValue() != null) {
             String[] items=f.getValue().split(",");
             for (            String s : items) {
-              ((List<ODocument>)newValue).add(new ODocument(db,new ORecordId(s)));
+              ((List<ORID>)newValue).add(new ORecordId(s));
             }
           }
         }
+ else         if (oldValue.equals(newValue))         continue;
       }
       doc.field(f.getKey(),newValue);
     }

@@ -1,6 +1,14 @@
 {
-  if (!(iCurrentRecord instanceof ODocument) || !(iCurrentRecord.getDatabase().getDatabaseOwner() instanceof OGraphDatabase))   return null;
-  final OGraphDatabase db=(OGraphDatabase)iCurrentRecord.getDatabase().getDatabaseOwner();
+  if (!(iCurrentRecord instanceof ODocument))   return null;
+  ODatabaseRecord currentDb=ODatabaseRecordThreadLocal.INSTANCE.get();
+  if (currentDb == null)   currentDb=iCurrentRecord.getDatabase();
+  currentDb=(ODatabaseRecord)currentDb.getDatabaseOwner();
+  final OGraphDatabase db;
+  if (currentDb instanceof OGraphDatabase)   db=(OGraphDatabase)currentDb;
+ else {
+    db=new OGraphDatabase(currentDb.getURL());
+    ODatabaseRecordThreadLocal.INSTANCE.set(db);
+  }
   if (result == null)   result=new ArrayList<Object>();
   if (iRequester.getParameters() != null)   currentParameters=new HashMap<Object,Object>();
   final Object scriptResult=OGremlinHelper.execute(db,(String)iParameters[0],iRequester != null ? iRequester.getParameters() : null,currentParameters,result,new OGremlinHelper.OGremlinCallback(){

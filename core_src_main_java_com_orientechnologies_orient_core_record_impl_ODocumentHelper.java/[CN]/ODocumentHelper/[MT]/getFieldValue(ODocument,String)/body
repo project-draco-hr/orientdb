@@ -3,30 +3,32 @@
   if (fieldNameLength == 0)   return null;
   Object value=null;
   int beginPos=0;
-  int separatorPos=0;
+  int nextSeparatorPos=0;
   do {
-    char separator=' ';
-    for (; separatorPos < fieldNameLength; ++separatorPos) {
-      separator=iFieldName.charAt(separatorPos);
-      if (separator == '.' || separator == '[')       break;
+    char nextSeparator=' ';
+    for (; nextSeparatorPos < fieldNameLength; ++nextSeparatorPos) {
+      nextSeparator=iFieldName.charAt(nextSeparatorPos);
+      if (nextSeparator == '.' || nextSeparator == '[')       break;
     }
     final String fieldName;
-    if (separatorPos < fieldNameLength)     fieldName=iFieldName.substring(beginPos,separatorPos);
- else     if (beginPos > 0)     fieldName=iFieldName.substring(beginPos);
- else     fieldName=iFieldName;
-    if (separator == '.') {
-      value=getIdentifiableValue(current,fieldName);
-      if (value == null || !(value instanceof ODocument))       return null;
-      current=(ODocument)value;
-      if (current.getInternalStatus() == STATUS.NOT_LOADED)       current.reload();
+    if (nextSeparatorPos < fieldNameLength)     fieldName=iFieldName.substring(beginPos,nextSeparatorPos);
+ else {
+      nextSeparator=' ';
+      if (beginPos > 0)       fieldName=iFieldName.substring(beginPos);
+ else       fieldName=iFieldName;
     }
- else     if (separator == '[') {
-      if (value == null)       value=getIdentifiableValue(current,fieldName);
+    if (nextSeparator == '.') {
+      value=getIdentifiableValue(iRecord,fieldName);
       if (value == null)       return null;
-      final int end=iFieldName.indexOf(']',separatorPos);
+      if (value != null && value instanceof ORecord<?> && ((ORecord<?>)value).getInternalStatus() == STATUS.NOT_LOADED)       iRecord.reload();
+    }
+ else     if (nextSeparator == '[') {
+      if (value == null)       value=getIdentifiableValue(iRecord,fieldName);
+      if (value == null)       return null;
+      final int end=iFieldName.indexOf(']',nextSeparatorPos);
       if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
-      final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(separatorPos + 1,end));
-      separatorPos=end;
+      final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(nextSeparatorPos + 1,end));
+      nextSeparatorPos=end;
       if (value instanceof ODocument) {
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
         if (indexParts.size() == 1)         value=((ODocument)value).field(index);
@@ -99,9 +101,12 @@
         }
       }
     }
- else     value=getIdentifiableValue(current,fieldName);
-    beginPos=++separatorPos;
+ else {
+      if (fieldName.contains("("))       value=evaluateFunction(value,fieldName);
+ else       value=getIdentifiableValue(iRecord,fieldName);
+    }
+    beginPos=++nextSeparatorPos;
   }
- while (separatorPos < fieldNameLength);
+ while (nextSeparatorPos < fieldNameLength);
   return (RET)value;
 }

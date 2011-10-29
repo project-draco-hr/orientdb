@@ -1,16 +1,25 @@
 {
-  String[] urlParts=checkSyntax(iRequest.url,2,"Syntax error: database/<database>");
+  String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: database/<db>/<type>");
   iRequest.data.commandInfo="Create database";
-  iRequest.data.commandDetail=urlParts[1];
-  ODatabaseDocumentTx db=null;
   try {
-    if (OSharedDocumentDatabase.getDatabasePools().containsKey(urlParts[1]))     throw new IllegalArgumentException("Can't create the database '" + urlParts[1] + "' because it already exists");
-    db=new ODatabaseDocumentTx("local:${ORIENTDB_HOME}/databases/" + urlParts[1] + "/"+ urlParts[1]);
-    db.create();
+    final String databaseName=urlParts[1];
+    final String storageMode=urlParts[2];
+    final String path=getStoragePath(databaseName,storageMode);
+    if (path != null) {
+      ODatabaseDocumentTx database=new ODatabaseDocumentTx(path);
+      if (database.exists())       throw new ODatabaseException("Database '" + database.getURL() + "' already exists");
+      for (      OStorage stg : Orient.instance().getStorages()) {
+        if (stg.getName().equalsIgnoreCase(database.getName()) && stg.exists())         throw new ODatabaseException("Database '" + database.getURL() + "' already exists: "+ stg);
+      }
+      OLogManager.instance().info(this,"Creating database " + path);
+      database.create();
+      sendDatabaseInfo(iRequest,database);
+    }
+ else {
+      throw new OCommandExecutionException("The '" + storageMode + "' storage mode doesn't exists.");
+    }
   }
   finally {
-    if (db != null)     db.close();
   }
-  sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,null,OHttpUtils.CONTENT_TEXT_PLAIN,null);
   return false;
 }

@@ -1,0 +1,33 @@
+{
+  configuration.setValue(OGlobalConfiguration.NETWORK_SOCKET_TIMEOUT,iTimeout);
+  channel=new OChannelBinaryClient(networkAddress,networkPort,configuration);
+  OChannelBinaryProtocol.checkProtocolVersion(channel);
+  OLogManager.instance().warn(this,"Cluster '%s': received joining request from peer node %s:%d. Checking authorizations...",iClusterName,networkAddress,networkPort);
+  clientTxId=serialClientId.decrementAndGet();
+  channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT);
+  channel.writeInt(clientTxId);
+  final ODocument doc=new ODocument();
+  doc.field("clusterName",iClusterName);
+  doc.field("clusterKey",iSecurityKey.getEncoded());
+  doc.field("leaderNodeAddress",leader.getManager().getId());
+  doc.field("leaderNodeRunningSince",leader.getManager().getRunningSince());
+  channel.writeBytes(doc.toStream());
+  channel.flush();
+  channel.readStatus();
+  clientTxId=channel.readInt();
+  final boolean connected=channel.readByte() == 1;
+  if (!connected) {
+    OLogManager.instance().warn(this,"Error: remote server node %s:%d has refused the connection because it's the new Leader of cluster '%s'. Switching to be a Peer Node...",networkAddress,networkPort,leader.getManager().getConfig().name);
+    leader.getManager().becomePeer(null);
+    return false;
+  }
+  doc.reset();
+  doc.fromStream(channel.readBytes());
+  final Collection<String> databases=doc.field("availableDatabases");
+  updateClusteredDatabaseConfiguration(doc,databases);
+  channel.writeBytes(doc.toStream());
+  channel.flush();
+  OLogManager.instance().info(this,"Cluster '%s': joined peer node %s:%d",iClusterName,networkAddress,networkPort);
+  status=STATUS.CONNECTED;
+  return true;
+}

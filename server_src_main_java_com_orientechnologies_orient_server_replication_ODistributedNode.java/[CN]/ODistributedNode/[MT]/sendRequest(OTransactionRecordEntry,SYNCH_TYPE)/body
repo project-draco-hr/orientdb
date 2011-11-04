@@ -1,0 +1,114 @@
+{
+  logChange(iRequest);
+  final ODistributedDatabaseInfo databaseEntry=databases.get(iRequest.getRecord().getDatabase().getName());
+  if (databaseEntry == null)   return;
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"-> Sending request to remote server %s in %s mode...",this,iRequestType);
+  final ORecordInternal<?> record=iRequest.getRecord();
+  try {
+    final Callable<Object> response;
+switch (iRequest.status) {
+case OTransactionRecordEntry.CREATED:
+      channel.beginRequest();
+    try {
+      channel.writeByte(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+      channel.writeInt(databaseEntry.sessionId);
+      channel.writeShort((short)record.getIdentity().getClusterId());
+      channel.writeBytes(record.toStream());
+      channel.writeByte(record.getRecordType());
+    }
+  finally {
+      channel.endRequest();
+    }
+  response=new Callable<Object>(){
+    @Override public Object call() throws Exception {
+      beginResponse(databaseEntry.sessionId);
+      try {
+        final long clusterPosition=channel.readLong();
+        if (clusterPosition != record.getIdentity().getClusterPosition())         handleError(iRequest,iRequestType,new ODistributedException("Error on distributed insert for database '" + record.getDatabase().getName() + "': the recordId received from the remote server node '"+ getName()+ "' is different from the current one. Master="+ record.getIdentity()+ ", "+ getName()+ "=#"+ record.getIdentity().getClusterId()+ ":"+ clusterPosition+ ". Unsharing the database against the remote server node..."));
+      }
+  finally {
+        endResponse();
+      }
+      return null;
+    }
+  }
+;
+if (iRequestType == SYNCH_TYPE.ASYNCHRONOUS) asynchExecutor.submit(new FutureTask<Object>(response));
+ else try {
+  response.call();
+}
+ catch (Exception e) {
+}
+break;
+case OTransactionRecordEntry.UPDATED:
+channel.beginRequest();
+try {
+channel.writeByte(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
+channel.writeInt(databaseEntry.sessionId);
+channel.writeShort((short)record.getIdentity().getClusterId());
+channel.writeLong(record.getIdentity().getClusterPosition());
+channel.writeBytes(record.toStream());
+channel.writeInt(record.getVersion());
+channel.writeByte(record.getRecordType());
+}
+  finally {
+channel.endRequest();
+}
+response=new Callable<Object>(){
+@Override public Object call() throws Exception {
+beginResponse(databaseEntry.sessionId);
+try {
+final int version=channel.readInt();
+}
+  finally {
+endResponse();
+}
+return null;
+}
+}
+;
+if (iRequestType == SYNCH_TYPE.ASYNCHRONOUS) asynchExecutor.submit(new FutureTask<Object>(response));
+ else try {
+response.call();
+}
+ catch (Exception e) {
+}
+break;
+case OTransactionRecordEntry.DELETED:
+channel.beginRequest();
+try {
+channel.writeByte(OChannelBinaryProtocol.REQUEST_RECORD_DELETE);
+channel.writeInt(databaseEntry.sessionId);
+channel.writeShort((short)record.getIdentity().getClusterId());
+channel.writeLong(record.getIdentity().getClusterPosition());
+channel.writeInt(record.getVersion());
+}
+  finally {
+channel.endRequest();
+}
+response=new Callable<Object>(){
+@Override public Object call() throws Exception {
+try {
+beginResponse(databaseEntry.sessionId);
+channel.readByte();
+}
+  finally {
+endResponse();
+}
+return null;
+}
+}
+;
+if (iRequestType == SYNCH_TYPE.ASYNCHRONOUS) asynchExecutor.submit(new FutureTask<Object>(response));
+ else try {
+response.call();
+}
+ catch (Exception e) {
+}
+break;
+}
+}
+ catch (IOException e) {
+handleError(iRequest,iRequestType,e);
+}
+}

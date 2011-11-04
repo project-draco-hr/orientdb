@@ -1,0 +1,35 @@
+{
+  if (getPeerNodeList() == null && OClientConnectionManager.instance().getConnections().size() == 0)   return;
+  final ODocument config=getClusteredConfigurationForDatabase(iDatabaseName);
+  OLogManager.instance().info(this,"Broadcasting distributed configuration for database '%s' to the connected servers and clients: %s",iDatabaseName,config.toJSON("attribSameRow"));
+  if (getPeerNodeList() != null)   for (  ORemotePeer node : getPeerNodeList()) {
+    if (node.getStatus() == ORemotePeer.STATUS.CONNECTED) {
+      node.sendConfiguration(config);
+    }
+  }
+  OChannelBinary ch;
+  for (  OClientConnection c : OClientConnectionManager.instance().getConnections()) {
+    if (c.protocol.getChannel() instanceof OChannelBinary) {
+      ch=(OChannelBinary)c.protocol.getChannel();
+      OLogManager.instance().info(this,"Sending distributed configuration for database '%s' to the connected client %s...",iDatabaseName,ch.socket.getRemoteSocketAddress());
+      try {
+        ch.acquireExclusiveLock();
+        try {
+          ch.writeByte(OChannelBinaryProtocol.PUSH_DATA);
+          ch.writeInt(Integer.MIN_VALUE);
+          ch.writeByte(OChannelDistributedProtocol.PUSH_DISTRIBUTED_CONFIG);
+          ch.writeBytes(config.toStream());
+        }
+ catch (        IOException e) {
+          e.printStackTrace();
+        }
+ finally {
+          ch.releaseExclusiveLock();
+        }
+      }
+ catch (      InterruptedException e1) {
+        OLogManager.instance().warn(this,"[broadcastClusterConfiguration] Timeout on sending configuration to remote node %s",ch.socket.getRemoteSocketAddress());
+      }
+    }
+  }
+}

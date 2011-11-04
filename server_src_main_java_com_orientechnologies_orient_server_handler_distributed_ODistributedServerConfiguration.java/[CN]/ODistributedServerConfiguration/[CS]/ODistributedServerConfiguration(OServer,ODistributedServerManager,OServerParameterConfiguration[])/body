@@ -1,0 +1,47 @@
+{
+  try {
+    name="unknown";
+    securityKey=null;
+    networkMulticastAddress=InetAddress.getByName("235.1.1.1");
+    networkMulticastPort=2424;
+    networkMulticastHeartbeat=5000;
+    networkTimeoutLeader=3000;
+    networkTimeoutNode=5000;
+    networkHeartbeatDelay=5000;
+    securityAlgorithm="Blowfish";
+    serverUpdateDelay=0;
+    serverOutSynchMaxBuffers=300;
+    byte[] tempSecurityKey=null;
+    if (iParams != null)     for (    OServerParameterConfiguration param : iParams) {
+      if ("name".equalsIgnoreCase(param.name))       name=param.value;
+ else       if ("security.algorithm".equalsIgnoreCase(param.name))       securityAlgorithm=param.value;
+ else       if ("security.key".equalsIgnoreCase(param.name))       tempSecurityKey=OBase64Utils.decode(param.value);
+ else       if ("network.multicast.address".equalsIgnoreCase(param.name))       networkMulticastAddress=InetAddress.getByName(param.value);
+ else       if ("network.multicast.port".equalsIgnoreCase(param.name))       networkMulticastPort=Integer.parseInt(param.value);
+ else       if ("network.multicast.heartbeat".equalsIgnoreCase(param.name))       networkMulticastHeartbeat=Integer.parseInt(param.value);
+ else       if ("network.timeout.leader".equalsIgnoreCase(param.name))       networkTimeoutLeader=Integer.parseInt(param.value);
+ else       if ("network.timeout.connection".equalsIgnoreCase(param.name))       networkTimeoutNode=Integer.parseInt(param.value);
+ else       if ("network.heartbeat.delay".equalsIgnoreCase(param.name))       networkHeartbeatDelay=Integer.parseInt(param.value);
+ else       if ("server.update.delay".equalsIgnoreCase(param.name))       serverUpdateDelay=Integer.parseInt(param.value);
+ else       if ("server.outsynch.maxbuffers".equalsIgnoreCase(param.name))       serverOutSynchMaxBuffers=Integer.parseInt(param.value);
+    }
+    if (tempSecurityKey == null) {
+      OLogManager.instance().info(this,"Generating Server security key and save it in configuration...");
+      securityKey=OSecurityManager.instance().generateKey(securityAlgorithm,96);
+      for (      OServerHandlerConfiguration handler : iServer.getConfiguration().handlers) {
+        if (handler.clazz.equals(iManager.getClass().getName())) {
+          handler.parameters=new OServerParameterConfiguration[iParams.length + 1];
+          for (int i=0; i < iParams.length; ++i) {
+            handler.parameters[i]=iParams[i];
+          }
+          handler.parameters[iParams.length]=new OServerParameterConfiguration("security.key",OBase64Utils.encodeBytes(securityKey.getEncoded()));
+        }
+      }
+      iServer.saveConfiguration();
+    }
+ else     securityKey=OSecurityManager.instance().createKey(securityAlgorithm,tempSecurityKey);
+  }
+ catch (  Exception e) {
+    throw new OConfigurationException("Can't configure OrientDB Server as Cluster Node",e);
+  }
+}

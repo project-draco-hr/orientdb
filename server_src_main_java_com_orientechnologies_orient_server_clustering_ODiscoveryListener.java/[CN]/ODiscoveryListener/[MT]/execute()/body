@@ -1,0 +1,36 @@
+{
+  try {
+    dgram.setLength(recvBuffer.length);
+    socket.receive(dgram);
+    OLogManager.instance().debug(this,"Received multicast packet %d bytes from %s:%d",dgram.getLength(),dgram.getAddress(),dgram.getPort());
+    final byte[] buffer=new byte[dgram.getLength()];
+    System.arraycopy(dgram.getData(),0,buffer,0,buffer.length);
+    try {
+      String packet=new String(OSecurityManager.instance().decrypt(manager.getConfig().securityAlgorithm,manager.getConfig().securityKey,buffer));
+      String[] parts=packet.trim().split("\\|");
+      int i=0;
+      if (!parts[i].startsWith(ODistributedServerConfiguration.PACKET_HEADER))       return;
+      if (Integer.parseInt(parts[++i]) != ODistributedServerConfiguration.PROTOCOL_VERSION) {
+        OLogManager.instance().debug(this,"Received bad multicast packet with version %s not equals to the current %d",parts[i],ODistributedServerConfiguration.PROTOCOL_VERSION);
+        return;
+      }
+      if (!parts[++i].equals(manager.getConfig().name)) {
+        OLogManager.instance().debug(this,"Received bad multicast packet with cluster name %s not equals to the current %s",parts[i],manager.getConfig().name);
+        return;
+      }
+      String configuredServerAddress=parts[++i];
+      String sourceServerAddress=dgram.getAddress().getHostAddress();
+      final int serverPort=Integer.parseInt(parts[++i]);
+      if (configuredServerAddress.equals(binaryNetworkListener.getInboundAddr().getHostName()) && serverPort == binaryNetworkListener.getInboundAddr().getPort())       return;
+      if (manager.getLeader() != null)       manager.getLeader().connect2Peer(new String[]{sourceServerAddress,configuredServerAddress},serverPort);
+    }
+ catch (    Exception e) {
+      OLogManager.instance().debug(this,"Received wrong packet from multicast IP",e);
+    }
+  }
+ catch (  Throwable t) {
+    OLogManager.instance().error(this,"Error on executing request",t);
+  }
+ finally {
+  }
+}

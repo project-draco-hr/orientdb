@@ -10,14 +10,20 @@
         index.acquireExclusiveLock();
         lockedIndexes.add(index);
       }
-      getStorage().commit(currentTx);
-      final ODocument indexEntries=currentTx.getIndexChanges();
-      if (indexEntries != null) {
-        for (        Entry<String,Object> indexEntry : indexEntries) {
-          final OIndex<?> index=getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
-          index.commit((ODocument)indexEntry.getValue());
+      getStorage().callInLock(new Callable<Void>(){
+        public Void call() throws Exception {
+          getStorage().commit(currentTx);
+          final ODocument indexEntries=currentTx.getIndexChanges();
+          if (indexEntries != null) {
+            for (            Entry<String,Object> indexEntry : indexEntries) {
+              final OIndex<?> index=getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
+              index.commit((ODocument)indexEntry.getValue());
+            }
+          }
+          return null;
         }
       }
+,true);
     }
   finally {
       if (lockedIndexes != null)       for (      OIndexMVRBTreeAbstract index : lockedIndexes) {

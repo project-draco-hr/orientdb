@@ -1,18 +1,25 @@
 {
   checkOpeness();
   if (iPojo == null)   return this;
-  OSerializationThreadLocal.INSTANCE.get().clear();
-  final ODocument record=getRecordByUserObject(iPojo,true);
-  try {
-    record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.MARSHALLING);
-    if (!saveOnlyDirty || record.isDirty()) {
-      pojo2Stream(iPojo,record);
-      underlying.save(record,iClusterName);
-      registerUserObject(iPojo,record);
+ else   if (OMultiValue.isMultiValue(iPojo)) {
+    for (    Object pojo : OMultiValue.getMultiValueIterable(iPojo)) {
+      save(pojo,iClusterName);
     }
   }
+ else {
+    OSerializationThreadLocal.INSTANCE.get().clear();
+    final ODocument record=getRecordByUserObject(iPojo,true);
+    try {
+      record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.MARSHALLING);
+      if (!saveOnlyDirty || record.isDirty()) {
+        pojo2Stream(iPojo,record);
+        underlying.save(record,iClusterName);
+        registerUserObject(iPojo,record);
+      }
+    }
   finally {
-    record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.LOADED);
+      record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.LOADED);
+    }
   }
   return this;
 }

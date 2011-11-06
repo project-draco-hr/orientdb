@@ -1,0 +1,33 @@
+{
+  acquireExclusiveLock();
+  try {
+    final OMVRBTreeEntry<Object,Set<OIdentifiable>> firstEntry;
+    if (iFromInclusive)     firstEntry=map.getCeilingEntry(iRangeFrom,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
+ else     firstEntry=map.getHigherEntry(iRangeFrom);
+    if (firstEntry == null)     return Collections.emptySet();
+    final int firstEntryIndex=map.getPageIndex();
+    final OMVRBTreeEntry<Object,Set<OIdentifiable>> lastEntry;
+    if (iToInclusive)     lastEntry=map.getHigherEntry(iRangeTo);
+ else     lastEntry=map.getCeilingEntry(iRangeTo,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
+    final int lastEntryIndex;
+    if (lastEntry != null)     lastEntryIndex=map.getPageIndex();
+ else     lastEntryIndex=-1;
+    OMVRBTreeEntry<Object,Set<OIdentifiable>> entry=firstEntry;
+    map.setPageIndex(firstEntryIndex);
+    final Set<OIdentifiable> result=new HashSet<OIdentifiable>();
+    while (entry != null && !(entry == lastEntry && map.getPageIndex() == lastEntryIndex)) {
+      final ORecordLazySet values=(ORecordLazySet)entry.getValue();
+      values.setDatabase(getDatabase());
+      if (values.isEmpty())       continue;
+      for (      final OIdentifiable value : values) {
+        if (maxValuesToFetch > -1 && maxValuesToFetch == result.size())         return result;
+        result.add(value);
+      }
+      entry=OMVRBTree.next(entry);
+    }
+    return result;
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

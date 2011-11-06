@@ -1,0 +1,25 @@
+{
+  acquireExclusiveLock();
+  try {
+    final OMVRBTreeEntry<Object,Set<OIdentifiable>> lastEntry;
+    if (isInclusive)     lastEntry=map.getFloorEntry(toKey,OMVRBTree.PartialSearchMode.HIGHEST_BOUNDARY);
+ else     lastEntry=map.getLowerEntry(toKey);
+    if (lastEntry == null)     return Collections.emptySet();
+    OMVRBTreeEntry<Object,Set<OIdentifiable>> entry=lastEntry;
+    final Set<OIdentifiable> result=new HashSet<OIdentifiable>();
+    while (entry != null) {
+      final ORecordLazySet values=(ORecordLazySet)entry.getValue();
+      values.setDatabase(getDatabase());
+      if (values.isEmpty())       continue;
+      for (      final OIdentifiable value : values) {
+        if (maxValuesToFetch > -1 && result.size() == maxValuesToFetch)         return result;
+        result.add(value);
+      }
+      entry=OMVRBTree.previous(entry);
+    }
+    return result;
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

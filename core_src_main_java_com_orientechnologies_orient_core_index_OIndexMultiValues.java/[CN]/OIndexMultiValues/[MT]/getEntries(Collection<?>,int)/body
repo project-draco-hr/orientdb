@@ -1,0 +1,27 @@
+{
+  final List<Comparable> sortedKeys=new ArrayList<Comparable>((Collection<? extends Comparable>)iKeys);
+  Collections.sort(sortedKeys);
+  acquireExclusiveLock();
+  try {
+    final Set<ODocument> result=new ODocumentFieldsHashSet();
+    for (    final Object key : sortedKeys) {
+      final ORecordLazySet values=(ORecordLazySet)map.get(key);
+      if (values == null)       continue;
+      values.setDatabase(getDatabase());
+      if (!values.isEmpty()) {
+        for (        final OIdentifiable value : values) {
+          if (maxEntriesToFetch > -1 && maxEntriesToFetch == result.size())           return result;
+          final ODocument document=new ODocument();
+          document.field("key",key);
+          document.field("rid",value.getIdentity());
+          document.unsetDirty();
+          result.add(document);
+        }
+      }
+    }
+    return result;
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

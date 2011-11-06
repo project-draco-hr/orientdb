@@ -1,0 +1,212 @@
+{
+  final List<OIndexSearchResult> indexSearchResults=new ArrayList<OIndexSearchResult>();
+  analyzeQueryBranch(iSchemaClass,compiledFilter.getRootCondition(),indexSearchResults);
+  Collections.sort(indexSearchResults,new Comparator<OIndexSearchResult>(){
+    public int compare(    final OIndexSearchResult searchResultOne,    final OIndexSearchResult searchResultTwo){
+      return searchResultTwo.getFieldCount() - searchResultOne.getFieldCount();
+    }
+  }
+);
+  for (  final OIndexSearchResult searchResult : indexSearchResults) {
+    final List<String> searchResultFields=searchResult.fields();
+    final List<OIndex> involvedIndexes=new ArrayList<OIndex>(iSchemaClass.getInvolvedIndexes(searchResultFields));
+    Collections.sort(involvedIndexes,new Comparator<OIndex>(){
+      public int compare(      final OIndex indexOne,      final OIndex indexTwo){
+        return indexOne.getDefinition().getParamCount() - indexTwo.getDefinition().getParamCount();
+      }
+    }
+);
+    for (    final OIndex index : involvedIndexes) {
+      final OIndexDefinition indexDefinition=index.getDefinition();
+      final OQueryOperator operator=searchResult.lastOperator;
+      if (!(operator instanceof OQueryOperatorEquals)) {
+        final String lastFiled=searchResult.lastField;
+        final String relatedIndexField=indexDefinition.getFields().get(searchResult.fieldValuePairs.size());
+        if (!lastFiled.equals(relatedIndexField))         continue;
+      }
+      final List<Object> keyParams=new ArrayList<Object>(searchResultFields.size());
+      for (      final String fieldName : indexDefinition.getFields().subList(0,searchResultFields.size())) {
+        final Object fieldValue=searchResult.fieldValuePairs.get(fieldName);
+        if (fieldValue != null)         keyParams.add(fieldValue);
+ else         keyParams.add(searchResult.lastValue);
+      }
+      final OIndex internalIndex=index.getInternal();
+      final boolean indexCanBeUsedInEqualityOperators=(internalIndex instanceof OIndexUnique || internalIndex instanceof OIndexNotUnique);
+      if (indexDefinition.getParamCount() == 1) {
+        if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorBetween) {
+          final Object[] betweenKeys=(Object[])keyParams.get(0);
+          final Object keyOne=indexDefinition.createValue(Collections.singletonList(OSQLHelper.getValue(betweenKeys[0])));
+          final Object keyTwo=indexDefinition.createValue(Collections.singletonList(OSQLHelper.getValue(betweenKeys[2])));
+          if (keyOne == null || keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+        if (indexCanBeUsedInEqualityOperators && operator instanceof OQueryOperatorIn) {
+          final List<Object> inParams=(List<Object>)keyParams.get(0);
+          final List<Object> inKeys=new ArrayList<Object>();
+          boolean containsNotCompatibleKey=false;
+          for (          final Object keyValue : inParams) {
+            final Object key=indexDefinition.createValue(OSQLHelper.getValue(keyValue));
+            if (key == null) {
+              containsNotCompatibleKey=true;
+              break;
+            }
+            inKeys.add(key);
+          }
+          if (containsNotCompatibleKey)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValues(inKeys,fetchLimit);
+ else           result=index.getValues(inKeys);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+        final Object key=indexDefinition.createValue(keyParams);
+        if (key == null)         continue;
+        if (internalIndex instanceof OIndexFullText && operator instanceof OQueryOperatorContainsText) {
+          fillSearchIndexResultSet(index.get(key));
+          return true;
+        }
+        if (!indexCanBeUsedInEqualityOperators)         continue;
+        if (operator instanceof OQueryOperatorEquals) {
+          fillSearchIndexResultSet(index.get(key));
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMajor) {
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesMajor(key,false,fetchLimit);
+ else           result=index.getValuesMajor(key,false);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMajorEquals) {
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesMajor(key,true,fetchLimit);
+ else           result=index.getValuesMajor(key,true);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMinor) {
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesMinor(key,false,fetchLimit);
+ else           result=index.getValuesMinor(key,false);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMinorEquals) {
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesMinor(key,true,fetchLimit);
+ else           result=index.getValuesMinor(key,true);
+          fillSearchIndexResultSet(result);
+          return true;
+        }
+      }
+ else {
+        if (!indexCanBeUsedInEqualityOperators)         continue;
+        if (operator instanceof OQueryOperatorBetween) {
+          final Object[] betweenKeys=(Object[])keyParams.get(keyParams.size() - 1);
+          final Object betweenKeyOne=OSQLHelper.getValue(betweenKeys[0]);
+          if (betweenKeyOne == null)           continue;
+          final Object betweenKeyTwo=OSQLHelper.getValue(betweenKeys[2]);
+          if (betweenKeyTwo == null)           continue;
+          final List<Object> betweenKeyOneParams=new ArrayList<Object>(keyParams.size());
+          betweenKeyOneParams.addAll(keyParams.subList(0,keyParams.size() - 1));
+          betweenKeyOneParams.add(betweenKeyOne);
+          final List<Object> betweenKeyTwoParams=new ArrayList<Object>(keyParams.size());
+          betweenKeyTwoParams.addAll(keyParams.subList(0,keyParams.size() - 1));
+          betweenKeyTwoParams.add(betweenKeyTwo);
+          final Object keyOne=indexDefinition.createValue(betweenKeyOneParams);
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(betweenKeyTwoParams);
+          if (keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+        if (operator instanceof OQueryOperatorEquals) {
+          final Object keyOne=indexDefinition.createValue(keyParams);
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(keyParams);
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMajor) {
+          final Object keyOne=indexDefinition.createValue(keyParams);
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(keyParams.subList(0,keyParams.size() - 1));
+          if (keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,false,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,false,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMajorEquals) {
+          final Object keyOne=indexDefinition.createValue(keyParams);
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(keyParams.subList(0,keyParams.size() - 1));
+          if (keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMinor) {
+          final Object keyOne=indexDefinition.createValue(keyParams.subList(0,keyParams.size() - 1));
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(keyParams);
+          if (keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,false,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,false);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+        if (operator instanceof OQueryOperatorMinorEquals) {
+          final Object keyOne=indexDefinition.createValue(keyParams.subList(0,keyParams.size() - 1));
+          if (keyOne == null)           continue;
+          final Object keyTwo=indexDefinition.createValue(keyParams);
+          if (keyTwo == null)           continue;
+          final Collection<OIdentifiable> result;
+          if (fetchLimit > -1)           result=index.getValuesBetween(keyOne,true,keyTwo,true,fetchLimit);
+ else           result=index.getValuesBetween(keyOne,true,keyTwo,true);
+          fillSearchIndexResultSet(result);
+          if (OProfiler.getInstance().isRecording()) {
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage",1);
+            OProfiler.getInstance().updateCounter("Query.compositeIndexUsage." + indexDefinition.getParamCount(),1);
+          }
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}

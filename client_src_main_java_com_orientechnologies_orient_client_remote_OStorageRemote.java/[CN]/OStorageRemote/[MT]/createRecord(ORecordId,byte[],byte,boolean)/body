@@ -1,0 +1,47 @@
+{
+  checkConnection();
+  do {
+    try {
+      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+      try {
+        network.writeShort((short)iRid.clusterId);
+        network.writeBytes(iContent);
+        network.writeByte(iRecordType);
+      }
+  finally {
+        endRequest(network);
+      }
+      if (iSynch)       try {
+        beginResponse(network);
+        iRid.clusterPosition=network.readLong();
+        return iRid.clusterPosition;
+      }
+  finally {
+        endResponse(network);
+      }
+ else {
+        Callable<Object> response=new Callable<Object>(){
+          public Object call() throws Exception {
+            beginResponse(network);
+            try {
+              final long clusterPosition=network.readLong();
+            }
+  finally {
+              endResponse(network);
+            }
+            return null;
+          }
+        }
+;
+        asynchExecutor.submit(new FutureTask<Object>(response));
+      }
+    }
+ catch (    OException e) {
+      throw e;
+    }
+catch (    Exception e) {
+      handleException("Error on create record in cluster: " + iRid.clusterId,e);
+    }
+  }
+ while (true);
+}

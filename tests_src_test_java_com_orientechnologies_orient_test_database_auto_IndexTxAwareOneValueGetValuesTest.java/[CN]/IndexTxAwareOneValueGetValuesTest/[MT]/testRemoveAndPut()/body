@@ -1,0 +1,19 @@
+{
+  database.begin();
+  final OIndex<?> index=database.getMetadata().getIndexManager().getIndex("idxTxAwareOneValueGetValuesTest");
+  Assert.assertTrue(index instanceof OIndexTxAwareOneValue);
+  final int clusterId=database.getDefaultClusterId();
+  index.put(1,new ORecordId(clusterId,1));
+  index.put(2,new ORecordId(clusterId,2));
+  database.commit();
+  Assert.assertNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetValuesTest"));
+  final Collection<?> resultOne=((OIndexTxAwareOneValue)index).getValues(Arrays.asList(1,2));
+  Assert.assertEquals(resultOne.size(),2);
+  database.begin();
+  index.remove(1);
+  index.put(1,new ORecordId(clusterId,1));
+  Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetValuesTest"));
+  final Collection<?> resultTwo=((OIndexTxAwareOneValue)index).getValues(Arrays.asList(1,2));
+  Assert.assertEquals(resultTwo.size(),2);
+  database.rollback();
+}

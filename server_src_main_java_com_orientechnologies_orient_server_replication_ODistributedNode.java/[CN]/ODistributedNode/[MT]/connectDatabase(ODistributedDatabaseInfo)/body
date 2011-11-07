@@ -1,20 +1,16 @@
 {
 synchronized (this) {
     databases.remove(iDatabase.databaseName);
-    if (channel == null)     connect();
+    OLogManager.instance().warn(this,"Starting replication for database '%s' against distributed node %s:%d...",iDatabase.databaseName,networkAddress,networkPort);
     try {
-      channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_OPEN);
-      channel.writeInt(clientTxId);
-      channel.writeString(iDatabase.databaseName);
-      channel.writeString(iDatabase.userName);
-      channel.writeString(iDatabase.userPassword);
-      channel.flush();
-      channel.readStatus();
-      iDatabase.sessionId=channel.readInt();
+      iDatabase.storage=new OStorageRemote(id + "/" + iDatabase.databaseName,"rw");
+      iDatabase.storage.open(iDatabase.userName,iDatabase.userPassword,null);
+      iDatabase.sessionId=iDatabase.storage.getSessionId();
+      databases.put(iDatabase.databaseName,iDatabase);
     }
  catch (    Exception e) {
       databases.remove(iDatabase.databaseName);
-      OLogManager.instance().warn(this,"Database '" + iDatabase.databaseName + "' is not present on remote server. Removing database from shared list.");
+      OLogManager.instance().warn(this,"Database '" + iDatabase.databaseName + "' is not present on remote server. Removing database from shared list.",e);
     }
   }
 }

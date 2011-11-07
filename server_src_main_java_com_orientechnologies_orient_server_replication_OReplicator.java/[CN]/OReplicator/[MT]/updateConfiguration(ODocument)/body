@@ -1,0 +1,26 @@
+{
+  clusterConfiguration=iDocument;
+  for (  String dbName : clusterConfiguration.fieldNames()) {
+    final ODocument db=clusterConfiguration.field(dbName);
+    final Collection<ODocument> dbNodes=db.field("nodes");
+    for (    ODocument node : dbNodes) {
+      final String nodeId=node.field("id");
+      if (manager.itsMe(nodeId))       continue;
+      if (!nodes.containsKey(nodeId)) {
+        final ODistributedNode dNode=new ODistributedNode(manager,nodeId);
+        nodes.put(nodeId,dNode);
+        try {
+          final ODistributedDatabaseInfo dbInfo=new ODistributedDatabaseInfo();
+          dbInfo.databaseName=dbName;
+          dbInfo.userName=replicatorUser.name;
+          dbInfo.userPassword=replicatorUser.password;
+          dbInfo.synchType=SYNCH_TYPE.valueOf(node.field("mode").toString().toUpperCase());
+          dNode.connectDatabase(dbInfo);
+        }
+ catch (        IOException e) {
+          removeDistributedNode(nodeId,e);
+        }
+      }
+    }
+  }
+}

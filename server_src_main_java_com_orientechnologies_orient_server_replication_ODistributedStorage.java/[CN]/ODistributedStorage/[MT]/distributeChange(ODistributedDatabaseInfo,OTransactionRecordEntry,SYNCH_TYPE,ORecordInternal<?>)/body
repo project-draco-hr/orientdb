@@ -1,0 +1,69 @@
+{
+  if (OLogManager.instance().isWarnEnabled()) {
+    String operation="?";
+switch (iRequest.status) {
+case OTransactionRecordEntry.CREATED:
+      operation="CREATE";
+    break;
+case OTransactionRecordEntry.UPDATED:
+  operation="UPDATE";
+break;
+case OTransactionRecordEntry.DELETED:
+operation="DELETE";
+break;
+}
+OLogManager.instance().warn(this,"-> %s (%s mode) %s record %s...",this,iRequestType,operation,iRecord.getIdentity());
+}
+checkConnection();
+do {
+try {
+final OChannelBinaryClient network=beginRequest(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_RECORD_CHANGE);
+try {
+network.writeByte(iRequest.status);
+network.writeLong(0);
+network.writeRID(iRecord.getIdentity());
+network.writeBytes(iRecord.toStream());
+network.writeInt(iRecord.getVersion() - 1);
+network.writeByte(iRecord.getRecordType());
+}
+  finally {
+endRequest(network);
+}
+if (iRequestType == SYNCH_TYPE.SYNCH) try {
+beginResponse(network);
+handleRemoteResponse(iRequest.status,iRequestType,iRecord,network.readLong());
+}
+  finally {
+endResponse(network);
+}
+ else {
+Callable<Object> response=new Callable<Object>(){
+public Object call() throws Exception {
+beginResponse(network);
+try {
+  handleRemoteResponse(iRequest.status,iRequestType,iRecord,network.readLong());
+}
+  finally {
+  endResponse(network);
+}
+return null;
+}
+}
+;
+asynchExecutor.submit(new FutureTask<Object>(response));
+}
+return;
+}
+ catch (OConcurrentModificationException e) {
+logIntegrityError(iRequest.status,iRequestType,iRecord);
+return;
+}
+catch (OException e) {
+throw e;
+}
+catch (Exception e) {
+handleException("Error on distribute record: " + iRecord.getIdentity(),e);
+}
+}
+ while (true);
+}

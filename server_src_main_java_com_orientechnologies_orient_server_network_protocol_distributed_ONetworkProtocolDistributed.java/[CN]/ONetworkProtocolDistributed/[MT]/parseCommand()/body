@@ -29,7 +29,7 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
         channel.writeBytes(doc.toStream());
         channel.flush();
         manager.getPeer().updateHeartBeatTime();
-        replicator.updateConfiguration(new ODocument(channel.readBytes()));
+        manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
       }
   finally {
         channel.releaseExclusiveLock();
@@ -48,6 +48,45 @@ sendOk(lastClientTxId);
 channel.releaseExclusiveLock();
 }
 break;
+case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_RECORD_CHANGE:
+{
+data.commandInfo="Distributed record change";
+final byte operationType=channel.readByte();
+final long operationId=channel.readLong();
+final ORecordId rid=channel.readRID();
+final byte[] buffer=channel.readBytes();
+final int version=channel.readInt();
+final byte recordType=channel.readByte();
+final long result;
+ODistributedRequesterThreadLocal.INSTANCE.set(true);
+try {
+switch (operationType) {
+case OTransactionRecordEntry.CREATED:
+result=createRecord(rid,buffer,recordType);
+break;
+case OTransactionRecordEntry.UPDATED:
+result=updateRecord(rid,buffer,version,recordType);
+break;
+case OTransactionRecordEntry.DELETED:
+result=deleteRecord(rid,version);
+break;
+default :
+throw new IllegalArgumentException("Received invalid distributed record change operation type: " + operationType);
+}
+}
+  finally {
+ODistributedRequesterThreadLocal.INSTANCE.set(false);
+}
+channel.acquireExclusiveLock();
+try {
+sendOk(lastClientTxId);
+channel.writeLong(result);
+}
+  finally {
+channel.releaseExclusiveLock();
+}
+break;
+}
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_SENDER:
 {
 data.commandInfo="Share the database to a remote server";
@@ -79,7 +118,6 @@ final String dbName=channel.readString();
 final String dbUser=channel.readString();
 final String dbPasswd=channel.readString();
 final String engineName=channel.readString();
-ODistributedRequesterThreadLocal.INSTANCE.set(true);
 try {
 OLogManager.instance().info(this,"Received database '%s' to share on local server node",dbName);
 connection.database=getDatabaseInstance(dbName,engineName);
@@ -110,8 +148,8 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
 {
 checkConnected();
 data.commandInfo="Update db configuration from server node leader";
-replicator.getClusterConfiguration().fromStream(channel.readBytes());
-OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",replicator.getClusterConfiguration().toJSON(""));
+manager.getReplicator().updateConfiguration(new ODocument().fromStream(channel.readBytes()));
+OLogManager.instance().warn(this,"Changed distributed server configuration:\n%s",manager.getReplicator().getClusterConfiguration().toJSON(""));
 channel.acquireExclusiveLock();
 try {
 sendOk(lastClientTxId);

@@ -1,18 +1,8 @@
 {
   try {
-    final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
-    if (ppos == null)     throw new OTransactionException("Can't retrieve the updated record #" + iRid);
-    if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't update the record " + iRid + " because the version is not the latest one. Probably you are updating an old record or it has been modified by another user (db=v"+ ppos.version+ " your=v"+ iVersion+ ")");
-    final ODataLocal dataSegment=storage.getDataSegment(storage.getDataSegmentForRecord(iClusterSegment,iContent));
-    final long dataOffset;
-    if (iContent != null) {
-      dataOffset=dataSegment.addRecord(iRid,iContent);
-      iClusterSegment.setPhysicalPosition(iRid.clusterPosition,dataSegment.getId(),dataOffset,iRecordType,++ppos.version);
-    }
- else     dataOffset=-1;
-    dataSegment.updateRid(ppos.dataPosition,ORecordId.EMPTY_RECORD_ID);
-    txSegment.addLog(OTxSegment.OPERATION_UPDATE,iTxId,iRid.clusterId,iRid.clusterPosition,ppos.dataSegment,ppos.dataPosition,ppos.version - 1);
-    return ppos.version;
+    final ORawBuffer buffer=storage.readRecord(iClusterSegment,iRid,false);
+    txSegment.addLog(OTxSegment.OPERATION_UPDATE,iTxId,iRid.clusterId,iRid.clusterPosition,iRecordType,buffer.version - 1,buffer.buffer);
+    return storage.updateRecord(iClusterSegment,iRid,iContent,iVersion,iRecordType);
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on updating entry #" + iRid + " in log segment: "+ iClusterSegment,e,OTransactionException.class);

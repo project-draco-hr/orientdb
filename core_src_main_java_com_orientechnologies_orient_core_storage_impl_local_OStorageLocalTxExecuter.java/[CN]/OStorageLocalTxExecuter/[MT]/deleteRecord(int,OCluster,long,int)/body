@@ -1,10 +1,9 @@
 {
   try {
-    final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iPosition,new OPhysicalPosition());
-    if (!storage.checkForRecordValidity(ppos))     return;
-    if (iVersion > -1 && ppos.version != iVersion)     throw new OConcurrentModificationException("Can't delete the record #" + iClusterSegment.getId() + ":"+ iPosition+ " because the version is not the latest one. Probably you are deleting an old record or it has been modified by another user (db=v"+ ppos.version+ " your=v"+ iVersion+ ")");
-    txSegment.addLog(OTxSegment.OPERATION_DELETE,iTxId,iClusterSegment.getId(),iPosition,ppos.dataSegment,ppos.dataPosition,iVersion);
-    iClusterSegment.removePhysicalPosition(iPosition,ppos);
+    final ORecordId rid=new ORecordId(iClusterSegment.getId(),iPosition);
+    final ORawBuffer buffer=storage.readRecord(iClusterSegment,rid,false);
+    txSegment.addLog(OTxSegment.OPERATION_DELETE,iTxId,iClusterSegment.getId(),iPosition,buffer.recordType,buffer.version,buffer.buffer);
+    storage.deleteRecord(iClusterSegment,rid,iVersion);
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on deleting entry #" + iPosition + " in log segment: "+ iClusterSegment,e,OTransactionException.class);

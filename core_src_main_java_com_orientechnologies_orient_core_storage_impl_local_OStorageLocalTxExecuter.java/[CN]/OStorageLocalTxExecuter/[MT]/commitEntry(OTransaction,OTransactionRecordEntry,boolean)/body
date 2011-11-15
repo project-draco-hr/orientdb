@@ -14,8 +14,8 @@ case OTransactionRecordEntry.CREATED:
     if (rid.isNew()) {
       if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_CREATE,txEntry.getRecord()))       stream=txEntry.getRecord().toStream();
       rid.clusterId=cluster.getId();
-      if (iUseLog)       createRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getRecordType());
- else       iTx.getDatabase().getStorage().createRecord(rid,stream,txEntry.getRecord().getRecordType(),null);
+      if (iUseLog)       rid.clusterPosition=createRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getRecordType());
+ else       rid.clusterPosition=iTx.getDatabase().getStorage().createRecord(rid,stream,txEntry.getRecord().getRecordType(),null);
       iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_CREATE,txEntry.getRecord());
     }
  else {
@@ -28,14 +28,16 @@ case OTransactionRecordEntry.UPDATED:
 {
   byte[] stream=txEntry.getRecord().toStream();
   if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_UPDATE,txEntry.getRecord()))   stream=txEntry.getRecord().toStream();
-  txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+  if (iUseLog)   txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
+ else   iTx.getDatabase().getStorage().updateRecord(rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType(),null);
   iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_UPDATE,txEntry.getRecord());
   break;
 }
 case OTransactionRecordEntry.DELETED:
 {
 iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,txEntry.getRecord());
-deleteRecord(iTx.getId(),cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
+if (iUseLog) deleteRecord(iTx.getId(),cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
+ else iTx.getDatabase().getStorage().deleteRecord(rid,txEntry.getRecord().getVersion(),null);
 iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_DELETE,txEntry.getRecord());
 }
 break;

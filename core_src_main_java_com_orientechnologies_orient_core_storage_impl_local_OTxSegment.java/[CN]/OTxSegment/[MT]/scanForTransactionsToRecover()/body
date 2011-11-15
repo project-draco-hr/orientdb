@@ -1,13 +1,9 @@
 {
   final Set<Integer> txToRecover=new HashSet<Integer>();
   final Set<Integer> txToNotRecover=new HashSet<Integer>();
-  int size=file.getFilledUpTo() / RECORD_SIZE;
-  for (int i=0; i < size; ++i) {
-    int offset=i * RECORD_SIZE;
+  for (long offset=0; eof(offset); offset=nextEntry(offset)) {
     final byte status=file.readByte(offset);
-    offset+=OConstants.SIZE_BYTE;
-    offset+=OConstants.SIZE_BYTE;
-    final int txId=file.readInt(offset);
+    final int txId=file.readInt(offset + OFFSET_TX_ID);
 switch (status) {
 case STATUS_FREE:
       txToNotRecover.add(txId);
@@ -17,6 +13,6 @@ case STATUS_COMMITTING:
 break;
 }
 }
-txToRecover.removeAll(txToNotRecover);
+if (txToNotRecover.size() > 0) txToRecover.removeAll(txToNotRecover);
 return txToRecover;
 }

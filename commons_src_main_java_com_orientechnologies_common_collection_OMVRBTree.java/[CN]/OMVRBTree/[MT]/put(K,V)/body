@@ -31,44 +31,17 @@
       final OMVRBTreeEntry<K,V> newNode=createEntry(parentNode);
       if (pageIndex < parentNode.getPageSplitItems())       parentNode.insert(pageIndex,key,value);
  else       newNode.insert(pageIndex - parentNode.getPageSplitItems(),key,value);
-      OMVRBTreeEntry<K,V> node=parentNode.getRight();
-      OMVRBTreeEntry<K,V> prevNode=parentNode;
-      int cmp=0;
-      if (comparator != null)       while (node != null) {
-        cmp=comparator.compare(newNode.getFirstKey(),node.getFirstKey());
-        if (cmp < 0) {
-          prevNode=node;
-          node=node.getLeft();
-        }
- else         if (cmp > 0) {
-          prevNode=node;
-          node=node.getRight();
-        }
- else {
-          throw new IllegalStateException();
-        }
+      final OMVRBTreeEntry<K,V> prevNode=parentNode.getRight();
+      parentNode.setRight(newNode);
+      if (prevNode != null) {
+        newNode.setRight(prevNode);
+        fixAfterInsertion(prevNode);
       }
- else       while (node != null) {
-        cmp=((Comparable)newNode.getFirstKey()).compareTo((Comparable)node.getFirstKey());
-        if (cmp < 0) {
-          prevNode=node;
-          node=node.getLeft();
-        }
- else         if (cmp > 0) {
-          prevNode=node;
-          node=node.getRight();
-        }
- else {
-          throw new IllegalStateException();
-        }
-      }
-      if (prevNode == parentNode)       parentNode.setRight(newNode);
- else       if (cmp < 0)       prevNode.setLeft(newNode);
- else       if (cmp > 0)       prevNode.setRight(newNode);
- else       throw new IllegalStateException();
-      fixAfterInsertion(newNode);
+ else       fixAfterInsertion(newNode);
+      checkTreeStructure(parentNode);
+      modCount++;
     }
-    modCount++;
+    checkTreeStructure(parentNode);
     size++;
     if (listener != null)     listener.signalTreeChanged(this);
   }

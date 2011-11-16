@@ -1,0 +1,45 @@
+{
+  database1=new ODatabaseDocumentTx(url).open("admin","admin");
+  if (database1.getURL().startsWith("remote"))   return;
+  database1.begin(TXTYPE.OPTIMISTIC);
+  ODocument vDocA=database1.newInstance();
+  vDocA.field(NAME,"docA");
+  vDocA.save();
+  ODocument vDocB=database1.newInstance();
+  vDocB.field(NAME,"docB");
+  vDocB.save();
+  database1.commit();
+  final ORID vDocA_Rid=vDocA.getIdentity().copy();
+  final ORID vDocB_Rid=vDocB.getIdentity().copy();
+  TestSimulateError.onDataLocalWriteRecord=new TestSimulateError(){
+    protected int fCountRecordWritten=0;
+    @Override public boolean checkDataLocalWriteRecord(    ODataLocal iODataLocal,    long[] iFilePosition,    int iClusterSegment,    long iClusterPosition,    byte[] iContent){
+      fCountRecordWritten++;
+      if (fCountRecordWritten == 2)       throw new RuntimeException("checkDataLocalWriteRecord on #" + iClusterSegment + ":"+ iClusterPosition);
+      return true;
+    }
+  }
+;
+  try {
+    database1.begin(TXTYPE.OPTIMISTIC);
+    vDocA.field(NAME,"docA_v2");
+    vDocA.save();
+    vDocB.field(NAME,"docB_v2");
+    vDocB.save();
+    database1.commit();
+    Assert.fail("Should throw Exception");
+  }
+ catch (  Exception e) {
+    vDocA=database1.load(vDocA_Rid);
+    vDocB=database1.load(vDocB_Rid);
+  }
+  Assert.assertEquals(vDocA.field(NAME),"docA");
+  Assert.assertEquals(vDocB.field(NAME),"docB");
+  database1.close();
+  database2=new ODatabaseDocumentTx(url).open("admin","admin");
+  ODocument vDocA_db2=database2.load(vDocA_Rid);
+  Assert.assertEquals(vDocA_db2.field(NAME),"docA");
+  ODocument vDocB_db2=database2.load(vDocB_Rid);
+  Assert.assertEquals(vDocB_db2.field(NAME),"docB");
+  database2.close();
+}

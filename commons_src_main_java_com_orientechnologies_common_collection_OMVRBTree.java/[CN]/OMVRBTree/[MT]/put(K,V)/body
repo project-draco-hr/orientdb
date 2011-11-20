@@ -18,7 +18,10 @@
       }
     }
     parentNode=getEntry(key,true,PartialSearchMode.NONE);
-    if (pageItemFound)     return parentNode.setValue(value);
+    if (pageItemFound) {
+      modCount++;
+      return parentNode.setValue(value);
+    }
     setLastSearchNode(null,null);
     if (parentNode == null) {
       parentNode=root;
@@ -31,17 +34,44 @@
       final OMVRBTreeEntry<K,V> newNode=createEntry(parentNode);
       if (pageIndex < parentNode.getPageSplitItems())       parentNode.insert(pageIndex,key,value);
  else       newNode.insert(pageIndex - parentNode.getPageSplitItems(),key,value);
-      final OMVRBTreeEntry<K,V> prevNode=parentNode.getRight();
-      parentNode.setRight(newNode);
-      if (prevNode != null) {
-        newNode.setRight(prevNode);
-        fixAfterInsertion(prevNode);
+      OMVRBTreeEntry<K,V> node=parentNode.getRight();
+      OMVRBTreeEntry<K,V> prevNode=parentNode;
+      int cmp=0;
+      if (comparator != null)       while (node != null) {
+        cmp=comparator.compare(newNode.getFirstKey(),node.getFirstKey());
+        if (cmp < 0) {
+          prevNode=node;
+          node=node.getLeft();
+        }
+ else         if (cmp > 0) {
+          prevNode=node;
+          node=node.getRight();
+        }
+ else {
+          throw new IllegalStateException("Duplicated keys were found in OMVRBTree.");
+        }
       }
- else       fixAfterInsertion(newNode);
-      checkTreeStructure(parentNode);
-      modCount++;
+ else       while (node != null) {
+        cmp=((Comparable<K>)newNode.getFirstKey()).compareTo(node.getFirstKey());
+        if (cmp < 0) {
+          prevNode=node;
+          node=node.getLeft();
+        }
+ else         if (cmp > 0) {
+          prevNode=node;
+          node=node.getRight();
+        }
+ else {
+          throw new IllegalStateException("Duplicated keys were found in OMVRBTree.");
+        }
+      }
+      if (prevNode == parentNode)       parentNode.setRight(newNode);
+ else       if (cmp < 0)       prevNode.setLeft(newNode);
+ else       if (cmp > 0)       prevNode.setRight(newNode);
+ else       throw new IllegalStateException("Duplicated keys were found in OMVRBTree.");
+      fixAfterInsertion(newNode);
     }
-    checkTreeStructure(parentNode);
+    modCount++;
     size++;
     if (listener != null)     listener.signalTreeChanged(this);
   }

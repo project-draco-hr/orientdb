@@ -1,6 +1,7 @@
 {
   final int fieldNameLength=iFieldName.length();
   if (fieldNameLength == 0)   return null;
+  ODocument currentRecord=iRecord;
   Object value=null;
   int beginPos=0;
   int nextSeparatorPos=0;
@@ -18,19 +19,20 @@
  else       fieldName=iFieldName;
     }
     if (nextSeparator == '[') {
-      if (value == null)       value=getIdentifiableValue(iRecord,fieldName);
+      if (value == null)       value=getIdentifiableValue(currentRecord,fieldName);
       if (value == null)       return null;
+      if (value instanceof ODocument)       currentRecord=(ODocument)value;
       final int end=iFieldName.indexOf(']',nextSeparatorPos);
       if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
       final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(nextSeparatorPos + 1,end));
       nextSeparatorPos=end;
       if (value instanceof ODocument) {
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
-        if (indexParts.size() == 1)         value=((ODocument)value).field(index);
+        if (indexParts.size() == 1)         value=currentRecord.field(index);
  else {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            values[i]=((ODocument)value).field(indexParts.get(i));
+            values[i]=currentRecord.field(indexParts.get(i));
           }
           value=values;
         }
@@ -99,10 +101,11 @@
  else {
       if (fieldName.contains("("))       value=evaluateFunction(value,fieldName);
  else {
-        value=getIdentifiableValue(iRecord,fieldName);
+        value=getIdentifiableValue(currentRecord,fieldName);
         if (value != null && value instanceof ORecord<?> && ((ORecord<?>)value).getInternalStatus() == STATUS.NOT_LOADED)         ((ORecord<?>)value).reload();
       }
     }
+    if (value instanceof ODocument)     currentRecord=(ODocument)value;
     beginPos=++nextSeparatorPos;
   }
  while (nextSeparatorPos < fieldNameLength && value != null);

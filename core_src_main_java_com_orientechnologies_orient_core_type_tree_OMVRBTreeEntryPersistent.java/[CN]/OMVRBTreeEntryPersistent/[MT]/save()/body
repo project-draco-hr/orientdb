@@ -1,27 +1,31 @@
 {
-  if (!record.isDirty())   return this;
-  final boolean isNew=record.getIdentity().isNew();
-  saveRecord();
-  if (isNew) {
-    final ORecordId rid=(ORecordId)record.getIdentity();
-    if (left != null) {
-      left.parentRid=rid;
-      left.markDirty();
+  if (!dataEntry.isEntryDirty())   return this;
+  final boolean isNew=dataEntry.getIdentity().isNew();
+  if (left != null && left.dataEntry.getIdentity().isNew()) {
+    if (isNew) {
+      left.dataEntry.save();
+      left.updateRefsAfterCreation();
     }
-    if (right != null) {
-      right.parentRid=rid;
-      right.markDirty();
-    }
-    if (parent != null) {
-      parentRid=parent.record.getIdentity();
-      if (parent.left == this)       parent.leftRid=rid;
- else       if (parent.right == this)       parent.rightRid=rid;
-      parent.markDirty();
-    }
+ else     left.save();
   }
-  if (parent != null)   if (!parent.record.getIdentity().equals(parentRid))   OLogManager.instance().error(this,"[save]: Tree node %s has parentRid '%s' different by the rid of the assigned parent node: %s",record.getIdentity(),parentRid,parent.record.getIdentity());
+  if (right != null && right.dataEntry.getIdentity().isNew()) {
+    if (isNew) {
+      right.dataEntry.save();
+      right.updateRefsAfterCreation();
+    }
+ else     right.save();
+  }
+  if (parent != null && parent.dataEntry.getIdentity().isNew()) {
+    if (isNew) {
+      parent.dataEntry.save();
+      parent.updateRefsAfterCreation();
+    }
+ else     parent.save();
+  }
+  dataEntry.save();
+  if (isNew)   updateRefsAfterCreation();
   checkEntryStructure();
-  if (pTree.searchNodeInCache(record.getIdentity()) != this) {
+  if (pTree.searchNodeInCache(dataEntry.getIdentity()) != this) {
     pTree.addNodeInCache(this);
   }
   return this;

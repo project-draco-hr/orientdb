@@ -2,28 +2,22 @@
   final long timer=OProfiler.getInstance().startChrono();
   int totalCommitted=0;
   try {
-    if (record.isDirty()) {
-      save();
-    }
     if (!recordsToCommit.isEmpty()) {
       final List<OMVRBTreeEntryPersistent<K,V>> tmp=new ArrayList<OMVRBTreeEntryPersistent<K,V>>();
       while (recordsToCommit.iterator().hasNext()) {
         tmp.addAll(recordsToCommit);
         recordsToCommit.clear();
-        for (        OMVRBTreeEntryPersistent<K,V> node : tmp)         if (node.record.isDirty()) {
-          boolean wasNew=node.record.getIdentity().isNew();
+        for (        OMVRBTreeEntryPersistent<K,V> node : tmp)         if (node.dataEntry.isEntryDirty()) {
+          boolean wasNew=node.dataEntry.getIdentity().isNew();
           node.save();
-          if (debug)           System.out.printf("\nSaved %s tree node %s: parent %s, left %s, right %s",wasNew ? "new" : "",node.record.getIdentity(),node.parentRid,node.leftRid,node.rightRid);
-          if (wasNew) {
-            if (node.record.getIdentity().getClusterPosition() < -1) {
-              if (cache.get(node.record.getIdentity()) != node)               cache.put(node.record.getIdentity().copy(),node);
-            }
-            cache.put(node.record.getIdentity(),node);
-          }
+          if (debug)           System.out.printf("\nSaved %s tree node %s: parent %s, left %s, right %s",wasNew ? "new" : "",node.dataEntry.getIdentity(),node.dataEntry.getParent(),node.dataEntry.getLeft(),node.dataEntry.getRight());
         }
         totalCommitted+=tmp.size();
         tmp.clear();
       }
+    }
+    if (dataTree.isTreeDirty()) {
+      saveTreeNode();
     }
   }
  catch (  IOException e) {

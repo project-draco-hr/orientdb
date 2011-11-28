@@ -2,6 +2,7 @@
   iOutput.append(OStringSerializerHelper.COLLECTION_BEGIN);
   final Iterator<Object> iterator=iValue instanceof Collection<?> ? ((Collection<Object>)iValue).iterator() : null;
   final int size=iValue instanceof Collection<?> ? ((Collection<Object>)iValue).size() : Array.getLength(iValue);
+  OType linkedType=iLinkedType;
   for (int i=0; i < size; ++i) {
     final Object o;
     if (iValue instanceof Collection<?>)     o=iterator.next();
@@ -19,13 +20,13 @@
         OObjectSerializerHelper.invokeCallback(o,doc,OAfterSerialization.class);
         id=doc;
       }
- else       if (!o.getClass().getName().startsWith("java.lang.") && (iLinkedType == null || iLinkedType == OType.EMBEDDED))       iLinkedType=OType.getTypeByClass(o.getClass());
+ else       if (iLinkedType == null)       linkedType=OType.getTypeByClass(o.getClass());
       linkedClass=iLinkedClass;
     }
  else {
       id=(OIdentifiable)o;
-      if (iLinkedType == null)       if (id.getIdentity().isValid())       iLinkedType=OType.LINK;
- else       iLinkedType=OType.EMBEDDED;
+      if (iLinkedType == null)       if (id.getIdentity().isValid())       linkedType=OType.LINK;
+ else       linkedType=OType.EMBEDDED;
       if (id instanceof ODocument) {
         doc=(ODocument)id;
         if (id.getIdentity().isTemporary())         doc.save();
@@ -33,8 +34,8 @@
       }
  else       linkedClass=null;
     }
-    if (id != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_BEGIN);
-    if (iLinkedType != OType.LINK && (linkedClass != null || doc != null)) {
+    if (id != null && linkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+    if (linkedType != OType.LINK && (linkedClass != null || doc != null)) {
       if (id == null)       id=OObjectSerializerHelper.toStream(o,new ODocument((ODatabaseRecord)iDatabase,o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
         public Object getUserObjectByRecord(        ORecordInternal<?> iRecord,        final String iFetchPlan){
           return iRecord;
@@ -53,12 +54,12 @@
     }
  else {
       if (iLinkedType == null) {
-        if (o != null)         iLinkedType=OType.getTypeByClass(o.getClass());
+        if (o != null)         linkedType=OType.getTypeByClass(o.getClass());
       }
  else       if (iLinkedType == OType.CUSTOM)       iOutput.append(OStringSerializerHelper.CUSTOM_TYPE);
-      fieldTypeToString(iOutput,iDatabase,iLinkedType,o);
+      fieldTypeToString(iOutput,iDatabase,linkedType,o);
     }
-    if (id != null && iLinkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.PARENTHESIS_END);
+    if (id != null && linkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.EMBEDDED_END);
   }
   iOutput.append(OStringSerializerHelper.COLLECTION_END);
   return iOutput;

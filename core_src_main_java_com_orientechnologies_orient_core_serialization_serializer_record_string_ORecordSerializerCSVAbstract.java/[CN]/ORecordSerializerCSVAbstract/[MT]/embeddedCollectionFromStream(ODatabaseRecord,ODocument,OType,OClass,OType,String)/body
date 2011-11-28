@@ -1,37 +1,36 @@
 {
   if (iValue.length() == 0)   return null;
   final String value=iValue.charAt(0) == '[' ? iValue.substring(1,iValue.length() - 1) : iValue;
-  final Collection<?> coll;
+  Collection<?> coll;
   if (iLinkedType == OType.LINK) {
     if (iDocument != null)     coll=iType == OType.EMBEDDEDLIST ? new ORecordLazyList(iDocument).setStreamedContent(new StringBuilder(value)) : new ORecordLazySet(iDocument).setStreamedContent(new StringBuilder(value));
  else     coll=iType == OType.EMBEDDEDLIST ? new ORecordLazyList(iDatabase).setStreamedContent(new StringBuilder(value)) : new ORecordLazySet(iDatabase).setStreamedContent(new StringBuilder(value));
-    return coll;
   }
-  coll=iType == OType.EMBEDDEDLIST ? new OTrackedList<Object>(iDocument) : new OTrackedSet<Object>(iDocument);
+ else   coll=iType == OType.EMBEDDEDLIST ? new OTrackedList<Object>(iDocument) : new OTrackedSet<Object>(iDocument);
   if (value.length() == 0)   return coll;
-  if (iLinkedType == null) {
-    final char begin=value.charAt(0);
-    if (begin == OStringSerializerHelper.LINK)     iLinkedType=OType.LINK;
-  }
+  OType linkedType;
   if (coll instanceof ORecordElement)   ((ORecordElement)coll).setInternalStatus(STATUS.UNMARSHALLING);
   final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR);
   for (  String item : items) {
     Object objectToAdd=null;
-    if (item.length() > 2 && item.charAt(0) == OStringSerializerHelper.PARENTHESIS_BEGIN) {
+    linkedType=null;
+    if (item.length() > 2 && item.charAt(0) == OStringSerializerHelper.EMBEDDED_BEGIN) {
       item=item.substring(1,item.length() - 1);
       if (!item.isEmpty()) {
         iLinkedClass=OStringSerializerHelper.getRecordClassName(iDatabase,item,iLinkedClass);
-        if (iLinkedClass != null) {
-          objectToAdd=fromString(iDocument.getDatabase(),item,new ODocument(iDatabase,iLinkedClass.getName()));
-        }
- else         objectToAdd=fieldTypeFromStream(iDocument,iLinkedType,item);
+        if (iLinkedClass != null)         objectToAdd=fromString(iDocument.getDatabase(),item,new ODocument(iDatabase,iLinkedClass.getName()));
+ else         objectToAdd=fieldTypeFromStream(iDocument,OType.EMBEDDED,item);
       }
     }
  else {
-      if (iLinkedType == null)       iLinkedType=getType(item);
-      if (iLinkedType == null)       throw new IllegalArgumentException("Linked type cannot be null. Probably the serialized type has not stored the type along with data");
- else       if (iLinkedType == OType.CUSTOM)       item=item.substring(1);
-      objectToAdd=fieldTypeFromStream(iDocument,iLinkedType,item);
+      if (linkedType == null) {
+        final char begin=value.charAt(0);
+        if (begin == OStringSerializerHelper.LINK)         linkedType=OType.LINK;
+ else         linkedType=getType(item);
+        if (linkedType == null)         throw new IllegalArgumentException("Linked type cannot be null. Probably the serialized type has not stored the type along with data");
+      }
+      if (iLinkedType == OType.CUSTOM)       item=item.substring(1,item.length() - 1);
+      objectToAdd=fieldTypeFromStream(iDocument,linkedType,item);
     }
     if (objectToAdd != null) {
       if (objectToAdd instanceof ODocument && coll instanceof ORecordElement)       ((ODocument)objectToAdd).addOwner((ORecordElement)coll);

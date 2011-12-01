@@ -1,0 +1,27 @@
+{
+  OGraphDatabase db1=new OGraphDatabase(url);
+  db1=db1.open("admin","admin");
+  OClass oc=db1.createVertexType("vertexA");
+  oc.createProperty("name",OType.STRING);
+  oc.createIndex("vertexA_name_idx",OClass.INDEX_TYPE.UNIQUE,"name");
+  OClass ocb=db1.createVertexType("vertexB");
+  ocb.createProperty("name",OType.STRING);
+  ocb.createProperty("map",OType.EMBEDDEDMAP);
+  ocb.createIndex("vertexB_name_idx",OClass.INDEX_TYPE.UNIQUE,"name");
+  ODocument docA=db1.createVertex("vertexA");
+  docA.field("name","valueA");
+  docA.save();
+  Map<String,String> map=new HashMap<String,String>();
+  map.put("key","value");
+  createAndLink(db1,"valueB1",map,docA);
+  createAndLink(db1,"valueB2",map,docA);
+  StringBuilder sb=new StringBuilder("select from vertexB");
+  sb.append(" where any() traverse(0, -1) (@class = '");
+  sb.append("vertexA");
+  sb.append("' AND name = 'valueA')");
+  List<ODocument> recordDocs=db1.query(new OSQLSynchQuery<ODocument>(sb.toString()));
+  for (  ODocument doc : recordDocs) {
+    System.out.println(doc);
+  }
+  db1.close();
+}

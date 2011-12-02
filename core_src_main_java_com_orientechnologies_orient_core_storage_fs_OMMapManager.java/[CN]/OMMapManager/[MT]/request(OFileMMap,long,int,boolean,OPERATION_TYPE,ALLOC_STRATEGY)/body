@@ -2,14 +2,17 @@
   if (iStrategy == ALLOC_STRATEGY.MMAP_NEVER)   return null;
   lastStrategy=iStrategy;
   OMMapBufferEntry entry=searchBetweenLastBlocks(iFile,iBeginOffset,iSize);
-  if (entry != null)   return entry;
+  if (entry != null && entry.buffer != null)   return entry;
   List<OMMapBufferEntry> fileEntries=bufferPoolPerFile.get(iFile);
   if (fileEntries == null) {
     fileEntries=new ArrayList<OMMapBufferEntry>();
     bufferPoolPerFile.put(iFile,fileEntries);
   }
   int position=searchEntry(fileEntries,iBeginOffset,iSize);
-  if (position > -1)   return fileEntries.get(position);
+  if (position > -1) {
+    entry=fileEntries.get(position);
+    if (entry != null && entry.buffer != null)     return entry;
+  }
   int p=(position + 2) * -1;
   if (!allocIfOverlaps(iBeginOffset,iSize,fileEntries,p)) {
     OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
@@ -25,7 +28,10 @@
     if (totalMemory + bufferSize > maxMemory)     freeResources();
     fileEntries=bufferPoolPerFile.get(iFile);
     position=searchEntry(fileEntries,iBeginOffset,iSize);
-    if (position > -1)     return fileEntries.get(position);
+    if (position > -1) {
+      entry=fileEntries.get(position);
+      if (entry != null && entry.buffer != null)       return entry;
+    }
     try {
       entry=mapBuffer(iFile,iBeginOffset,bufferSize);
     }
@@ -48,5 +54,6 @@ catch (    Exception e) {
     bufferPoolPerFile.put(iFile,fileEntries);
   }
   fileEntries.add(p,entry);
-  return entry;
+  if (entry != null && entry.buffer != null)   return entry;
+  return null;
 }

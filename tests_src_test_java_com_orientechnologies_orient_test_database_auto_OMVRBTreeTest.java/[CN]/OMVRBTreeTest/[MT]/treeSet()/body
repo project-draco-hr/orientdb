@@ -1,15 +1,30 @@
 {
   database.open("admin","admin");
+  int total=1000;
   OMVRBTreeRIDSet set=new OMVRBTreeRIDSet("index");
-  for (int i=0; i < 10000; ++i)   set.add(new ORecordId(10,i));
-  Assert.assertEquals(set.size(),10000);
+  for (int i=0; i < total; ++i)   set.add(new ORecordId(10,i));
+  Assert.assertEquals(set.size(),total);
   ODocument doc=set.toDocument();
   doc.save();
   database.close();
   database.open("admin","admin");
-  OMVRBTreeRIDSet set2=new OMVRBTreeRIDSet(doc.getIdentity());
-  Assert.assertEquals(set2.size(),10000);
+  OMVRBTreeRIDSet set2=new OMVRBTreeRIDSet(doc.getIdentity()).setAutoConvert(false);
+  Assert.assertEquals(set2.size(),total);
   int i=0;
-  for (  OIdentifiable rid : set2)   Assert.assertEquals(rid.getIdentity().getClusterPosition(),i++);
+  for (  OIdentifiable rid : set2) {
+    Assert.assertEquals(rid.getIdentity().getClusterPosition(),i);
+    i++;
+  }
+  Assert.assertEquals(i,total);
+  ORID rootRID=doc.field("root",ORecordId.class);
+  i=0;
+  for (Iterator<OIdentifiable> it=set2.iterator(); it.hasNext(); ) {
+    final OIdentifiable rid=it.next();
+    Assert.assertEquals(rid.getIdentity().getClusterPosition(),i);
+    it.remove();
+    i++;
+  }
+  Assert.assertEquals(i,total);
+  Assert.assertEquals(set2.size(),0);
   database.close();
 }

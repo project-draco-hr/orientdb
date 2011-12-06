@@ -48,13 +48,17 @@
     if (vField != null && fieldName.equals(vField.getName()))     continue;
     fieldValue=serializeFieldValue(iPojo,fieldName,getFieldValue(iPojo,fieldName));
     schemaProperty=schemaClass != null ? schemaClass.getProperty(fieldName) : null;
-    if (fieldValue != null && getEmbeddetTypesByJPAAnnotation(iPojo.getClass(),fieldValue.getClass(),fieldName,iEntityManager) != null && getEmbeddetTypesByJPAAnnotation(iPojo.getClass(),fieldValue.getClass(),fieldName,iEntityManager).equals(OType.EMBEDDED)) {
-      if (schemaClass == null) {
-        db.getMetadata().getSchema().createClass(iPojo.getClass());
-        iRecord.setClassNameIfExists(iPojo.getClass().getSimpleName());
-      }
-      if (schemaProperty == null) {
-        schemaProperty=iRecord.getSchemaClass().createProperty(fieldName,OType.EMBEDDED);
+    if (fieldValue != null) {
+      if (isEmbeddedObject(iPojo.getClass(),fieldValue.getClass(),fieldName,iEntityManager)) {
+        if (schemaClass == null) {
+          db.getMetadata().getSchema().createClass(iPojo.getClass());
+          iRecord.setClassNameIfExists(iPojo.getClass().getSimpleName());
+        }
+        if (schemaProperty == null) {
+          OType t=OType.getTypeByClass(fieldValue.getClass());
+          if (t == null)           t=OType.EMBEDDED;
+          schemaProperty=iRecord.getSchemaClass().createProperty(fieldName,t);
+        }
       }
     }
     fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,iEntityManager,iObj2RecHandler,db,iSaveOnlyDirty);

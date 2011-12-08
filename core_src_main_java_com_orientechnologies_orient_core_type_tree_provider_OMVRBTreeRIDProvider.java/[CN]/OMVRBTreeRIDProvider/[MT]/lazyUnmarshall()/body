@@ -1,0 +1,25 @@
+{
+  if (size > 0 || marshalling || buffer.length() == 0)   return;
+  marshalling=true;
+  try {
+    final char firstChar=buffer.charAt(0);
+    String value=firstChar == OStringSerializerHelper.COLLECTION_BEGIN ? buffer.substring(1,buffer.length() - 1) : buffer.toString();
+    if (firstChar == OStringSerializerHelper.COLLECTION_BEGIN || firstChar == OStringSerializerHelper.LINK) {
+      embeddedStreaming=true;
+      final StringTokenizer tokenizer=new StringTokenizer(value,",");
+      while (tokenizer.hasMoreElements()) {
+        final ORecordId rid=new ORecordId(tokenizer.nextToken());
+        tree.put(rid,rid);
+      }
+    }
+ else {
+      embeddedStreaming=false;
+      value=firstChar == OStringSerializerHelper.EMBEDDED_BEGIN ? value.substring(1,value.length() - 1) : value.toString();
+      fromStream(value.getBytes());
+      tree.load();
+    }
+  }
+  finally {
+    marshalling=false;
+  }
+}

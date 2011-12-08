@@ -67,16 +67,18 @@
     }
     public Object fetchLinked(    final ODocument iRoot,    final Object iUserObject,    final String iFieldName,    final Object iLinked){
       final Class<?> type;
-      if (iLinked != null && iLinked instanceof ODocument)       type=getFieldType((ODocument)iLinked,iEntityManager);
+      if (iLinked != null && iLinked instanceof ODocument && (!"ORIDs".equals(((ODocument)iLinked).getClassName())))       type=getFieldType((ODocument)iLinked,iEntityManager);
  else       type=getFieldType(iUserObject,iFieldName);
       if (type == null)       throw new OSerializationException("Linked type of field '" + iRoot.getClassName() + "."+ iFieldName+ "' is unknown. Probably needs to be registered with <db>.getEntityManager().registerEntityClasses(<package>) or <db>.getEntityManager().registerEntityClass(<class>) or the package cannot be loaded correctly due to a classpath problem. In this case register the single classes one by one.");
       Object fieldValue=null;
       Class<?> fieldClass;
       boolean propagate=false;
       if (Set.class.isAssignableFrom(type)) {
-        final Collection<Object> set=(Collection<Object>)iLinked;
+        final Collection<?> set;
+        if (iLinked instanceof Collection)         set=(Collection<Object>)iLinked;
+ else         set=new OMVRBTreeRIDSet().fromDocument((ODocument)iLinked);
         final Set<Object> target;
-        if (iLazyLoading)         target=new OLazyObjectSet<Object>(iRoot,set).setFetchPlan(iFetchPlan);
+        if (iLazyLoading)         target=new OLazyObjectSet<Object>(iRoot,(Collection<Object>)set).setFetchPlan(iFetchPlan);
  else {
           target=new HashSet();
           if (set != null && !set.isEmpty())           for (          Object o : set) {

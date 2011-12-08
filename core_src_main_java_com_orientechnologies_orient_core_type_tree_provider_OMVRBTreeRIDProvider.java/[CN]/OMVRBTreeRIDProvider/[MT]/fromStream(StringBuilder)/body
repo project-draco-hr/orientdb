@@ -1,10 +1,21 @@
 {
   if (iInput != null && iInput.length() > 0) {
-    final String value=iInput.charAt(0) == '[' ? iInput.substring(1,iInput.length() - 1) : iInput.toString();
-    final StringTokenizer tokenizer=new StringTokenizer(value,",");
-    while (tokenizer.hasMoreElements()) {
-      final ORecordId rid=new ORecordId(tokenizer.nextToken());
-      tree.put(rid,rid);
+    final char firstChar=iInput.charAt(0);
+    String value=firstChar == OStringSerializerHelper.COLLECTION_BEGIN ? iInput.substring(1,iInput.length() - 1) : iInput.toString();
+    if (firstChar == OStringSerializerHelper.COLLECTION_BEGIN || firstChar == OStringSerializerHelper.LINK) {
+      embeddedStreaming=true;
+      value=firstChar == OStringSerializerHelper.COLLECTION_BEGIN ? value.substring(1,value.length() - 1) : value.toString();
+      final StringTokenizer tokenizer=new StringTokenizer(value,",");
+      while (tokenizer.hasMoreElements()) {
+        final ORecordId rid=new ORecordId(tokenizer.nextToken());
+        tree.put(rid,rid);
+      }
+    }
+ else {
+      embeddedStreaming=false;
+      value=firstChar == OStringSerializerHelper.EMBEDDED_BEGIN ? value.substring(1,value.length() - 1) : value.toString();
+      fromStream(value.getBytes());
+      tree.load();
     }
   }
   return this;

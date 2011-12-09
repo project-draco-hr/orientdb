@@ -2,16 +2,17 @@
   if (iLinked == null)   return null;
   OIdentifiable resultRid=null;
   ORID rid;
+  final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
   if (iLinked instanceof ORID) {
     rid=(ORID)iLinked;
     if (rid.isValid() && rid.isNew()) {
       final ORecord<?> record=rid.getRecord();
-      if (record.getDatabase().getTransaction().isActive()) {
-        final OTransactionRecordEntry recordEntry=record.getDatabase().getTransaction().getRecordEntry(rid);
-        if (recordEntry != null)         record.getDatabase().save((ORecordInternal<?>)record,recordEntry.clusterName);
- else         record.getDatabase().save((ORecordInternal<?>)record);
+      if (database.getTransaction().isActive()) {
+        final OTransactionRecordEntry recordEntry=database.getTransaction().getRecordEntry(rid);
+        if (recordEntry != null)         database.save((ORecordInternal<?>)record,recordEntry.clusterName);
+ else         database.save((ORecordInternal<?>)record);
       }
- else       record.getDatabase().save((ORecordInternal<?>)record);
+ else       database.save((ORecordInternal<?>)record);
       rid=record.getIdentity();
     }
   }
@@ -24,17 +25,17 @@
     ORecordInternal<?> iLinkedRecord=(ORecordInternal<?>)iLinked;
     rid=iLinkedRecord.getIdentity();
     if (rid.isNew() || iLinkedRecord.isDirty()) {
-      if (iLinkedRecord.getDatabase() == null && iParentRecord != null)       iLinkedRecord.setDatabase(iParentRecord.getDatabase());
       if (iLinkedRecord instanceof ODocument) {
         final OClass schemaClass=((ODocument)iLinkedRecord).getSchemaClass();
-        iLinkedRecord.getDatabase().save(iLinkedRecord,schemaClass != null ? iLinkedRecord.getDatabase().getClusterNameById(schemaClass.getDefaultClusterId()) : null);
+        database.save(iLinkedRecord,schemaClass != null ? database.getClusterNameById(schemaClass.getDefaultClusterId()) : null);
       }
- else       iLinkedRecord.getDatabase().save(iLinkedRecord);
-      iLinkedRecord.getDatabase().registerUserObject(iLinkedRecord.getDatabase().getUserObjectByRecord(iLinkedRecord,null),iLinkedRecord);
+ else       database.save(iLinkedRecord);
+      final ODatabaseComplex<?> dbOwner=database.getDatabaseOwner();
+      dbOwner.registerUserObject(dbOwner.getUserObjectByRecord(iLinkedRecord,null),iLinkedRecord);
       resultRid=iLinkedRecord;
     }
-    if (iParentRecord != null && iParentRecord.getDatabase() instanceof ODatabaseRecord) {
-      final ODatabaseRecord db=iParentRecord.getDatabase();
+    if (iParentRecord != null && database instanceof ODatabaseRecord) {
+      final ODatabaseRecord db=database;
       if (!db.isRetainRecords())       resultRid=iLinkedRecord.getIdentity();
     }
   }

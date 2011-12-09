@@ -3,6 +3,7 @@
   if (!(iCommand instanceof OSerializableStream))   throw new OCommandExecutionException("Cannot serialize the command to be executed to the server side.");
   OSerializableStream command=iCommand;
   Object result=null;
+  final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
   do {
     OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
     try {
@@ -12,7 +13,7 @@
       try {
         network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
         network.writeByte((byte)(asynch ? 'a' : 's'));
-        network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(iCommand.getDatabase(),command));
+        network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(command));
       }
   finally {
         endRequest(network);
@@ -22,7 +23,7 @@
         if (asynch) {
           byte status;
           while ((status=network.readByte()) > 0) {
-            final ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readIdentifiable(network,iCommand.getDatabase());
+            final ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)readIdentifiable(network);
             if (record == null)             break;
 switch (status) {
 case 1:
@@ -35,10 +36,10 @@ case 1:
  catch (              Throwable t) {
                 t.printStackTrace();
               }
-            iCommand.getDatabase().getLevel1Cache().updateRecord(record);
+            database.getLevel1Cache().updateRecord(record);
           break;
 case 2:
-        iCommand.getDatabase().getLevel1Cache().updateRecord(record);
+        database.getLevel1Cache().updateRecord(record);
     }
   }
 }
@@ -49,15 +50,15 @@ case 'n':
     result=null;
   break;
 case 'r':
-result=readIdentifiable(network,iCommand.getDatabase());
-if (result instanceof ORecord<?>) iCommand.getDatabase().getLevel1Cache().updateRecord((ORecordInternal<?>)result);
+result=readIdentifiable(network);
+if (result instanceof ORecord<?>) database.getLevel1Cache().updateRecord((ORecordInternal<?>)result);
 break;
 case 'l':
 final int tot=network.readInt();
 final Collection<OIdentifiable> list=new ArrayList<OIdentifiable>();
 for (int i=0; i < tot; ++i) {
-final OIdentifiable resultItem=readIdentifiable(network,iCommand.getDatabase());
-if (resultItem instanceof ORecord<?>) iCommand.getDatabase().getLevel1Cache().updateRecord((ORecordInternal<?>)resultItem);
+final OIdentifiable resultItem=readIdentifiable(network);
+if (resultItem instanceof ORecord<?>) database.getLevel1Cache().updateRecord((ORecordInternal<?>)resultItem);
 list.add(resultItem);
 }
 result=list;

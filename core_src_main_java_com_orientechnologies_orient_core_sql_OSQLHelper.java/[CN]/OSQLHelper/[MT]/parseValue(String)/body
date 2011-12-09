@@ -1,0 +1,38 @@
+{
+  if (iValue == null)   return null;
+  iValue=iValue.trim();
+  Object fieldValue=VALUE_NOT_PARSED;
+  if (iValue.startsWith("'") && iValue.endsWith("'") || iValue.startsWith("\"") && iValue.endsWith("\""))   fieldValue=OStringSerializerHelper.getStringContent(iValue);
+ else   if (iValue.charAt(0) == OStringSerializerHelper.COLLECTION_BEGIN && iValue.charAt(iValue.length() - 1) == OStringSerializerHelper.COLLECTION_END) {
+    final List<String> items=OStringSerializerHelper.smartSplit(iValue.substring(1,iValue.length() - 1),OStringSerializerHelper.RECORD_SEPARATOR);
+    final List<Object> coll=new ArrayList<Object>();
+    for (    String item : items) {
+      coll.add(parseValue(item));
+    }
+    fieldValue=coll;
+  }
+ else   if (iValue.charAt(0) == OStringSerializerHelper.MAP_BEGIN && iValue.charAt(iValue.length() - 1) == OStringSerializerHelper.MAP_END) {
+    final List<String> items=OStringSerializerHelper.smartSplit(iValue.substring(1,iValue.length() - 1),OStringSerializerHelper.RECORD_SEPARATOR);
+    final Map<Object,Object> map=new HashMap<Object,Object>();
+    for (    String item : items) {
+      final List<String> parts=OStringSerializerHelper.smartSplit(item,OStringSerializerHelper.ENTRY_SEPARATOR);
+      if (parts == null || parts.size() != 2)       throw new OCommandSQLParsingException("Map found but entries are not defined as <key>:<value>");
+      map.put(parseValue(parts.get(0)),parseValue(parts.get(1)));
+    }
+    fieldValue=map;
+  }
+ else   if (iValue.charAt(0) == ORID.PREFIX)   fieldValue=new ORecordId(iValue.trim());
+ else {
+    final String upperCase=iValue.toUpperCase(Locale.ENGLISH);
+    if (upperCase.equals("NULL"))     fieldValue=null;
+ else     if (upperCase.equals("NOT NULL"))     fieldValue=NOT_NULL;
+ else     if (upperCase.equals("DEFINED"))     fieldValue=DEFINED;
+ else     if (upperCase.equals("TRUE"))     fieldValue=Boolean.TRUE;
+ else     if (upperCase.equals("FALSE"))     fieldValue=Boolean.FALSE;
+ else {
+      final Object v=parseStringNumber(iValue);
+      if (v != null)       fieldValue=v;
+    }
+  }
+  return fieldValue;
+}

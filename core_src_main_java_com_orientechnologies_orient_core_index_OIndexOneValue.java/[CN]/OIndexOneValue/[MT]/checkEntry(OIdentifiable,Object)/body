@@ -1,4 +1,15 @@
 {
   final OIdentifiable indexedRID=get(iKey);
-  if (indexedRID != null && !indexedRID.getIdentity().equals(iRecord.getIdentity()))   OLogManager.instance().exception("Found duplicated key '%s' previously assigned to the record %s",null,OIndexException.class,iKey,indexedRID);
+  if (indexedRID != null && !indexedRID.getIdentity().equals(iRecord.getIdentity())) {
+    final OTransactionIndexChanges indexChanges=ODatabaseRecordThreadLocal.INSTANCE.get().getTransaction().getIndexChanges(getName());
+    if (indexChanges != null) {
+      final OTransactionIndexChangesPerKey keyChanges=indexChanges.getChangesPerKey(iKey);
+      if (keyChanges != null) {
+        for (        OTransactionIndexEntry entry : keyChanges.entries) {
+          if (entry.operation == OPERATION.REMOVE)           return;
+        }
+      }
+    }
+    OLogManager.instance().exception("Found duplicated key '%s' previously assigned to the record %s",null,OIndexException.class,iKey,indexedRID);
+  }
 }

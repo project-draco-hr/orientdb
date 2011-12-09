@@ -3,36 +3,30 @@
   Object fieldValue;
   final StringBuilder types=new StringBuilder();
   for (  String fieldName : record.fieldNames()) {
-    if (iFetchPlan == null) {
-      final Object v=record.field(fieldName);
+    final int depthLevel=getDepthLevel(record,iFetchPlan,fieldName);
+    if (depthLevel == 0)     continue;
+    if (depthLevel > -1 && iCurrentLevel > depthLevel) {
+      continue;
+    }
+    fieldValue=record.field(fieldName);
+    if (fieldValue == null || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof Collection<?>) || ((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof OIdentifiable)) && (!(fieldValue instanceof Map<?,?>) || ((Map<?,?>)fieldValue).size() == 0 || !(((Map<?,?>)fieldValue).values().iterator().next() instanceof OIdentifiable))) {
       if (keepTypes) {
-        if (v instanceof Long)         appendType(types,fieldName,'l');
- else         if (v instanceof Float)         appendType(types,fieldName,'f');
- else         if (v instanceof Short)         appendType(types,fieldName,'s');
- else         if (v instanceof Double)         appendType(types,fieldName,'d');
- else         if (v instanceof Date)         appendType(types,fieldName,'t');
- else         if (v instanceof Byte)         appendType(types,fieldName,'b');
+        if (fieldValue instanceof Long)         appendType(types,fieldName,'l');
+ else         if (fieldValue instanceof Float)         appendType(types,fieldName,'f');
+ else         if (fieldValue instanceof Short)         appendType(types,fieldName,'s');
+ else         if (fieldValue instanceof Double)         appendType(types,fieldName,'d');
+ else         if (fieldValue instanceof Date)         appendType(types,fieldName,'t');
+ else         if (fieldValue instanceof Byte)         appendType(types,fieldName,'b');
       }
-      json.writeAttribute(indentLevel + 1,true,fieldName,OJSONWriter.encode(v));
+      json.writeAttribute(indentLevel + 1,true,fieldName,OJSONWriter.encode(fieldValue));
     }
  else {
-      final int depthLevel=getDepthLevel(record,iFetchPlan,fieldName);
-      if (depthLevel == 0)       continue;
-      if (depthLevel > -1 && iCurrentLevel > depthLevel) {
-        continue;
+      try {
+        fetch(record,iFetchPlan,fieldValue,fieldName,iCurrentLevel,iMaxFetch,json,indentLevel,includeType,includeId,includeVer,includeClazz,attribSameRow,keepTypes,parsedRecords,depthLevel);
       }
-      fieldValue=record.field(fieldName);
-      if (fieldValue == null || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof Collection<?>) || ((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof OIdentifiable)) && (!(fieldValue instanceof Map<?,?>) || ((Map<?,?>)fieldValue).size() == 0 || !(((Map<?,?>)fieldValue).values().iterator().next() instanceof OIdentifiable))) {
-        json.writeAttribute(indentLevel + 1,true,fieldName,OJSONWriter.encode(fieldValue));
-      }
- else {
-        try {
-          fetch(record,iFetchPlan,fieldValue,fieldName,iCurrentLevel,iMaxFetch,json,indentLevel,includeType,includeId,includeVer,includeClazz,attribSameRow,keepTypes,parsedRecords);
-        }
- catch (        Exception e) {
-          e.printStackTrace();
-          OLogManager.instance().error(null,"Fetching error on record %s",e,record.getIdentity());
-        }
+ catch (      Exception e) {
+        e.printStackTrace();
+        OLogManager.instance().error(null,"Fetching error on record %s",e,record.getIdentity());
       }
     }
   }

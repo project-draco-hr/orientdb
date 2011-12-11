@@ -1,0 +1,38 @@
+{
+  final OMemoryStream buffer=new OMemoryStream();
+  buffer.set(text);
+  buffer.set(limit);
+  buffer.set(fetchPlan != null ? fetchPlan : "");
+  if (parameters == null || parameters.size() == 0)   buffer.set(new byte[0]);
+ else {
+    final Map<Object,Object> newParams=new HashMap<Object,Object>(parameters);
+    for (    Entry<Object,Object> entry : newParams.entrySet()) {
+      final Object value=entry.getValue();
+      if (value instanceof Set<?> && ((Set<?>)value).iterator().next() instanceof ORecord<?>) {
+        final Set<ORID> newSet=new HashSet<ORID>();
+        for (        ORecord<?> rec : (Set<ORecord<?>>)value) {
+          newSet.add(rec.getIdentity());
+        }
+        parameters.put(entry.getKey(),newSet);
+      }
+ else       if (value instanceof List<?> && ((List<?>)value).get(0) instanceof ORecord<?>) {
+        final List<ORID> newList=new ArrayList<ORID>();
+        for (        ORecord<?> rec : (List<ORecord<?>>)value) {
+          newList.add(rec.getIdentity());
+        }
+        parameters.put(entry.getKey(),newList);
+      }
+ else       if (value instanceof Map<?,?> && ((Map<?,?>)value).values().iterator().next() instanceof ORecord<?>) {
+        final Map<Object,ORID> newMap=new HashMap<Object,ORID>();
+        for (        Entry<?,ORecord<?>> mapEntry : ((Map<?,ORecord<?>>)value).entrySet()) {
+          newMap.put(mapEntry.getKey(),mapEntry.getValue().getIdentity());
+        }
+        parameters.put(entry.getKey(),newMap);
+      }
+    }
+    final ODocument param=new ODocument();
+    param.field("params",parameters);
+    buffer.set(param.toStream());
+  }
+  return buffer;
+}

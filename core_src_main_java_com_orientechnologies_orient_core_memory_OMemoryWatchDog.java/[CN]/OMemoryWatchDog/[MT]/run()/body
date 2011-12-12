@@ -1,0 +1,27 @@
+{
+  while (true) {
+    try {
+      monitorQueue.remove();
+      alertTimes++;
+      long maxMemory=Runtime.getRuntime().maxMemory();
+      long freeMemory=Runtime.getRuntime().freeMemory();
+      int freeMemoryPer=(int)(freeMemory * 100 / maxMemory);
+      OLogManager.instance().debug(this,"Free memory is low %s of %s (%d%%), calling listeners to free memory...",OFileUtils.getSizeAsString(freeMemory),OFileUtils.getSizeAsString(maxMemory),freeMemoryPer);
+      final long timer=OProfiler.getInstance().startChrono();
+      for (      Listener listener : listeners) {
+        try {
+          listener.memoryUsageLow(freeMemory,freeMemoryPer);
+        }
+ catch (        Exception e) {
+          e.printStackTrace();
+        }
+      }
+      OProfiler.getInstance().stopChrono("OMemoryWatchDog.freeResources",timer);
+    }
+ catch (    Exception e) {
+    }
+ finally {
+      monitorRef=new SoftReference<Object>(new Object(),monitorQueue);
+    }
+  }
+}

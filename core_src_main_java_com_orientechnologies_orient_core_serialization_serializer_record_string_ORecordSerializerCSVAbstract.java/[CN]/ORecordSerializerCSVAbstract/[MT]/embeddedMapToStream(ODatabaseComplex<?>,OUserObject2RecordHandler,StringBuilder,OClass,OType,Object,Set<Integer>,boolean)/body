@@ -10,20 +10,23 @@
         if (o.getValue() instanceof ORecord<?>) {
           final ODocument record;
           if (o.getValue() instanceof ODocument)           record=(ODocument)o.getValue();
- else           record=OObjectSerializerHelper.toStream(o.getValue(),new ODocument((ODatabaseRecord)iDatabase,o.getValue().getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
-            public Object getUserObjectByRecord(            ORecordInternal<?> iRecord,            final String iFetchPlan){
-              return iRecord;
+ else {
+            if (iDatabase == null && ODatabaseRecordThreadLocal.INSTANCE.isDefined())             iDatabase=ODatabaseRecordThreadLocal.INSTANCE.get();
+            record=OObjectSerializerHelper.toStream(o.getValue(),new ODocument(o.getValue().getClass().getSimpleName()),iDatabase instanceof ODatabaseObjectTx ? ((ODatabaseObjectTx)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+              public Object getUserObjectByRecord(              ORecordInternal<?> iRecord,              final String iFetchPlan){
+                return iRecord;
+              }
+              public ORecordInternal<?> getRecordByUserObject(              Object iPojo,              boolean iCreateIfNotAvailable){
+                return new ODocument(iLinkedClass);
+              }
+              public boolean existsUserObjectByRID(              ORID iRID){
+                return false;
+              }
+              public void registerUserObject(              Object iObject,              ORecordInternal<?> iRecord){
+              }
             }
-            public ORecordInternal<?> getRecordByUserObject(            Object iPojo,            boolean iCreateIfNotAvailable){
-              return new ODocument(iLinkedClass);
-            }
-            public boolean existsUserObjectByRID(            ORID iRID){
-              return false;
-            }
-            public void registerUserObject(            Object iObject,            ORecordInternal<?> iRecord){
-            }
-          }
 ,null,iSaveOnlyDirty);
+          }
           iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
           toString(record,iOutput,null,iObjHandler,iMarshalledRecords,false);
           iOutput.append(OStringSerializerHelper.EMBEDDED_END);

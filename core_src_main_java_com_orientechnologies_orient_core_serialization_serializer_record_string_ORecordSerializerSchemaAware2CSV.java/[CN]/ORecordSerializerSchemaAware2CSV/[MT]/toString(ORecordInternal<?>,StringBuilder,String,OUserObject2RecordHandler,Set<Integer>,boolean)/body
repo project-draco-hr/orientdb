@@ -6,7 +6,6 @@
     return iOutput;
   }
  else   iMarshalledRecords.add(identityRecord);
-  final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
   if (!iOnlyDelta && record.getSchemaClass() != null) {
     iOutput.append(record.getSchemaClass().getStreamableName());
     iOutput.append(OStringSerializerHelper.CLASS_SEPARATOR);
@@ -18,6 +17,7 @@
   String fieldClassName;
   int i=0;
   final String[] fieldNames=iOnlyDelta && record.isTrackingChanges() ? record.getDirtyFields() : record.fieldNames();
+  if (iObjHandler == null && ODatabaseRecordThreadLocal.INSTANCE.isDefined())   iObjHandler=ODatabaseRecordThreadLocal.INSTANCE.get();
   for (  String fieldName : fieldNames) {
     Object fieldValue=record.rawField(fieldName);
     if (i > 0)     iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
@@ -34,15 +34,15 @@
  else     if (fieldValue != null) {
       if (type == null) {
         if (fieldValue.getClass() == byte[].class)         type=OType.BINARY;
- else         if (database != null && fieldValue instanceof ORecord<?>) {
+ else         if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && fieldValue instanceof ORecord<?>) {
           if (type == null)           if (fieldValue instanceof ODocument && ((ODocument)fieldValue).hasOwners())           type=OType.EMBEDDED;
  else           type=OType.LINK;
-          linkedClass=getLinkInfo(database,fieldClassName);
+          linkedClass=getLinkInfo(ODatabaseRecordThreadLocal.INSTANCE.get(),fieldClassName);
         }
  else         if (fieldValue instanceof ORID)         type=OType.LINK;
- else         if (database != null && database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(fieldClassName) != null) {
+ else         if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner()).getEntityManager().getEntityClass(fieldClassName) != null) {
           type=OType.LINK;
-          linkedClass=getLinkInfo(database,fieldClassName);
+          linkedClass=getLinkInfo(ODatabaseRecordThreadLocal.INSTANCE.get(),fieldClassName);
         }
  else         if (fieldValue instanceof Date)         type=OType.DATETIME;
  else         if (fieldValue instanceof String)         type=OType.STRING;
@@ -69,8 +69,8 @@
               if (fieldValue instanceof Set<?>)               type=OType.LINKSET;
  else               type=OType.LINKLIST;
             }
- else             if (database != null && (firstValue instanceof ORecordSchemaAware<?> || (database.getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)database.getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
-              linkedClass=getLinkInfo(database,getClassName(firstValue));
+ else             if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && (firstValue instanceof ORecordSchemaAware<?> || (ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
+              linkedClass=getLinkInfo(ODatabaseRecordThreadLocal.INSTANCE.get(),getClassName(firstValue));
               if (type == null) {
                 linkedType=OType.LINK;
                 if (fieldValue instanceof Set<?>)                 type=OType.LINKSET;

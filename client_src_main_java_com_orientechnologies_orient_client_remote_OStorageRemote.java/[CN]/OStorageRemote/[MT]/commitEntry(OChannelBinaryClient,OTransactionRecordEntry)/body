@@ -1,18 +1,31 @@
 {
   if (txEntry.status == OTransactionRecordEntry.LOADED)   return;
-  iNetwork.writeByte((byte)1);
-  iNetwork.writeByte(txEntry.status);
-  iNetwork.writeShort((short)txEntry.getRecord().getIdentity().getClusterId());
-  iNetwork.writeLong(txEntry.getRecord().getIdentity().getClusterPosition());
-  iNetwork.writeByte(txEntry.getRecord().getRecordType());
+  byte[] stream=null;
+  try {
 switch (txEntry.status) {
 case OTransactionRecordEntry.CREATED:
-    iNetwork.writeString(txEntry.clusterName);
-  iNetwork.writeBytes(txEntry.getRecord().toStream());
+case OTransactionRecordEntry.UPDATED:
+      stream=txEntry.getRecord().toStream();
+    break;
+}
+}
+ catch (Exception e) {
+iNetwork.writeByte((byte)-1);
+throw new OTransactionException("Error on transaction commit",e);
+}
+iNetwork.writeByte((byte)1);
+iNetwork.writeByte(txEntry.status);
+iNetwork.writeShort((short)txEntry.getRecord().getIdentity().getClusterId());
+iNetwork.writeLong(txEntry.getRecord().getIdentity().getClusterPosition());
+iNetwork.writeByte(txEntry.getRecord().getRecordType());
+switch (txEntry.status) {
+case OTransactionRecordEntry.CREATED:
+iNetwork.writeString(txEntry.clusterName);
+iNetwork.writeBytes(stream);
 break;
 case OTransactionRecordEntry.UPDATED:
 iNetwork.writeInt(txEntry.getRecord().getVersion());
-iNetwork.writeBytes(txEntry.getRecord().toStream());
+iNetwork.writeBytes(stream);
 break;
 case OTransactionRecordEntry.DELETED:
 iNetwork.writeInt(txEntry.getRecord().getVersion());

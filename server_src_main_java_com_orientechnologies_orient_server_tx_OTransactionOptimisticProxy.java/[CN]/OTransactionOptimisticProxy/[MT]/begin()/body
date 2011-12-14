@@ -2,7 +2,8 @@
   super.begin();
   try {
     setUsingLog(channel.readByte() == 1);
-    while (channel.readByte() == 1) {
+    byte lastTxStatus;
+    for (lastTxStatus=channel.readByte(); lastTxStatus == 1; lastTxStatus=channel.readByte()) {
       final byte recordStatus=channel.readByte();
       final ORecordId rid=channel.readRID();
       final OTransactionEntryProxy entry=new OTransactionEntryProxy(channel.readByte());
@@ -25,6 +26,7 @@ throw new OTransactionException("Unrecognized tx command: " + entry.status);
 }
 recordEntries.put((ORecordId)entry.getRecord().getIdentity(),entry);
 }
+if (lastTxStatus == -1) throw new OTransactionException("Transaction aborted by the client");
 remoteIndexEntries=new ODocument(channel.readBytes());
 for (ORecord<?> record : createdRecords.values()) unmarshallRecord(record);
 for (ORecord<?> record : updatedRecords.values()) unmarshallRecord(record);

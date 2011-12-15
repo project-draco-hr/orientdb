@@ -4,7 +4,6 @@
   iQueryText=iQueryText.trim();
   if (iQueryText.length() == 0 || iQueryText.equalsIgnoreCase("select"))   return;
   iQueryText="select " + iQueryText;
-  currentResultSet.clear();
   final List<String> columns=new ArrayList<String>();
   final int limit;
   if (iQueryText.contains("limit")) {
@@ -14,15 +13,11 @@
     limit=Integer.parseInt((String)properties.get("limit"));
   }
   long start=System.currentTimeMillis();
-  currentDatabase.query(new OSQLAsynchQuery<ODocument>(iQueryText,limit,new OCommandResultListener(){
-    public boolean result(    final Object iRecord){
-      final OIdentifiable record=(OIdentifiable)iRecord;
-      dumpRecordInTable(currentResultSet.size(),record,columns);
-      currentResultSet.add(record);
-      return true;
-    }
+  currentResultSet=currentDatabase.query(new OSQLSynchQuery<ODocument>(iQueryText,limit).setFetchPlan("*:1"));
+  int i=0;
+  for (  OIdentifiable record : currentResultSet) {
+    dumpRecordInTable(i++,record,columns);
   }
-).setFetchPlan("*:1"));
   if (currentResultSet.size() > 0 && (limit == -1 || currentResultSet.size() < limit))   printHeaderLine(columns);
   out.println("\n" + currentResultSet.size() + " item(s) found. Query executed in "+ (float)(System.currentTimeMillis() - start) / 1000 + " sec(s).");
 }

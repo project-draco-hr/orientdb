@@ -1,3 +1,28 @@
 {
-  beginResponse(iRequesterId,DEFAULT_TIMEOUT);
+  do {
+    lockRead.lock();
+    if (!channelRead) {
+      channelRead=true;
+      try {
+        currentStatus=readByte();
+        currentTxId=readInt();
+      }
+ catch (      IOException e) {
+        lockRead.unlock();
+        throw e;
+      }
+    }
+    if (currentTxId == iRequesterId)     break;
+    lockRead.unlock();
+synchronized (this) {
+      try {
+        wait(1000);
+      }
+ catch (      InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+ while (true);
+  handleStatus(currentStatus,currentTxId);
 }

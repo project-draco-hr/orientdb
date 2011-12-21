@@ -1,0 +1,42 @@
+{
+  long oldIndexUsage=profiler.getCounter("Query.indexUsage");
+  long oldCompositeIndexUsage=profiler.getCounter("Query.compositeIndexUsage");
+  long oldCompositeIndexUsage2=profiler.getCounter("Query.compositeIndexUsage.2");
+  if (oldIndexUsage == -1) {
+    oldIndexUsage=0;
+  }
+  if (oldCompositeIndexUsage == -1) {
+    oldCompositeIndexUsage=0;
+  }
+  if (oldCompositeIndexUsage2 == -1) {
+    oldCompositeIndexUsage2=0;
+  }
+  final int clusterId=database.getMetadata().getSchema().getClass("sqlSelectIndexReuseTestClass").getClusterIds()[0];
+  final ORID ridToSearch=new ORecordId(clusterId,1);
+  final List<ODocument> result=database.command(new OSQLSynchQuery<ODocument>("select * from sqlSelectIndexReuseTestClass where fLinkList contains ?")).execute(ridToSearch);
+  Assert.assertEquals(result.size(),20);
+  final List<ORID> linkListOne=new ArrayList<ORID>(2);
+  linkListOne.add(new ORecordId(clusterId,0));
+  linkListOne.add(new ORecordId(clusterId,1));
+  final List<ORID> linkListTwo=new ArrayList<ORID>(2);
+  linkListTwo.add(new ORecordId(clusterId,1));
+  linkListTwo.add(new ORecordId(clusterId,2));
+  int listOneCounter=0;
+  int listTwoCounter=0;
+  for (  final ODocument doc : result) {
+    final List<OIdentifiable> linkList=doc.field("fLinkList");
+    boolean isContainedInFirstList=true;
+    boolean isContainedInSecondList=true;
+    for (    final OIdentifiable link : linkList) {
+      if (!linkListOne.contains(link.getIdentity()))       isContainedInFirstList=false;
+      if (!linkListTwo.contains(link.getIdentity()))       isContainedInSecondList=false;
+    }
+    if (isContainedInFirstList)     listOneCounter++;
+    if (isContainedInSecondList)     listTwoCounter++;
+  }
+  Assert.assertEquals(listOneCounter,10);
+  Assert.assertEquals(listTwoCounter,10);
+  Assert.assertEquals(profiler.getCounter("Query.indexUsage"),oldIndexUsage + 1);
+  Assert.assertEquals(profiler.getCounter("Query.compositeIndexUsage"),oldCompositeIndexUsage);
+  Assert.assertEquals(profiler.getCounter("Query.compositeIndexUsage.2"),oldCompositeIndexUsage2);
+}

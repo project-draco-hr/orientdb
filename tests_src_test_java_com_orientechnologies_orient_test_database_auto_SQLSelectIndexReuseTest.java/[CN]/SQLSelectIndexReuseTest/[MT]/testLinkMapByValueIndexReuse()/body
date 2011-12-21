@@ -1,0 +1,33 @@
+{
+  long oldIndexUsage=profiler.getCounter("Query.indexUsage");
+  long oldCompositeIndexUsage=profiler.getCounter("Query.compositeIndexUsage");
+  long oldCompositeIndexUsage2=profiler.getCounter("Query.compositeIndexUsage.2");
+  if (oldIndexUsage == -1) {
+    oldIndexUsage=0;
+  }
+  if (oldCompositeIndexUsage == -1) {
+    oldCompositeIndexUsage=0;
+  }
+  if (oldCompositeIndexUsage2 == -1) {
+    oldCompositeIndexUsage2=0;
+  }
+  final int clusterId=database.getMetadata().getSchema().getClass("sqlSelectIndexReuseTestClass").getClusterIds()[0];
+  final ORID ridToSearch=new ORecordId(clusterId,2);
+  final List<ODocument> result=database.command(new OSQLSynchQuery<ODocument>("select * from sqlSelectIndexReuseTestClass where fLinkMap containsvalue ?")).execute(ridToSearch);
+  Assert.assertEquals(result.size(),10);
+  final Map<String,ORID> linkMap=new HashMap<String,ORID>();
+  linkMap.put("key21",new ORecordId(clusterId,2));
+  linkMap.put("key22",new ORecordId(clusterId,2));
+  linkMap.put("key23",new ORecordId(clusterId,2));
+  linkMap.put("key24",new ORecordId(clusterId,2));
+  for (  final ODocument doc : result) {
+    final Map<String,OIdentifiable> resultLinkMap=(Map<String,OIdentifiable>)doc.field("fLinkMap");
+    for (    Map.Entry<String,OIdentifiable> mapEntry : resultLinkMap.entrySet()) {
+      final ORID link=(linkMap.get(mapEntry.getKey())).getIdentity();
+      Assert.assertEquals(mapEntry.getValue(),link);
+    }
+  }
+  Assert.assertEquals(profiler.getCounter("Query.indexUsage"),oldIndexUsage + 1);
+  Assert.assertEquals(profiler.getCounter("Query.compositeIndexUsage"),oldCompositeIndexUsage);
+  Assert.assertEquals(profiler.getCounter("Query.compositeIndexUsage.2"),oldCompositeIndexUsage2);
+}

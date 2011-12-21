@@ -1,5 +1,7 @@
 {
-  if (database.isClosed())   database.open("admin","admin");
+  if (database.isClosed()) {
+    database.open("admin","admin");
+  }
   final OSchema schema=database.getMetadata().getSchema();
   final OClass oClass=schema.createClass("sqlSelectIndexReuseTestClass");
   oClass.createProperty("prop1",OType.INTEGER);
@@ -9,26 +11,55 @@
   oClass.createProperty("prop5",OType.INTEGER);
   oClass.createProperty("prop6",OType.INTEGER);
   oClass.createProperty("prop7",OType.STRING);
+  oClass.createProperty("fEmbeddedMap",OType.EMBEDDEDMAP,OType.INTEGER);
+  oClass.createProperty("fLinkMap",OType.LINKMAP);
   oClass.createIndex("indexone",OClass.INDEX_TYPE.UNIQUE,"prop1","prop2");
   oClass.createIndex("indextwo",OClass.INDEX_TYPE.UNIQUE,"prop3");
   oClass.createIndex("indexthree",OClass.INDEX_TYPE.NOTUNIQUE,"prop1","prop2","prop4");
   oClass.createIndex("indexfour",OClass.INDEX_TYPE.NOTUNIQUE,"prop4","prop1","prop3");
   oClass.createIndex("indexfive",OClass.INDEX_TYPE.NOTUNIQUE,"prop6","prop1","prop3");
   oClass.createIndex("indexsix",OClass.INDEX_TYPE.FULLTEXT,"prop7");
+  oClass.createIndex("sqlSelectIndexReuseTestEmbeddedMapByKey",OClass.INDEX_TYPE.NOTUNIQUE,"fEmbeddedMap");
+  oClass.createIndex("sqlSelectIndexReuseTestEmbeddedMapByValue",OClass.INDEX_TYPE.NOTUNIQUE,"fEmbeddedMap by value");
+  oClass.createIndex("sqlSelectIndexReuseTestLinkMapByKey",OClass.INDEX_TYPE.NOTUNIQUE,"fLinkMap");
+  oClass.createIndex("sqlSelectIndexReuseTestLinkMapByValue",OClass.INDEX_TYPE.NOTUNIQUE,"fLinkMap by value");
   schema.save();
   final String fullTextIndexStrings[]={"Alice : What is the use of a book, without pictures or conversations?","Rabbit : Oh my ears and whiskers, how late it's getting!","Alice : If it had grown up, it would have made a dreadfully ugly child; but it makes rather a handsome pig, I think","The Cat : We're all mad here.","The Hatter : Why is a raven like a writing desk?","The Hatter : Twinkle, twinkle, little bat! How I wonder what you're at.","The Queen : Off with her head!","The Duchess : Tut, tut, child! Everything's got a moral, if only you can find it.","The Duchess : Take care of the sense, and the sounds will take care of themselves.","The King : Begin at the beginning and go on till you come to the end: then stop."};
-  for (int i=0; i < 10; i++)   for (int j=0; j < 10; j++) {
+  final ORID[] links=new ORID[10];
+  for (int i=0; i < 10; i++) {
     final ODocument document=new ODocument(database,"sqlSelectIndexReuseTestClass");
-    document.field("prop1",i);
-    document.field("prop2",j);
-    document.field("prop3",i * 10 + j);
-    document.field("prop4",i);
-    document.field("prop5",i);
-    document.field("prop6",j);
-    document.field("prop7",fullTextIndexStrings[i]);
+    document.field("ftosearch","ftosearch");
     document.save();
+    links[i]=document.getIdentity();
+  }
+  for (int i=0; i < 10; i++) {
+    final Map<String,Integer> embeddedMap=new HashMap<String,Integer>();
+    final Map<String,ORID> linkMap=new HashMap<String,ORID>();
+    embeddedMap.put("key" + (i * 10 + 1),i * 10 + 1);
+    embeddedMap.put("key" + (i * 10 + 2),i * 10 + 2);
+    embeddedMap.put("key" + (i * 10 + 3),i * 10 + 3);
+    embeddedMap.put("key" + (i * 10 + 4),i * 10 + 1);
+    linkMap.put("key" + (i * 10 + 1),links[i]);
+    linkMap.put("key" + (i * 10 + 2),links[i]);
+    linkMap.put("key" + (i * 10 + 3),links[i]);
+    linkMap.put("key" + (i * 10 + 4),links[i]);
+    for (int j=0; j < 10; j++) {
+      final ODocument document=new ODocument(database,"sqlSelectIndexReuseTestClass");
+      document.field("prop1",i);
+      document.field("prop2",j);
+      document.field("prop3",i * 10 + j);
+      document.field("prop4",i);
+      document.field("prop5",i);
+      document.field("prop6",j);
+      document.field("prop7",fullTextIndexStrings[i]);
+      document.field("fEmbeddedMap",embeddedMap);
+      document.field("fLinkMap",linkMap);
+      document.save();
+    }
   }
   profiler=getProfilerInstance();
   database.close();
-  if (!profiler.isRecording())   profiler.startRecording();
+  if (!profiler.isRecording()) {
+    profiler.startRecording();
+  }
 }

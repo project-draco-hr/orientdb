@@ -63,7 +63,9 @@
           fillSearchIndexResultSet(result);
           return true;
         }
-        final Object key=indexDefinition.createValue(keyParams);
+        final Object key;
+        if (indexDefinition instanceof OIndexDefinitionMultiValue)         key=((OIndexDefinitionMultiValue)indexDefinition).createSingleValue(keyParams.get(0));
+ else         key=indexDefinition.createValue(keyParams);
         if (key == null)         continue;
         if (internalIndex instanceof OIndexFullText && operator instanceof OQueryOperatorContainsText) {
           fillSearchIndexResultSet(index.get(key));
@@ -73,6 +75,20 @@
         if (operator instanceof OQueryOperatorEquals) {
           fillSearchIndexResultSet(index.get(key));
           return true;
+        }
+        if (operator instanceof OQueryOperatorContainsKey) {
+          if ((index.getDefinition() instanceof OPropertyMapIndexDefinition) && ((OPropertyMapIndexDefinition)index.getDefinition()).getIndexBy() == OPropertyMapIndexDefinition.INDEX_BY.KEY) {
+            fillSearchIndexResultSet(index.get(key));
+            return true;
+          }
+          continue;
+        }
+        if (operator instanceof OQueryOperatorContainsValue) {
+          if ((index.getDefinition() instanceof OPropertyMapIndexDefinition) && ((OPropertyMapIndexDefinition)index.getDefinition()).getIndexBy() == OPropertyMapIndexDefinition.INDEX_BY.VALUE) {
+            fillSearchIndexResultSet(index.get(key));
+            return true;
+          }
+          continue;
         }
         if (operator instanceof OQueryOperatorMajor) {
           final Collection<OIdentifiable> result;

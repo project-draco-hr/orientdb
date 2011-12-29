@@ -1,11 +1,23 @@
 {
   final OSQLFilterCondition rootCondition=compiledFilter.getRootCondition();
   final ODatabaseRecord database=getDatabase();
+  final ORID beginRange;
+  final ORID endRange;
   if (rootCondition == null) {
-    final ORID beginRange;
     if (request instanceof OSQLSynchQuery)     beginRange=((OSQLSynchQuery)request).getNextPageRID();
  else     beginRange=null;
-    ((OStorageEmbedded)database.getStorage()).browse(clusterIds,beginRange,null,this,(ORecordInternal<?>)database.newInstance(),false);
+    endRange=null;
   }
- else   ((OStorageEmbedded)database.getStorage()).browse(clusterIds,rootCondition.getBeginRidRange(),rootCondition.getEndRidRange(),this,(ORecordInternal<?>)database.newInstance(),false);
+ else {
+    final ORID conditionBeginRange=rootCondition.getBeginRidRange();
+    final ORID conditionEndRange=rootCondition.getEndRidRange();
+    final ORID nextPageRid;
+    if (request instanceof OSQLSynchQuery)     nextPageRid=((OSQLSynchQuery)request).getNextPageRID();
+ else     nextPageRid=null;
+    if (conditionBeginRange != null && nextPageRid != null)     beginRange=conditionBeginRange.compareTo(nextPageRid) > 0 ? conditionBeginRange : nextPageRid;
+ else     if (conditionBeginRange != null)     beginRange=conditionBeginRange;
+ else     beginRange=nextPageRid;
+    endRange=conditionEndRange;
+  }
+  ((OStorageEmbedded)database.getStorage()).browse(clusterIds,beginRange,endRange,this,(ORecordInternal<?>)database.newInstance(),false);
 }

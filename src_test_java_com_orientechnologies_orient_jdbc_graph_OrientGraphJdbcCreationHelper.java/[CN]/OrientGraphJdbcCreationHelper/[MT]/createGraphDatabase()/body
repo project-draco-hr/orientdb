@@ -1,0 +1,66 @@
+{
+  OrientGraph graphDB=null;
+  try {
+    OServerAdmin adminTool=null;
+    adminTool=new OServerAdmin(URL_DB).connect(ADMINISTRATOR_NAME,ADMINISTRATOR_PWD);
+    System.out.println("Successful connection to " + URL_DB);
+    if (adminTool.existsDatabase()) {
+      System.out.println("The database already exists. It will be deleted and created again.");
+      adminTool.dropDatabase();
+    }
+    System.out.println("The database is going to be created.");
+    adminTool.createDatabase("local");
+    adminTool.close();
+    System.out.println("Database created!");
+    graphDB=new OrientGraph(URL_DB,USERNAME,PASSWORD);
+    graphDB.setMaxBufferSize(0);
+    graphDB.startTransaction();
+    Vertex root=graphDB.addVertex(null);
+    root.setProperty(NAME,"Plant");
+    root.setProperty(DESCRIPTION,"This is the Plant");
+    Vertex cell=graphDB.addVertex(null);
+    cell.setProperty(NAME,"Cell 1");
+    cell.setProperty(DESCRIPTION,"This is the Production Cell 1");
+    graphDB.addEdge(null,root,cell,CONTAINMENT_EDGE);
+    Vertex cellComponent=graphDB.addVertex(null);
+    cellComponent.setProperty(NAME,"Cell Element A1");
+    cellComponent.setProperty(DESCRIPTION,"This is an element of the production cell 1");
+    graphDB.addEdge(null,cell,cellComponent,COMPONENT_EDGE);
+    cell=graphDB.addVertex(null);
+    cell.setProperty(NAME,"Cell 2");
+    cell.setProperty(DESCRIPTION,"This is the Production Cell 2");
+    graphDB.addEdge(null,root,cell,CONTAINMENT_EDGE);
+    cellComponent=graphDB.addVertex(null);
+    cellComponent.setProperty(NAME,"Cell Element B1");
+    cellComponent.setProperty(DESCRIPTION,"This is an element of the production cell 2");
+    graphDB.addEdge(null,cell,cellComponent,COMPONENT_EDGE);
+    URI fileURI=ClassLoader.getSystemResource(FILE_NAME).toURI();
+    Vertex binaryVertex=graphDB.addVertex(null);
+    binaryVertex.setProperty(NAME,"NoSQL Definition (single binary record)");
+    binaryVertex.setProperty(BINARY_DATA,loadFile(graphDB.getRawGraph(),fileURI));
+    binaryVertex=graphDB.addVertex(null);
+    binaryVertex.setProperty(NAME,"NoSQL Definition (multiple binary record)");
+    binaryVertex.setProperty(BINARY_DATA,loadFile(graphDB.getRawGraph(),fileURI,50000));
+    root=graphDB.addVertex(null);
+    root.setProperty(NAME,"SimpleVertex");
+    Vertex prop=graphDB.addVertex(null);
+    prop.setProperty(VALUE,new Date());
+    graphDB.addEdge(null,root,prop,CREATION_DATE_EDGE);
+    prop=graphDB.addVertex(null);
+    prop.setProperty(VALUE,loadFile(graphDB.getRawGraph(),fileURI,50000));
+    graphDB.addEdge(null,root,prop,FILE_EDGE);
+    prop=graphDB.addVertex(null);
+    prop.setProperty(VALUE,"This is a simple vertex with three properties: this description, a file and a date");
+    graphDB.addEdge(null,root,prop,DESCRIPTION);
+    graphDB.stopTransaction(Conclusion.SUCCESS);
+    graphDB.shutdown();
+  }
+ catch (  Exception e) {
+    System.err.println("An error occured during the creation of the database " + URL_DB + ": "+ e.getMessage());
+    e.printStackTrace();
+    if (graphDB != null)     graphDB.stopTransaction(Conclusion.FAILURE);
+  }
+ finally {
+    if (graphDB != null)     graphDB.shutdown();
+  }
+}

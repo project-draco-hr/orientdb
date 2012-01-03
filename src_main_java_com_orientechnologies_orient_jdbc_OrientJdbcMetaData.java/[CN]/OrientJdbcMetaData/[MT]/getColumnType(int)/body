@@ -1,10 +1,46 @@
 {
-  String columnName=getColumnName(column);
-  String className=resultSet.getDocument().getClassName();
-  OClass theClass=connection.getDatabase().getMetadata().getSchema().getClass(className);
-  if (theClass != null) {
-    OProperty property=theClass.getProperty(columnName);
-    if (property != null)     return oTypesSqlTypes.get(property.getType());
+  ODocument currentRecord=this.resultSet.unwrap(ODocument.class);
+  String fieldName=currentRecord.fieldNames()[column - 1];
+  OType type=currentRecord.fieldType(fieldName);
+  if (type == null) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+    if (value instanceof ORecordBytes)     return Types.BINARY;
+ else     if (value instanceof ORecordLazyList) {
+      ORecordLazyList list=(ORecordLazyList)value;
+      ListIterator<OIdentifiable> iterator=list.listIterator();
+      OIdentifiable listElement;
+      boolean stop=false;
+      while (iterator.hasNext() && !stop) {
+        listElement=iterator.next();
+        if (!(listElement instanceof ORecordBytes))         stop=true;
+      }
+      if (!stop)       return Types.BLOB;
+    }
+    return Types.JAVA_OBJECT;
   }
-  return oTypesSqlTypes.get(OType.STRING);
+ else   if (type == OType.EMBEDDED || type == OType.LINK) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+    if (value instanceof ORecordBytes)     return Types.BINARY;
+ else     return oTypesSqlTypes.get(type);
+  }
+ else   if (type == OType.EMBEDDEDLIST || type == OType.LINKLIST) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+    if (value instanceof ORecordLazyList) {
+      ORecordLazyList list=(ORecordLazyList)value;
+      ListIterator<OIdentifiable> iterator=list.listIterator();
+      OIdentifiable listElement;
+      boolean stop=false;
+      while (iterator.hasNext() && !stop) {
+        listElement=iterator.next();
+        if (!(listElement instanceof ORecordBytes))         stop=true;
+      }
+      if (stop)       return oTypesSqlTypes.get(type);
+ else       return Types.BLOB;
+    }
+ else     return Types.JAVA_OBJECT;
+  }
+ else   return oTypesSqlTypes.get(type);
 }

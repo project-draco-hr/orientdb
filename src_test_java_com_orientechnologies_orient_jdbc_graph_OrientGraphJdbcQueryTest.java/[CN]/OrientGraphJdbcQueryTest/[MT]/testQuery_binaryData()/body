@@ -1,0 +1,46 @@
+{
+  final String BLOB_OUTPUT_PATH="D:\\GIT Repository\\orientdb-jdbc\\src\\test\\resources\\output_blob.pdf";
+  File blob_file=new File(BLOB_OUTPUT_PATH);
+  final String BINARY_OUTPUT_PATH="D:\\GIT Repository\\orientdb-jdbc\\src\\test\\resources\\output_binary.pdf";
+  File binary_file=new File(BINARY_OUTPUT_PATH);
+  String digest=null;
+  try {
+    digest=this.calculateMD5checksum(ClassLoader.getSystemResourceAsStream(OrientGraphJdbcCreationHelper.FILE_NAME));
+  }
+ catch (  NoSuchAlgorithmException e1) {
+    e1.printStackTrace();
+    Assert.fail(e1.getMessage());
+  }
+  String query="select * from OGraphVertex where name like '%binary record%'";
+  System.out.println("Executing: " + query);
+  try {
+    Statement statement=conn.createStatement(ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY,ResultSet.HOLD_CURSORS_OVER_COMMIT);
+    ResultSet result=statement.executeQuery(query);
+    ResultSetMetaData resultMetaData=null;
+    while (result.next()) {
+      resultMetaData=result.getMetaData();
+      Blob data;
+      byte[] bytes;
+      for (int i=1; i <= resultMetaData.getColumnCount(); i++) {
+        if (resultMetaData.getColumnType(i) == Types.BLOB) {
+          data=result.getBlob(i);
+          System.out.println("Column name: " + resultMetaData.getColumnName(i) + " Output: "+ BLOB_OUTPUT_PATH);
+          new FileOutputStream(blob_file).write((data.getBytes(1,(int)data.length())));
+        }
+ else         if (resultMetaData.getColumnType(i) == Types.BINARY) {
+          bytes=result.getBytes(i);
+          System.out.println("Column name: " + resultMetaData.getColumnName(i) + " Output: "+ BINARY_OUTPUT_PATH);
+          new FileOutputStream(binary_file).write(bytes);
+        }
+      }
+    }
+    Assert.assertTrue("The file '" + BINARY_OUTPUT_PATH + "' does not exist",binary_file.isFile());
+    this.verifyMD5checksum(binary_file,digest);
+    Assert.assertTrue("The file '" + BLOB_OUTPUT_PATH + "' does not exist",blob_file.isFile());
+    this.verifyMD5checksum(blob_file,digest);
+  }
+ catch (  SQLException e) {
+    e.printStackTrace();
+    Assert.fail("An error occured during the execution of the SQL Query.");
+  }
+}

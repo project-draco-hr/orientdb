@@ -1,10 +1,46 @@
 {
-  String columnName=getColumnName(column);
-  String className=resultSet.getDocument().getClassName();
-  OClass theClass=connection.getDatabase().getMetadata().getSchema().getClass(className);
-  if (theClass != null) {
-    OProperty property=theClass.getProperty(columnName);
-    if (property != null)     return oTypesSqlTypes.get(property.getType());
+  ODocument currentRecord=this.resultSet.unwrap(ODocument.class);
+  String fieldName=currentRecord.fieldNames()[column - 1];
+  OType otype=currentRecord.fieldType(fieldName);
+  if (otype == null) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+ else     if (value instanceof ORecordBytes)     return Types.BINARY;
+ else     if (value instanceof ORecordLazyList) {
+      ORecordLazyList list=(ORecordLazyList)value;
+      ListIterator<OIdentifiable> iterator=list.listIterator();
+      OIdentifiable listElement;
+      boolean stop=false;
+      while (iterator.hasNext() && !stop) {
+        listElement=iterator.next();
+        if (!(listElement instanceof ORecordBytes))         stop=true;
+      }
+      if (!stop)       return Types.BLOB;
+    }
+    return this.getSQLTypeFromJavaClass(value);
   }
-  return oTypesSqlTypes.get(OType.STRING);
+ else   if (otype == OType.EMBEDDED || otype == OType.LINK) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+    if (value instanceof ORecordBytes)     return Types.BINARY;
+ else     return oTypesSqlTypes.get(otype);
+  }
+ else   if (otype == OType.EMBEDDEDLIST || otype == OType.LINKLIST) {
+    Object value=currentRecord.field(fieldName);
+    if (value == null)     return Types.NULL;
+    if (value instanceof ORecordLazyList) {
+      ORecordLazyList list=(ORecordLazyList)value;
+      ListIterator<OIdentifiable> iterator=list.listIterator();
+      OIdentifiable listElement;
+      boolean stop=false;
+      while (iterator.hasNext() && !stop) {
+        listElement=iterator.next();
+        if (!(listElement instanceof ORecordBytes))         stop=true;
+      }
+      if (stop)       return oTypesSqlTypes.get(otype);
+ else       return Types.BLOB;
+    }
+ else     return Types.JAVA_OBJECT;
+  }
+ else   return oTypesSqlTypes.get(otype);
 }

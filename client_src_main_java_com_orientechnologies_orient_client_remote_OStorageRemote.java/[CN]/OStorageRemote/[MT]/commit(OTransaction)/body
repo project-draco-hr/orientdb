@@ -7,11 +7,11 @@
         network=beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
         network.writeInt(((OTransaction)iTx).getId());
         network.writeByte((byte)(((OTransaction)iTx).isUsingLog() ? 1 : 0));
-        final List<OTransactionRecordEntry> tmpEntries=new ArrayList<OTransactionRecordEntry>();
+        final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
         while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
-          for (          OTransactionRecordEntry txEntry : iTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
+          for (          ORecordOperation txEntry : iTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
           iTx.clearRecordEntries();
-          if (tmpEntries.size() > 0)           for (          OTransactionRecordEntry txEntry : tmpEntries)           commitEntry(network,txEntry);
+          if (tmpEntries.size() > 0)           for (          ORecordOperation txEntry : tmpEntries)           commitEntry(network,txEntry);
         }
         network.writeByte((byte)0);
         network.writeBytes(iTx.getIndexChanges().toStream());
@@ -27,7 +27,7 @@
         for (int i=0; i < createdRecords; i++) {
           currentRid=network.readRID();
           createdRid=network.readRID();
-          for (          OTransactionRecordEntry txEntry : iTx.getAllRecordEntries()) {
+          for (          ORecordOperation txEntry : iTx.getAllRecordEntries()) {
             if (txEntry.getRecord().getIdentity().equals(currentRid)) {
               txEntry.getRecord().setIdentity(createdRid);
               break;
@@ -38,7 +38,7 @@
         ORecordId rid;
         for (int i=0; i < updatedRecords; ++i) {
           rid=network.readRID();
-          for (          OTransactionRecordEntry txEntry : iTx.getAllRecordEntries()) {
+          for (          ORecordOperation txEntry : iTx.getAllRecordEntries()) {
             if (txEntry.getRecord().getIdentity().equals(rid)) {
               txEntry.getRecord().setVersion(network.readInt());
               break;
@@ -49,7 +49,7 @@
   finally {
         endResponse(network);
       }
-      for (      OTransactionRecordEntry txEntry : iTx.getAllRecordEntries())       txEntry.getRecord().unload();
+      for (      ORecordOperation txEntry : iTx.getAllRecordEntries())       txEntry.getRecord().unload();
       OTransactionAbstract.updateCacheFromEntries(this,iTx,iTx.getAllRecordEntries(),false);
       break;
     }

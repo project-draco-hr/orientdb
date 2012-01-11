@@ -61,13 +61,13 @@ final long result;
 ODistributedRequesterThreadLocal.INSTANCE.set(true);
 try {
 switch (operationType) {
-case OTransactionRecordEntry.CREATED:
+case ORecordOperation.CREATED:
 result=createRecord(rid,buffer,recordType);
 break;
-case OTransactionRecordEntry.UPDATED:
+case ORecordOperation.UPDATED:
 result=updateRecord(rid,buffer,version,recordType);
 break;
-case OTransactionRecordEntry.DELETED:
+case ORecordOperation.DELETED:
 result=deleteRecord(rid,version);
 break;
 default :
@@ -77,6 +77,9 @@ throw new IllegalArgumentException("Received invalid distributed record change o
   finally {
 ODistributedRequesterThreadLocal.INSTANCE.set(false);
 }
+final ODistributedNode node=manager.getReplicator().getNode(data.clientId.substring(ODistributedStorage.DNODE_PREFIX.length()));
+final ODistributedDatabaseInfo db=node.getDatabase(connection.database.getName());
+db.log.appendLog(operationId,operationType,rid);
 channel.acquireExclusiveLock();
 try {
 sendOk(lastClientTxId);

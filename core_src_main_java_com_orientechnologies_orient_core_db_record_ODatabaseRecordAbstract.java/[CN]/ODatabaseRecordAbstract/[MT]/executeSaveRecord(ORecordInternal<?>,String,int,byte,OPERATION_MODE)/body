@@ -1,0 +1,48 @@
+{
+  checkOpeness();
+  if (!iRecord.isDirty())   return;
+  final ORecordId rid=(ORecordId)iRecord.getIdentity();
+  if (rid == null)   throw new ODatabaseException("Cannot create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
+  setCurrentDatabaseinThreadLocal();
+  try {
+    final boolean wasNew=rid.isNew();
+    byte[] stream=iRecord.toStream();
+    final boolean isNew=rid.isNew();
+    if (isNew)     iRecord.onBeforeIdentityChanged(rid);
+ else     if (stream.length == 0)     return;
+    if (isNew && rid.clusterId < 0)     rid.clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
+    if (rid.clusterId > -1 && iClusterName == null)     iClusterName=getClusterNameById(rid.clusterId);
+    if (stream != null && stream.length > 0) {
+      if (wasNew) {
+        checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
+        if (callbackHooks(TYPE.BEFORE_CREATE,iRecord))         stream=iRecord.toStream();
+      }
+ else {
+        checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
+        if (callbackHooks(TYPE.BEFORE_UPDATE,iRecord))         stream=iRecord.toStream();
+      }
+      if (!iRecord.isDirty()) {
+        getLevel1Cache().updateRecord(iRecord);
+        return;
+      }
+    }
+    final int realVersion=iVersion == -1 || !mvcc ? -1 : iRecord.getVersion();
+    final long result=underlying.save(rid,stream,realVersion,iRecord.getRecordType(),iMode.ordinal());
+    if (isNew) {
+      ((ORecordId)iRecord.getIdentity()).copyFrom(rid);
+      iRecord.onAfterIdentityChanged(iRecord);
+      iRecord.fill(rid,0,stream,stream == null || stream.length == 0);
+    }
+ else {
+      iRecord.fill(rid,(int)result,stream,stream == null || stream.length == 0);
+    }
+    callbackHooks(wasNew ? TYPE.AFTER_CREATE : TYPE.AFTER_UPDATE,iRecord);
+    if (stream != null && stream.length > 0)     getLevel1Cache().updateRecord(iRecord);
+  }
+ catch (  OException e) {
+    throw e;
+  }
+catch (  Throwable t) {
+    throw new ODatabaseException("Error on saving record in cluster #" + iRecord.getIdentity().getClusterId(),t);
+  }
+}

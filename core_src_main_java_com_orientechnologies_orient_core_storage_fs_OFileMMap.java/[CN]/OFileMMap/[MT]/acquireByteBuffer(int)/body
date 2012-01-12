@@ -1,9 +1,24 @@
 {
-  if (iSize > BYTEBUFFER_POOLABLE_SIZE)   return ByteBuffer.allocateDirect(iSize);
+  if (iSize > BYTEBUFFER_POOLABLE_SIZE) {
+    try {
+      OProfiler.getInstance().updateStat("MMap.extraBufferSize",iSize);
+      return ByteBuffer.allocate(iSize);
+    }
+ catch (    OutOfMemoryError e) {
+      OLogManager.instance().error(this,"Error on allocating direct buffer of size %d bytes",e,iSize);
+      throw e;
+    }
+  }
   final ByteBuffer buffer;
 synchronized (this) {
-    if (bufferPool.isEmpty())     buffer=ByteBuffer.allocate(BYTEBUFFER_POOLABLE_SIZE);
- else     buffer=bufferPool.remove(0);
+    if (bufferPool.isEmpty()) {
+      buffer=ByteBuffer.allocateDirect(BYTEBUFFER_POOLABLE_SIZE);
+      OProfiler.getInstance().updateStat("MMap.pooledBufferSize",BYTEBUFFER_POOLABLE_SIZE);
+    }
+ else {
+      buffer=bufferPool.remove(0);
+      OProfiler.getInstance().updateCounter("MMap.pooledBuffers",-1);
+    }
   }
   buffer.limit(iSize);
   return buffer;

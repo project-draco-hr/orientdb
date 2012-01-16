@@ -1,43 +1,66 @@
 {
 switch (lastRequestType) {
-case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
+case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_SYNCHRONIZE:
 {
-      data.commandInfo="Clustered connection from leader";
-      final ODocument doc=new ODocument().fromStream(channel.readBytes());
-      final String clusterName=doc.field("clusterName");
-      final byte[] encodedSecurityKey=doc.field("clusterKey");
-      final String leaderAddress=doc.field("leaderNodeAddress");
-      if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getConfig().getSecurityKey()))       throw new OSecurityException("Invalid combination of cluster name and key received");
-      channel.acquireExclusiveLock();
-      try {
-        sendOk(lastClientTxId);
-        channel.writeInt(connection.id);
-        if (manager.isLeader()) {
-          OLogManager.instance().warn(this,"Received remote connection from the leader node %s, but current node is itself leader: split network problem?",leaderAddress);
-          final String myUid=InetAddress.getLocalHost().getHostAddress() + ":" + channel.socket.getLocalPort();
-          if (leaderAddress.compareTo(myUid) > 0) {
-            channel.writeByte((byte)0);
-            channel.flush();
-            OLogManager.instance().warn(this,"Current node remains the Leader of the cluster because it has lower network address",leaderAddress);
-            return;
-          }
-        }
+      data.commandInfo="Synchronization between nodes";
+      final ODocument nodeCfg=new ODocument(channel.readBytes());
+      final ORecordOperation op=new ORecordOperation();
+      final String node=nodeCfg.field("node");
+      final long lastOpId=(Long)nodeCfg.field("lastOperation");
+      final String dbName=connection.database.getName();
+      OLogManager.instance().info(this,"Received synchronization request for database '%s' reading operation logs after %d for node %s",dbName,lastOpId,node);
+      final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
+      int position=opLog.findOperationId(lastOpId);
+      int sent=0;
+      sendOk(lastClientTxId);
+      for (int i=position - 1; i >= 0; --i) {
         channel.writeByte((byte)1);
-        manager.becomePeer();
-        doc.reset();
-        doc.field("availableDatabases",manager.getReplicator().getDatabaseConfiguration());
-        channel.writeBytes(doc.toStream());
-        channel.flush();
-        manager.getPeer().updateHeartBeatTime();
-        manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+        opLog.getEntry(i,op);
+        channel.writeBytes(op.toStream());
+        sent++;
+        OLogManager.instance().info(this,"%d: operation %d with RID %s",sent,op.serial,op.record.getIdentity());
       }
-  finally {
-        channel.releaseExclusiveLock();
-      }
+      channel.writeByte((byte)0);
       break;
     }
+case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
+{
+    data.commandInfo="Clustered connection from leader";
+    final ODocument doc=new ODocument().fromStream(channel.readBytes());
+    final String clusterName=doc.field("clusterName");
+    final byte[] encodedSecurityKey=doc.field("clusterKey");
+    final String leaderAddress=doc.field("leaderNodeAddress");
+    if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getConfig().getSecurityKey()))     throw new OSecurityException("Invalid combination of cluster name and key received");
+    channel.acquireExclusiveLock();
+    try {
+      sendOk(lastClientTxId);
+      channel.writeInt(connection.id);
+      if (manager.isLeader()) {
+        OLogManager.instance().warn(this,"Received remote connection from the leader node %s, but current node is itself leader: split network problem?",leaderAddress);
+        final String myUid=InetAddress.getLocalHost().getHostAddress() + ":" + channel.socket.getLocalPort();
+        if (leaderAddress.compareTo(myUid) > 0) {
+          channel.writeByte((byte)0);
+          channel.flush();
+          OLogManager.instance().warn(this,"Current node remains the Leader of the cluster because it has lower network address",leaderAddress);
+          return;
+        }
+      }
+      channel.writeByte((byte)1);
+      manager.becomePeer();
+      doc.reset();
+      doc.field("availableDatabases",manager.getReplicator().getDatabaseConfiguration());
+      channel.writeBytes(doc.toStream());
+      channel.flush();
+      manager.getPeer().updateHeartBeatTime();
+      manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+    }
+  finally {
+      channel.releaseExclusiveLock();
+    }
+    break;
+  }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
-  checkConnected();
+checkConnected();
 data.commandInfo="Cluster Heartbeat";
 manager.updateHeartBeatTime();
 channel.acquireExclusiveLock();

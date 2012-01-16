@@ -1,7 +1,7 @@
 {
   final int fieldNameLength=iFieldName.length();
   if (fieldNameLength == 0)   return null;
-  ODocument currentRecord=iRecord;
+  OIdentifiable currentRecord=iRecord;
   Object value=null;
   int beginPos=0;
   int nextSeparatorPos=0;
@@ -21,18 +21,19 @@
     if (nextSeparator == '[') {
       if (value == null)       value=getIdentifiableValue(currentRecord,fieldName);
       if (value == null)       return null;
-      if (value instanceof ODocument)       currentRecord=(ODocument)value;
+ else       if (value instanceof OIdentifiable)       currentRecord=(OIdentifiable)value;
       final int end=iFieldName.indexOf(']',nextSeparatorPos);
       if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
       final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(nextSeparatorPos + 1,end));
       nextSeparatorPos=end;
-      if (value instanceof ODocument) {
+      if (value instanceof OIdentifiable) {
+        final ORecord<?> record=currentRecord != null && currentRecord instanceof OIdentifiable ? ((OIdentifiable)currentRecord).getRecord() : null;
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
-        if (indexParts.size() == 1)         value=currentRecord.field(index);
+        if (indexParts.size() == 1)         value=((ODocument)record).field(index);
  else {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            values[i]=currentRecord.field(indexParts.get(i));
+            values[i]=((ODocument)record).field(indexParts.get(i));
           }
           value=values;
         }
@@ -105,7 +106,7 @@
         if (value != null && value instanceof ORecord<?> && ((ORecord<?>)value).getInternalStatus() == STATUS.NOT_LOADED)         ((ORecord<?>)value).reload();
       }
     }
-    if (value instanceof ODocument)     currentRecord=(ODocument)value;
+    if (value instanceof OIdentifiable)     currentRecord=(OIdentifiable)value;
     beginPos=++nextSeparatorPos;
   }
  while (nextSeparatorPos < fieldNameLength && value != null);

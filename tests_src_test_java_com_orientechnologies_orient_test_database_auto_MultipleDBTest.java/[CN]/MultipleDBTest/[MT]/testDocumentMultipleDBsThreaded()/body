@@ -6,13 +6,14 @@
   final AtomicInteger activeDBs=new AtomicInteger(dbs);
   final Set<String> times=Collections.newSetFromMap(new ConcurrentHashMap<String,Boolean>());
   for (int i=0; i < dbs; i++) {
-    sem.acquire();
     final String dbUrl=baseUrl + i;
+    sem.acquire();
     Thread t=new Thread(new Runnable(){
       public void run(){
         ODatabaseDocumentTx tx=new ODatabaseDocumentTx(dbUrl);
         try {
           ODatabaseHelper.deleteDatabase(tx);
+          System.out.println("Thread " + this + "  is creating database "+ dbUrl);
           ODatabaseHelper.createDatabase(tx,dbUrl);
         }
  catch (        IOException e) {
@@ -49,13 +50,14 @@
           time="(" + dbUrl + ") "+ "Executed operations (READ) in: "+ (end - start)+ " ms";
           System.out.println(time);
           times.add(time);
-          tx.close();
-          sem.release();
-          activeDBs.decrementAndGet();
         }
   finally {
           try {
+            tx.close();
+            System.out.println("Thread " + this + "  is dropping database "+ dbUrl);
             ODatabaseHelper.deleteDatabase(tx);
+            sem.release();
+            activeDBs.decrementAndGet();
           }
  catch (          Exception e) {
           }

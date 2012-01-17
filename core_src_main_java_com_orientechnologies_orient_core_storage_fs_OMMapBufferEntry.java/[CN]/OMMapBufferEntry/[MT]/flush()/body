@@ -1,10 +1,10 @@
 {
+  if (!dirty)   return true;
   final long timer=OProfiler.getInstance().startChrono();
-  boolean forceSucceed=false;
   for (int i=0; i < FORCE_RETRY; ++i) {
     try {
       buffer.force();
-      forceSucceed=true;
+      dirty=false;
       break;
     }
  catch (    Exception e) {
@@ -12,8 +12,8 @@
       OMemoryWatchDog.freeMemory(FORCE_DELAY);
     }
   }
-  if (!forceSucceed)   OLogManager.instance().debug(this,"Cannot commit memory buffer to disk after %d retries",FORCE_RETRY);
+  if (dirty)   OLogManager.instance().debug(this,"Cannot commit memory buffer to disk after %d retries",FORCE_RETRY);
  else   OProfiler.getInstance().updateCounter("OMMapManager.pagesCommitted",1);
   OProfiler.getInstance().stopChrono("OMMapManager.commitPages",timer);
-  return forceSucceed;
+  return !dirty;
 }

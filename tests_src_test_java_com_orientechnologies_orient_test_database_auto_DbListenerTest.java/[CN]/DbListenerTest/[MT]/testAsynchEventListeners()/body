@@ -1,14 +1,21 @@
 {
   if (!database.getURL().startsWith("remote:"))   return;
   database.open("admin","admin");
-  ((OStorageRemoteThread)database.getStorage()).addRemoteServerEventListener(new ORemoteServerEventListener(){
-    public void onRecordPulled(    ORecord<?> iRecord){
-      onRecordPulled++;
-    }
-    public void onClusterConfigurationChange(    byte[] clusterConfig){
-      onClusterConfigurationChange++;
-    }
-  }
+  ((OStorageRemoteThread)database.getStorage()).setRemoteServerEventListener(new ORemoteServerEventListener(){
+    public void onRequest(    byte iRequestCode,    Object iObject){
+switch (iRequestCode) {
+case OChannelBinaryProtocol.REQUEST_PUSH_RECORD:
+        onRecordPulled++;
+      break;
+case OChannelDistributedProtocol.PUSH_DISTRIBUTED_CONFIG:
+    onClusterConfigurationChange++;
+  break;
+case OChannelDistributedProtocol.PUSH_LEADER_AVAILABLE_DBS:
+onAvailableDatabaseChange++;
+break;
+}
+}
+}
 );
-  database.close();
+database.close();
 }

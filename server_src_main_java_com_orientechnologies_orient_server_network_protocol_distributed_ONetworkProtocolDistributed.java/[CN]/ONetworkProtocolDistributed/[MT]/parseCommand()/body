@@ -9,7 +9,7 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_SYNCHRONIZE:
       final String node=nodeCfg.field("node");
       final long lastOpId=(Long)nodeCfg.field("lastOperation");
       final String dbName=connection.database.getName();
-      OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,node,lastOpId);
+      OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,clientId,lastOpId);
       final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
       sendOk(lastClientTxId);
       if (opLog != null) {
@@ -50,17 +50,12 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
         }
       }
       channel.writeByte((byte)1);
-      manager.becomePeer();
-      doc.reset();
-      doc.field("availableDatabases",manager.getReplicator().getDatabaseConfiguration());
-      channel.writeBytes(doc.toStream());
-      channel.flush();
-      manager.getPeer().updateHeartBeatTime();
-      manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+      manager.becomePeer(this);
     }
   finally {
       channel.releaseExclusiveLock();
     }
+    manager.getPeer().updateConfigurationToLeader();
     break;
   }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
@@ -130,7 +125,6 @@ openDatabase(dbUrl,dbUser,dbPassword);
 final ODistributedNode node=manager.getReplicator().getNode(remoteServerName);
 if (node == null) throw new ODistributedSynchronizationException("Cannot find remote node '" + remoteServerName + "'. Assure the remote server and port are correct. Example '192.168.0.10:2425'");
 final ODistributedDatabaseInfo db=node.shareDatabase(connection.database,remoteServerEngine,manager.getReplicator().getReplicatorUser().name,manager.getReplicator().getReplicatorUser().password);
-node.startDatabaseReplication(db);
 channel.acquireExclusiveLock();
 try {
 sendOk(lastClientTxId);
@@ -138,7 +132,7 @@ sendOk(lastClientTxId);
   finally {
 channel.releaseExclusiveLock();
 }
-manager.getPeer().updateConfigurationToLeader(dbUrl,remoteServerName);
+manager.getPeer().updateConfigurationToLeader();
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_SHARE_RECEIVER:
@@ -173,15 +167,17 @@ channel.releaseExclusiveLock();
   finally {
 manager.getPeer().updateHeartBeatTime();
 }
-manager.getReplicator().startReplication(dbName,clientId,SYNCH_TYPE.SYNCH.toString());
+manager.getPeer().updateConfigurationToLeader();
 break;
 }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_DB_CONFIG:
 {
 checkConnected();
 data.commandInfo="Update db configuration from server node leader";
-manager.getReplicator().updateConfiguration(new ODocument().fromStream(channel.readBytes()));
-OLogManager.instance().warn(this,"Cluster <%s>: changed distributed server configuration:\n%s",manager.getConfig().name,manager.getReplicator().getClusterConfiguration().toJSON(""));
+final ODocument cfg=new ODocument().fromStream(channel.readBytes());
+manager.getReplicator().updateConfiguration(cfg);
+OLogManager.instance().warn(this,"Cluster <%s>: changed distributed server configuration:\n%s",manager.getConfig().name,cfg.toJSON(""));
+for (String dbName : cfg.fieldNames()) manager.sendClusterConfigurationToClients(dbName,cfg);
 channel.acquireExclusiveLock();
 try {
 sendOk(lastClientTxId);

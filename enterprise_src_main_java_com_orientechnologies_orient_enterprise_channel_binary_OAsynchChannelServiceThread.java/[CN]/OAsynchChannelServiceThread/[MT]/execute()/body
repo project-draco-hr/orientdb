@@ -1,0 +1,30 @@
+{
+  try {
+    try {
+      network.beginResponse(sessionId);
+    }
+ catch (    IOException ioe) {
+      sendShutdown();
+      network.close();
+      return;
+    }
+    final byte request=network.readByte();
+    Object obj=null;
+switch (request) {
+case OChannelBinaryProtocol.REQUEST_PUSH_RECORD:
+      obj=(ORecordInternal<?>)OChannelBinaryProtocol.readIdentifiable(network);
+    break;
+case OChannelDistributedProtocol.PUSH_DISTRIBUTED_CONFIG:
+  obj=new ODocument().fromStream(network.readBytes());
+break;
+case OChannelDistributedProtocol.PUSH_LEADER_AVAILABLE_DBS:
+obj=new ODocument().fromStream(network.readBytes());
+break;
+}
+remoteServerEventListener.onRequest(request,obj);
+network.endResponse();
+}
+ catch (Exception e) {
+sendShutdown();
+}
+}

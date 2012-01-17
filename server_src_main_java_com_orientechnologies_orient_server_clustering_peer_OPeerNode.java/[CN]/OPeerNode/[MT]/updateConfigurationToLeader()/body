@@ -1,0 +1,18 @@
+{
+  if (manager.isLeader())   return;
+  final ODocument doc=new ODocument();
+  doc.field("availableDatabases",manager.getReplicator().getDatabaseConfiguration());
+  final OChannelBinaryServer channel=((OChannelBinaryServer)leaderConnection.getChannel());
+  channel.acquireExclusiveLock();
+  try {
+    channel.writeByte(OChannelBinaryProtocol.PUSH_DATA);
+    channel.writeInt(Integer.MIN_VALUE);
+    channel.writeByte(OChannelDistributedProtocol.PUSH_LEADER_AVAILABLE_DBS);
+    channel.writeBytes(doc.toStream());
+    channel.flush();
+    manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+  }
+  finally {
+    channel.releaseExclusiveLock();
+  }
+}

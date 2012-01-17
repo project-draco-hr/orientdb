@@ -1,7 +1,7 @@
 {
   checkConnection();
   final long time=System.currentTimeMillis();
-  OLogManager.instance().info(this,"Starting synchronization of database '%s'. Storing delta of updates...",getName());
+  OLogManager.instance().info(this,"<-> DB %s: synchronization started. Storing delta of updates...",name);
   try {
     final OChannelBinaryClient network=beginRequest(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_SYNCHRONIZE);
     for (    ODocument node : iDbCfg) {
@@ -19,10 +19,10 @@
         while (network.readByte() == 1) {
           opLog.fromStream(network.readBytes());
           ops++;
-          OLogManager.instance().info(this,"%d: received record %s",ops,opLog.record);
+          OLogManager.instance().info(this,"<< DB %s: (%d) received record %s",name,ops,opLog.record);
           replicator.getOperationLog(nodeId,getName()).appendLog(opLog.serial,opLog.type,(ORecordId)opLog.record.getIdentity());
         }
-        if (OLogManager.instance().isInfoEnabled())         OLogManager.instance().info(this,"Synchronization of database '%s' completed: received %d operations from remote node. Total time: %dms",getName(),ops,(System.currentTimeMillis() - time));
+        if (OLogManager.instance().isInfoEnabled())         OLogManager.instance().info(this,"<-> DB %s: synchronization completed. Received %d operations from remote node (%dms)",getName(),ops,(System.currentTimeMillis() - time));
       }
   finally {
         endResponse(network);
@@ -33,6 +33,6 @@
     throw e;
   }
 catch (  Exception e) {
-    handleException("Error on synchronization of database '" + getName() + "'",e);
+    handleException("<-> DB " + getName() + ": error on synchronization",e);
   }
 }

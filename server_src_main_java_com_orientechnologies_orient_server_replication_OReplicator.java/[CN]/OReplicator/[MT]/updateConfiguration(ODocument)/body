@@ -1,39 +1,8 @@
 {
   clusterConfiguration=iDocument;
   for (  String dbName : clusterConfiguration.fieldNames()) {
-    if (!localLogs.containsKey(dbName)) {
-      localLogs.put(dbName,new OOperationLog(manager.getId(),dbName));
-      OLogManager.instance().info(this,"Initialized cluster operation log for database '%s'",dbName);
-    }
     final ODocument db=clusterConfiguration.field(dbName);
     final Collection<ODocument> dbNodes=db.field("nodes");
-    boolean currentNodeInvolved=false;
-    for (    ODocument node : dbNodes) {
-      final String nodeId=node.field("id");
-      if (manager.itsMe(nodeId)) {
-        currentNodeInvolved=true;
-        break;
-      }
-    }
-    if (currentNodeInvolved)     for (    ODocument node : dbNodes) {
-      final String nodeId=node.field("id");
-      if (manager.itsMe(nodeId))       continue;
-      if (!nodes.containsKey(nodeId)) {
-        final ODistributedNode dNode=new ODistributedNode(this,nodeId);
-        nodes.put(nodeId,dNode);
-        try {
-          final ODistributedDatabaseInfo dbInfo=new ODistributedDatabaseInfo();
-          dbInfo.databaseName=dbName;
-          dbInfo.userName=replicatorUser.name;
-          dbInfo.userPassword=replicatorUser.password;
-          dbInfo.synchType=SYNCH_TYPE.valueOf(node.field("mode").toString().toUpperCase());
-          dbInfo.log=new OOperationLog(nodeId,dbName);
-          dNode.connectDatabase(dbInfo);
-        }
- catch (        IOException e) {
-          removeDistributedNode(nodeId,e);
-        }
-      }
-    }
+    for (    ODocument node : dbNodes)     startReplication(dbName,(String)node.field("id"),node.field("mode").toString());
   }
 }

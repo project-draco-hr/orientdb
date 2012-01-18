@@ -4,29 +4,31 @@
   OLogManager.instance().info(this,"<-> DB %s: synchronization started. Storing delta of updates...",name);
   try {
     final OChannelBinaryClient network=beginRequest(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_SYNCHRONIZE);
-    for (    ODocument node : iDbCfg) {
-      final String nodeId=(String)node.field("node");
-      try {
-        network.writeBytes(node.toStream());
-      }
+    ODocument cfg=new ODocument().field("nodes",iDbCfg,OType.EMBEDDEDSET);
+    try {
+      network.writeBytes(cfg.toStream());
+      network.flush();
+    }
   finally {
-        endRequest(network);
-      }
-      beginResponse(network);
-      try {
-        int ops=0;
-        final ORecordOperation opLog=new ORecordOperation();
+      endRequest(network);
+    }
+    beginResponse(network);
+    try {
+      int ops=0;
+      final ORecordOperation opLog=new ORecordOperation();
+      while (network.readByte() == 1) {
+        final String nodeId=network.readString();
         while (network.readByte() == 1) {
           opLog.fromStream(network.readBytes());
           ops++;
           OLogManager.instance().info(this,"<< DB %s: (%d) received record %s",name,ops,opLog.record);
           replicator.getOperationLog(nodeId,getName()).appendLog(opLog.serial,opLog.type,(ORecordId)opLog.record.getIdentity());
         }
-        if (OLogManager.instance().isInfoEnabled())         OLogManager.instance().info(this,"<-> DB %s: synchronization completed. Received %d operations from remote node (%dms)",getName(),ops,(System.currentTimeMillis() - time));
       }
+      if (OLogManager.instance().isInfoEnabled())       OLogManager.instance().info(this,"<-> DB %s: synchronization completed. Received %d operations from remote node (%dms)",getName(),ops,(System.currentTimeMillis() - time));
+    }
   finally {
-        endResponse(network);
-      }
+      endResponse(network);
     }
   }
  catch (  OException e) {

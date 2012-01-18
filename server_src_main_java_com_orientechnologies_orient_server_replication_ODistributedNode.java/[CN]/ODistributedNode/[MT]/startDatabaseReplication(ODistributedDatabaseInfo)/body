@@ -1,16 +1,18 @@
 {
 synchronized (this) {
-    databases.remove(iDatabase.databaseName);
+    final ODistributedDatabaseInfo oldDbInfo=databases.remove(iDatabase.databaseName);
+    if (oldDbInfo != null)     oldDbInfo.close();
     OLogManager.instance().warn(this,"<-> DB %s: starting replication against distributed node %s:%d",iDatabase.databaseName,networkAddress,networkPort);
     try {
+      databases.put(iDatabase.databaseName,iDatabase);
       if (iDatabase.storage == null)       iDatabase.storage=new ODistributedStorage(replicator,replicator.getManager().getId(),id + "/" + iDatabase.databaseName,"rw",replicator.getConflictResolver());
       iDatabase.storage.open(iDatabase.userName,iDatabase.userPassword,null);
-      databases.put(iDatabase.databaseName,iDatabase);
       status=STATUS.SYNCHRONIZING;
-      iDatabase.storage.synchronize(replicator.getDatabaseConfiguration(iDatabase.databaseName));
+      iDatabase.storage.synchronize(replicator.getLocalDatabaseConfiguration(iDatabase.databaseName));
       status=STATUS.ONLINE;
     }
  catch (    Exception e) {
+      iDatabase.close();
       databases.remove(iDatabase.databaseName);
       OLogManager.instance().warn(this,"<> DB %s: cannot find database on remote server. Removing it from shared list.",e,iDatabase.databaseName);
     }

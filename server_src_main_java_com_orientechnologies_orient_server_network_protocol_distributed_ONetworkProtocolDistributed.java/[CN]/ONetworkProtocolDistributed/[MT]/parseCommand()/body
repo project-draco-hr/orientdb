@@ -4,24 +4,30 @@ switch (lastRequestType) {
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_SYNCHRONIZE:
 {
       data.commandInfo="Synchronization between nodes";
-      final ODocument nodeCfg=new ODocument(channel.readBytes());
-      final ORecordOperation op=new ORecordOperation();
-      final String node=nodeCfg.field("node");
-      final long lastOpId=(Long)nodeCfg.field("lastOperation");
-      final String dbName=connection.database.getName();
-      OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,clientId,lastOpId);
-      final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
+      final ODocument cfg=new ODocument(channel.readBytes());
       sendOk(lastClientTxId);
-      if (opLog != null) {
-        int position=opLog.findOperationId(lastOpId);
-        int sent=0;
-        sendOk(lastClientTxId);
-        for (int i=position - 1; i >= 0; --i) {
+      final ORecordOperation op=new ORecordOperation();
+      Collection<ODocument> nodes=cfg.field("nodes");
+      for (      ODocument nodeCfg : nodes) {
+        final String node=nodeCfg.field("node");
+        final long lastLog=(Long)nodeCfg.field("lastLog");
+        final String dbName=connection.database.getName();
+        OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,clientId,lastLog);
+        final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
+        if (opLog != null) {
           channel.writeByte((byte)1);
-          opLog.getEntry(i,op);
-          channel.writeBytes(op.toStream());
-          sent++;
-          OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
+          channel.writeString(node);
+          int position=opLog.findOperationId(lastLog);
+          int sent=0;
+          sendOk(lastClientTxId);
+          for (int i=position - 1; i >= 0; --i) {
+            channel.writeByte((byte)1);
+            opLog.getEntry(i,op);
+            channel.writeBytes(op.toStream());
+            sent++;
+            OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
+          }
+          channel.writeByte((byte)0);
         }
       }
       channel.writeByte((byte)0);
@@ -35,6 +41,7 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
     final byte[] encodedSecurityKey=doc.field("clusterKey");
     final String leaderAddress=doc.field("leaderNodeAddress");
     if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getConfig().getSecurityKey()))     throw new OSecurityException("Invalid combination of cluster name and key received");
+    boolean remainTheLeader=false;
     channel.acquireExclusiveLock();
     try {
       sendOk(lastClientTxId);
@@ -45,17 +52,22 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
         if (leaderAddress.compareTo(myUid) > 0) {
           channel.writeByte((byte)0);
           channel.flush();
+          remainTheLeader=true;
           OLogManager.instance().warn(this,"Current node remains the Leader of the cluster because it has lower network address",leaderAddress);
-          return;
         }
       }
-      channel.writeByte((byte)1);
-      manager.becomePeer(this);
+      if (!remainTheLeader) {
+        manager.becomePeer(this);
+        channel.writeByte((byte)1);
+        channel.writeBytes(manager.getReplicator().getLocalDatabaseConfiguration().toStream());
+        channel.flush();
+        manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+      }
     }
   finally {
       channel.releaseExclusiveLock();
     }
-    manager.getPeer().updateConfigurationToLeader();
+    if (remainTheLeader)     shutdown();
     break;
   }
 case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_HEARTBEAT:
@@ -122,8 +134,7 @@ final String remoteServerName=channel.readString();
 final String remoteServerEngine=channel.readString();
 checkServerAccess("database.share");
 openDatabase(dbUrl,dbUser,dbPassword);
-final ODistributedNode node=manager.getReplicator().getNode(remoteServerName);
-if (node == null) throw new ODistributedSynchronizationException("Cannot find remote node '" + remoteServerName + "'. Assure the remote server and port are correct. Example '192.168.0.10:2425'");
+final ODistributedNode node=manager.getReplicator().getOrCreateDistributedNode(remoteServerName);
 final ODistributedDatabaseInfo db=node.shareDatabase(connection.database,remoteServerEngine,manager.getReplicator().getReplicatorUser().name,manager.getReplicator().getReplicatorUser().password);
 channel.acquireExclusiveLock();
 try {
@@ -159,6 +170,7 @@ new ODatabaseImport(connection.database,new OChannelBinaryInputStream(channel),t
 OLogManager.instance().info(this,"<-> DB %s: database imported correctly",dbName);
 sendOk(lastClientTxId);
 channel.writeInt(connection.id);
+channel.flush();
 }
   finally {
 channel.releaseExclusiveLock();

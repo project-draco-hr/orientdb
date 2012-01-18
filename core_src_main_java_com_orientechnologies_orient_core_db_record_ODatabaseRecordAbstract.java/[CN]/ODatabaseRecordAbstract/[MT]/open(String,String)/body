@@ -8,6 +8,16 @@
     recordFormat=DEF_RECORD_FORMAT;
     if (getStorage() instanceof OStorageEmbedded) {
       user=getMetadata().getSecurity().authenticate(iUserName,iUserPassword);
+      final Set<ORole> roles=user.getRoles();
+      if (roles == null || roles.isEmpty() || roles.iterator().next() == null) {
+        for (        ODatabaseListener l : underlying.getListeners()) {
+          if (l.onCorruptionRepairDatabase(this,"security metadata are corrupted: current user '" + user.getName() + "' has no roles defined")) {
+            user=null;
+            user=metadata.getSecurity().repair();
+            break;
+          }
+        }
+      }
       registerHook(new OUserTrigger());
       registerHook(new OClassIndexManager());
     }

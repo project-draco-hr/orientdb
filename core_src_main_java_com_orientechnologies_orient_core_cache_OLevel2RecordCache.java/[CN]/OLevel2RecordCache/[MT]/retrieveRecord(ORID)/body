@@ -1,14 +1,14 @@
 {
-  if (!enabled)   return null;
-  if (iRID.getClusterId() == excludedCluster)   return null;
-  acquireExclusiveLock();
+  if (!isEnabled() || iRID.getClusterId() == excludedCluster)   return null;
+  final ORecordInternal<?> record;
+  lock.lock();
   try {
-    final ORecordInternal<?> record=entries.remove(iRID);
+    record=underlying.remove(iRID);
     if (record == null || record.isDirty())     return null;
-    if (strategy == STRATEGY.COPY_RECORD)     entries.put(iRID,(ORecordInternal<?>)record.flatCopy());
-    return record;
+    if (strategy == STRATEGY.COPY_RECORD)     underlying.put((ORecordInternal<?>)record.flatCopy());
   }
   finally {
-    releaseExclusiveLock();
+    lock.unlock();
   }
+  return record;
 }

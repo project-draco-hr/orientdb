@@ -1,25 +1,10 @@
 {
-  if (!enabled)   return null;
-  ORecordInternal<?> record;
-  acquireSharedLock();
-  try {
-    record=entries.get(iRID);
-  }
-  finally {
-    releaseSharedLock();
-  }
+  if (!isEnabled())   return null;
+  ORecordInternal<?> record=underlying.get(rid);
   if (record == null) {
-    record=level2cache.retrieveRecord(iRID);
-    if (record != null) {
-      acquireExclusiveLock();
-      try {
-        entries.put(record.getIdentity(),record);
-      }
-  finally {
-        releaseExclusiveLock();
-      }
-    }
+    record=secondary.get().retrieveRecord(rid);
+    if (record != null)     underlying.put(record);
   }
-  OProfiler.getInstance().updateCounter(record != null ? PROFILER_CACHE_FOUND : PROFILER_CACHE_NOTFOUND,+1);
+  OProfiler.getInstance().updateCounter(record != null ? CACHE_HIT : CACHE_MISS,1L);
   return record;
 }

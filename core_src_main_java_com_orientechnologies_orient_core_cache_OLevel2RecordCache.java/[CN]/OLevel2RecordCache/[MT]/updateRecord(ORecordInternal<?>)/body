@@ -1,21 +1,19 @@
 {
-  if (!enabled || iRecord == null || iRecord.isDirty() || iRecord.getIdentity().isNew())   return;
-  if (iRecord.getIdentity().getClusterId() == excludedCluster)   return;
-  if (!iRecord.getIdentity().isValid())   return;
-  acquireExclusiveLock();
-  try {
-    if (iRecord.isPinned()) {
-      final ORecordInternal<?> prevEntry=entries.get(iRecord.getIdentity());
-      if (prevEntry != null && prevEntry.getVersion() >= iRecord.getVersion())       return;
-      if ((!ODatabaseRecordThreadLocal.INSTANCE.isDefined() || iRecord.getDatabase().isClosed())) {
-        iRecord.detach();
-        entries.put(iRecord.getIdentity(),iRecord);
+  if (!isEnabled() || fresh == null || fresh.isDirty() || fresh.getIdentity().isNew() || !fresh.getIdentity().isValid() || fresh.getIdentity().getClusterId() == excludedCluster)   return;
+  if (fresh.isPinned()) {
+    lock.lock();
+    try {
+      final ORecordInternal<?> current=underlying.get(fresh.getIdentity());
+      if (current != null && current.getVersion() >= fresh.getVersion())       return;
+      if (databaseClosed(fresh)) {
+        fresh.detach();
+        underlying.put(fresh);
       }
- else       entries.put(iRecord.getIdentity(),(ORecordInternal<?>)iRecord.flatCopy());
+ else       underlying.put((ORecordInternal<?>)fresh.flatCopy());
     }
- else     entries.remove(iRecord.getIdentity());
-  }
   finally {
-    releaseExclusiveLock();
+      lock.unlock();
+    }
   }
+ else   underlying.remove(fresh.getIdentity());
 }

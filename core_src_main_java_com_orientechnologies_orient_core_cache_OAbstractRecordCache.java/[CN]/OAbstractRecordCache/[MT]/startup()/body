@@ -1,50 +1,20 @@
 {
-  watchDogListener=Orient.instance().getMemoryWatchDog().addListener(new Listener(){
-    public void memoryUsageLow(    final long iFreeMemory,    final long iFreeMemoryPercentage){
-      acquireExclusiveLock();
-      try {
-        if (iFreeMemoryPercentage < 10) {
-          OLogManager.instance().debug(this,"Free memory is low (%d%%): clearing %d resources",iFreeMemoryPercentage,entries.size());
-          entries.clear();
-        }
- else {
-          final int oldSize=entries.size();
-          if (oldSize == 0)           return;
-          final int threshold=(int)(oldSize * 0.9f);
-          entries.removeEldestItems(threshold);
-          OLogManager.instance().debug(this,"Low memory (%d%%): auto reduce the record cache size from %d to %d",iFreeMemoryPercentage,oldSize,threshold);
-        }
-      }
- catch (      Exception e) {
-        OLogManager.instance().error(this,"Error while freeing resources",e);
-      }
- finally {
-        releaseExclusiveLock();
-      }
-    }
-  }
-);
+  underlying.startup();
   OProfiler.getInstance().registerHookValue(profilerPrefix + ".cache.enabled",new OProfilerHookValue(){
     public Object getValue(){
-      return enabled;
+      return isEnabled();
     }
   }
 );
   OProfiler.getInstance().registerHookValue(profilerPrefix + ".cache.current",new OProfilerHookValue(){
     public Object getValue(){
-      acquireSharedLock();
-      try {
-        return entries.size();
-      }
-  finally {
-        releaseSharedLock();
-      }
+      return getSize();
     }
   }
 );
   OProfiler.getInstance().registerHookValue(profilerPrefix + ".cache.max",new OProfilerHookValue(){
     public Object getValue(){
-      return maxSize;
+      return getMaxSize();
     }
   }
 );

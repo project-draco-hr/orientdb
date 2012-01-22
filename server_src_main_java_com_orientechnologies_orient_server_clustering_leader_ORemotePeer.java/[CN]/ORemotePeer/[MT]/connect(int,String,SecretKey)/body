@@ -1,11 +1,10 @@
 {
   configuration.setValue(OGlobalConfiguration.NETWORK_SOCKET_TIMEOUT,iTimeout);
   channel=new OChannelBinaryClient(networkAddress,networkPort,configuration);
-  serviceThread=new OAsynchChannelServiceThread(new ODistributedRemoteAsynchEventListener(leader.getManager(),null,id),channel);
   OLogManager.instance().warn(this,"Cluster <%s>: received joining request from peer node %s:%d. Checking authorizations...",iClusterName,networkAddress,networkPort);
-  clientTxId=serialClientId.decrementAndGet();
+  sessionId=OStorageRemoteThread.getNextConnectionId();
   channel.writeByte(OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT);
-  channel.writeInt(clientTxId);
+  channel.writeInt(sessionId);
   final ODocument doc=new ODocument();
   doc.field("clusterName",iClusterName);
   doc.field("clusterKey",iSecurityKey.getEncoded());
@@ -13,16 +12,22 @@
   doc.field("leaderNodeRunningSince",leader.getManager().getRunningSince());
   channel.writeBytes(doc.toStream());
   channel.flush();
-  channel.readStatus();
-  clientTxId=channel.readInt();
-  final boolean connectedAsPeer=channel.readByte() == 1;
-  if (!connectedAsPeer) {
-    OLogManager.instance().warn(this,"Cluster <%s>: remote server node %s:%d has refused the connection because it's the new Leader. Switching to be a Peer Node...",leader.getManager().getConfig().name,networkAddress,networkPort);
-    leader.getManager().becomePeer(null);
-    return false;
+  final ODocument cfg;
+  beginResponse(sessionId);
+  try {
+    sessionId=channel.readInt();
+    final byte connectedAsPeer=channel.readByte();
+    if (connectedAsPeer == 0) {
+      OLogManager.instance().warn(this,"Cluster <%s>: remote server node %s:%d has refused the connection because it's the new Leader. Switching to be a Peer Node...",leader.getManager().getConfig().name,networkAddress,networkPort);
+      leader.getManager().becomePeer(null);
+      return false;
+    }
+    OLogManager.instance().info(this,"Cluster <%s>: joined peer node %s:%d",iClusterName,networkAddress,networkPort);
+    cfg=new ODocument().fromStream(channel.readBytes());
   }
-  OLogManager.instance().info(this,"Cluster <%s>: joined peer node %s:%d",iClusterName,networkAddress,networkPort);
-  final ODocument cfg=new ODocument().fromStream(channel.readBytes());
+  finally {
+    endResponse();
+  }
   final ODocument answer=leader.updatePeerDatabases(id,cfg);
   channel.writeBytes(answer.toStream());
   channel.flush();

@@ -50,24 +50,22 @@ case OChannelDistributedProtocol.REQUEST_DISTRIBUTED_LEADER_CONNECT:
         OLogManager.instance().warn(this,"Received remote connection from the leader node %s, but current node is itself leader: split network problem or high network latency?",leaderAddress);
         final String myUid=InetAddress.getLocalHost().getHostAddress() + ":" + channel.socket.getLocalPort();
         if (leaderAddress.compareTo(myUid) > 0) {
-          channel.writeByte((byte)0);
-          channel.flush();
           remainTheLeader=true;
           OLogManager.instance().warn(this,"Current node remains the Leader of the cluster because it has lower network address",leaderAddress);
         }
       }
+      channel.writeByte((byte)(remainTheLeader ? 0 : 1));
       if (!remainTheLeader) {
-        channel.writeByte((byte)1);
-        channel.flush();
-        channel.writeBytes(manager.getReplicator().getLocalDatabaseConfiguration().toStream());
-        channel.flush();
-        manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
-        manager.becomePeer(this);
+        final ODocument localCfg=manager.getReplicator().getLocalDatabaseConfiguration();
+        channel.writeBytes(localCfg.toStream());
       }
     }
   finally {
       channel.releaseExclusiveLock();
+      channel.flush();
     }
+    manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+    manager.becomePeer(this);
     if (remainTheLeader)     shutdown();
     break;
   }

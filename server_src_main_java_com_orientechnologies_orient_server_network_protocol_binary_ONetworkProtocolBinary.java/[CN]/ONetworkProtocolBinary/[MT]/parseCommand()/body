@@ -2,7 +2,7 @@
 switch (lastRequestType) {
 case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
 {
-      data.commandInfo="Shutdowning";
+      setDataCommandInfo("Shutdowning");
       OLogManager.instance().info(this,"Received shutdown command from the remote client %s:%d",channel.socket.getInetAddress(),channel.socket.getPort());
       user=channel.readString();
       passwd=channel.readString();
@@ -27,7 +27,7 @@ case OChannelBinaryProtocol.REQUEST_SHUTDOWN:
     }
 case OChannelBinaryProtocol.REQUEST_CONNECT:
 {
-    data.commandInfo="Connect";
+    setDataCommandInfo("Connect");
     readConnectionData();
     serverLogin(channel.readString(),channel.readString(),"connect");
     channel.acquireExclusiveLock();
@@ -42,7 +42,7 @@ case OChannelBinaryProtocol.REQUEST_CONNECT:
   }
 case OChannelBinaryProtocol.REQUEST_DB_LIST:
 {
-  data.commandInfo="List databases";
+  setDataCommandInfo("List databases");
   ODocument doc=listDatabases();
   channel.acquireExclusiveLock();
   try {
@@ -56,7 +56,7 @@ case OChannelBinaryProtocol.REQUEST_DB_LIST:
 }
 case OChannelBinaryProtocol.REQUEST_DB_OPEN:
 {
-data.commandInfo="Open database";
+setDataCommandInfo("Open database");
 readConnectionData();
 final String dbURL=channel.readString();
 user=channel.readString();
@@ -81,7 +81,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_RELOAD:
 {
-data.commandInfo="Reload database information";
+setDataCommandInfo("Reload database information");
 checkDatabase();
 channel.acquireExclusiveLock();
 try {
@@ -95,7 +95,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_CREATE:
 {
-data.commandInfo="Create database";
+setDataCommandInfo("Create database");
 String dbName=channel.readString();
 String storageMode=channel.readString();
 checkServerAccess("database.create");
@@ -112,10 +112,10 @@ channel.releaseExclusiveLock();
 break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_CLOSE:
-data.commandInfo="Close Database";
+setDataCommandInfo("Close Database");
 if (connection != null) {
 connection.close();
-OClientConnectionManager.instance().disconnect(connection.id);
+if (OClientConnectionManager.instance().disconnect(connection.id)) sendShutdown();
 }
 channel.acquireExclusiveLock();
 try {
@@ -127,7 +127,7 @@ channel.releaseExclusiveLock();
 break;
 case OChannelBinaryProtocol.REQUEST_DB_EXIST:
 {
-data.commandInfo="Exists database";
+setDataCommandInfo("Exists database");
 String dbName=channel.readString();
 checkServerAccess("database.exists");
 connection.database=getDatabaseInstance(dbName,"local");
@@ -143,7 +143,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_DELETE:
 {
-data.commandInfo="Delete database";
+setDataCommandInfo("Delete database");
 String dbName=channel.readString();
 checkServerAccess("database.delete");
 connection.database=getDatabaseInstance(dbName,"local");
@@ -160,7 +160,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_SIZE:
 {
-data.commandInfo="Database size";
+setDataCommandInfo("Database size");
 checkDatabase();
 channel.acquireExclusiveLock();
 try {
@@ -174,7 +174,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DB_COUNTRECORDS:
 {
-data.commandInfo="Database count records";
+setDataCommandInfo("Database count records");
 checkDatabase();
 channel.acquireExclusiveLock();
 try {
@@ -188,7 +188,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DATACLUSTER_COUNT:
 {
-data.commandInfo="Count cluster elements";
+setDataCommandInfo("Count cluster elements");
 checkDatabase();
 int[] clusterIds=new int[channel.readShort()];
 for (int i=0; i < clusterIds.length; ++i) clusterIds[i]=channel.readShort();
@@ -205,7 +205,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DATACLUSTER_DATARANGE:
 {
-data.commandInfo="Get the begin/end range of data in cluster";
+setDataCommandInfo("Get the begin/end range of data in cluster");
 checkDatabase();
 long[] pos=connection.database.getStorage().getClusterDataRange(channel.readShort());
 channel.acquireExclusiveLock();
@@ -221,7 +221,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DATACLUSTER_ADD:
 {
-data.commandInfo="Add cluster";
+setDataCommandInfo("Add cluster");
 checkDatabase();
 final String type=channel.readString();
 final String name=channel.readString();
@@ -252,7 +252,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_DATACLUSTER_REMOVE:
 {
-data.commandInfo="Remove cluster";
+setDataCommandInfo("Remove cluster");
 checkDatabase();
 final int id=channel.readShort();
 boolean result=connection.database.dropCluster(connection.database.getClusterNameById(id));
@@ -268,7 +268,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_RECORD_LOAD:
 {
-data.commandInfo="Load record";
+setDataCommandInfo("Load record");
 final ORecordId rid=channel.readRID();
 final String fetchPlanString=channel.readString();
 if (rid.clusterId == 0 && rid.clusterPosition == 0) {
@@ -334,7 +334,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_RECORD_CREATE:
 {
-data.commandInfo="Create record";
+setDataCommandInfo("Create record");
 checkDatabase();
 final ORecordId rid=new ORecordId(channel.readShort(),ORID.CLUSTER_POS_INVALID);
 final byte[] buffer=channel.readBytes();
@@ -355,7 +355,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_RECORD_UPDATE:
 {
-data.commandInfo="Update record";
+setDataCommandInfo("Update record");
 checkDatabase();
 final ORecordId rid=channel.readRID();
 final byte[] buffer=channel.readBytes();
@@ -377,7 +377,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_RECORD_DELETE:
 {
-data.commandInfo="Delete record";
+setDataCommandInfo("Delete record");
 checkDatabase();
 final ORID rid=channel.readRID();
 final int version=channel.readInt();
@@ -397,7 +397,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_COUNT:
 {
-data.commandInfo="Count cluster records";
+setDataCommandInfo("Count cluster records");
 checkDatabase();
 final String clusterName=channel.readString();
 final long size=connection.database.countClusterElements(clusterName);
@@ -413,12 +413,12 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_COMMAND:
 {
-data.commandInfo="Execute remote command";
+setDataCommandInfo("Execute remote command");
 checkDatabase();
 final boolean asynch=channel.readByte() == 'a';
 final OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
 final OQuery<?> query=(OQuery<?>)(command instanceof OQuery<?> ? command : null);
-data.commandDetail=command.getText();
+connection.data.commandDetail=command.getText();
 channel.acquireExclusiveLock();
 try {
 if (asynch) {
@@ -505,7 +505,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_TX_COMMIT:
 {
-data.commandInfo="Transaction commit";
+setDataCommandInfo("Transaction commit");
 checkDatabase();
 final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy((ODatabaseRecordTx)connection.database.getUnderlying(),channel);
 try {
@@ -543,7 +543,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_CONFIG_GET:
 {
-data.commandInfo="Get config";
+setDataCommandInfo("Get config");
 checkServerAccess("server.config.get");
 final String key=channel.readString();
 final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(key);
@@ -560,7 +560,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_CONFIG_SET:
 {
-data.commandInfo="Get config";
+setDataCommandInfo("Get config");
 checkServerAccess("server.config.set");
 final String key=channel.readString();
 final String value=channel.readString();
@@ -577,7 +577,7 @@ break;
 }
 case OChannelBinaryProtocol.REQUEST_CONFIG_LIST:
 {
-data.commandInfo="List config";
+setDataCommandInfo("List config");
 checkServerAccess("server.config.get");
 channel.acquireExclusiveLock();
 try {
@@ -594,7 +594,7 @@ channel.releaseExclusiveLock();
 break;
 }
 default :
-data.commandInfo="Command not supported";
+setDataCommandInfo("Command not supported");
 OLogManager.instance().error(this,"Request not supported. Code: " + lastRequestType);
 channel.clearInput();
 sendError(lastClientTxId,new ONetworkProtocolException("Request not supported. Code: " + lastRequestType));

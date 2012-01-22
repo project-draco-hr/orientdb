@@ -1,7 +1,5 @@
 {
   lastRequestType=-1;
-  data.commandInfo="Listening";
-  data.commandDetail="-";
   lastClientTxId=0;
   try {
     lastRequestType=channel.readByte();
@@ -14,9 +12,13 @@
       }
  else       connection=OClientConnectionManager.instance().connect(connection.protocol.getChannel().socket,this);
     }
-    if (connection != null)     ODatabaseRecordThreadLocal.INSTANCE.set(connection.database);
-    ++data.totalRequests;
-    data.lastCommandReceived=System.currentTimeMillis();
+    if (connection != null) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(connection.database);
+      ++connection.data.totalRequests;
+      setDataCommandInfo("Listening");
+      connection.data.commandDetail="-";
+      connection.data.lastCommandReceived=System.currentTimeMillis();
+    }
     OServerHandlerHelper.invokeHandlerCallbackOnBeforeClientRequest(connection,(byte)lastRequestType);
     parseCommand();
     OServerHandlerHelper.invokeHandlerCallbackOnAfterClientRequest(connection,(byte)lastRequestType);
@@ -47,9 +49,13 @@ catch (  Throwable t) {
       OLogManager.instance().debug(this,"Error on send data over the network",t);
     }
     OSerializationThreadLocal.INSTANCE.get().clear();
-    data.lastCommandExecutionTime=System.currentTimeMillis() - data.lastCommandReceived;
-    data.totalCommandExecutionTime+=data.lastCommandExecutionTime;
-    data.lastCommandInfo=data.commandInfo;
-    data.lastCommandDetail=data.commandDetail;
+    if (connection != null) {
+      connection.data.lastCommandExecutionTime=System.currentTimeMillis() - connection.data.lastCommandReceived;
+      connection.data.totalCommandExecutionTime+=connection.data.lastCommandExecutionTime;
+      connection.data.lastCommandInfo=connection.data.commandInfo;
+      connection.data.lastCommandDetail=connection.data.commandDetail;
+      setDataCommandInfo("Listening");
+      connection.data.commandDetail="-";
+    }
   }
 }

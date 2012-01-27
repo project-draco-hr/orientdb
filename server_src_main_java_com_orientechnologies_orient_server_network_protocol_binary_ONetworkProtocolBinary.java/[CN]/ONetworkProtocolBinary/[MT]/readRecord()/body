@@ -1,0 +1,65 @@
+{
+  setDataCommandInfo("Load record");
+  final ORecordId rid=channel.readRID();
+  final String fetchPlanString=channel.readString();
+  if (rid.clusterId == 0 && rid.clusterPosition == 0) {
+    OFetchHelper.checkFetchPlanValid(fetchPlanString);
+    beginResponse();
+    try {
+      sendOk(clientTxId);
+      channel.writeByte((byte)1);
+      channel.writeBytes(connection.database.getStorage().getConfiguration().toStream());
+      channel.writeInt(0);
+      channel.writeByte(ORecordBytes.RECORD_TYPE);
+      channel.writeByte((byte)0);
+    }
+  finally {
+      endResponse();
+    }
+  }
+ else {
+    final ORecordInternal<?> record=connection.database.load(rid,fetchPlanString);
+    beginResponse();
+    try {
+      sendOk(clientTxId);
+      if (record != null) {
+        channel.writeByte((byte)1);
+        channel.writeBytes(record.toStream());
+        channel.writeInt(record.getVersion());
+        channel.writeByte(record.getRecordType());
+        if (fetchPlanString.length() > 0) {
+          if (record instanceof ODocument) {
+            final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
+            final Set<ODocument> recordsToSend=new HashSet<ODocument>();
+            final ODocument doc=(ODocument)record;
+            OFetchHelper.fetch(doc,doc,doc.fieldNames(),fetchPlan,null,0,-1,new OFetchListener(){
+              @Override public int size(){
+                return recordsToSend.size();
+              }
+              @Override public Object fetchLinked(              final ODocument iRoot,              final Object iUserObject,              final String iFieldName,              final Object iLinked){
+                if (iLinked instanceof ODocument) {
+                  if (((ODocument)iLinked).getIdentity().isValid())                   return recordsToSend.add((ODocument)iLinked) ? iLinked : null;
+                  return null;
+                }
+ else                 if (iLinked instanceof Collection<?>)                 return recordsToSend.addAll((Collection<? extends ODocument>)iLinked) ? iLinked : null;
+ else                 if (iLinked instanceof Map<?,?>)                 return recordsToSend.addAll(((Map<String,? extends ODocument>)iLinked).values()) ? iLinked : null;
+ else                 throw new IllegalArgumentException("Unrecognized type while fetching records: " + iLinked);
+              }
+            }
+);
+            for (            ODocument d : recordsToSend) {
+              if (d.getIdentity().isValid()) {
+                channel.writeByte((byte)2);
+                writeIdentifiable(d);
+              }
+            }
+          }
+        }
+      }
+      channel.writeByte((byte)0);
+    }
+  finally {
+      endResponse();
+    }
+  }
+}

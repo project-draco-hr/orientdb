@@ -1,0 +1,18 @@
+{
+  final ORecordInternal<?> newRecord=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  newRecord.fill(rid,version,buffer,true);
+  if (((OSchemaProxy)iDatabase.getMetadata().getSchema()).getIdentity().equals(rid))   throw new OSecurityAccessException("Cannot update internal record " + rid);
+  final ORecordInternal<?> currentRecord;
+  if (newRecord instanceof ODocument) {
+    currentRecord=iDatabase.load(rid);
+    if (currentRecord == null)     throw new ORecordNotFoundException(rid.toString());
+    ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
+  }
+ else   currentRecord=newRecord;
+  currentRecord.setVersion(version);
+  iDatabase.save(currentRecord);
+  if (currentRecord.getIdentity().toString().equals(iDatabase.getStorage().getConfiguration().indexMgrRecordId)) {
+    iDatabase.getMetadata().getIndexManager().reload();
+  }
+  return currentRecord.getVersion();
+}

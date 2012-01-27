@@ -1,22 +1,36 @@
 {
+  int unreadResponse=0;
   do {
     lockRead.lock();
     if (!channelRead) {
       channelRead=true;
       try {
         currentStatus=readByte();
-        currentTxId=readInt();
+        currentSessionId=readInt();
       }
  catch (      IOException e) {
         lockRead.unlock();
+        channelRead=false;
         throw e;
       }
     }
-    if (currentTxId == iRequesterId)     break;
+    if (currentSessionId == iRequesterId)     break;
+    if (unreadResponse > MAX_UNREAD_RESPONSES) {
+      final StringBuilder dirtyBuffer=new StringBuilder();
+      int i=0;
+      while (in.available() > 0) {
+        if (dirtyBuffer.length() > 0)         dirtyBuffer.append('-');
+        dirtyBuffer.append(in.read());
+        ++i;
+      }
+      OLogManager.instance().error(this,"Received unread response for session=" + currentSessionId + ", probably corrupted data from the network connection. Cleared dirty data in the buffer ("+ i+ " bytes): ["+ dirtyBuffer+ "]",OIOException.class);
+    }
     lockRead.unlock();
 synchronized (this) {
       try {
+        final long start=System.currentTimeMillis();
         wait(1000);
+        if (System.currentTimeMillis() - start >= 1000)         unreadResponse++;
       }
  catch (      InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -24,5 +38,5 @@ synchronized (this) {
     }
   }
  while (true);
-  handleStatus(currentStatus,currentTxId);
+  handleStatus(currentStatus,currentSessionId);
 }

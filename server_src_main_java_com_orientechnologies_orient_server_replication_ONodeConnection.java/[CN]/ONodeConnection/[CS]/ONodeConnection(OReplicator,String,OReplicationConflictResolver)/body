@@ -1,0 +1,24 @@
+{
+  super(iNodeId.split(":")[0],Integer.parseInt(iNodeId.split(":")[1]));
+  channel=new OChannelBinaryClient(networkAddress,networkPort,new OContextConfiguration(),OClusterProtocol.CURRENT_PROTOCOL_VERSION);
+  OLogManager.instance().warn(this,"Cluster <%s>: connecting to node %s...",iReplicator.getManager().getConfig().name,iNodeId);
+  beginRequest(OClusterProtocol.REQUEST_NODE2NODE_CONNECT);
+  try {
+    channel.writeString(iReplicator.getManager().getId());
+    channel.writeString(iReplicator.getReplicatorUser().name);
+    channel.writeString(iReplicator.getReplicatorUser().password);
+  }
+  finally {
+    endRequest();
+  }
+  try {
+    beginResponse();
+  }
+  finally {
+    endResponse();
+  }
+  serviceThread=new OAsynchChannelServiceThread(new ODistributedRemoteAsynchEventListener(iReplicator.getManager(),new ODistributedRemoteAsynchEventListener(iReplicator.getManager(),null,iNodeId),iNodeId),channel,"OrientDB <- Asynch Node/" + iNodeId);
+  replicator=iReplicator;
+  conflictResolver=iConflictResolver;
+  asynchExecutor=Executors.newSingleThreadExecutor();
+}

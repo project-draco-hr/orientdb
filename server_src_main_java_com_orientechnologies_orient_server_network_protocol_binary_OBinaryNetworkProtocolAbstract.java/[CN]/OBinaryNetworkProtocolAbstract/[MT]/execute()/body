@@ -1,0 +1,42 @@
+{
+  requestType=-1;
+  clientTxId=0;
+  try {
+    requestType=channel.readByte();
+    clientTxId=channel.readInt();
+    onBeforeRequest();
+    if (!executeRequest()) {
+      OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
+      channel.clearInput();
+      sendError(clientTxId,new ONetworkProtocolException("Request not supported. Code: " + requestType));
+    }
+    onAfterRequest();
+  }
+ catch (  EOFException e) {
+    handleConnectionError(e);
+    sendShutdown();
+  }
+catch (  SocketException e) {
+    handleConnectionError(e);
+    sendShutdown();
+  }
+catch (  OException e) {
+    sendError(clientTxId,e);
+  }
+catch (  RuntimeException e) {
+    sendError(clientTxId,e);
+  }
+catch (  Throwable t) {
+    OLogManager.instance().error(this,"Error on executing request",t);
+    sendError(clientTxId,t);
+  }
+ finally {
+    try {
+      channel.flush();
+    }
+ catch (    Throwable t) {
+      OLogManager.instance().debug(this,"Error on sendind data over the network",t);
+    }
+    OSerializationThreadLocal.INSTANCE.get().clear();
+  }
+}

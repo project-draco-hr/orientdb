@@ -1,0 +1,188 @@
+{
+switch (requestType) {
+case OClusterProtocol.REQUEST_NODE2NODE_CONNECT:
+{
+      commandInfo="Connection from node";
+      remoteNodeId=channel.readString();
+      setName("OrientDB <- Node/" + remoteNodeId);
+      serverLogin(channel.readString(),channel.readString(),"connect");
+      channel.acquireExclusiveLock();
+      try {
+        sendOk(clientTxId);
+      }
+  finally {
+        channel.releaseExclusiveLock();
+      }
+      break;
+    }
+case OClusterProtocol.REQUEST_LEADER2PEER_CONNECT:
+{
+    commandInfo="Connection from leader";
+    final ODocument doc=new ODocument().fromStream(channel.readBytes());
+    final String clusterName=doc.field("clusterName");
+    final byte[] encodedSecurityKey=doc.field("clusterKey");
+    final String leaderAddress=doc.field("leaderNodeAddress");
+    if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getConfig().getSecurityKey()))     throw new OSecurityException("Invalid combination of cluster name and key received");
+    boolean remainTheLeader=false;
+    channel.acquireExclusiveLock();
+    try {
+      sendOk(clientTxId);
+      if (manager.isLeader()) {
+        OLogManager.instance().warn(this,"Received remote connection from the leader node %s, but current node is itself leader: split network problem or high network latency?",leaderAddress);
+        final String myUid=InetAddress.getLocalHost().getHostAddress() + ":" + channel.socket.getLocalPort();
+        if (leaderAddress.compareTo(myUid) > 0) {
+          remainTheLeader=true;
+          OLogManager.instance().warn(this,"Current node remains the Leader of the cluster because it has lower network address",leaderAddress);
+        }
+      }
+      channel.writeByte((byte)(remainTheLeader ? 0 : 1));
+      if (!remainTheLeader) {
+        final ODocument localCfg=manager.getReplicator().getLocalDatabaseConfiguration();
+        channel.writeBytes(localCfg.toStream());
+      }
+    }
+  finally {
+      channel.releaseExclusiveLock();
+      channel.flush();
+    }
+    if (remainTheLeader)     shutdown();
+ else {
+      setName("OrientDB <- Distributed Leader");
+      manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
+      manager.becomePeer(this);
+    }
+    break;
+  }
+case OClusterProtocol.REQUEST_LEADER2PEER_HEARTBEAT:
+checkConnected();
+commandInfo="Cluster Heartbeat";
+manager.updateHeartBeatTime();
+channel.acquireExclusiveLock();
+try {
+sendOk(clientTxId);
+}
+  finally {
+channel.releaseExclusiveLock();
+}
+break;
+case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE:
+{
+commandInfo="Synchronization between nodes";
+final String dbName=channel.readString();
+final ODocument cfg=new ODocument(channel.readBytes());
+if (!databases.containsKey(dbName)) {
+final ODatabaseDocumentTx db=openDatabase(dbName,serverUser.name,serverUser.password);
+databases.put(dbName,db);
+}
+sendOk(clientTxId);
+final ORecordOperation op=new ORecordOperation();
+Collection<ODocument> nodes=cfg.field("nodes");
+for (ODocument nodeCfg : nodes) {
+final String node=nodeCfg.field("node");
+final long lastLog=(Long)nodeCfg.field("lastLog");
+OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,remoteNodeId,lastLog);
+final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
+if (opLog != null) {
+channel.writeByte((byte)1);
+channel.writeString(node);
+int position=opLog.findOperationId(lastLog);
+int sent=0;
+sendOk(clientTxId);
+for (int i=position - 1; i >= 0; --i) {
+channel.writeByte((byte)1);
+opLog.getEntry(i,op);
+channel.writeBytes(op.toStream());
+sent++;
+OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
+}
+channel.writeByte((byte)0);
+}
+}
+channel.writeByte((byte)0);
+manager.getReplicator().startReplication(dbName,remoteNodeId,SYNCH_TYPE.ASYNCH.toString());
+break;
+}
+case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_CHANGE:
+{
+commandInfo="Distributed record change";
+final String dbName=channel.readString();
+final byte operationType=channel.readByte();
+final long operationId=channel.readLong();
+final ORecordId rid=channel.readRID();
+final byte[] buffer=channel.readBytes();
+final int version=channel.readInt();
+final byte recordType=channel.readByte();
+final long result;
+ODatabaseRecord database=databases.get(dbName);
+ODistributedRequesterThreadLocal.INSTANCE.set(true);
+try {
+switch (operationType) {
+case ORecordOperation.CREATED:
+result=createRecord(database,rid,buffer,recordType);
+break;
+case ORecordOperation.UPDATED:
+result=updateRecord(database,rid,buffer,version,recordType);
+break;
+case ORecordOperation.DELETED:
+result=deleteRecord(database,rid,version);
+break;
+default :
+throw new IllegalArgumentException("Received invalid distributed record change operation type: " + operationType);
+}
+}
+  finally {
+ODistributedRequesterThreadLocal.INSTANCE.set(false);
+}
+final ODistributedNode node=manager.getReplicator().getNode(remoteNodeId);
+final ODistributedDatabaseInfo db=node.getDatabase(database.getName());
+db.log.appendLog(operationId,operationType,rid);
+channel.acquireExclusiveLock();
+try {
+sendOk(clientTxId);
+channel.writeLong(result);
+}
+  finally {
+channel.releaseExclusiveLock();
+}
+break;
+}
+case OClusterProtocol.REQUEST_NODE2NODE_DB_COPY:
+{
+checkConnected();
+commandInfo="Importing a database from a remote node";
+final String dbName=channel.readString();
+final String dbUser=channel.readString();
+final String dbPasswd=channel.readString();
+final String engineName=channel.readString();
+try {
+OLogManager.instance().info(this,"<-> DB %s: importing database...",dbName);
+ODatabaseDocumentTx database=getDatabaseInstance(dbName,engineName);
+if (database.exists()) {
+OLogManager.instance().info(this,"<-> DB %s: deleting existent database...",database.getName());
+database.delete();
+}
+database=createDatabase(database,dbUser,dbPasswd);
+if (database.isClosed()) database.open(dbUser,dbPasswd);
+OLogManager.instance().info(this,"<-> DB %s: reading database content via streaming from remote server node...",dbName);
+channel.acquireExclusiveLock();
+try {
+new ODatabaseImport(database,new OChannelBinaryInputStream(channel),this).importDatabase();
+OLogManager.instance().info(this,"<-> DB %s: database imported correctly",dbName);
+sendOk(clientTxId);
+channel.flush();
+}
+  finally {
+channel.releaseExclusiveLock();
+}
+}
+  finally {
+manager.getPeer().updateHeartBeatTime();
+}
+manager.getPeer().updateConfigurationToLeader();
+break;
+}
+default :
+return false;
+}
+return true;
+}

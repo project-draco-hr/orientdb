@@ -1,0 +1,35 @@
+{
+  setDataCommandInfo("Transaction commit");
+  checkDatabase();
+  final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy((ODatabaseRecordTx)connection.database.getUnderlying(),channel);
+  try {
+    connection.database.begin(tx);
+    try {
+      connection.database.commit();
+      beginResponse();
+      try {
+        sendOk(clientTxId);
+        channel.writeInt(tx.getCreatedRecords().size());
+        for (        Entry<ORecordId,ORecord<?>> entry : tx.getCreatedRecords().entrySet()) {
+          channel.writeRID(entry.getKey());
+          channel.writeRID(entry.getValue().getIdentity());
+          if (entry.getValue().getVersion() > 0)           tx.getUpdatedRecords().put((ORecordId)entry.getValue().getIdentity(),entry.getValue());
+        }
+        channel.writeInt(tx.getUpdatedRecords().size());
+        for (        Entry<ORecordId,ORecord<?>> entry : tx.getUpdatedRecords().entrySet()) {
+          channel.writeRID(entry.getKey());
+          channel.writeInt(entry.getValue().getVersion());
+        }
+      }
+  finally {
+        endResponse();
+      }
+    }
+ catch (    Exception e) {
+      connection.database.rollback();
+      sendError(clientTxId,e);
+    }
+  }
+ catch (  OTransactionException e) {
+  }
+}

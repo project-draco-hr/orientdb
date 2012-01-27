@@ -1,0 +1,21 @@
+{
+  setDataCommandInfo("Shutdowning");
+  OLogManager.instance().info(this,"Received shutdown command from the remote client %s:%d",channel.socket.getInetAddress(),channel.socket.getPort());
+  user=channel.readString();
+  passwd=channel.readString();
+  if (OServerMain.server().authenticate(user,passwd,"shutdown")) {
+    OLogManager.instance().info(this,"Remote client %s:%d authenticated. Starting shutdown of server...",channel.socket.getInetAddress(),channel.socket.getPort());
+    beginResponse();
+    try {
+      sendOk(clientTxId);
+    }
+  finally {
+      endResponse();
+    }
+    channel.close();
+    OServerMain.server().shutdown();
+    System.exit(0);
+  }
+  OLogManager.instance().error(this,"Authentication error of remote client %s:%d: shutdown is aborted.",channel.socket.getInetAddress(),channel.socket.getPort());
+  sendError(clientTxId,new OSecurityAccessException("Invalid user/password to shutdown the server"));
+}

@@ -1,0 +1,90 @@
+{
+  setDataCommandInfo("Execute remote command");
+  checkDatabase();
+  final boolean asynch=channel.readByte() == 'a';
+  final OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+  final OQuery<?> query=(OQuery<?>)(command instanceof OQuery<?> ? command : null);
+  connection.data.commandDetail=command.getText();
+  beginResponse();
+  try {
+    if (asynch) {
+      final StringBuilder empty=new StringBuilder();
+      final Set<ODocument> recordsToSend=new HashSet<ODocument>();
+      final int txId=clientTxId;
+      final Map<String,Integer> fetchPlan=query != null ? OFetchHelper.buildFetchPlan(query.getFetchPlan()) : null;
+      command.setResultListener(new OCommandResultListener(){
+        @Override public boolean result(        final Object iRecord){
+          if (empty.length() == 0)           try {
+            sendOk(txId);
+            empty.append("-");
+          }
+ catch (          IOException e1) {
+          }
+          try {
+            channel.writeByte((byte)1);
+            writeIdentifiable((ORecordInternal<?>)iRecord);
+            if (fetchPlan != null && iRecord instanceof ODocument) {
+              final ODocument doc=(ODocument)iRecord;
+              OFetchHelper.fetch(doc,iRecord,doc.fieldNames(),fetchPlan,null,0,-1,new OFetchListener(){
+                @Override public int size(){
+                  return recordsToSend.size();
+                }
+                @Override public Object fetchLinked(                final ODocument iRoot,                final Object iUserObject,                final String iFieldName,                final Object iLinked){
+                  if (iLinked instanceof ODocument)                   return recordsToSend.add((ODocument)iLinked) ? iLinked : null;
+ else                   if (iLinked instanceof Collection<?>)                   return recordsToSend.addAll((Collection<? extends ODocument>)iLinked) ? iLinked : null;
+ else                   if (iLinked instanceof Map<?,?>)                   return recordsToSend.addAll(((Map<String,? extends ODocument>)iLinked).values()) ? iLinked : null;
+ else                   throw new IllegalArgumentException("Unrecognized type while fetching records: " + iLinked);
+                }
+              }
+);
+            }
+          }
+ catch (          IOException e) {
+            return false;
+          }
+          return true;
+        }
+      }
+);
+      ((OCommandRequestInternal)connection.database.command(command)).execute();
+      if (empty.length() == 0)       try {
+        sendOk(clientTxId);
+      }
+ catch (      IOException e1) {
+      }
+      for (      ODocument doc : recordsToSend) {
+        channel.writeByte((byte)2);
+        writeIdentifiable(doc);
+      }
+      channel.writeByte((byte)0);
+    }
+ else {
+      final Object result=((OCommandRequestInternal)connection.database.command(command)).execute();
+      sendOk(clientTxId);
+      if (result == null) {
+        channel.writeByte((byte)'n');
+      }
+ else       if (result instanceof OIdentifiable) {
+        channel.writeByte((byte)'r');
+        writeIdentifiable((OIdentifiable)result);
+      }
+ else       if (result instanceof Collection<?>) {
+        channel.writeByte((byte)'l');
+        final Collection<OIdentifiable> list=(Collection<OIdentifiable>)result;
+        channel.writeInt(list.size());
+        for (        OIdentifiable o : list) {
+          writeIdentifiable(o);
+        }
+      }
+ else {
+        channel.writeByte((byte)'a');
+        final StringBuilder value=new StringBuilder();
+        ORecordSerializerStringAbstract.fieldTypeToString(value,OType.getTypeByClass(result.getClass()),result);
+        channel.writeString(value.toString());
+      }
+    }
+  }
+  finally {
+    endResponse();
+  }
+}

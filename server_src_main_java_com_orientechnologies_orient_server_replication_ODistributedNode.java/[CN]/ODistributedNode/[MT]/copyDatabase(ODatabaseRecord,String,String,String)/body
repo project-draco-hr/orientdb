@@ -1,0 +1,24 @@
+{
+  ODistributedDatabaseInfo db=getDatabase(iDb.getName());
+  if (db != null)   throw new ODistributedSynchronizationException("Database '" + iDb.getName() + "' is already shared on remote server node '"+ id+ "'");
+  if (status != STATUS.ONLINE)   throw new ODistributedSynchronizationException("Cannot share database '" + iDb.getName() + "' on remote server node '"+ id+ "' because is disconnected");
+  final long time=System.currentTimeMillis();
+  db=createDatabaseEntry(iDb.getName(),SYNCH_TYPE.SYNCH,iUserName,iUserPasswd);
+  try {
+    status=STATUS.SYNCHRONIZING;
+    OLogManager.instance().info(this,"<-> DB %s: sharing database exporting to the remote server %s via streaming across the network...",db.databaseName,id);
+    db.connection=new ONodeConnection(replicator,id,replicator.getConflictResolver());
+    db.connection.copy(iDb,db.databaseName,db.userName,db.userPassword,iRemoteEngine);
+    db.connected();
+  }
+ catch (  IOException e) {
+    databases.remove(iDb.getName());
+    throw e;
+  }
+ finally {
+    status=STATUS.ONLINE;
+  }
+  OLogManager.instance().info(this,"<-> DB %s: sharing completed (%dms)",db.databaseName,System.currentTimeMillis() - time);
+  status=STATUS.ONLINE;
+  return db;
+}

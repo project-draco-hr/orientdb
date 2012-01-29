@@ -1,10 +1,24 @@
 {
-  final int[] clusterIds;
-  String firstCluster=compiledFilter.getTargetClusters().keySet().iterator().next();
-  if (firstCluster == null || firstCluster.length() == 0)   throw new OCommandExecutionException("No cluster or schema class selected in query");
   final ODatabaseRecord database=getDatabase();
-  if (Character.isDigit(firstCluster.charAt(0)))   clusterIds=OStringSerializerHelper.splitIntArray(firstCluster);
- else   clusterIds=new int[]{database.getClusterIdByName(firstCluster.toLowerCase())};
-  database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,firstCluster.toLowerCase());
-  scanEntireClusters(clusterIds);
+  final Set<Integer> clusterIds=new HashSet<Integer>();
+  for (  String clusterName : compiledFilter.getTargetClusters().keySet()) {
+    if (clusterName == null || clusterName.length() == 0)     throw new OCommandExecutionException("No cluster or schema class selected in query");
+    database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,clusterName.toLowerCase());
+    if (Character.isDigit(clusterName.charAt(0))) {
+      for (      int clusterId : OStringSerializerHelper.splitIntArray(clusterName)) {
+        if (clusterId == -1)         throw new OCommandExecutionException("Cluster '" + clusterName + "' not found");
+        clusterIds.add(clusterId);
+      }
+    }
+ else {
+      final int clusterId=database.getClusterIdByName(clusterName.toLowerCase());
+      if (clusterId == -1)       throw new OCommandExecutionException("Cluster '" + clusterName + "' not found");
+      clusterIds.add(clusterId);
+    }
+  }
+  final int[] clIds=new int[clusterIds.size()];
+  int i=0;
+  for (  int c : clusterIds)   clIds[i++]=c;
+  final ORID[] range=getRange();
+  target=new ORecordIteratorClusters<ORecordInternal<?>>(database,(ODatabaseRecordAbstract)database,clIds).setRange(range[0],range[1]);
 }

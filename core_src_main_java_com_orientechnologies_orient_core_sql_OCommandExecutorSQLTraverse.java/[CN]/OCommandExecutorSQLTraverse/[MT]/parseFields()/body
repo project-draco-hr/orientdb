@@ -1,0 +1,33 @@
+{
+  int currentPos=0;
+  final StringBuilder word=new StringBuilder();
+  currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
+  if (!word.toString().equals(KEYWORD_TRAVERSE))   return -1;
+  int fromPosition=textUpperCase.indexOf(KEYWORD_FROM_2FIND,currentPos);
+  if (fromPosition == -1)   throw new OQueryParsingException("Missed " + KEYWORD_FROM,text,currentPos);
+  Object projectionValue;
+  final String projectionString=text.substring(currentPos,fromPosition).trim();
+  if (projectionString.length() > 0 && !projectionString.equals("*")) {
+    fields=new LinkedHashMap<String,Object>();
+    final List<String> items=OStringSerializerHelper.smartSplit(projectionString,',');
+    String fieldName;
+    int beginPos;
+    int endPos;
+    for (    String projection : items) {
+      projection=projection.trim();
+      if (fields == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() operator");
+      fieldName=null;
+      beginPos=projection.charAt(0) == '@' ? 1 : 0;
+      endPos=extractProjectionNameSubstringEndPosition(projection);
+      fieldName=endPos > -1 ? projection.substring(beginPos,endPos) : projection.substring(beginPos);
+      fieldName=OStringSerializerHelper.getStringContent(fieldName);
+      for (int fieldIndex=2; fields.containsKey(fieldName); ++fieldIndex) {
+        fieldName+=fieldIndex;
+      }
+      projectionValue=OSQLHelper.parseValue(this,projection);
+      fields.put(fieldName,projectionValue);
+    }
+  }
+  currentPos=fromPosition + KEYWORD_FROM.length() + 1;
+  return currentPos;
+}

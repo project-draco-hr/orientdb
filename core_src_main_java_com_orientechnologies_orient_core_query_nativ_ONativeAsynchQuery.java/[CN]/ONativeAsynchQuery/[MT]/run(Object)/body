@@ -2,8 +2,18 @@
   final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
   if (!(database.getStorage() instanceof OStorageEmbedded))   throw new OCommandExecutionException("Native queries can run only in embedded-local version. Not in the remote one.");
   queryRecord.setSourceQuery(this);
-  final OClass cls=database.getMetadata().getSchema().getClass(cluster);
-  if (cls == null)   throw new OCommandExecutionException("Cluster " + cluster + " was not found");
-  ((OStorageEmbedded)database.getStorage()).browse(cls.getPolymorphicClusterIds(),null,null,this,record,false);
+  final OClass cls=database.getMetadata().getSchema().getClass(className);
+  if (cls == null)   throw new OCommandExecutionException("Class '" + className + "' was not found");
+  final ORecordIteratorClass<ORecordInternal<?>> target=new ORecordIteratorClass<ORecordInternal<?>>(database,(ODatabaseRecordAbstract)database,className,isPolymorphic());
+  for (  OIdentifiable id : target) {
+    final ORecordInternal<?> record=(ORecordInternal<?>)id.getRecord();
+    if (record != null && record.getRecordType() != ODocument.RECORD_TYPE)     continue;
+    queryRecord.setRecord((ODocument)record);
+    if (filter(queryRecord)) {
+      resultCount++;
+      resultListener.result(record.copy());
+      if (limit > -1 && resultCount == limit)       break;
+    }
+  }
   return null;
 }

@@ -1,14 +1,23 @@
 {
   checkDirection(false);
-  ORecordInternal<?> record=getRecord();
-  while (currentClusterIdx > -1) {
-    while (hasPrevious()) {
-      if (record == null)       record=readCurrentRecord(null,-1);
-      if (record != null)       if (record instanceof ODocument)       if (include((ODocument)record))       return (REC)record;
-    }
-    currentClusterIdx--;
-    updateClusterRange();
-    current.clusterPosition=lastClusterPosition + 1;
+  if (currentRecord != null)   try {
+    return (REC)currentRecord;
   }
-  throw new NoSuchElementException();
+  finally {
+    currentRecord=null;
+  }
+  ORecordInternal<?> record=getRecord();
+  while (hasPrevious()) {
+    if (currentRecord != null)     try {
+      return (REC)currentRecord;
+    }
+  finally {
+      currentRecord=null;
+    }
+    if (record == null)     record=readCurrentRecord(null,-1);
+    if (record != null)     if (include(record))     return (REC)record;
+  }
+  record=getTransactionEntry();
+  if (record != null)   return (REC)record;
+  throw new NoSuchElementException("Direction: backward, last position was: " + current + ", range: "+ beginRange+ "-"+ endRange);
 }

@@ -5,29 +5,13 @@
   if (!word.toString().equals(KEYWORD_TRAVERSE))   return -1;
   int fromPosition=textUpperCase.indexOf(KEYWORD_FROM_2FIND,currentPos);
   if (fromPosition == -1)   throw new OQueryParsingException("Missed " + KEYWORD_FROM,text,currentPos);
-  Object projectionValue;
-  final String projectionString=text.substring(currentPos,fromPosition).trim();
-  if (projectionString.length() > 0 && !projectionString.equals("*")) {
-    fields=new LinkedHashMap<String,Object>();
-    final List<String> items=OStringSerializerHelper.smartSplit(projectionString,',');
-    String fieldName;
-    int beginPos;
-    int endPos;
-    for (    String projection : items) {
-      projection=projection.trim();
-      if (fields == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() operator");
-      fieldName=null;
-      beginPos=projection.charAt(0) == '@' ? 1 : 0;
-      endPos=extractProjectionNameSubstringEndPosition(projection);
-      fieldName=endPos > -1 ? projection.substring(beginPos,endPos) : projection.substring(beginPos);
-      fieldName=OStringSerializerHelper.getStringContent(fieldName);
-      for (int fieldIndex=2; fields.containsKey(fieldName); ++fieldIndex) {
-        fieldName+=fieldIndex;
-      }
-      projectionValue=OSQLHelper.parseValue(this,projection);
-      fields.put(fieldName,projectionValue);
-    }
+  final String fieldString=text.substring(currentPos,fromPosition).trim();
+  if (fieldString.length() > 0) {
+    fields=new HashSet<String>();
+    final List<String> items=OStringSerializerHelper.smartSplit(fieldString,',');
+    for (    String field : items)     fields.add(field.trim());
   }
+ else   throw new OQueryParsingException("Missed field list to cross in TRAVERSE. Use TRAVERSE <field> FROM <target> [WHERE <filter>]",text,currentPos);
   currentPos=fromPosition + KEYWORD_FROM.length() + 1;
   return currentPos;
 }

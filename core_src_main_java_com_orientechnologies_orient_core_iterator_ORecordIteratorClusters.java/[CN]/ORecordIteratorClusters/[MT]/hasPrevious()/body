@@ -2,12 +2,18 @@
   checkDirection(false);
   if (limit > -1 && browsedRecords >= limit)   return false;
   if (browsedRecords >= totalAvailableRecords)   return false;
-  if (liveUpdated)   return current.clusterPosition > database.getStorage().getClusterDataRange(current.clusterId)[0];
+  if (liveUpdated)   firstClusterPosition=database.getStorage().getClusterDataRange(current.clusterId)[0];
+  ORecordInternal<?> record=getRecord();
   while (currentClusterIdx > -1) {
-    if (current.clusterPosition > firstClusterPosition)     return true;
+    while (current.clusterPosition > firstClusterPosition) {
+      currentRecord=readCurrentRecord(record,-1);
+      if (currentRecord != null)       if (include(currentRecord))       return true;
+    }
     currentClusterIdx--;
     updateClusterRange();
     current.clusterPosition=lastClusterPosition + 1;
   }
-  return txEntries != null && txEntries.size() - (currentTxEntryPosition + 1) > 0;
+  if (txEntries != null && txEntries.size() - (currentTxEntryPosition + 1) > 0)   return true;
+  currentRecord=null;
+  return false;
 }

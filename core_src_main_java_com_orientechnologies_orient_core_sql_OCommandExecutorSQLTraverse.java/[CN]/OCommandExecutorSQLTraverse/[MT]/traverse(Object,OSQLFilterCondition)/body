@@ -1,0 +1,24 @@
+{
+  if (!(iTarget instanceof OIdentifiable))   return;
+  ((OTraverseContext)context).traversedRecords++;
+  if (((OTraverseContext)context).evaluatedRecords.contains(((OIdentifiable)iTarget).getIdentity()))   return;
+  final ORecord<?> record=((OIdentifiable)iTarget).getRecord();
+  if (!(record instanceof ODocument))   return;
+  final ODocument target=(ODocument)record;
+  if (target.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)   try {
+    target.load();
+  }
+ catch (  final ORecordNotFoundException e) {
+    return;
+  }
+  ((OTraverseContext)context).evaluatedRecords.add(record.getIdentity());
+  final Object conditionResult=iCondition.evaluate(target,context);
+  if (conditionResult != Boolean.TRUE)   return;
+  addResult(target);
+  for (  final String cfgField : fields) {
+    if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equals(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equals(cfgField)) {
+      for (      final String fieldName : target.fieldNames())       traverseField(target.rawField(fieldName),iCondition);
+    }
+ else     traverseField(target.rawField(cfgField),iCondition);
+  }
+}

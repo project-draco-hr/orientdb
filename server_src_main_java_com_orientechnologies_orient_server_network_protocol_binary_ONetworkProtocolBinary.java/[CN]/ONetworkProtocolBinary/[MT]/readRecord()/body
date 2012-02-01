@@ -32,21 +32,9 @@
             final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
             final Set<ODocument> recordsToSend=new HashSet<ODocument>();
             final ODocument doc=(ODocument)record;
-            OFetchHelper.fetch(doc,doc,doc.fieldNames(),fetchPlan,null,0,-1,new OFetchListener(){
-              @Override public int size(){
-                return recordsToSend.size();
-              }
-              @Override public Object fetchLinked(              final ODocument iRoot,              final Object iUserObject,              final String iFieldName,              final Object iLinked){
-                if (iLinked instanceof ODocument) {
-                  if (((ODocument)iLinked).getIdentity().isValid())                   return recordsToSend.add((ODocument)iLinked) ? iLinked : null;
-                  return null;
-                }
- else                 if (iLinked instanceof Collection<?>)                 return recordsToSend.addAll((Collection<? extends ODocument>)iLinked) ? iLinked : null;
- else                 if (iLinked instanceof Map<?,?>)                 return recordsToSend.addAll(((Map<String,? extends ODocument>)iLinked).values()) ? iLinked : null;
- else                 throw new IllegalArgumentException("Unrecognized type while fetching records: " + iLinked);
-              }
-            }
-);
+            final OFetchListener listener=new ORemoteFetchListener(recordsToSend);
+            final OFetchContext context=new ORemoteFetchContext();
+            OFetchHelper.fetch(doc,doc,fetchPlan,listener,context);
             for (            ODocument d : recordsToSend) {
               if (d.getIdentity().isValid()) {
                 channel.writeByte((byte)2);

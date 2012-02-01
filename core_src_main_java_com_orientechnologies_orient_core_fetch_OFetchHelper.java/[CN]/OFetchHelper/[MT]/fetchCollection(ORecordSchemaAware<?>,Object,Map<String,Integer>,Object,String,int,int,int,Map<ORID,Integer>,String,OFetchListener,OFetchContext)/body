@@ -1,0 +1,30 @@
+{
+  final Collection<OIdentifiable> linked;
+  if (fieldValue instanceof ODocument) {
+    linked=new OMVRBTreeRIDSet().fromDocument((ODocument)fieldValue);
+  }
+ else {
+    linked=(Collection<OIdentifiable>)fieldValue;
+  }
+  iContext.onBeforeCollection(iRootRecord,fieldName,iUserObject,linked);
+  for (  OIdentifiable d : linked) {
+    final Integer fieldDepthLevel=parsedRecords.get(d.getIdentity());
+    if (!d.getIdentity().isValid() || (fieldDepthLevel != null && fieldDepthLevel.intValue() == iLevelFromRoot)) {
+      removeParsedFromMap(parsedRecords,d);
+      d=d.getRecord();
+      if (!(d instanceof ODocument)) {
+        iListener.processStandardField(null,d,fieldName,iContext);
+      }
+ else {
+        iContext.onBeforeDocument((ODocument)d,fieldName,iUserObject);
+        final Object userObject=iListener.fetchLinkedCollectionValue(iRootRecord,iUserObject,fieldName,(ODocument)d,iContext);
+        processRecord((ODocument)d,userObject,iFetchPlan,iCurrentLevel,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
+        iContext.onAfterDocument((ODocument)d,fieldName,iUserObject);
+      }
+    }
+ else {
+      iListener.parseLinked(iRootRecord,d,iUserObject,fieldName,iContext);
+    }
+  }
+  iContext.onAfterCollection(iRootRecord,fieldName,iUserObject);
+}

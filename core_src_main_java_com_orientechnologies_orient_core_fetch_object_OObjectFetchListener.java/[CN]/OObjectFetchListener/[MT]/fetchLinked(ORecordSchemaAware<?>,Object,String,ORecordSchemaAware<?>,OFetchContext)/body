@@ -1,0 +1,22 @@
+{
+  if (iUserObject == null)   return null;
+  final Class<?> type;
+  if (iLinked != null && iLinked instanceof ODocument)   type=OObjectSerializerHelper.getFieldType((ODocument)iLinked,((OObjectFetchContext)iContext).getEntityManager());
+ else   type=OObjectSerializerHelper.getFieldType(iUserObject,iFieldName);
+  if (type == null)   throw new OSerializationException("Linked type of field '" + iRoot.getClassName() + "."+ iFieldName+ "' is unknown. Probably needs to be registered with <db>.getEntityManager().registerEntityClasses(<package>) or <db>.getEntityManager().registerEntityClass(<class>) or the package cannot be loaded correctly due to a classpath problem. In this case register the single classes one by one.");
+  Object fieldValue=null;
+  Class<?> fieldClass;
+  if (type.isEnum()) {
+    String enumName=((ODocument)iLinked).field(iFieldName);
+    Class<Enum> enumClass=(Class<Enum>)type;
+    fieldValue=Enum.valueOf(enumClass,enumName);
+  }
+ else {
+    fieldClass=((OObjectFetchContext)iContext).getEntityManager().getEntityClass(type.getSimpleName());
+    if (fieldClass != null) {
+      fieldValue=((OObjectFetchContext)iContext).getObj2RecHandler().getUserObjectByRecord((ODocument)iLinked,((OObjectFetchContext)iContext).getFetchPlan());
+    }
+  }
+  OObjectSerializerHelper.setFieldValue(iUserObject,iFieldName,OObjectSerializerHelper.unserializeFieldValue(iUserObject,iFieldName,fieldValue));
+  return fieldValue;
+}

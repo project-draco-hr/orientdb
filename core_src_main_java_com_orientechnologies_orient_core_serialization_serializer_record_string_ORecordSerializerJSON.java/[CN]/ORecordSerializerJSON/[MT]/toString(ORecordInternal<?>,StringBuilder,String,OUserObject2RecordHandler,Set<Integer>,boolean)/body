@@ -2,7 +2,6 @@
   try {
     final StringWriter buffer=new StringWriter();
     final OJSONWriter json=new OJSONWriter(buffer,iFormat);
-    final Map<ORID,Integer> parsedRecords=new HashMap<ORID,Integer>();
     boolean includeVer;
     boolean includeType;
     boolean includeId;
@@ -40,15 +39,10 @@
  else       if (f.startsWith("keepTypes"))       keepTypes=true;
     }
     json.beginObject(indentLevel);
-    writeSignature(json,indentLevel,includeType,includeId,includeVer,includeClazz,attribSameRow,iRecord);
+    OJSONFetchContext context=new OJSONFetchContext(json,includeType,includeId,includeVer,includeClazz,attribSameRow,keepTypes);
+    context.writeSignature(json,indentLevel,includeType,includeId,includeVer,includeClazz,attribSameRow,iRecord);
     if (iRecord instanceof ORecordSchemaAware<?>) {
-      final ORecordSchemaAware<?> record=(ORecordSchemaAware<?>)iRecord;
-      if (iRecord.getIdentity().isValid())       parsedRecords.put(iRecord.getIdentity(),0);
-      Map<String,Integer> fetchPlanMap=null;
-      if (fetchPlan == null || fetchPlan.isEmpty())       fetchPlan="*:1";
-      fetchPlanMap=OFetchHelper.buildFetchPlan(fetchPlan);
-      processRecordRidMap(record,fetchPlanMap,0,-1,parsedRecords);
-      processRecord(json,indentLevel,includeType,includeId,includeVer,includeClazz,attribSameRow,record,fetchPlanMap,keepTypes,0,-1,parsedRecords);
+      OFetchHelper.fetch(iRecord,null,OFetchHelper.buildFetchPlan(fetchPlan),new OJSONFetchListener(),context);
     }
  else     if (iRecord instanceof ORecordStringable) {
       final ORecordStringable record=(ORecordStringable)iRecord;
@@ -60,7 +54,6 @@
     }
  else     throw new OSerializationException("Error on marshalling record of type '" + iRecord.getClass() + "' to JSON. The record type cannot be exported to JSON");
     json.endObject(indentLevel);
-    parsedRecords.clear();
     iOutput.append(buffer);
     return iOutput;
   }

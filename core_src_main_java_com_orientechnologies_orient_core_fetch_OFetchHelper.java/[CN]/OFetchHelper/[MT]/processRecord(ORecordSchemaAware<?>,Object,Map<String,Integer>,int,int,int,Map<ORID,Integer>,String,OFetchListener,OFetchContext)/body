@@ -1,0 +1,33 @@
+{
+  Object fieldValue;
+  iContext.onBeforeFetch(record);
+  for (  String fieldName : record.fieldNames()) {
+    String fieldPath=!iFieldPathFromRoot.isEmpty() ? iFieldPathFromRoot + "." + fieldName : fieldName;
+    final int depthLevel;
+    if (iFieldDepthLevel > -1) {
+      depthLevel=iFieldDepthLevel;
+    }
+ else {
+      depthLevel=getDepthLevel(iFetchPlan,fieldPath);
+    }
+    fieldValue=record.field(fieldName);
+    if (fieldValue == null || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof Collection<?>) || ((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof OIdentifiable)) && (!(fieldValue instanceof Map<?,?>) || ((Map<?,?>)fieldValue).size() == 0 || !(((Map<?,?>)fieldValue).values().iterator().next() instanceof OIdentifiable))) {
+      iContext.onBeforeStandardField(fieldValue,fieldName,iUserObject);
+      iListener.processStandardField(record,fieldValue,fieldName,iContext);
+      iContext.onAfterStandardField(fieldValue,fieldName,iUserObject);
+    }
+ else {
+      try {
+        if (!iFetchPlan.containsKey(fieldPath) && depthLevel > -1 && iCurrentLevel > depthLevel) {
+          continue;
+        }
+        fetch(record,iUserObject,iFetchPlan,fieldValue,fieldName,iCurrentLevel,iLevelFromRoot + 1,iFieldDepthLevel,parsedRecords,depthLevel,fieldPath,iListener,iContext);
+      }
+ catch (      Exception e) {
+        e.printStackTrace();
+        OLogManager.instance().error(null,"Fetching error on record %s",e,record.getIdentity());
+      }
+    }
+  }
+  iContext.onAfterFetch(record);
+}

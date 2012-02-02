@@ -19,11 +19,21 @@
   addResult(target);
   ((OTraverseContext)context).depth++;
   try {
-    for (    final String cfgField : fields) {
+    for (    String cfgField : fields) {
       if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equals(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equals(cfgField)) {
         for (        final String fieldName : target.fieldNames())         traverseField(target.rawField(fieldName),iCondition);
       }
- else       traverseField(target.rawField(cfgField),iCondition);
+ else {
+        final int pos=cfgField.indexOf('.');
+        if (pos > -1) {
+          final OClass cls=target.getSchemaClass();
+          if (cls == null)           continue;
+          final String className=cfgField.substring(0,pos);
+          if (!cls.isSubClassOf(className))           continue;
+          cfgField=cfgField.substring(pos + 1);
+        }
+        traverseField(target.rawField(cfgField),iCondition);
+      }
     }
   }
   finally {

@@ -1,0 +1,31 @@
+{
+  final ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.get();
+  final Map<ORID,Set<ORID>> map=new HashMap<ORID,Set<ORID>>();
+  for (  ORID rid : iRecordIds) {
+    map.put(rid,new HashSet<ORID>());
+  }
+  if (classList == null || classList.isEmpty()) {
+    for (    String clusterName : db.getClusterNames()) {
+      browseCluster(db,iRecordIds,map,clusterName);
+    }
+  }
+ else {
+    List<String> classes=OStringSerializerHelper.smartSplit(classList,',');
+    for (    String clazz : classes) {
+      if (clazz.startsWith("CLUSTER:")) {
+        browseCluster(db,iRecordIds,map,clazz.substring(clazz.indexOf("CLUSTER:") + "CLUSTER:".length()));
+      }
+ else {
+        browseClass(db,iRecordIds,map,clazz);
+      }
+    }
+  }
+  final List<ODocument> result=new ArrayList<ODocument>();
+  for (  Entry<ORID,Set<ORID>> entry : map.entrySet()) {
+    final ODocument doc=new ODocument();
+    result.add(doc);
+    doc.field("rid",entry.getKey());
+    doc.field("referredBy",entry.getValue());
+  }
+  return result;
+}

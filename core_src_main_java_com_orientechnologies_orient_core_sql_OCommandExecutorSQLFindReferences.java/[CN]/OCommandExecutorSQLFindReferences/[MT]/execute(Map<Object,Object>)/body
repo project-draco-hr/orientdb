@@ -1,22 +1,8 @@
 {
-  if (recordId == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final ODatabaseRecord database=getDatabase();
-  final Set<ORID> result=new HashSet<ORID>();
-  if (classList == null || classList.equals("")) {
-    for (    String clusterName : database.getClusterNames()) {
-      browseCluster(clusterName,result);
-    }
+  if (recordIds.isEmpty() && subQuery == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  if (subQuery != null) {
+    final List<OIdentifiable> result=new OCommandSQL(subQuery.toString()).execute();
+    for (    OIdentifiable id : result)     recordIds.add(id.getIdentity());
   }
- else {
-    List<String> classes=OStringSerializerHelper.smartSplit(classList,',');
-    for (    String clazz : classes) {
-      if (clazz.startsWith("CLUSTER:")) {
-        browseCluster(clazz.substring(clazz.indexOf("CLUSTER:") + "CLUSTER:".length()),result);
-      }
- else {
-        browseClass(clazz,result);
-      }
-    }
-  }
-  return new ArrayList<ORID>(result);
+  return OFindReferenceHelper.findReferences(recordIds,classList);
 }

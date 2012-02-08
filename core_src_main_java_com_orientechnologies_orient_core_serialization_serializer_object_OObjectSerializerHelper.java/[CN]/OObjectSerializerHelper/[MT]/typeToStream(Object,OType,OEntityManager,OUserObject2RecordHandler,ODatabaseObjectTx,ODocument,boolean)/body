@@ -1,0 +1,30 @@
+{
+  if (iFieldValue == null)   return null;
+  if (!OType.isSimpleType(iFieldValue)) {
+    Class<?> fieldClass=iFieldValue.getClass();
+    if (fieldClass.isArray()) {
+      iFieldValue=multiValueToStream(Arrays.asList(iFieldValue),iType,iEntityManager,iObj2RecHandler,db,iRecord,iSaveOnlyDirty);
+    }
+ else     if (Collection.class.isAssignableFrom(fieldClass)) {
+      iFieldValue=multiValueToStream(iFieldValue,iType,iEntityManager,iObj2RecHandler,db,iRecord,iSaveOnlyDirty);
+    }
+ else     if (Map.class.isAssignableFrom(fieldClass)) {
+      iFieldValue=multiValueToStream(iFieldValue,iType,iEntityManager,iObj2RecHandler,db,iRecord,iSaveOnlyDirty);
+    }
+ else     if (fieldClass.isEnum()) {
+      iFieldValue=((Enum<?>)iFieldValue).name();
+      iType=OType.STRING;
+    }
+ else {
+      fieldClass=iEntityManager.getEntityClass(fieldClass.getSimpleName());
+      if (fieldClass != null) {
+        final ODocument linkedDocument=(ODocument)iObj2RecHandler.getRecordByUserObject(iFieldValue,true);
+        final Object pojo=iFieldValue;
+        iFieldValue=toStream(pojo,linkedDocument,iEntityManager,linkedDocument.getSchemaClass(),iObj2RecHandler,db,iSaveOnlyDirty);
+        iObj2RecHandler.registerUserObject(pojo,linkedDocument);
+      }
+ else       throw new OSerializationException("Linked type [" + iFieldValue.getClass() + ":"+ iFieldValue+ "] cannot be serialized because is not part of registered entities. To fix this error register this class");
+    }
+  }
+  return iFieldValue;
+}

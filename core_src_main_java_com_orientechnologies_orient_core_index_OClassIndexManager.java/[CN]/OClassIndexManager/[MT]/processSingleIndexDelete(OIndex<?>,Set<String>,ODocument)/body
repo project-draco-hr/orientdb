@@ -1,0 +1,30 @@
+{
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  final List<String> indexFields=indexDefinition.getFields();
+  if (indexFields.isEmpty()) {
+    return false;
+  }
+  final String indexField=indexFields.iterator().next();
+  if (dirtyFields.contains(indexField)) {
+    final OMultiValueChangeTimeLine<?,?> multiValueChangeTimeLine=iRecord.getCollectionTimeLine(indexField);
+    final Object origValue;
+    if (multiValueChangeTimeLine != null) {
+      final OTrackedMultiValue fieldValue=iRecord.field(indexField);
+      final Object restoredMultiValue=fieldValue.returnOriginalState(multiValueChangeTimeLine.getMultiValueChangeEvents());
+      origValue=indexDefinition.createValue(restoredMultiValue);
+    }
+ else     origValue=indexDefinition.createValue(iRecord.getOriginalValue(indexField));
+    if (origValue instanceof Collection) {
+      for (      final Object valueItem : (Collection<?>)origValue) {
+        if (valueItem != null) {
+          index.remove(valueItem,iRecord);
+        }
+      }
+    }
+ else     if (origValue != null) {
+      index.remove(origValue,iRecord);
+    }
+    return true;
+  }
+  return false;
+}

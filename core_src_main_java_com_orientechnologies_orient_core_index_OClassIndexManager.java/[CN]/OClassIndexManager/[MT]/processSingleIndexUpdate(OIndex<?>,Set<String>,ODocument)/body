@@ -1,0 +1,58 @@
+{
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  final List<String> indexFields=indexDefinition.getFields();
+  if (indexFields.isEmpty())   return;
+  final String indexField=indexFields.get(0);
+  if (!dirtyFields.contains(indexField))   return;
+  final OMultiValueChangeTimeLine<?,?> multiValueChangeTimeLine=iRecord.getCollectionTimeLine(indexField);
+  if (multiValueChangeTimeLine != null) {
+    final OIndexDefinitionMultiValue indexDefinitionMultiValue=(OIndexDefinitionMultiValue)indexDefinition;
+    final Map<Object,Integer> keysToAdd=new HashMap<Object,Integer>();
+    final Map<Object,Integer> keysToRemove=new HashMap<Object,Integer>();
+    for (    OMultiValueChangeEvent changeEvent : multiValueChangeTimeLine.getMultiValueChangeEvents()) {
+      indexDefinitionMultiValue.processChangeEvent(changeEvent,keysToAdd,keysToRemove);
+    }
+    for (    final Object keyToRemove : keysToRemove.keySet())     index.remove(keyToRemove,iRecord);
+    for (    final Object keyToAdd : keysToAdd.keySet())     index.put(keyToAdd,iRecord.placeholder());
+  }
+ else {
+    final Object origValue=indexDefinition.createValue(iRecord.getOriginalValue(indexField));
+    final Object newValue=indexDefinition.getDocumentValueToIndex(iRecord);
+    if ((origValue instanceof Collection) && (newValue instanceof Collection)) {
+      final Set<Object> valuesToRemove=new HashSet<Object>((Collection<?>)origValue);
+      final Set<Object> valuesToAdd=new HashSet<Object>((Collection<?>)newValue);
+      valuesToRemove.removeAll((Collection<?>)newValue);
+      valuesToAdd.removeAll((Collection<?>)origValue);
+      for (      final Object valueToRemove : valuesToRemove) {
+        if (valueToRemove != null) {
+          index.remove(valueToRemove,iRecord);
+        }
+      }
+      for (      final Object valueToAdd : valuesToAdd) {
+        if (valueToAdd != null) {
+          index.put(valueToAdd,iRecord);
+        }
+      }
+    }
+ else {
+      if (origValue instanceof Collection) {
+        for (        final Object origValueItem : (Collection<?>)origValue) {
+          if (origValueItem != null) {
+            index.remove(origValueItem,iRecord);
+          }
+        }
+      }
+ else       if (origValue != null) {
+        index.remove(origValue,iRecord);
+      }
+      if (newValue instanceof Collection) {
+        for (        final Object newValueItem : (Collection<?>)newValue) {
+          index.put(newValueItem,iRecord.placeholder());
+        }
+      }
+ else       if (newValue != null) {
+        index.put(newValue,iRecord.placeholder());
+      }
+    }
+  }
+}

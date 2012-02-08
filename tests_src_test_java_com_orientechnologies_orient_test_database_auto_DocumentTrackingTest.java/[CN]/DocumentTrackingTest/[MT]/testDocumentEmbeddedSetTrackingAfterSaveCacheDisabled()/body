@@ -1,0 +1,26 @@
+{
+  database.getLevel1Cache().clear();
+  database.getLevel2Cache().clear();
+  database.getLevel1Cache().setEnable(false);
+  database.getLevel2Cache().setEnable(false);
+  final ODocument document=new ODocument();
+  final Set<String> set=new HashSet<String>();
+  set.add("value1");
+  document.field("embeddedset",set,OType.EMBEDDEDSET);
+  document.field("val",1);
+  document.save();
+  Assert.assertFalse(document.isDirty());
+  Assert.assertEquals(document.getDirtyFields(),new String[]{});
+  final Set<String> trackedSet=document.field("embeddedset");
+  trackedSet.add("value2");
+  Assert.assertTrue(document.isDirty());
+  final OMultiValueChangeTimeLine timeLine=document.getCollectionTimeLine("embeddedset");
+  Assert.assertNotNull(timeLine);
+  Assert.assertNotNull(timeLine.getMultiValueChangeEvents());
+  final List<OMultiValueChangeEvent> firedEvents=new ArrayList<OMultiValueChangeEvent>();
+  firedEvents.add(new OMultiValueChangeEvent(OMultiValueChangeEvent.OChangeType.ADD,"value2","value2"));
+  Assert.assertEquals(timeLine.getMultiValueChangeEvents(),firedEvents);
+  Assert.assertEquals(document.getDirtyFields(),new String[]{"embeddedset"});
+  database.getLevel1Cache().setEnable(true);
+  database.getLevel2Cache().setEnable(true);
+}

@@ -1,0 +1,25 @@
+{
+  final ODocument doc=new ODocument();
+  doc.unsetDirty();
+  Assert.assertFalse(doc.isDirty());
+  final OTrackedSet<String> trackedSet=new OTrackedSet<String>(doc);
+  trackedSet.add("value1");
+  trackedSet.add("value2");
+  trackedSet.add("value3");
+  doc.unsetDirty();
+  Assert.assertFalse(doc.isDirty());
+  final ORef<Boolean> changed=new ORef<Boolean>(false);
+  trackedSet.addChangeListener(new OMultiValueChangeListener<String,String>(){
+    public void onAfterRecordChanged(    final OMultiValueChangeEvent<String,String> event){
+      Assert.assertEquals(event.getChangeType(),OMultiValueChangeEvent.OChangeType.REMOVE);
+      Assert.assertEquals(event.getOldValue(),"value2");
+      Assert.assertEquals(event.getKey(),"value2");
+      Assert.assertNull(event.getValue());
+      changed.value=true;
+    }
+  }
+);
+  trackedSet.remove("value2");
+  Assert.assertTrue(changed.value);
+  Assert.assertTrue(doc.isDirty());
+}

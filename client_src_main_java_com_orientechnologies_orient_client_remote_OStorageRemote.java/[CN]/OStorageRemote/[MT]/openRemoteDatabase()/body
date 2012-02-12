@@ -1,9 +1,11 @@
 {
   minPool=OGlobalConfiguration.CLIENT_CHANNEL_MIN_POOL.getValueAsInteger();
   maxPool=OGlobalConfiguration.CLIENT_CHANNEL_MAX_POOL.getValueAsInteger();
+  connectionDbType=ODatabaseDocument.TYPE;
   if (connectionOptions != null && connectionOptions.size() > 0) {
     if (connectionOptions.containsKey(PARAM_MIN_POOL))     minPool=Integer.parseInt(connectionOptions.get(PARAM_MIN_POOL).toString());
     if (connectionOptions.containsKey(PARAM_MAX_POOL))     maxPool=Integer.parseInt(connectionOptions.get(PARAM_MAX_POOL).toString());
+    if (connectionOptions.containsKey(PARAM_DB_TYPE))     connectionDbType=connectionOptions.get(PARAM_DB_TYPE).toString();
   }
   setSessionId(-1);
   createConnectionPool();
@@ -11,7 +13,10 @@
   try {
     network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_OPEN);
     sendClientInfo(network);
-    network.writeString(name).writeString(connectionUserName).writeString(connectionUserPassword);
+    network.writeString(name);
+    if (network.getSrvProtocolVersion() >= 8)     network.writeString(connectionDbType);
+    network.writeString(connectionUserName);
+    network.writeString(connectionUserPassword);
   }
   finally {
     endRequest(network);

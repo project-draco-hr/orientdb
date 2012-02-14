@@ -17,7 +17,7 @@
     if (iRecord.containsField(fieldName)) {
       fieldValue=iRecord.field(fieldName);
       if (fieldValue == null || !(fieldValue instanceof ODocument) || (fieldValue instanceof Collection<?> && (((Collection<?>)fieldValue).size() == 0 || !(((Collection<?>)fieldValue).iterator().next() instanceof ODocument))) || (!(fieldValue instanceof Map<?,?>) || ((Map<?,?>)fieldValue).size() == 0 || !(((Map<?,?>)fieldValue).values().iterator().next() instanceof ODocument))) {
-        final Class<?> genericTypeClass=getGenericMultivalueType(p);
+        final Class<?> genericTypeClass=OReflectionHelper.getGenericMultivalueType(p);
         if (genericTypeClass != null)         if (genericTypeClass.isEnum()) {
           if (fieldValue instanceof List) {
             final List<Object> list=(List<Object>)fieldValue;
@@ -29,6 +29,7 @@
                 list.set(i,v);
               }
             }
+            continue;
           }
  else           if (fieldValue instanceof Set) {
             final Set<Object> newColl=new HashSet<Object>();
@@ -39,7 +40,8 @@
                 newColl.add(v);
               }
             }
-            fieldValue=newColl;
+            setFieldValue(iPojo,fieldName,newColl);
+            continue;
           }
  else           if (fieldValue instanceof Map) {
             final Map<String,Object> map=(Map<String,Object>)fieldValue;
@@ -51,6 +53,7 @@
                 map.put(entry.getKey(),v);
               }
             }
+            continue;
           }
         }
  else {
@@ -59,25 +62,29 @@
             Object v;
             for (int i=0; i < list.size(); ++i) {
               v=list.get(i);
-              if (v != null)               list.set(i,unserializeFieldValue(null,null,v));
+              if (v != null)               list.set(i,unserializeFieldValue(genericTypeClass,v));
             }
+            continue;
           }
  else           if (fieldValue instanceof Set) {
             final Set<Object> newColl=new HashSet<Object>();
             final Set<Object> set=(Set<Object>)fieldValue;
-            for (            Object v : set)             if (v != null)             newColl.add(unserializeFieldValue(null,null,v));
-            fieldValue=newColl;
+            for (            Object v : set)             if (v != null)             newColl.add(unserializeFieldValue(genericTypeClass,v));
+            setFieldValue(iPojo,fieldName,newColl);
+            continue;
           }
  else           if (fieldValue instanceof Map) {
             final Map<String,Object> map=(Map<String,Object>)fieldValue;
             Object v;
             for (            Entry<String,?> entry : map.entrySet()) {
               v=entry.getValue();
-              if (v != null)               map.put(entry.getKey(),unserializeFieldValue(null,null,v));
+              if (v != null)               map.put(entry.getKey(),unserializeFieldValue(genericTypeClass,v));
             }
+            continue;
           }
         }
-        setFieldValue(iPojo,fieldName,unserializeFieldValue(iPojo,fieldName,fieldValue));
+        final Type type=p.getGenericType();
+        setFieldValue(iPojo,fieldName,unserializeFieldValue((Class<?>)(type != null && type instanceof Class<?> ? type : null),fieldValue));
       }
     }
   }

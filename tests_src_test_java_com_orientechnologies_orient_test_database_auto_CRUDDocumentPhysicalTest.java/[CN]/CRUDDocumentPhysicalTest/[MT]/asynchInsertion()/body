@@ -1,28 +1,32 @@
 {
   database=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
-  startRecordNumber=database.countClusterElements("Account");
-  for (long i=startRecordNumber; i < startRecordNumber + TOT_RECORDS; ++i) {
-    record.reset();
-    record.setClassName("Account");
-    record.field("id",i);
-    record.field("name","Asynch insertion test");
-    record.field("location","Italy");
-    record.field("salary",(i + 300));
-    database.save(record,OPERATION_MODE.ASYNCHRONOUS);
-  }
-  final ODatabaseDocumentTx db=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
-  long tot;
-  while ((tot=db.countClusterElements("Account")) < startRecordNumber + TOT_RECORDS) {
-    System.out.println("Asynchronous insertion: found " + tot + " records but waiting till "+ (startRecordNumber + TOT_RECORDS)+ " is reached");
-    try {
-      Thread.sleep(100);
+  try {
+    startRecordNumber=database.countClusterElements("Account");
+    for (long i=startRecordNumber; i < startRecordNumber + TOT_RECORDS; ++i) {
+      record.reset();
+      record.setClassName("Account");
+      record.field("id",i);
+      record.field("name","Asynch insertion test");
+      record.field("location","Italy");
+      record.field("salary",(i + 300));
+      database.save(record,OPERATION_MODE.ASYNCHRONOUS);
     }
- catch (    InterruptedException e) {
+    final ODatabaseDocumentTx db=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
+    long tot;
+    while ((tot=db.countClusterElements("Account")) < startRecordNumber + TOT_RECORDS) {
+      System.out.println("Asynchronous insertion: found " + tot + " records but waiting till "+ (startRecordNumber + TOT_RECORDS)+ " is reached");
+      try {
+        Thread.sleep(100);
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+    db.close();
+    for (    ODocument d : database.browseClass("Account")) {
+      if (d.field("name").equals("Asynch insertion test"))       d.delete();
     }
   }
-  db.close();
-  for (  ODocument d : database.browseClass("Account")) {
-    if (d.field("name").equals("Asynch insertion test"))     d.delete();
+  finally {
+    database.close();
   }
-  database.close();
 }

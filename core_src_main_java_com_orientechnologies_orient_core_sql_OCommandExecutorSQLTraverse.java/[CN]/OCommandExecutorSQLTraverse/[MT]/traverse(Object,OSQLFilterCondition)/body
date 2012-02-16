@@ -1,27 +1,26 @@
 {
   if (!(iTarget instanceof OIdentifiable))   return;
-  ((OTraverseContext)context).traversedRecords++;
-  if (((OTraverseContext)context).evaluatedRecords.contains(((OIdentifiable)iTarget).getIdentity()))   return;
   final ORecord<?> record=((OIdentifiable)iTarget).getRecord();
   if (!(record instanceof ODocument))   return;
   final ODocument target=(ODocument)record;
+  if (((OTraverseContext)context).traversed.contains(target.getIdentity()))   return;
   if (target.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)   try {
     target.load();
   }
  catch (  final ORecordNotFoundException e) {
     return;
   }
-  ((OTraverseContext)context).evaluatedRecords.add(record.getIdentity());
   if (iCondition != null) {
     final Object conditionResult=iCondition.evaluate(target,context);
     if (conditionResult != Boolean.TRUE)     return;
   }
   addResult(target);
-  ((OTraverseContext)context).depth++;
+  ((OTraverseContext)context).traversed.add(target.getIdentity());
+  ((OTraverseContext)context).history.add(target.getIdentity());
   try {
     for (    String cfgField : fields) {
       if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equals(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equals(cfgField)) {
-        for (        final String fieldName : target.fieldNames())         traverseField(target.rawField(fieldName),iCondition);
+        for (        final String fieldName : target.fieldNames())         traverseField(target,fieldName,iCondition);
       }
  else {
         final int pos=cfgField.indexOf('.');
@@ -32,11 +31,11 @@
           if (!cls.isSubClassOf(className))           continue;
           cfgField=cfgField.substring(pos + 1);
         }
-        traverseField(target.rawField(cfgField),iCondition);
+        traverseField(target,cfgField,iCondition);
       }
     }
   }
   finally {
-    ((OTraverseContext)context).depth--;
+    ((OTraverseContext)context).history.remove(((OTraverseContext)context).history.size() - 1);
   }
 }

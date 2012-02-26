@@ -1,0 +1,20 @@
+{
+  Collector collector=new Collector();
+  collector.setStringCollection(new ArrayList<String>(Arrays.asList("spam","eggs")));
+  database.save(collector);
+  database.begin();
+  Collector loadedCollector=(Collector)database.load(new ORecordId(collector.getId()));
+  loadedCollector.getStringCollection().add("cookies");
+  database.save(loadedCollector);
+  database.rollback();
+  List<ODocument> result=database.command(new OCommandSQL("select key, rid from index:Collector.stringCollection")).execute();
+  Assert.assertNotNull(result);
+  Assert.assertEquals(result.size(),2);
+  for (  ODocument d : result) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals("spam") && !d.field("key").equals("eggs")) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+}

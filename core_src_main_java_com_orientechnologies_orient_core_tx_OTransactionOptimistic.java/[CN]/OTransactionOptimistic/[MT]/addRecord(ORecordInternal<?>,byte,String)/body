@@ -1,15 +1,19 @@
 {
   checkTransaction();
+  invokeBeforeRecordListener(iStatus,iRecord);
   if ((status == OTransaction.TXSTATUS.COMMITTING) && database.getStorage() instanceof OStorageEmbedded) {
 switch (iStatus) {
 case ORecordOperation.CREATED:
 case ORecordOperation.UPDATED:
-      database.executeSaveRecord(iRecord,iClusterName,iRecord.getVersion(),iRecord.getRecordType(),OPERATION_MODE.SYNCHRONOUS);
-    break;
+      ORID prevRid=new ORecordId(iRecord.getIdentity());
+    database.executeSaveRecord(iRecord,iClusterName,iRecord.getVersion(),iRecord.getRecordType(),OPERATION_MODE.SYNCHRONOUS);
+  if (prevRid.isNew())   updateIndexIdentityAfterCommit(prevRid,iRecord.getIdentity());
+break;
 case ORecordOperation.DELETED:
-  database.executeDeleteRecord(iRecord,iRecord.getVersion(),false,OPERATION_MODE.SYNCHRONOUS);
+database.executeDeleteRecord(iRecord,iRecord.getVersion(),false,OPERATION_MODE.SYNCHRONOUS);
 break;
 }
+invokeAfterRecordListener(iStatus,iRecord);
 }
  else {
 final ORecordId rid=(ORecordId)iRecord.getIdentity();
@@ -24,6 +28,7 @@ ORecordOperation txEntry=getRecordEntry(rid);
 if (txEntry == null) {
 txEntry=new ORecordOperation(iRecord,iStatus);
 recordEntries.put(rid,txEntry);
+invokeAfterRecordListener(iStatus,iRecord);
 }
  else {
 txEntry.record=iRecord;
@@ -31,10 +36,12 @@ switch (txEntry.type) {
 case ORecordOperation.LOADED:
 switch (iStatus) {
 case ORecordOperation.UPDATED:
-  txEntry.type=ORecordOperation.UPDATED;
+txEntry.type=ORecordOperation.UPDATED;
+invokeAfterRecordListener(iStatus,iRecord);
 break;
 case ORecordOperation.DELETED:
 txEntry.type=ORecordOperation.DELETED;
+invokeAfterRecordListener(iStatus,iRecord);
 break;
 }
 break;
@@ -42,6 +49,10 @@ case ORecordOperation.UPDATED:
 switch (iStatus) {
 case ORecordOperation.DELETED:
 txEntry.type=ORecordOperation.DELETED;
+invokeAfterRecordListener(iStatus,iRecord);
+break;
+case ORecordOperation.UPDATED:
+invokeAfterRecordListener(iStatus,iRecord);
 break;
 }
 break;
@@ -51,6 +62,10 @@ case ORecordOperation.CREATED:
 switch (iStatus) {
 case ORecordOperation.DELETED:
 recordEntries.remove(rid);
+invokeAfterRecordListener(iStatus,iRecord);
+break;
+case ORecordOperation.UPDATED:
+invokeAfterRecordListener(iStatus,iRecord);
 break;
 }
 break;

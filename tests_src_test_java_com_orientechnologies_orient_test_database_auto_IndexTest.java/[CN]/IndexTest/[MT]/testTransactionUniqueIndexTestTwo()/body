@@ -1,0 +1,27 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(database.getURL());
+  db.open("admin","admin");
+  if (!db.getMetadata().getSchema().existsClass("TransactionUniqueIndexTest")) {
+    final OClass termClass=db.getMetadata().getSchema().createClass("TransactionUniqueIndexTest");
+    termClass.createProperty("label",OType.STRING);
+    termClass.createIndex("idxTransactionUniqueIndexTest",INDEX_TYPE.UNIQUE,"label");
+    db.getMetadata().getSchema().save();
+  }
+  final List<ODocument> resultBeforeCommit=db.query(new OSQLSynchQuery<ODocument>("select from TransactionUniqueIndexTest"));
+  Assert.assertEquals(resultBeforeCommit.size(),1);
+  db.begin();
+  try {
+    ODocument docOne=new ODocument("TransactionUniqueIndexTest");
+    docOne.field("label","B");
+    docOne.save();
+    ODocument docTwo=new ODocument("TransactionUniqueIndexTest");
+    docTwo.field("label","B");
+    docTwo.save();
+    db.commit();
+  }
+ catch (  OIndexException oie) {
+    db.rollback();
+  }
+  final List<ODocument> resultAfterCommit=db.query(new OSQLSynchQuery<ODocument>("select from TransactionUniqueIndexTest"));
+  Assert.assertEquals(resultAfterCommit,resultBeforeCommit);
+}

@@ -1,0 +1,39 @@
+{
+  final Mapper mapper=new Mapper();
+  Map<String,Integer> map=new HashMap<String,Integer>();
+  map.put("key1",10);
+  map.put("key2",20);
+  mapper.setIntMap(map);
+  database.save(mapper);
+  try {
+    database.begin();
+    final Mapper loadedMapper=(Mapper)database.load(new ORecordId(mapper.getId()));
+    loadedMapper.getIntMap().put("key2",40);
+    database.save(loadedMapper);
+    database.commit();
+  }
+ catch (  Exception e) {
+    database.rollback();
+    throw e;
+  }
+  final List<ODocument> resultByKey=database.command(new OCommandSQL("select key, rid from index:mapIndexTestKey")).execute();
+  Assert.assertNotNull(resultByKey);
+  Assert.assertEquals(resultByKey.size(),2);
+  for (  ODocument d : resultByKey) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals("key1") && !d.field("key").equals("key2")) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+  final List<ODocument> resultByValue=database.command(new OCommandSQL("select key, rid from index:mapIndexTestValue")).execute();
+  Assert.assertNotNull(resultByValue);
+  Assert.assertEquals(resultByValue.size(),2);
+  for (  ODocument d : resultByValue) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals(10) && !d.field("key").equals(40)) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+}

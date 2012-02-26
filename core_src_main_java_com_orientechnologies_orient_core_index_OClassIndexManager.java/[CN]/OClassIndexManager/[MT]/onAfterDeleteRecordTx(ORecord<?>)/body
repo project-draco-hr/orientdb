@@ -1,0 +1,31 @@
+{
+  if (!(iRecord instanceof ODocument))   return;
+  ODocument doc=(ODocument)iRecord;
+  final OClass cls=doc.getSchemaClass();
+  if (cls == null)   return;
+  final Collection<OIndex<?>> indexes=new ArrayList<OIndex<?>>(cls.getIndexes());
+  if (!indexes.isEmpty()) {
+    final Set<String> dirtyFields=new HashSet<String>(Arrays.asList(doc.getDirtyFields()));
+    if (!dirtyFields.isEmpty()) {
+      final Iterator<OIndex<?>> indexIterator=indexes.iterator();
+      while (indexIterator.hasNext()) {
+        final OIndex<?> index=indexIterator.next();
+        final boolean result;
+        if (index.getDefinition() instanceof OCompositeIndexDefinition)         result=processCompositeIndexDelete(index,dirtyFields,doc);
+ else         result=processSingleIndexDelete(index,dirtyFields,doc);
+        if (result)         indexIterator.remove();
+      }
+    }
+    for (    final OIndex<?> index : indexes) {
+      final Object key=index.getDefinition().getDocumentValueToIndex(doc);
+      if (key instanceof Collection) {
+        for (        final Object keyItem : (Collection<?>)key)         if (keyItem != null)         index.remove(keyItem,iRecord);
+      }
+ else       if (key != null)       index.remove(key,iRecord);
+    }
+  }
+  if (doc.isTrackingChanges()) {
+    doc.setTrackingChanges(false);
+    doc.setTrackingChanges(true);
+  }
+}

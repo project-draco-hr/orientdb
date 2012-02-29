@@ -4,17 +4,14 @@
     try {
       OChannelBinaryClient network=null;
       try {
+        network=beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
+        network.writeInt(iTx.getId());
+        network.writeByte((byte)(iTx.isUsingLog() ? 1 : 0));
         final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
         while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
           for (          ORecordOperation txEntry : iTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
           iTx.clearRecordEntries();
-          if (tmpEntries.size() > 0)           for (          ORecordOperation txEntry : tmpEntries)           txEntry.getRecord().toStream();
-        }
-        network=beginRequest(OChannelBinaryProtocol.REQUEST_TX_COMMIT);
-        network.writeInt(iTx.getId());
-        network.writeByte((byte)(iTx.isUsingLog() ? 1 : 0));
-        for (        ORecordOperation txEntry : iTx.getAllRecordEntries()) {
-          commitEntry(network,txEntry);
+          if (tmpEntries.size() > 0)           for (          ORecordOperation txEntry : tmpEntries)           commitEntry(network,txEntry);
         }
         network.writeByte((byte)0);
         network.writeBytes(iTx.getIndexChanges().toStream());

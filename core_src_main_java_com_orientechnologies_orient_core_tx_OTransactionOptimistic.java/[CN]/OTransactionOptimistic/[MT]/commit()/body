@@ -1,5 +1,36 @@
 {
   checkTransaction();
   status=TXSTATUS.COMMITTING;
-  database.executeCommit();
+  if (!(database.getStorage() instanceof OStorageEmbedded))   database.getStorage().commit(this);
+ else {
+    database.getStorage().callInLock(new Callable<Void>(){
+      public Void call() throws Exception {
+        final List<String> involvedIndexes=getInvolvedIndexes();
+        List<OIndexMVRBTreeAbstract<?>> lockedIndexes=null;
+        try {
+          if (involvedIndexes != null)           for (          String indexName : involvedIndexes) {
+            final OIndexMVRBTreeAbstract<?> index=(OIndexMVRBTreeAbstract<?>)database.getMetadata().getIndexManager().getIndexInternal(indexName);
+            if (lockedIndexes == null)             lockedIndexes=new ArrayList<OIndexMVRBTreeAbstract<?>>();
+            index.acquireExclusiveLock();
+            lockedIndexes.add(index);
+          }
+          database.getStorage().commit(OTransactionOptimistic.this);
+          final ODocument indexEntries=getIndexChanges();
+          if (indexEntries != null) {
+            for (            Entry<String,Object> indexEntry : indexEntries) {
+              final OIndex<?> index=database.getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
+              index.commit((ODocument)indexEntry.getValue());
+            }
+          }
+          return null;
+        }
+  finally {
+          if (lockedIndexes != null)           for (          OIndexMVRBTreeAbstract<?> index : lockedIndexes) {
+            index.releaseExclusiveLock();
+          }
+        }
+      }
+    }
+,true);
+  }
 }

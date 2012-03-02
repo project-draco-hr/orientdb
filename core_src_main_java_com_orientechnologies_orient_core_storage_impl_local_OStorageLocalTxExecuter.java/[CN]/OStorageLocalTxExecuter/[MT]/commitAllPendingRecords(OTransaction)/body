@@ -1,11 +1,17 @@
 {
-  final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
-  while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
-    for (    ORecordOperation txEntry : iTx.getCurrentRecordEntries())     tmpEntries.add(txEntry);
-    iTx.clearRecordEntries();
-    if (!tmpEntries.isEmpty()) {
-      for (      ORecordOperation txEntry : tmpEntries)       commitEntry(iTx,txEntry,iTx.isUsingLog());
+  currentTransaction=iTx;
+  try {
+    final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
+    while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
+      for (      ORecordOperation txEntry : iTx.getCurrentRecordEntries())       tmpEntries.add(txEntry);
+      iTx.clearRecordEntries();
+      if (!tmpEntries.isEmpty()) {
+        for (        ORecordOperation txEntry : tmpEntries)         commitEntry(iTx,txEntry,iTx.isUsingLog());
+      }
     }
+    OTransactionAbstract.updateCacheFromEntries(storage,iTx,iTx.getAllRecordEntries(),true);
   }
-  OTransactionAbstract.updateCacheFromEntries(storage,iTx,iTx.getAllRecordEntries(),true);
+  finally {
+    currentTransaction=null;
+  }
 }

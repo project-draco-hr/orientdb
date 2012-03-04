@@ -1,14 +1,17 @@
 {
-  if (entry.flush()) {
-    it.remove();
+  if (!entry.flush())   return false;
+  entry.acquire();
+  try {
     final List<OMMapBufferEntry> file=bufferPoolPerFile.get(entry.file);
     if (file != null) {
       file.remove(entry);
       if (file.isEmpty())       bufferPoolPerFile.remove(entry.file);
     }
-    entry.buffer=null;
+    entry.close();
     totalMemory-=entry.size;
     return true;
   }
-  return false;
+  finally {
+    entry.release();
+  }
 }

@@ -1,20 +1,22 @@
 {
-  flush();
   acquireExclusiveLock();
   try {
-    if (file != null)     file=null;
-    if (buffer != null && sunClass != null) {
-      try {
-        final Method m=sunClass.getMethod("cleaner");
-        final Object cleaner=m.invoke(buffer);
-        cleaner.getClass().getMethod("clean").invoke(cleaner);
+    if (buffer != null) {
+      if (dirty)       buffer.force();
+      if (sunClass != null) {
+        try {
+          final Method m=sunClass.getMethod("cleaner");
+          final Object cleaner=m.invoke(buffer);
+          cleaner.getClass().getMethod("clean").invoke(cleaner);
+        }
+ catch (        Exception e) {
+          OLogManager.instance().error(this,"Error on calling Sun's MMap buffer clean",e);
+        }
       }
- catch (      Exception e) {
-        OLogManager.instance().error(this,"Error on calling MMap buffer clean",e);
-      }
+      buffer=null;
     }
-    buffer=null;
     counter=0;
+    file=null;
   }
   finally {
     releaseExclusiveLock();

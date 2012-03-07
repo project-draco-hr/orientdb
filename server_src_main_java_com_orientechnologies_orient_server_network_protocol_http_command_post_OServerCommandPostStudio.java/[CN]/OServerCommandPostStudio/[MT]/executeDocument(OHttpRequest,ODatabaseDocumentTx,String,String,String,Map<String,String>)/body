@@ -3,33 +3,23 @@
     iRequest.data.commandInfo="Studio edit document";
     if (rid == null)     throw new IllegalArgumentException("Record ID not found in request");
     ODocument doc=new ODocument(className,new ORecordId(rid));
-    doc=(ODocument)doc.load();
-    Object oldValue;
-    Object newValue;
+    doc.reload(null,true);
     for (    Entry<String,String> f : fields.entrySet()) {
-      oldValue=doc.rawField(f.getKey());
-      newValue=f.getValue();
-      if (oldValue != null) {
-        if (oldValue instanceof ORID) {
-          final ORID oldRid=(ORID)oldValue;
-          final ORID newRid=new ORecordId(f.getValue());
-          if (!oldRid.equals(newRid)) {
-            if (newRid.getRecord() == null)             throw new ORecordNotFoundException("Linked record " + oldRid + " was not found in database");
-            newValue=newRid;
+      final Object oldValue=doc.rawField(f.getKey());
+      String userValue=f.getValue();
+      if (userValue.equals("undefined"))       continue;
+      Object newValue=ORecordSerializerStringAbstract.getTypeValue(userValue);
+      if (newValue != null) {
+        if (newValue instanceof Collection) {
+          final ArrayList<Object> array=new ArrayList<Object>();
+          for (          String s : (Collection<String>)newValue) {
+            Object v=ORecordSerializerStringAbstract.getTypeValue(s);
+            array.add(v);
           }
- else           continue;
+          newValue=array;
         }
- else         if (oldValue instanceof Collection<?>) {
-          newValue=new ArrayList<ODocument>();
-          if (f.getValue() != null) {
-            String[] items=f.getValue().split(",");
-            for (            String s : items) {
-              ((List<ORID>)newValue).add(new ORecordId(s));
-            }
-          }
-        }
- else         if (oldValue.equals(newValue))         continue;
       }
+      if (oldValue != null && oldValue.equals(userValue))       continue;
       doc.field(f.getKey(),newValue);
     }
     doc.save();

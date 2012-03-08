@@ -4,8 +4,11 @@ case OClusterProtocol.REQUEST_NODE2NODE_CONNECT:
 {
       commandInfo="Connection from node";
       remoteNodeId=channel.readString();
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Cluster <%s>: remote node %s connected, authenticating it...",manager.getConfig().name,remoteNodeId);
       setName("OrientDB <- Node/" + remoteNodeId);
-      serverLogin(channel.readString(),channel.readString(),"connect");
+      final String userName=channel.readString();
+      serverLogin(userName,channel.readString(),"connect");
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Cluster <%s>: remote node %s authenticated correctly with user '%s'",manager.getConfig().name,remoteNodeId,userName);
       channel.acquireExclusiveLock();
       try {
         sendOk(clientTxId);
@@ -48,15 +51,16 @@ case OClusterProtocol.REQUEST_LEADER2PEER_CONNECT:
     if (remainTheLeader)     shutdown();
  else {
       setName("OrientDB <- Distributed Leader");
-      manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
       manager.becomePeer(this);
+      manager.getReplicator().updateConfiguration(new ODocument(channel.readBytes()));
     }
     break;
   }
 case OClusterProtocol.REQUEST_LEADER2PEER_HEARTBEAT:
 checkConnected();
 commandInfo="Cluster Heartbeat";
-manager.updateHeartBeatTime();
+final long lastInterval=manager.updateHeartBeatTime();
+if (OLogManager.instance().isDebugEnabled()) OLogManager.instance().debug(this,"Received heartbeat message from leader. Last interval was " + lastInterval + "ms");
 channel.acquireExclusiveLock();
 try {
 sendOk(clientTxId);
@@ -70,6 +74,7 @@ case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE:
 commandInfo="Synchronization between nodes";
 final String dbName=channel.readString();
 final ODocument cfg=new ODocument(channel.readBytes());
+if (OLogManager.instance().isInfoEnabled()) OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s...",dbName,remoteNodeId);
 if (!databases.containsKey(dbName)) {
 final ODatabaseDocumentTx db=(ODatabaseDocumentTx)openDatabase(ODatabaseDocumentTx.TYPE,dbName,serverUser.name,serverUser.password);
 databases.put(dbName,db);
@@ -80,7 +85,7 @@ Collection<ODocument> nodes=cfg.field("nodes");
 for (ODocument nodeCfg : nodes) {
 final String node=nodeCfg.field("node");
 final long lastLog=(Long)nodeCfg.field("lastLog");
-OLogManager.instance().info(this,"<-> DB %s: received synchronization request from node %s reading operation logs after %d",dbName,remoteNodeId,lastLog);
+OLogManager.instance().info(this,"<-> DB %s: Reading operation logs from %s after %d",dbName,remoteNodeId,lastLog);
 final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
 if (opLog != null) {
 channel.writeByte((byte)1);
@@ -99,7 +104,6 @@ channel.writeByte((byte)0);
 }
 }
 channel.writeByte((byte)0);
-manager.getReplicator().startReplication(dbName,remoteNodeId,SYNCH_TYPE.ASYNCH.toString());
 break;
 }
 case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_CHANGE:

@@ -9,7 +9,10 @@
       String packet=new String(OSecurityManager.instance().decrypt(manager.getConfig().securityAlgorithm,manager.getConfig().securityKey,buffer));
       String[] parts=packet.trim().split("\\|");
       int i=0;
-      if (!parts[i].startsWith(ODistributedServerConfiguration.PACKET_HEADER))       return;
+      if (!parts[i].startsWith(ODistributedServerConfiguration.PACKET_HEADER)) {
+        OLogManager.instance().debug(this,"Packet discarded because invalid");
+        return;
+      }
       if (Integer.parseInt(parts[++i]) != ODistributedServerConfiguration.PROTOCOL_VERSION) {
         OLogManager.instance().debug(this,"Received bad multicast packet with version %s not equals to the current %d",parts[i],ODistributedServerConfiguration.PROTOCOL_VERSION);
         return;
@@ -25,7 +28,11 @@
         OLogManager.instance().debug(this,"Ignored because sent by myself");
         return;
       }
-      if (manager.getLeader() != null)       manager.getLeader().connect2Peer(new String[]{sourceServerAddress,configuredServerAddress},serverPort);
+      if (manager.getLeader() == null) {
+        OLogManager.instance().debug(this,"Packet discarded because I'm not the leader");
+        return;
+      }
+      manager.getLeader().connect2Peer(new String[]{sourceServerAddress,configuredServerAddress},serverPort);
     }
  catch (    Exception e) {
       OLogManager.instance().debug(this,"Received wrong packet from multicast IP",e);

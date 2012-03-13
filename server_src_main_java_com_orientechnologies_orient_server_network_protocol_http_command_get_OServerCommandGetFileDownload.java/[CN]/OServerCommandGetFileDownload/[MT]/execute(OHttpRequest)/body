@@ -6,11 +6,21 @@
   final String rid=urlParts[2];
   iRequest.data.commandInfo="Download";
   iRequest.data.commandDetail=rid;
-  final ORecordBytes response;
+  final ORecordAbstract<?> response;
   try {
     response=db.load(new ORecordId(rid));
     if (response != null) {
-      sendBinaryFileContent(iRequest,OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,fileType,response,fileName);
+      if (response instanceof ORecordBytes) {
+        sendORecordBinaryFileContent(iRequest,OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,fileType,(ORecordBytes)response,fileName);
+      }
+ else       if (response instanceof ORecordSchemaAware) {
+        for (        OProperty prop : ((ORecordSchemaAware<?>)response).getSchemaClass().properties()) {
+          if (prop.getType().equals(OType.BINARY))           sendBinaryFieldFileContent(iRequest,OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,fileType,(byte[])((ORecordSchemaAware<?>)response).field(prop.getName()),fileName);
+        }
+      }
+ else {
+        sendTextContent(iRequest,OHttpUtils.STATUS_INVALIDMETHOD_CODE,"Record requested is not a file nor has a readable schema",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Record requested is not a file nor has a readable schema");
+      }
     }
  else {
       sendTextContent(iRequest,OHttpUtils.STATUS_INVALIDMETHOD_CODE,"Record requested not exists",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Record requestes not exists");

@@ -4,9 +4,19 @@
       if (lock.readLock().tryLock(timeout,TimeUnit.MILLISECONDS))       return;
     }
  catch (    InterruptedException e) {
-      throw new OLockException("Thread interrupted while waiting for resource of class '" + getClass() + "'");
+      if (ignoreThreadInterruption) {
+        try {
+          if (lock.readLock().tryLock(timeout,TimeUnit.MILLISECONDS)) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+ catch (        InterruptedException e2) {
+        }
+      }
+      throw new OLockException("Thread interrupted while waiting for resource of class '" + getClass() + "' with timeout="+ timeout);
     }
-    throw new OTimeoutException("Timeout on acquiring shared lock against resource of class : " + getClass());
+    throw new OTimeoutException("Timeout on acquiring shared lock against resource of class : " + getClass() + " with timeout="+ timeout);
   }
  else   lock.readLock().lock();
 }

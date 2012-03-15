@@ -9,39 +9,44 @@
  catch (  Throwable e) {
   }
   try {
-    lock.writeLock().lock();
-    for (    OServerHandler h : handlers) {
-      OLogManager.instance().info(this,"Shutdowning handler %s...",h.getName());
-      try {
-        h.sendShutdown();
+    lock.lock();
+    if (handlers.size() > 0) {
+      OLogManager.instance().info(this,"Shutdowning handlers:");
+      for (      OServerHandler h : handlers) {
+        OLogManager.instance().info(this,"- %s",h.getName());
+        try {
+          h.sendShutdown();
+        }
+ catch (        Throwable t) {
+        }
       }
- catch (      Throwable t) {
-      }
+    }
+    if (protocols.size() > 0) {
+      OLogManager.instance().info(this,"Shutdowning protocols");
+      protocols.clear();
     }
     try {
-      protocols.clear();
-      try {
-        MBeanServer mBeanServer=ManagementFactory.getPlatformMBeanServer();
-        mBeanServer.unregisterMBean(onProfiler);
-        mBeanServer.unregisterMBean(onServer);
-      }
- catch (      Exception e) {
-        OLogManager.instance().error(this,"OrientDB Server v" + OConstants.ORIENT_VERSION + " unregisterMBean error.",e);
-      }
+      MBeanServer mBeanServer=ManagementFactory.getPlatformMBeanServer();
+      mBeanServer.unregisterMBean(onProfiler);
+      mBeanServer.unregisterMBean(onServer);
     }
- catch (    Throwable t) {
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"OrientDB Server v" + OConstants.ORIENT_VERSION + " unregisterMBean error.",e);
     }
-    for (    OServerNetworkListener l : listeners) {
-      OLogManager.instance().info(this,"Shutdowning connection listener '" + l + "'...");
-      try {
-        l.shutdown();
-      }
- catch (      Throwable e) {
+    if (listeners.size() > 0) {
+      OLogManager.instance().info(this,"Shutdowning listeners:");
+      for (      OServerNetworkListener l : listeners) {
+        OLogManager.instance().info(this,"- %s",l);
+        try {
+          l.shutdown();
+        }
+ catch (        Throwable e) {
+        }
       }
     }
   }
   finally {
-    lock.writeLock().unlock();
+    lock.unlock();
   }
   OLogManager.instance().info(this,"OrientDB Server shutdown complete");
   System.out.println();

@@ -9,12 +9,12 @@ case OClusterProtocol.REQUEST_NODE2NODE_CONNECT:
       final String userName=channel.readString();
       serverLogin(userName,channel.readString(),"connect");
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Cluster <%s>: remote node %s authenticated correctly with user '%s'",manager.getConfig().name,remoteNodeId,userName);
-      channel.acquireExclusiveLock();
+      beginResponse();
       try {
         sendOk(clientTxId);
       }
   finally {
-        channel.releaseExclusiveLock();
+        endResponse();
       }
       break;
     }
@@ -27,7 +27,7 @@ case OClusterProtocol.REQUEST_LEADER2PEER_CONNECT:
     final String leaderAddress=doc.field("leaderNodeAddress");
     if (!clusterName.equals(manager.getName()) || !Arrays.equals(encodedSecurityKey,manager.getConfig().getSecurityKey()))     throw new OSecurityException("Invalid combination of cluster name and key received");
     boolean remainTheLeader=false;
-    channel.acquireExclusiveLock();
+    beginResponse();
     try {
       sendOk(clientTxId);
       if (manager.isLeader()) {
@@ -45,8 +45,7 @@ case OClusterProtocol.REQUEST_LEADER2PEER_CONNECT:
       }
     }
   finally {
-      channel.releaseExclusiveLock();
-      channel.flush();
+      endResponse();
     }
     if (remainTheLeader)     sendShutdown();
  else {
@@ -61,12 +60,12 @@ checkConnected();
 commandInfo="Cluster Heartbeat";
 final long lastInterval=manager.updateHeartBeatTime();
 if (OLogManager.instance().isDebugEnabled()) OLogManager.instance().debug(this,"Received heartbeat message from leader. Last interval was " + lastInterval + "ms");
-channel.acquireExclusiveLock();
+beginResponse();
 try {
 sendOk(clientTxId);
 }
   finally {
-channel.releaseExclusiveLock();
+endResponse();
 }
 break;
 case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE:
@@ -79,6 +78,8 @@ if (!databases.containsKey(dbName)) {
 final ODatabaseDocumentTx db=(ODatabaseDocumentTx)openDatabase(ODatabaseDocumentTx.TYPE,dbName,serverUser.name,serverUser.password);
 databases.put(dbName,db);
 }
+beginResponse();
+try {
 sendOk(clientTxId);
 final ORecordOperation op=new ORecordOperation();
 Collection<ODocument> nodes=cfg.field("nodes");
@@ -104,6 +105,10 @@ channel.writeByte((byte)0);
 }
 }
 channel.writeByte((byte)0);
+}
+  finally {
+endResponse();
+}
 OLogManager.instance().info(this,"<-> DB %s: Synchronization completed from node %s, starting inverse replication...",dbName,remoteNodeId);
 manager.getReplicator().startReplication(dbName,remoteNodeId,SYNCH_TYPE.ASYNCH.toString());
 OLogManager.instance().info(this,"<-> DB %s: Reverse synchronization completed to node %s",dbName,remoteNodeId);
@@ -143,13 +148,13 @@ ODistributedRequesterThreadLocal.INSTANCE.set(false);
 final ODistributedNode node=manager.getReplicator().getNode(remoteNodeId);
 final ODistributedDatabaseInfo db=node.getDatabase(database.getName());
 db.log.appendLog(operationId,operationType,rid);
-channel.acquireExclusiveLock();
+beginResponse();
 try {
 sendOk(clientTxId);
 channel.writeLong(result);
 }
   finally {
-channel.releaseExclusiveLock();
+endResponse();
 }
 break;
 }
@@ -172,15 +177,14 @@ database.drop();
 database=createDatabase(database,dbUser,dbPasswd);
 if (database.isClosed()) database.open(dbUser,dbPasswd);
 OLogManager.instance().info(this,"<-> DB %s: reading database content via streaming from remote server node...",dbName);
-channel.acquireExclusiveLock();
+beginResponse();
 try {
 new ODatabaseImport(database,new OChannelBinaryInputStream(channel),this).importDatabase();
 OLogManager.instance().info(this,"<-> DB %s: database imported correctly",dbName);
 sendOk(clientTxId);
-channel.flush();
 }
   finally {
-channel.releaseExclusiveLock();
+endResponse();
 }
 }
   finally {

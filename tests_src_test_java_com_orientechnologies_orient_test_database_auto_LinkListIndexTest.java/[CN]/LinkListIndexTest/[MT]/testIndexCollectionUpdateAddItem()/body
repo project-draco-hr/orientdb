@@ -1,0 +1,22 @@
+{
+  final ODocument docOne=new ODocument();
+  docOne.save();
+  final ODocument docTwo=new ODocument();
+  docTwo.save();
+  final ODocument docThree=new ODocument();
+  docThree.save();
+  final ODocument document=new ODocument("LinkListIndexTestClass");
+  document.field("linkCollection",new ArrayList<ORID>(Arrays.asList(docOne.getIdentity(),docTwo.getIdentity())));
+  document.save();
+  database.command(new OCommandSQL("UPDATE " + document.getIdentity() + " add linkCollection = "+ docThree.getIdentity())).execute();
+  List<ODocument> result=database.command(new OCommandSQL("select key, rid from index:linkCollectionIndex")).execute();
+  Assert.assertNotNull(result);
+  Assert.assertEquals(result.size(),3);
+  for (  ODocument d : result) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals(docOne.getIdentity()) && !d.field("key").equals(docTwo.getIdentity()) && !d.field("key").equals(docThree.getIdentity())) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+}

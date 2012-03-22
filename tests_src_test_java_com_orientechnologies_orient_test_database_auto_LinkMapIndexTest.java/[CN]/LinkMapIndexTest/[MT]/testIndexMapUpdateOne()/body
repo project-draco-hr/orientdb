@@ -1,0 +1,39 @@
+{
+  final ODocument docOne=new ODocument();
+  docOne.save();
+  final ODocument docTwo=new ODocument();
+  docTwo.save();
+  final ODocument docThree=new ODocument();
+  docThree.save();
+  Map<String,ORID> mapOne=new HashMap<String,ORID>();
+  mapOne.put("key1",docOne.getIdentity());
+  mapOne.put("key2",docTwo.getIdentity());
+  final ODocument document=new ODocument("LinkMapIndexTestClass");
+  document.field("linkMap",mapOne);
+  document.save();
+  final Map<String,ORID> mapTwo=new HashMap<String,ORID>();
+  mapTwo.put("key2",docOne.getIdentity());
+  mapTwo.put("key3",docThree.getIdentity());
+  document.field("linkMap",mapTwo);
+  document.save();
+  final List<ODocument> resultByKey=database.command(new OCommandSQL("select key, rid from index:mapIndexTestKey")).execute();
+  Assert.assertNotNull(resultByKey);
+  Assert.assertEquals(resultByKey.size(),2);
+  for (  ODocument d : resultByKey) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals("key2") && !d.field("key").equals("key3")) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+  final List<ODocument> resultByValue=database.command(new OCommandSQL("select key, rid from index:mapIndexTestValue")).execute();
+  Assert.assertNotNull(resultByValue);
+  Assert.assertEquals(resultByValue.size(),2);
+  for (  ODocument d : resultByValue) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals(docOne.getIdentity()) && !d.field("key").equals(docThree.getIdentity())) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+}

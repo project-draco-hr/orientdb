@@ -6,7 +6,7 @@
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
       final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
-      if (!checkForRecordValidity(ppos))       return -1;
+      if (!checkForRecordValidity(ppos))       return null;
 switch (iVersion) {
 case -1:
         ++ppos.version;
@@ -31,7 +31,8 @@ if (ppos.dataChunkPosition == -1) newDataSegmentOffset=getDataSegment(ppos.dataS
  else newDataSegmentOffset=getDataSegment(ppos.dataSegmentId).setRecord(ppos.dataChunkPosition,iRid,iContent);
 if (newDataSegmentOffset != ppos.dataChunkPosition) iClusterSegment.setPhysicalPosition(iRid.clusterPosition,ppos.dataSegmentId,newDataSegmentOffset,iRecordType,ppos.version);
 incrementVersion();
-return ppos.version;
+ppos.dataChunkPosition=newDataSegmentOffset;
+return ppos;
 }
   finally {
 lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
@@ -44,5 +45,5 @@ OLogManager.instance().error(this,"Error on updating record " + iRid + " (cluste
 lock.releaseSharedLock();
 OProfiler.getInstance().stopChrono(PROFILER_UPDATE_RECORD,timer);
 }
-return -1;
+return null;
 }

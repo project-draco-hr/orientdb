@@ -81,30 +81,29 @@ databases.put(dbName,db);
 beginResponse();
 try {
 sendOk(clientTxId);
+OLogManager.instance().info(this,"------------------------------------------------------------------");
 final ORecordOperation op=new ORecordOperation();
 Collection<ODocument> nodes=cfg.field("nodes");
+channel.writeInt(nodes.size());
 for (ODocument nodeCfg : nodes) {
 final String node=nodeCfg.field("node");
+channel.writeString(node);
 final long lastLog=(Long)nodeCfg.field("lastLog");
 OLogManager.instance().info(this,"REPL <%s> reading operation logs from %s after %d",dbName,remoteNodeId,lastLog);
 final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
 if (opLog != null) {
-channel.writeByte((byte)1);
-channel.writeString(node);
 int position=opLog.findOperationId(lastLog);
 int sent=0;
-sendOk(clientTxId);
+channel.writeInt(position);
 for (int i=position - 1; i >= 0; --i) {
-channel.writeByte((byte)1);
 opLog.getEntry(i,op);
 channel.writeBytes(op.toStream());
 sent++;
 OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
 }
-channel.writeByte((byte)0);
 }
+ else channel.writeInt(0);
 }
-channel.writeByte((byte)0);
 }
   finally {
 endResponse();

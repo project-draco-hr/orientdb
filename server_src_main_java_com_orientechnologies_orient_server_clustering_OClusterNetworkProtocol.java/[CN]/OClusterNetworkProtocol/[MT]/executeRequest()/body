@@ -4,11 +4,11 @@ case OClusterProtocol.REQUEST_NODE2NODE_CONNECT:
 {
       commandInfo="Connection from node";
       remoteNodeId=channel.readString();
-      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Cluster <%s>: remote node %s connected, authenticating it...",manager.getConfig().name,remoteNodeId);
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"REPL NODE <%s> connected, authenticating it...",remoteNodeId);
       setName("OrientDB <- Node/" + remoteNodeId);
       final String userName=channel.readString();
       serverLogin(userName,channel.readString(),"connect");
-      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"CLUSTER <%s>: remote node %s authenticated correctly with user '%s'",manager.getConfig().name,remoteNodeId,userName);
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"REPL NODE <%s> authenticated correctly with user '%s'",remoteNodeId,userName);
       beginResponse();
       try {
         sendOk(clientTxId);
@@ -73,7 +73,7 @@ case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE:
 commandInfo="Synchronization between nodes";
 final String dbName=channel.readString();
 final ODocument cfg=new ODocument(channel.readBytes());
-if (OLogManager.instance().isInfoEnabled()) OLogManager.instance().info(this,"REPL <%s> received synchronization request from node %s...",dbName,remoteNodeId);
+if (OLogManager.instance().isInfoEnabled()) OLogManager.instance().info(this,"REPL DB <-(%s) received synchronization request from node %s...",dbName,remoteNodeId);
 if (!databases.containsKey(dbName)) {
 final ODatabaseDocumentTx db=(ODatabaseDocumentTx)openDatabase(ODatabaseDocumentTx.TYPE,dbName,serverUser.name,serverUser.password);
 databases.put(dbName,db);
@@ -81,7 +81,6 @@ databases.put(dbName,db);
 beginResponse();
 try {
 sendOk(clientTxId);
-OLogManager.instance().info(this,"------------------------------------------------------------------");
 final ORecordOperation op=new ORecordOperation();
 Collection<ODocument> nodes=cfg.field("nodes");
 channel.writeInt(nodes.size());
@@ -89,7 +88,7 @@ for (ODocument nodeCfg : nodes) {
 final String node=nodeCfg.field("node");
 channel.writeString(node);
 final long lastLog=(Long)nodeCfg.field("lastLog");
-OLogManager.instance().info(this,"REPL <%s> reading operation logs from %s after %d",dbName,remoteNodeId,lastLog);
+OLogManager.instance().info(this,"REPL DB <-(%s) reading operation logs from %s after %d",dbName,remoteNodeId,lastLog);
 final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
 if (opLog != null) {
 int position=opLog.findOperationId(lastLog);
@@ -99,7 +98,7 @@ for (int i=position - 1; i >= 0; --i) {
 opLog.getEntry(i,op);
 channel.writeBytes(op.toStream());
 sent++;
-OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
+OLogManager.instance().info(this,"REPL DB <-(%s) #%d operation %d with RID %s",dbName,sent,op.serial,op.record.getIdentity());
 }
 }
  else channel.writeInt(0);
@@ -108,9 +107,9 @@ OLogManager.instance().info(this,">> %s: (%d) operation %d with RID %s",dbName,s
   finally {
 endResponse();
 }
-OLogManager.instance().info(this,"REPL <%s> synchronization completed from node %s, starting inverse replication...",dbName,remoteNodeId);
+OLogManager.instance().info(this,"REPL DB (%s)-> synchronization completed from node %s, starting inverse replication...",dbName,remoteNodeId);
 manager.getReplicator().startReplication(dbName,remoteNodeId,SYNCH_TYPE.ASYNCH.toString());
-OLogManager.instance().info(this,"REPL <%s> reverse synchronization completed to node %s",dbName,remoteNodeId);
+OLogManager.instance().info(this,"REPL DB <-(%s) reverse synchronization completed to node %s",dbName,remoteNodeId);
 break;
 }
 case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_CHANGE:
@@ -123,13 +122,17 @@ final ORecordId rid=channel.readRID();
 final byte[] buffer=channel.readBytes();
 final int version=channel.readInt();
 final byte recordType=channel.readByte();
+OLogManager.instance().info(this,"REPL DB <-(%s) %s record %s from %s...",dbName,ORecordOperation.getName(operationType),rid,remoteNodeId);
 final long result;
 ODatabaseRecord database=databases.get(dbName);
 ODistributedRequesterThreadLocal.INSTANCE.set(true);
 try {
 switch (operationType) {
 case ORecordOperation.CREATED:
+long origClusterPosition=rid.clusterPosition;
+rid.clusterPosition=-1;
 result=createRecord(database,rid,buffer,recordType);
+if (result != origClusterPosition) throw new OReplicationConflictException("Record created has RID different by the original: original " + rid.clusterId + ":"+ origClusterPosition+ ", local "+ rid.clusterId+ ":"+ result);
 break;
 case ORecordOperation.UPDATED:
 result=updateRecord(database,rid,buffer,version,recordType);

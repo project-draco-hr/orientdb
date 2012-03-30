@@ -1,6 +1,7 @@
 {
   final long time=System.currentTimeMillis();
-  OLogManager.instance().info(this,"REPL DB <-(%s) synchronization started. Storing delta of updates...",iDatabaseName);
+  logger.setDatabase(iDatabaseName);
+  logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"synchronization started. Storing delta of updates...");
   try {
     ODocument cfg=new ODocument().field("nodes",iDbCfg,OType.EMBEDDEDSET);
     final OChannelBinaryClient network=beginRequest(OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE);
@@ -22,14 +23,14 @@
         final int logEntries=network.readInt();
         for (int l=0; l < logEntries; ++l) {
           final byte[] buffer=network.readBytes();
-          if (buffer == null)           break;
+          if (buffer == null)           continue;
           opLog.fromStream(buffer);
           ops++;
-          OLogManager.instance().info(this,"REPL DB <-(%s) (%d) received record %s",iDatabaseName,ops,opLog.record);
+          logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"#%d received record %s",ops,opLog.record.getIdentity());
           replicator.getOperationLog(nodeId,iDatabaseName).appendLog(opLog.serial,opLog.type,(ORecordId)opLog.record.getIdentity());
         }
       }
-      if (OLogManager.instance().isInfoEnabled())       OLogManager.instance().info(this,"REPL DB <-(%s) synchronization completed. Received %d operations from remote node (%dms)",iDatabaseName,ops,(System.currentTimeMillis() - time));
+      logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"synchronization completed. Received %d operations from remote node (%dms)",ops,(System.currentTimeMillis() - time));
     }
   finally {
       endResponse();

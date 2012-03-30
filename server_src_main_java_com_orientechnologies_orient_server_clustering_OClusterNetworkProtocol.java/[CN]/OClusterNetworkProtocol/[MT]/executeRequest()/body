@@ -77,37 +77,37 @@ final String dbName=channel.readString();
 final ODocument cfg=new ODocument(channel.readBytes());
 logger.setDatabase(dbName);
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"received synchronization request");
-if (!databases.containsKey(dbName)) {
-final ODatabaseDocumentTx db=(ODatabaseDocumentTx)openDatabase(ODatabaseDocumentTx.TYPE,dbName,serverUser.name,serverUser.password);
-databases.put(dbName,db);
-}
+getOrOpenDatabase(dbName);
 beginResponse();
 try {
 sendOk(clientTxId);
+}
+  finally {
+endResponse();
+}
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"opening a connection back...");
+manager.getReplicator().connect(remoteNodeId,dbName,SYNCH_TYPE.ASYNCH.toString());
+final ODistributedNode replicationNode=manager.getReplicator().getNode(remoteNodeId);
 final ORecordOperation op=new ORecordOperation();
 Collection<ODocument> nodes=cfg.field("nodes");
-channel.writeInt(nodes.size());
+int sent=0;
 for (ODocument nodeCfg : nodes) {
 final String node=nodeCfg.field("node");
-channel.writeString(node);
 final long lastLog=(Long)nodeCfg.field("lastLog");
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"reading operation for node %s logs after %d",node,lastLog);
 final OOperationLog opLog=manager.getReplicator().getOperationLog(node,dbName);
 if (opLog != null) {
-int sent=0;
 int position=opLog.findOperationId(lastLog);
 final int totalToSend=opLog.totalEntries();
-channel.writeInt(totalToSend - position);
 for (int i=position; i < totalToSend; ++i) {
 opLog.getEntry(i,op);
 try {
-channel.writeBytes(op.toStream());
+replicationNode.sendRequest(op,SYNCH_TYPE.SYNCH);
 sent++;
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"#%d operation %d with RID %s",sent,op.serial,op.record.getIdentity());
 }
  catch (OSerializationException e) {
 logger.log(this,Level.SEVERE,TYPE.REPLICATION,DIRECTION.OUT,"#%d cannot be transmitted, log entry %d, record %s: ",sent,op.serial,op.record.getIdentity(),e.getCause());
-channel.writeBytes(null);
 }
 catch (RuntimeException e) {
 logger.log(this,Level.SEVERE,TYPE.REPLICATION,DIRECTION.OUT,"#%d cannot be transmitted, log entry %d, record %s",e,sent,op.serial,op.record.getIdentity());
@@ -115,15 +115,10 @@ throw e;
 }
 }
 }
- else channel.writeInt(0);
 }
-}
-  finally {
-endResponse();
-}
-logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"synchronization completed, starting inverse replication...");
-manager.getReplicator().startReplication(dbName,remoteNodeId,SYNCH_TYPE.ASYNCH.toString());
-logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"reverse synchronization completed");
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"starting inverse replication...");
+manager.getReplicator().startReplication(remoteNodeId,dbName,SYNCH_TYPE.ASYNCH.toString());
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"synchronization completed");
 break;
 }
 case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_CHANGE:
@@ -139,7 +134,7 @@ final byte recordType=channel.readByte();
 logger.setNode(dbName);
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"%s record %s...",ORecordOperation.getName(operationType),rid);
 final long result;
-ODatabaseRecord database=databases.get(dbName);
+final ODatabaseRecord database=getOrOpenDatabase(dbName);
 ODistributedRequesterThreadLocal.INSTANCE.set(true);
 try {
 switch (operationType) {

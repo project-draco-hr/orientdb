@@ -1,5 +1,6 @@
 {
   int unreadResponse=0;
+  final long startClock=iTimeout > 0 ? System.currentTimeMillis() : 0;
   do {
     if (iTimeout <= 0)     lockRead.lock();
  else     if (!lockRead.tryLock(iTimeout,TimeUnit.MILLISECONDS))     throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
@@ -18,6 +19,7 @@
     }
     if (currentSessionId == iRequesterId)     break;
     if (debug)     OLogManager.instance().debug(this,"%s - Session %d skip response, it is for %d",socket.getRemoteSocketAddress(),iRequesterId,currentSessionId);
+    if (iTimeout > 0 && (System.currentTimeMillis() - startClock) > iTimeout)     throw new OTimeoutException("Timeout on reading response from the server for the request " + iRequesterId);
     if (unreadResponse > maxUnreadResponses) {
       final StringBuilder dirtyBuffer=new StringBuilder();
       int i=0;

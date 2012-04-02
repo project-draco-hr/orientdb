@@ -6,19 +6,21 @@
       if (f.isFile() && f.getName().endsWith(OOperationLog.EXTENSION)) {
         final String nodeId=f.getName().substring(0,f.getName().indexOf('.')).replace('_','.').replace('-',':');
         if (manager.itsMe(nodeId))         continue;
-        final ODistributedNode node=getOrCreateDistributedNode(nodeId);
-        if (node.getDatabase(dbName) == null) {
-          node.registerDatabase(node.createDatabaseEntry(dbName,SYNCH_TYPE.ASYNCH,manager.getReplicator().getReplicatorUser().name,manager.getReplicator().getReplicatorUser().password));
-        }
-        final ODocument nodeCfg=new ODocument();
-        set.add(nodeCfg);
-        try {
-          final long[] logRange=node.getLogRange(dbName);
-          nodeCfg.field("node",nodeId);
-          nodeCfg.field("firstLog",logRange[0]);
-          nodeCfg.field("lastLog",logRange[1]);
-        }
- catch (        IOException e) {
+synchronized (this) {
+          final ODistributedNode node=getOrCreateDistributedNode(nodeId);
+          if (node.getDatabase(dbName) == null) {
+            node.registerDatabase(node.createDatabaseEntry(dbName,SYNCH_TYPE.ASYNCH,manager.getReplicator().getReplicatorUser().name,manager.getReplicator().getReplicatorUser().password));
+          }
+          final ODocument nodeCfg=new ODocument();
+          set.add(nodeCfg);
+          try {
+            final long[] logRange=node.getLogRange(dbName);
+            nodeCfg.field("node",nodeId);
+            nodeCfg.field("firstLog",logRange[0]);
+            nodeCfg.field("lastLog",logRange[1]);
+          }
+ catch (          IOException e) {
+          }
         }
       }
     }

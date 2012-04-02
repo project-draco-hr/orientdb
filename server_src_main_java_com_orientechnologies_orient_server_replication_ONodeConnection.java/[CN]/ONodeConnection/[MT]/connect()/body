@@ -1,0 +1,22 @@
+{
+  if (channel != null)   return;
+  logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"connecting...",getId());
+  channel=new OChannelBinaryClient(networkAddress,networkPort,new OContextConfiguration(),OClusterProtocol.CURRENT_PROTOCOL_VERSION);
+  beginRequest(OClusterProtocol.REQUEST_NODE2NODE_CONNECT);
+  try {
+    channel.writeString(replicator.getManager().getId());
+    channel.writeString(replicator.getReplicatorUser().name);
+    channel.writeString(replicator.getReplicatorUser().password);
+  }
+  finally {
+    endRequest();
+  }
+  try {
+    beginResponse();
+  }
+  finally {
+    endResponse();
+  }
+  logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"connected");
+  serviceThread=new OAsynchChannelServiceThread(new ODistributedRemoteAsynchEventListener(replicator.getManager(),new ODistributedRemoteAsynchEventListener(replicator.getManager(),null,getId()),getId()),channel,"OrientDB <- Asynch Node/" + getId());
+}

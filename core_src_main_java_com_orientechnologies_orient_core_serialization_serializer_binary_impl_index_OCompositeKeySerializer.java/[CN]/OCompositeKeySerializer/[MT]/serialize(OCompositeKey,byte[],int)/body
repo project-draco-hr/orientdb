@@ -1,0 +1,18 @@
+{
+  final List<Comparable> keys=compositeKey.getKeys();
+  final int keysSize=keys.size();
+  final int oldStartPosition=startPosition;
+  startPosition+=OIntegerSerializer.INT_SIZE;
+  OIntegerSerializer.INSTANCE.serialize(keysSize,stream,startPosition);
+  startPosition+=OIntegerSerializer.INT_SIZE;
+  final OBinarySerializerFactory factory=OBinarySerializerFactory.INSTANCE;
+  for (  final Comparable key : keys) {
+    final OType type=OType.getTypeByClass(key.getClass());
+    OBinarySerializer binarySerializer=factory.getObjectSerializer(type);
+    stream[startPosition]=binarySerializer.getId();
+    startPosition+=OBinarySerializerFactory.TYPE_IDENTIFIER_SIZE;
+    binarySerializer.serialize(key,stream,startPosition);
+    startPosition+=binarySerializer.getObjectSize(key);
+  }
+  OIntegerSerializer.INSTANCE.serialize((startPosition - oldStartPosition),stream,oldStartPosition);
+}

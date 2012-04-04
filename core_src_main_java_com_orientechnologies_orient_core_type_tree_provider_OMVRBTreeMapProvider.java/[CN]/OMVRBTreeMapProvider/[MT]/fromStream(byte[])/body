@@ -5,7 +5,7 @@
     byte protocolVersion=stream.peek();
     if (protocolVersion != -1) {
       stream.getAsByte();
-      if (protocolVersion != CURRENT_PROTOCOL_VERSION)       OLogManager.instance().debug(this,"Found tree %s created with MVRBTree protocol version %d while current one supports the version %d. The tree will be migrated transparently",getRecord().getIdentity(),protocolVersion,CURRENT_PROTOCOL_VERSION);
+      if (protocolVersion != CURRENT_PROTOCOL_VERSION)       throw new OSerializationException("The index has been created with a previous version of OrientDB. To use it with this version of OrientDB you need to export and import your database. " + protocolVersion + "<->"+ CURRENT_PROTOCOL_VERSION);
     }
     root=new ORecordId();
     root.fromStream(stream.getAsByteArrayFixed(ORecordId.PERSISTENT_SIZE));
@@ -17,7 +17,8 @@
       OLogManager.instance().warn(this,"Previous index version was found, " + " partial composite index queries may do not work if you do not rebuild index.");
     }
  else     keySize=stream.getAsInteger();
-    serializerFromStream(stream);
+    keySerializer=OBinarySerializerFactory.INSTANCE.getObjectSerializer(stream.getAsByte());
+    valueSerializer=OStreamSerializerFactory.get(stream.getAsString());
   }
  catch (  Exception e) {
     OLogManager.instance().error(this,"Error on unmarshalling OMVRBTreeMapProvider object from record: %s",e,OSerializationException.class,root);

@@ -5,14 +5,13 @@ synchronized (this) {
     if (log == null)     return;
     iTransactionEntry.serial=log.appendLocalLog(iTransactionEntry.type,(ORecordId)iTransactionEntry.getRecord().getIdentity());
     if (nodes.isEmpty())     return;
+    logger.setDatabase(dbName);
     for (    ODistributedNode node : nodes.values()) {
-      if (node.getStatus() != ODistributedNode.STATUS.ONLINE)       logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"node status %s: the change is not propagated",node.getStatus());
- else {
-        final ODistributedDatabaseInfo dbEntry=node.getDatabase(dbName);
-        if (dbEntry != null) {
-          if (dbEntry.status != STATUS_TYPE.ONLINE)           OLogManager.instance().info(this,"REPL <%s> status %s, the change is not propagated",dbEntry.databaseName,dbEntry.status);
- else           node.sendRequest(iTransactionEntry,dbEntry.synchType);
-        }
+      logger.setNode(node.getName());
+      final ODistributedDatabaseInfo dbEntry=node.getDatabase(dbName);
+      if (dbEntry != null) {
+        if (dbEntry.status != STATUS_TYPE.ONLINE)         logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"database status %s: the change is not propagated",dbEntry.status);
+ else         node.sendRequest(iTransactionEntry,dbEntry.synchType);
       }
     }
   }

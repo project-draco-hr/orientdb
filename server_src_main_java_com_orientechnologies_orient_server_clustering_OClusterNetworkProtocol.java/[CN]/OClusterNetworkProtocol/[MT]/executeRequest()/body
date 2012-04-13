@@ -8,7 +8,7 @@ case OClusterProtocol.REQUEST_NODE2NODE_CONNECT:
       logger.log(this,Level.FINE,TYPE.REPLICATION,DIRECTION.IN,"connected, authenticating it...");
       setName("OrientDB <- Node/" + remoteNodeId);
       final String userName=channel.readString();
-      serverLogin(userName,channel.readString(),"connect");
+      serverUser=OServerMain.server().serverLogin(userName,channel.readString(),"connect");
       logger.log(this,Level.FINE,TYPE.REPLICATION,DIRECTION.IN,"authenticated correctly with user '%s'",userName);
       beginResponse();
       try {
@@ -103,7 +103,7 @@ final int totalToSend=opLog.totalEntries();
 for (int i=position; i < totalToSend; ++i) {
 opLog.getEntry(i,op);
 try {
-replicationNode.sendRequest(op,SYNCH_TYPE.SYNCH);
+replicationNode.propagateChange(op,SYNCH_TYPE.SYNCH);
 sent++;
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"#%d operation %d with RID %s",sent,op.serial,op.record.getIdentity());
 }
@@ -123,7 +123,72 @@ manager.getReplicator().startReplication(remoteNodeId,dbName,SYNCH_TYPE.ASYNCH.t
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"synchronization completed");
 break;
 }
-case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_CHANGE:
+case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_ALIGN:
+{
+commandInfo="Alignment between nodes";
+final ODocument cfg=new ODocument(channel.readBytes());
+final String dbName=cfg.field("db");
+final ODocument block=cfg.field("block");
+logger.setDatabase(dbName);
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"received alignment request");
+final ODatabaseRecord db=getOrOpenDatabase(dbName);
+final OStorage storage=db.getStorage();
+final ODistributedNode remoteNode=manager.getReplicator().getNode(remoteNodeId);
+beginResponse();
+try {
+sendOk(clientTxId);
+}
+  finally {
+endResponse();
+}
+ORecordId rid=new ORecordId();
+for (String ridAsString : block.fieldNames()) {
+rid.fromString(ridAsString);
+final ORawBuffer localRecord=storage.readRecord(rid,null,false,null);
+final int remoteVersion=block.field(ridAsString);
+if (localRecord.version == -1) {
+if (remoteVersion > -1) remoteNode.propagateChange(new ORecordOperation(rid,ORecordOperation.DELETED),SYNCH_TYPE.SYNCH);
+}
+ else if (remoteVersion == -1) {
+if (localRecord.version > -1) db.delete(rid);
+}
+ else if (localRecord.version > remoteVersion) {
+logger.log(this,Level.FINE,TYPE.REPLICATION,DIRECTION.IN,"Sending record %s to remote: my version %d > remote %d",rid,localRecord.version,remoteVersion);
+remoteNode.propagateChange(new ORecordOperation(rid,ORecordOperation.UPDATED),SYNCH_TYPE.SYNCH);
+}
+ else if (localRecord.version < remoteVersion) {
+logger.log(this,Level.FINE,TYPE.REPLICATION,DIRECTION.IN,"Getting remote record %s: its version %d > mine %d",rid,remoteVersion,localRecord.version);
+remoteNode.requestRecord(dbName,rid);
+}
+}
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"alignment completed for %d",block.fields());
+break;
+}
+case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_REQUEST:
+{
+commandInfo="Retrieve record";
+final String dbName=channel.readString();
+final ORecordId rid=channel.readRID();
+logger.setNode(dbName);
+logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"record %s...",rid);
+final ODatabaseRecord database=getOrOpenDatabase(dbName);
+final ORecordInternal<?> record=database.load(rid);
+beginResponse();
+try {
+sendOk(clientTxId);
+if (record != null) {
+channel.writeByte(record.getRecordType());
+channel.writeInt(record.getVersion());
+channel.writeBytes(record.toStream());
+}
+ else channel.writeByte((byte)-1);
+}
+  finally {
+endResponse();
+}
+break;
+}
+case OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_RECORD_PROPAGATE:
 {
 commandInfo="Distributed record change";
 final String dbName=channel.readString();
@@ -131,7 +196,7 @@ final byte operationType=channel.readByte();
 final long operationId=channel.readLong();
 final ORecordId rid=channel.readRID();
 final byte[] buffer=channel.readBytes();
-final int version=channel.readInt();
+final int version=channel.readInt() - 1;
 final byte recordType=channel.readByte();
 logger.setNode(dbName);
 logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"%s record %s...",ORecordOperation.getName(operationType),rid);

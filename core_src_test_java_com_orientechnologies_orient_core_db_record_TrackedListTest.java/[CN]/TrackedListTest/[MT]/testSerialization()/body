@@ -1,6 +1,10 @@
 {
-  ODocument doc=new ODocument();
-  OTrackedList<String> beforeSerialization=new OTrackedList<String>(doc);
+class NotSerializableDocument extends ODocument {
+    private void writeObject(    ObjectOutputStream oos) throws IOException {
+      throw new NotSerializableException();
+    }
+  }
+  final OTrackedList<String> beforeSerialization=new OTrackedList<String>(new NotSerializableDocument());
   beforeSerialization.add("firstVal");
   beforeSerialization.add("secondVal");
   final OMemoryStream memoryStream=new OMemoryStream();
@@ -8,7 +12,7 @@
   out.writeObject(beforeSerialization);
   out.close();
   final ObjectInputStream input=new ObjectInputStream(new OMemoryInputStream(memoryStream.copy()));
-  @SuppressWarnings("unchecked") final List<String> afterSerialization=(OTrackedList<String>)input.readObject();
+  @SuppressWarnings("unchecked") final List<String> afterSerialization=(List<String>)input.readObject();
   Assert.assertEquals(afterSerialization.size(),beforeSerialization.size(),"List size");
   for (int i=0; i < afterSerialization.size(); i++) {
     Assert.assertEquals(afterSerialization.get(i),beforeSerialization.get(i));

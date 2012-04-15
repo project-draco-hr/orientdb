@@ -1,0 +1,19 @@
+{
+  int bufferSize=2 * OIntegerSerializer.INT_SIZE;
+  bufferSize+=OLinkSerializer.INSTANCE.getObjectSize(oldParentRid) * 3;
+  bufferSize+=OBooleanSerializer.BOOLEAN_SIZE;
+  bufferSize+=OIntegerSerializer.INT_SIZE;
+  final OBinarySerializer<K> keySerializer=((OMVRBTreeMapProvider<K,V>)treeDataProvider).keySerializer;
+  final OStreamSerializer valueSerializer=((OMVRBTreeMapProvider<K,V>)treeDataProvider).valueSerializer;
+  for (int i=0; i < oldSize; ++i)   bufferSize+=keySerializer.getObjectSize(oldKeys[i]);
+  final byte[] outBuffer=new byte[bufferSize * 2];
+  int offset=serializeMetadata(outBuffer,oldSize,oldPageSize,oldParentRid,oldLeftRid,oldRightRid,oldColor);
+  for (int i=0; i < oldSize; i++) {
+    keySerializer.serialize(oldKeys[i],outBuffer,offset);
+    offset+=keySerializer.getObjectSize(oldKeys[i]);
+  }
+  final OMemoryStream outStream=new OMemoryStream(outBuffer);
+  outStream.jump(offset);
+  for (int i=0; i < oldSize; ++i)   outStream.set(valueSerializer.toStream(oldValues[i]));
+  return outStream.toByteArray();
+}

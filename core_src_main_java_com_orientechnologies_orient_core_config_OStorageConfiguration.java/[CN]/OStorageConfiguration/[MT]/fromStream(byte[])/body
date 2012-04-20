@@ -13,25 +13,23 @@
   dateTimeFormat=read(values[index++]);
   if (version > 1)   index=phySegmentFromStream(values,index,fileTemplate);
   int size=Integer.parseInt(read(values[index++]));
-  String clusterType;
-  int clusterId;
-  String clusterName;
   clusters=new ArrayList<OStorageClusterConfiguration>(size);
   for (int i=0; i < size; ++i) {
-    clusterId=Integer.parseInt(read(values[index++]));
+    final int clusterId=Integer.parseInt(read(values[index++]));
     if (clusterId == -1)     continue;
-    clusterName=read(values[index++]);
-    clusterType=read(values[index++]);
+    final String clusterName=read(values[index++]);
+    final int targetDataSegmentId=version >= 3 ? Integer.parseInt(read(values[index++])) : 0;
+    final String clusterType=read(values[index++]);
     final OStorageClusterConfiguration currentCluster;
     if (clusterType.equals("p")) {
-      final OStoragePhysicalClusterConfiguration phyCluster=new OStoragePhysicalClusterConfiguration(this,clusterId);
+      final OStoragePhysicalClusterConfiguration phyCluster=new OStoragePhysicalClusterConfiguration(this,clusterId,targetDataSegmentId);
       phyCluster.name=clusterName;
       index=phySegmentFromStream(values,index,phyCluster);
-      phyCluster.holeFile=new OStorageClusterHoleConfiguration(phyCluster,read(values[index++]),read(values[index++]),read(values[index++]));
+      phyCluster.setHoleFile(new OStorageClusterHoleConfiguration(phyCluster,read(values[index++]),read(values[index++]),read(values[index++])));
       currentCluster=phyCluster;
     }
- else     if (clusterType.equals("l"))     currentCluster=new OStorageLogicalClusterConfiguration(clusterName,clusterId,Integer.parseInt(read(values[index++])),new ORecordId(values[index++]));
- else     currentCluster=new OStorageMemoryClusterConfiguration(clusterName,clusterId);
+ else     if (clusterType.equals("m"))     currentCluster=new OStorageMemoryClusterConfiguration(clusterName,clusterId,targetDataSegmentId);
+ else     throw new IllegalArgumentException("Unsupported cluster type: " + clusterType);
     for (int c=clusters.size(); c <= clusterId; ++c)     clusters.add(null);
     clusters.set(clusterId,currentCluster);
   }

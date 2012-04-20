@@ -3,27 +3,23 @@
   checkDatabase();
   final String type=channel.readString();
   final String name=channel.readString();
-  final int num;
-  OStorage.CLUSTER_TYPE t=OStorage.CLUSTER_TYPE.valueOf(type);
-switch (t) {
-case PHYSICAL:
-    num=connection.database.addPhysicalCluster(name,channel.readString(),channel.readInt());
-  break;
-case MEMORY:
-num=connection.database.getStorage().addCluster(name,t);
-break;
-case LOGICAL:
-num=connection.database.addLogicalCluster(name,channel.readInt());
-break;
-default :
-throw new IllegalArgumentException("Cluster type " + type + " is not supported");
-}
-beginResponse();
-try {
-sendOk(clientTxId);
-channel.writeShort((short)num);
-}
+  final String location;
+  if (connection.data.protocolVersion >= 10 || type.equalsIgnoreCase("PHYSICAL"))   location=channel.readString();
+ else   location=null;
+  final int dataSegmentId;
+  if (connection.data.protocolVersion >= 10)   dataSegmentId=channel.readInt();
+ else {
+    channel.readInt();
+    dataSegmentId=0;
+  }
+  Object[] params=null;
+  final int num=connection.database.addCluster(type,name,location,dataSegmentId,params);
+  beginResponse();
+  try {
+    sendOk(clientTxId);
+    channel.writeShort((short)num);
+  }
   finally {
-endResponse();
-}
+    endResponse();
+  }
 }

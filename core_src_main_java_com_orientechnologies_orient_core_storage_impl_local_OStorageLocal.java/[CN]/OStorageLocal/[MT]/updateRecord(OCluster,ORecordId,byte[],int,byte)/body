@@ -5,33 +5,33 @@
   try {
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
-      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
+      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
       if (!checkForRecordValidity(ppos))       return null;
 switch (iVersion) {
 case -1:
-        ++ppos.version;
-      iClusterSegment.updateVersion(iRid.clusterPosition,ppos.version);
+        ++ppos.recordVersion;
+      iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
     break;
 case -2:
   break;
 default :
 if (iVersion > -1) {
-  if (iVersion != ppos.version)   throw new OConcurrentModificationException("Cannot update record " + iRid + " in storage '"+ name+ "' because the version is not the latest. Probably you are updating an old record or it has been modified by another user (db=v"+ ppos.version+ " your=v"+ iVersion+ ")",iRid,ppos.version,iVersion);
-  ++ppos.version;
-  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.version);
+  if (iVersion != ppos.recordVersion)   throw new OConcurrentModificationException("Cannot update record " + iRid + " in storage '"+ name+ "' because the version is not the latest. Probably you are updating an old record or it has been modified by another user (db=v"+ ppos.recordVersion+ " your=v"+ iVersion+ ")",iRid,ppos.recordVersion,iVersion);
+  ++ppos.recordVersion;
+  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
 }
  else {
-  ppos.version=iVersion - Integer.MIN_VALUE;
-  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.version);
+  ppos.recordVersion=iVersion - Integer.MIN_VALUE;
+  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
 }
 }
-if (ppos.type != iRecordType) iClusterSegment.updateRecordType(iRid.clusterPosition,iRecordType);
+if (ppos.recordType != iRecordType) iClusterSegment.updateRecordType(iRid.clusterPosition,iRecordType);
 final long newDataSegmentOffset;
-if (ppos.dataChunkPosition == -1) newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).addRecord(iRid,iContent);
- else newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).setRecord(ppos.dataChunkPosition,iRid,iContent);
-if (newDataSegmentOffset != ppos.dataChunkPosition) iClusterSegment.setPhysicalPosition(iRid.clusterPosition,ppos.dataSegmentId,newDataSegmentOffset,iRecordType,ppos.version);
+if (ppos.dataSegmentPos == -1) newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).addRecord(iRid,iContent);
+ else newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).setRecord(ppos.dataSegmentPos,iRid,iContent);
+if (newDataSegmentOffset != ppos.dataSegmentPos) iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,newDataSegmentOffset);
 incrementVersion();
-ppos.dataChunkPosition=newDataSegmentOffset;
+ppos.dataSegmentPos=newDataSegmentOffset;
 return ppos;
 }
   finally {

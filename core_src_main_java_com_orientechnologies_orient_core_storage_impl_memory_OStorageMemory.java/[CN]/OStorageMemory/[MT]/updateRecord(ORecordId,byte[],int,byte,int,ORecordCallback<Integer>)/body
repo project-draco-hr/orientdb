@@ -5,18 +5,18 @@
   try {
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
-      final OPhysicalPosition ppos=cluster.getPhysicalPosition(iRid.clusterPosition,new OPhysicalPosition());
+      final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
       if (ppos == null)       return -1;
       if (iVersion != -1) {
         if (iVersion > -1) {
-          if (iVersion != ppos.version)           throw new OConcurrentModificationException("Cannot update record " + iRid + " because the version is not the latest. Probably you are updating an old record or it has been modified by another user (db=v"+ ppos.version+ " your=v"+ iVersion+ ")",iRid,ppos.version,iVersion);
-          ++ppos.version;
+          if (iVersion != ppos.recordVersion)           throw new OConcurrentModificationException("Cannot update record " + iRid + " because the version is not the latest. Probably you are updating an old record or it has been modified by another user (db=v"+ ppos.recordVersion+ " your=v"+ iVersion+ ")",iRid,ppos.recordVersion,iVersion);
+          ++ppos.recordVersion;
         }
- else         --ppos.version;
+ else         --ppos.recordVersion;
       }
       final ODataSegmentMemory dataSegment=(ODataSegmentMemory)getDataSegmentById(ppos.dataSegmentId);
-      dataSegment.updateRecord(ppos.dataChunkPosition,iContent);
-      return ppos.version;
+      dataSegment.updateRecord(ppos.dataSegmentPos,iContent);
+      return ppos.recordVersion;
     }
   finally {
       lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);

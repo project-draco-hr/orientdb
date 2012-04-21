@@ -12,10 +12,10 @@
       if (!(c instanceof OClusterLocal))       continue;
       formatMessage(iVerbose,iListener,"\n- data-cluster #%-5d %s -> ",c.getId(),c.getName());
       for (final OClusterPositionIterator it=c.absoluteIterator(); it.hasNext(); ) {
-        final Long pos=it.next();
+        ppos.clusterPosition=it.next();
         totalRecors++;
         try {
-          c.getPhysicalPosition(pos,ppos);
+          c.getPhysicalPosition(ppos);
           if (ppos.dataSegmentId >= dataSegments.length) {
             formatMessage(iVerbose,iListener,"WARN: Found wrong data segment %d ",ppos.dataSegmentId);
             warnings++;
@@ -28,32 +28,28 @@
             formatMessage(iVerbose,iListener,"WARN: Found suspected big record size %d. Is it corrupted? ",ppos.recordSize);
             warnings++;
           }
-          if (ppos.dataChunkPosition > dataSegments[ppos.dataSegmentId].getFilledUpTo()) {
-            formatMessage(iVerbose,iListener,"WARN: Found wrong pointer to data chunk %d out of data segment size (%d) ",ppos.dataChunkPosition,dataSegments[ppos.dataSegmentId].getFilledUpTo());
+          if (ppos.dataSegmentPos > dataSegments[ppos.dataSegmentId].getFilledUpTo()) {
+            formatMessage(iVerbose,iListener,"WARN: Found wrong pointer to data chunk %d out of data segment size (%d) ",ppos.dataSegmentPos,dataSegments[ppos.dataSegmentId].getFilledUpTo());
             warnings++;
           }
-          if (ppos.version < -1) {
-            formatMessage(iVerbose,iListener,"WARN: Found wrong record version %d ",ppos.version);
-            warnings++;
-          }
- else           if (ppos.version == -1) {
+          if (ppos.recordVersion < 0) {
             boolean found=false;
             int tot=((OClusterLocal)c).holeSegment.getHoles();
             for (int i=0; i < tot; ++i) {
               final long recycledPosition=((OClusterLocal)c).holeSegment.getEntryPosition(i) / OClusterLocal.RECORD_SIZE;
-              if (recycledPosition == pos) {
+              if (recycledPosition == ppos.clusterPosition) {
                 found=true;
                 break;
               }
             }
             if (!found) {
-              formatMessage(iVerbose,iListener,"WARN: Cannot find hole for deleted record %d:%d ",c.getId(),pos);
+              formatMessage(iVerbose,iListener,"WARN: Cannot find hole for deleted record %d:%d ",c.getId(),ppos.clusterPosition);
               warnings++;
             }
           }
         }
  catch (        IOException e) {
-          formatMessage(iVerbose,iListener,"WARN: Error while reading record #%d:%d ",e,c.getId(),pos);
+          formatMessage(iVerbose,iListener,"WARN: Error while reading record #%d:%d ",e,c.getId(),ppos.clusterPosition);
           warnings++;
         }
       }
@@ -63,9 +59,9 @@
         for (int i=0; i < tot; ++i) {
           long recycledPosition=-1;
           try {
-            recycledPosition=((OClusterLocal)c).holeSegment.getEntryPosition(i) / OClusterLocal.RECORD_SIZE;
-            c.getPhysicalPosition(recycledPosition,ppos);
-            if (ppos.version != -1) {
+            ppos.clusterPosition=((OClusterLocal)c).holeSegment.getEntryPosition(i) / OClusterLocal.RECORD_SIZE;
+            c.getPhysicalPosition(ppos);
+            if (ppos.recordVersion > -1) {
               formatMessage(iVerbose,iListener,"WARN: Found wrong hole %d/%d for deleted record %d:%d. The record seems good ",i,tot - 1,c.getId(),recycledPosition);
               warnings++;
             }
@@ -144,13 +140,14 @@
                   warnings++;
                 }
  else {
-                  clusters[rid.clusterId].getPhysicalPosition(rid.clusterPosition,ppos);
+                  ppos.clusterPosition=rid.clusterPosition;
+                  clusters[rid.clusterId].getPhysicalPosition(ppos);
                   if (ppos.dataSegmentId != d.getId()) {
                     formatMessage(iVerbose,iListener,"WARN: Chunk %s:%d (offset=%d size=%d) point to the RID %d but it doesn't point to current data segment %d but to %d ",d.getName(),totalChunks,pos,recordSize,rid,d.getId(),ppos.dataSegmentId);
                     warnings++;
                   }
-                  if (ppos.dataChunkPosition != pos) {
-                    formatMessage(iVerbose,iListener,"WARN: Chunk %s:%d (offset=%d size=%d) point to the RID %d but it doesn't point to current chunk %d but to %d ",d.getName(),totalChunks,pos,recordSize,rid,ppos.dataChunkPosition,pos);
+                  if (ppos.dataSegmentPos != pos) {
+                    formatMessage(iVerbose,iListener,"WARN: Chunk %s:%d (offset=%d size=%d) point to the RID %d but it doesn't point to current chunk %d but to %d ",d.getName(),totalChunks,pos,recordSize,rid,ppos.dataSegmentPos,pos);
                     warnings++;
                   }
                 }

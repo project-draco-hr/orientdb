@@ -1,5 +1,6 @@
 {
   checkConnection();
+  final OPhysicalPosition ppos=new OPhysicalPosition(iDataSegmentId,-1,iRecordType);
   do {
     try {
       final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
@@ -13,11 +14,14 @@
   finally {
         endRequest(network);
       }
-      if (iMode == 1)       return -1;
+      if (iMode == 1)       return ppos;
       if (iCallback == null)       try {
         beginResponse(network);
         iRid.clusterPosition=network.readLong();
-        return iRid.clusterPosition;
+        ppos.clusterPosition=iRid.clusterPosition;
+        if (network.getSrvProtocolVersion() >= 11)         ppos.recordVersion=network.readInt();
+ else         ppos.recordVersion=0;
+        return ppos;
       }
   finally {
         endResponse(network);

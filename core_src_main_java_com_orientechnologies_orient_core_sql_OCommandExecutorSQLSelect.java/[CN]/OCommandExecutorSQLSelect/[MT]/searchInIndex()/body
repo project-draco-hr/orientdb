@@ -62,10 +62,17 @@
     }
   }
  else {
-    for (Iterator<Entry<Object,Object>> it=index.iterator(); it.hasNext(); ) {
-      final Entry<Object,Object> current=it.next();
-      if (current.getValue() instanceof Collection<?>)       for (Iterator<OIdentifiable> collIt=((OMVRBTreeRIDSet)current.getValue()).iterator(); collIt.hasNext(); )       addResult(createIndexEntryAsDocument(current.getKey(),collIt.next().getIdentity()));
- else       addResult(createIndexEntryAsDocument(current.getKey(),(OIdentifiable)current.getValue()));
+    final OIndexInternal indexInternal=index.getInternal();
+    if (indexInternal instanceof OSharedResource)     ((OSharedResource)indexInternal).acquireExclusiveLock();
+    try {
+      for (Iterator<Entry<Object,Object>> it=index.iterator(); it.hasNext(); ) {
+        final Entry<Object,Object> current=it.next();
+        if (current.getValue() instanceof Collection<?>)         for (        OIdentifiable identifiable : ((OMVRBTreeRIDSet)current.getValue()))         addResult(createIndexEntryAsDocument(current.getKey(),identifiable.getIdentity()));
+ else         addResult(createIndexEntryAsDocument(current.getKey(),(OIdentifiable)current.getValue()));
+      }
+    }
+  finally {
+      if (indexInternal instanceof OSharedResource)       ((OSharedResource)indexInternal).releaseExclusiveLock();
     }
   }
   if (anyFunctionAggregates) {

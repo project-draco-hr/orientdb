@@ -1,0 +1,37 @@
+{
+  buffer.set(text);
+  if (parameters == null || parameters.size() == 0) {
+    buffer.set(false);
+    buffer.set(false);
+  }
+ else {
+    final Map<Object,Object> params=new HashMap<Object,Object>();
+    final Map<Object,byte[]> compositeKeyParams=new HashMap<Object,byte[]>();
+    for (    final Entry<Object,Object> paramEntry : parameters.entrySet())     if (paramEntry.getValue() instanceof OCompositeKey) {
+      final OCompositeKey compositeKey=(OCompositeKey)paramEntry.getValue();
+      final int bufferSize=OCompositeKeySerializer.INSTANCE.getObjectSize(compositeKey);
+      final byte[] stream=new byte[bufferSize];
+      OCompositeKeySerializer.INSTANCE.serialize(compositeKey,stream,0);
+      compositeKeyParams.put(paramEntry.getKey(),stream);
+    }
+ else     if (paramEntry.getValue() instanceof String) {
+      final StringBuilder builder=new StringBuilder();
+      ORecordSerializerStringAbstract.simpleValueToStream(builder,OType.STRING,paramEntry.getValue());
+      params.put(paramEntry.getKey(),builder.toString());
+    }
+ else     params.put(paramEntry.getKey(),paramEntry.getValue());
+    buffer.set(!params.isEmpty());
+    if (!params.isEmpty()) {
+      final ODocument param=new ODocument();
+      param.field("params",params);
+      buffer.set(param.toStream());
+    }
+    buffer.set(!compositeKeyParams.isEmpty());
+    if (!compositeKeyParams.isEmpty()) {
+      final ODocument compositeKey=new ODocument();
+      compositeKey.field("compositeKeyParams",compositeKeyParams);
+      buffer.set(compositeKey.toStream());
+    }
+  }
+  return buffer.toByteArray();
+}

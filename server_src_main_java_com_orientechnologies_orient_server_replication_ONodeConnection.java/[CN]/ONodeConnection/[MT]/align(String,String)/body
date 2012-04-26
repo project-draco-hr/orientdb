@@ -1,10 +1,10 @@
 {
   logger.setDatabase(iDatabaseName);
-  logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.IN,"alignment started with options %s",iOptions);
+  logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"alignment started with options %s",iOptions);
   try {
     connect();
     final String path=OServerMain.server().getStoragePath(iDatabaseName);
-    final ODatabaseComplex<?> database=OServerMain.server().openDatabase("document","local:" + path,null,null);
+    final ODatabaseComplex<?> database=OServerMain.server().openDatabase("document",path,replicator.getReplicatorUser().name,replicator.getReplicatorUser().password);
     final int blockSize=OGlobalConfiguration.DISTRIBUTED_ALIGN_RECORD_BLOCK.getValueAsInteger();
     final ODocument cfg=new ODocument();
     cfg.field("db",iDatabaseName);
@@ -16,11 +16,16 @@
       final OClusterPositionIterator iterator=cluster.absoluteIterator();
       while (iterator.hasNext()) {
         ppos.clusterPosition=iterator.next();
-        cluster.getPhysicalPosition(ppos);
-        block.field(cluster.getId() + ":" + ppos.clusterPosition,ppos.recordVersion);
-        if (current++ % blockSize == 0) {
-          sendAlignmentBlock(cfg);
-          current=0;
+        try {
+          cluster.getPhysicalPosition(ppos);
+          block.field(cluster.getId() + "_" + ppos.clusterPosition,ppos.recordVersion);
+          if (++current % blockSize == 0) {
+            sendAlignmentBlock(cfg);
+            current=0;
+          }
+        }
+ catch (        Exception e) {
+          logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"Error on loading record %d:%d because: %s",cluster.getId(),ppos.clusterPosition,e.toString());
         }
       }
     }

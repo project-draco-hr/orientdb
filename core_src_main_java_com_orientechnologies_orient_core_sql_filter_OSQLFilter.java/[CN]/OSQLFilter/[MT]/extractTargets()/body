@@ -11,8 +11,13 @@
  else   if (c == '(') {
     final StringBuilder subText=new StringBuilder();
     currentPos=OStringSerializerHelper.getEmbedded(text,currentPos,-1,subText);
-    final OCommandSQL subCommand=new OCommandSQL(subText.toString());
-    targetRecords=(Iterable<? extends OIdentifiable>)subCommand.execute();
+    final OCommandSQL subCommand=new OCommandSQLResultset(subText.toString());
+    final OCommandExecutor executor=OCommandManager.instance().getExecutor(subCommand);
+    executor.setProgressListener(subCommand.getProgressListener());
+    executor.parse(subCommand);
+    subCommand.setContext(executor.getContext());
+    if (!(executor instanceof Iterable<?>))     throw new OCommandSQLParsingException("Sub-query cannot be iterated because doesn't implement the Iterable interface: " + subCommand);
+    targetRecords=(Iterable<? extends OIdentifiable>)executor;
     final OCommandContext subContext=subCommand.getContext();
     if (context != null)     context.merge(subContext);
  else     context=subContext;

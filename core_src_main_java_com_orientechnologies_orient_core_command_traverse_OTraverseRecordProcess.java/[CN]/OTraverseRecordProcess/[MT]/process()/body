@@ -1,0 +1,34 @@
+{
+  if (command.getContext().isAlreadyTraversed(target))   return drop();
+  if (target.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)   try {
+    target.reload();
+  }
+ catch (  final ORecordNotFoundException e) {
+    return drop();
+  }
+  command.getContext().addTraversed(target);
+  if (command.getPredicate() != null) {
+    final Object conditionResult=command.getPredicate().evaluate(target,command.getContext());
+    if (conditionResult != Boolean.TRUE)     return drop();
+  }
+  final List<String> fields=new ArrayList<String>();
+  for (  String cfgField : command.getFields()) {
+    if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equalsIgnoreCase(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equalsIgnoreCase(cfgField)) {
+      for (      String f : target.fieldNames())       fields.add(f);
+      break;
+    }
+ else {
+      final int pos=cfgField.indexOf('.');
+      if (pos > -1) {
+        final OClass cls=target.getSchemaClass();
+        if (cls == null)         continue;
+        final String className=cfgField.substring(0,pos);
+        if (!cls.isSubClassOf(className))         continue;
+        cfgField=cfgField.substring(pos + 1);
+        fields.add(cfgField);
+      }
+    }
+  }
+  new OTraverseFieldProcess(command,fields.iterator());
+  return target;
+}

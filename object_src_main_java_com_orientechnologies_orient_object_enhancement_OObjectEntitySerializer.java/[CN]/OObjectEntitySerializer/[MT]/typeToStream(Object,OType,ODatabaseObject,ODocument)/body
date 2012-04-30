@@ -1,0 +1,31 @@
+{
+  if (iFieldValue == null)   return null;
+  if (iFieldValue instanceof Proxy)   return getDocument((Proxy)iFieldValue);
+  if (!OType.isSimpleType(iFieldValue)) {
+    Class<?> fieldClass=iFieldValue.getClass();
+    if (fieldClass.isArray()) {
+      iFieldValue=multiValueToStream(Arrays.asList(iFieldValue),iType,db,iRecord);
+    }
+ else     if (Collection.class.isAssignableFrom(fieldClass)) {
+      iFieldValue=multiValueToStream(iFieldValue,iType,db,iRecord);
+    }
+ else     if (Map.class.isAssignableFrom(fieldClass)) {
+      iFieldValue=multiValueToStream(iFieldValue,iType,db,iRecord);
+    }
+ else     if (fieldClass.isEnum()) {
+      iFieldValue=((Enum<?>)iFieldValue).name();
+    }
+ else {
+      fieldClass=db.getEntityManager().getEntityClass(fieldClass.getSimpleName());
+      if (fieldClass != null) {
+        iFieldValue=getDocument((Proxy)serializeObject(iFieldValue,db));
+      }
+ else {
+        final Object result=serializeFieldValue(null,iFieldValue);
+        if (iFieldValue == result)         throw new OSerializationException("Linked type [" + iFieldValue.getClass() + ":"+ iFieldValue+ "] cannot be serialized because is not part of registered entities. To fix this error register this class");
+        iFieldValue=result;
+      }
+    }
+  }
+  return iFieldValue;
+}

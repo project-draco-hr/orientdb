@@ -1,0 +1,33 @@
+{
+  try {
+    final List<ORecordOperation> newEntries;
+    if (getTransaction().getCurrentRecordEntries() != null) {
+      newEntries=new ArrayList<ORecordOperation>();
+      for (      ORecordOperation entry : getTransaction().getCurrentRecordEntries())       if (entry.type == ORecordOperation.CREATED)       newEntries.add(entry);
+    }
+ else     newEntries=null;
+    ((ODatabaseRecordTx)underlying.getUnderlying()).rollback();
+    if (newEntries != null) {
+      Object pojo=null;
+      for (      ORecordOperation entry : newEntries) {
+        pojo=records2Objects.get(entry.getRecord());
+        OObjectSerializerHelper.setObjectID(null,pojo);
+        OObjectSerializerHelper.setObjectVersion(null,pojo);
+      }
+    }
+    if (getTransaction().getCurrentRecordEntries() != null)     for (    ORecordOperation recordEntry : getTransaction().getCurrentRecordEntries()) {
+      rid2Records.remove(recordEntry.getRecord().getIdentity());
+      final Object pojo=records2Objects.remove(recordEntry.getRecord());
+      if (pojo != null)       objects2Records.remove(pojo);
+    }
+    if (getTransaction().getAllRecordEntries() != null)     for (    ORecordOperation recordEntry : getTransaction().getAllRecordEntries()) {
+      rid2Records.remove(recordEntry.getRecord().getIdentity());
+      final Object pojo=records2Objects.remove(recordEntry.getRecord());
+      if (pojo != null)       objects2Records.remove(pojo);
+    }
+  }
+  finally {
+    getTransaction().close();
+  }
+  return this;
+}

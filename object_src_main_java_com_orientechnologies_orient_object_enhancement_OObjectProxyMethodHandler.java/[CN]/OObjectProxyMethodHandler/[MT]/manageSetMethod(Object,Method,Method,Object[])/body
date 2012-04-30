@@ -1,0 +1,42 @@
+{
+  final String fieldName;
+  fieldName=getFieldName(m);
+  Object valueToSet=args[0];
+  if (valueToSet instanceof Proxy) {
+    doc.field(fieldName,OObjectEntitySerializer.getDocument((Proxy)valueToSet));
+  }
+ else   if (((valueToSet instanceof Collection<?> || valueToSet instanceof Map<?,?>)) || valueToSet.getClass().isArray()) {
+    Class<?> genericMultiValueType=OReflectionHelper.getGenericMultivalueType(getField(fieldName,self.getClass()));
+    if (genericMultiValueType != null && !OReflectionHelper.isJavaType(genericMultiValueType)) {
+      if (!(valueToSet instanceof OLazyObjectMultivalueElement)) {
+        if (valueToSet instanceof Collection<?>) {
+          valueToSet=manageCollectionSave(fieldName,(Collection<?>)valueToSet);
+        }
+ else         if (valueToSet instanceof Map<?,?>) {
+          valueToSet=manageMapSave(fieldName,(Map<?,?>)valueToSet);
+        }
+ else         if (valueToSet.getClass().isArray()) {
+          valueToSet=manageArraySave(fieldName,(Object[])valueToSet);
+        }
+      }
+    }
+ else {
+      if (OObjectEntitySerializer.isToSerialize(valueToSet.getClass())) {
+        doc.field(fieldName,OObjectEntitySerializer.serializeFieldValue(getField(fieldName,self.getClass()).getType(),valueToSet));
+      }
+ else {
+        doc.field(fieldName,valueToSet);
+      }
+    }
+  }
+ else {
+    if (OObjectEntitySerializer.isToSerialize(valueToSet.getClass())) {
+      doc.field(fieldName,OObjectEntitySerializer.serializeFieldValue(getField(fieldName,self.getClass()).getType(),valueToSet));
+    }
+ else {
+      doc.field(fieldName,valueToSet);
+    }
+  }
+  args[0]=valueToSet;
+  return proceed.invoke(self,args);
+}

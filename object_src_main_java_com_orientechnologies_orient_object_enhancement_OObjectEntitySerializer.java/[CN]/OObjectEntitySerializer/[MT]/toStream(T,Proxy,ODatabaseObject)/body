@@ -1,0 +1,69 @@
+{
+  final ODocument iRecord=getDocument(iProxiedPojo);
+  final long timer=OProfiler.getInstance().startChrono();
+  final Integer identityRecord=System.identityHashCode(iPojo);
+  if (OObjectSerializationThreadLocal.INSTANCE.get().containsKey(identityRecord))   return (T)OObjectSerializationThreadLocal.INSTANCE.get().get(identityRecord);
+  OObjectSerializationThreadLocal.INSTANCE.get().put(identityRecord,iProxiedPojo);
+  OProperty schemaProperty;
+  final Class<?> pojoClass=iPojo.getClass();
+  final OClass schemaClass=iRecord.getSchemaClass();
+  final Field idField=getIdField(pojoClass);
+  if (idField != null) {
+    Object id=getFieldValue(idField,iPojo);
+    if (id != null) {
+      if (id instanceof ORecordId) {
+        iRecord.setIdentity((ORecordId)id);
+      }
+ else       if (id instanceof Number) {
+        ((ORecordId)iRecord.getIdentity()).clusterId=schemaClass.getDefaultClusterId();
+        ((ORecordId)iRecord.getIdentity()).clusterPosition=((Number)id).longValue();
+      }
+ else       if (id instanceof String)       ((ORecordId)iRecord.getIdentity()).fromString((String)id);
+ else       if (id.getClass().equals(Object.class))       iRecord.setIdentity((ORecordId)id);
+ else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Id field has been declared as %s while the supported are: ORID, Number, String, Object",id.getClass());
+    }
+  }
+  final Field vField=getVersionField(pojoClass);
+  boolean versionConfigured=false;
+  if (vField != null) {
+    versionConfigured=true;
+    Object ver=getFieldValue(vField,iPojo);
+    if (ver != null) {
+      if (ver instanceof Number) {
+        iRecord.setVersion(((Number)ver).intValue());
+      }
+ else       if (ver instanceof String)       iRecord.setVersion(Integer.parseInt((String)ver));
+ else       if (ver.getClass().equals(Object.class))       iRecord.setVersion((Integer)ver);
+ else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Version field has been declared as %s while the supported are: Number, String, Object",ver.getClass());
+    }
+  }
+  if (db.isMVCC() && !versionConfigured && db.getTransaction() instanceof OTransactionOptimistic)   throw new OTransactionException("Cannot involve an object of class '" + pojoClass + "' in an Optimistic Transaction commit because it does not define @Version or @OVersion and therefore cannot handle MVCC");
+  String fieldName;
+  Object fieldValue;
+  invokeCallback(pojoClass,iProxiedPojo,iRecord,OBeforeSerialization.class);
+  for (  Field p : pojoClass.getDeclaredFields()) {
+    fieldName=p.getName();
+    if ((idField != null && fieldName.equals(idField.getName()) || (vField != null && fieldName.equals(vField.getName())) || (transientFields.get(pojoClass) != null && transientFields.get(pojoClass).contains(fieldName))))     continue;
+    fieldValue=serializeFieldValue(p.getType(),getFieldValue(p,iPojo));
+    schemaProperty=iRecord.getSchemaClass() != null ? iRecord.getSchemaClass().getProperty(fieldName) : null;
+    if (fieldValue != null) {
+      if (isEmbeddedObject(p)) {
+        if (iRecord.getSchemaClass() == null) {
+          db.getMetadata().getSchema().createClass(iPojo.getClass());
+          iRecord.setClassNameIfExists(iPojo.getClass().getSimpleName());
+        }
+        if (schemaProperty == null) {
+          OType t=OType.getTypeByClass(fieldValue.getClass());
+          if (t == null)           t=OType.EMBEDDED;
+          schemaProperty=iRecord.getSchemaClass().createProperty(fieldName,t);
+        }
+      }
+    }
+    fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,db,iRecord);
+    iRecord.field(fieldName,fieldValue);
+  }
+  invokeCallback(pojoClass,iProxiedPojo,iRecord,OAfterSerialization.class);
+  OObjectSerializationThreadLocal.INSTANCE.get().remove(identityRecord);
+  OProfiler.getInstance().stopChrono("Object.toStream",timer);
+  return (T)iProxiedPojo;
+}

@@ -1,0 +1,64 @@
+{
+  if (iMultiValue == null)   return null;
+  final Collection<Object> sourceValues;
+  if (iMultiValue instanceof Collection<?>) {
+    sourceValues=(Collection<Object>)iMultiValue;
+  }
+ else {
+    sourceValues=(Collection<Object>)((Map<?,?>)iMultiValue).values();
+  }
+  if (sourceValues.size() == 0)   return iMultiValue;
+  final Object firstValue=sourceValues.iterator().next();
+  if (firstValue == null)   return iMultiValue;
+  if (iType == null) {
+    if (OType.isSimpleType(firstValue)) {
+      if (iMultiValue instanceof List)       iType=OType.EMBEDDEDLIST;
+ else       if (iMultiValue instanceof Set)       iType=OType.EMBEDDEDSET;
+ else       iType=OType.EMBEDDEDMAP;
+    }
+ else {
+      if (iMultiValue instanceof List)       iType=OType.LINKLIST;
+ else       if (iMultiValue instanceof Set)       iType=OType.LINKSET;
+ else       iType=OType.LINKMAP;
+    }
+  }
+  Object result=iMultiValue;
+  final OType linkedType;
+  if (iType.equals(OType.EMBEDDEDSET) || iType.equals(OType.LINKSET)) {
+    if (isToSerialize(firstValue.getClass()))     result=new HashSet<Object>();
+ else     if (iRecord != null && iType.equals(OType.EMBEDDEDSET))     result=new OTrackedSet<Object>(iRecord);
+ else     result=new ORecordLazySet(iRecord);
+  }
+ else   if (iType.equals(OType.EMBEDDEDLIST) || iType.equals(OType.LINKLIST)) {
+    if (isToSerialize(firstValue.getClass()))     result=new ArrayList<Object>();
+ else     if (iRecord != null && iType.equals(OType.EMBEDDEDLIST))     result=new OTrackedList<Object>(iRecord);
+ else     result=new ORecordLazyList(iRecord);
+  }
+  if (iType.equals(OType.LINKLIST) || iType.equals(OType.LINKSET) || iType.equals(OType.LINKMAP))   linkedType=OType.LINK;
+ else   if (iType.equals(OType.EMBEDDEDLIST) || iType.equals(OType.EMBEDDEDSET) || iType.equals(OType.EMBEDDEDMAP))   linkedType=OType.EMBEDDED;
+ else   throw new IllegalArgumentException("Type " + iType + " must be a multi value type (collection or map)");
+  if (iMultiValue instanceof Set<?>) {
+    for (    Object o : sourceValues) {
+      ((Set<Object>)result).add(typeToStream(o,linkedType,db,null));
+    }
+  }
+ else   if (iMultiValue instanceof List<?>) {
+    for (int i=0; i < sourceValues.size(); i++) {
+      ((List<Object>)result).add(typeToStream(((List<?>)sourceValues).get(i),linkedType,db,null));
+    }
+  }
+ else {
+    if (iMultiValue instanceof OLazyObjectMap<?>) {
+      result=((OLazyObjectMap<?>)iMultiValue).getUnderlying();
+    }
+ else {
+      if (isToSerialize(firstValue.getClass()))       result=new HashMap<Object,Object>();
+ else       if (iRecord != null && iType.equals(OType.EMBEDDEDMAP))       result=new OTrackedMap<Object>(iRecord);
+ else       result=new ORecordLazyMap(iRecord);
+      for (      Entry<Object,Object> entry : ((Map<Object,Object>)iMultiValue).entrySet()) {
+        ((Map<Object,Object>)result).put(entry.getKey(),typeToStream(entry.getValue(),linkedType,db,null));
+      }
+    }
+  }
+  return result;
+}

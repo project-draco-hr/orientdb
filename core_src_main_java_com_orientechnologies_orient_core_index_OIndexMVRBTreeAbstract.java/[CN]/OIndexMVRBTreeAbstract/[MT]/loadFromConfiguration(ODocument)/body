@@ -54,7 +54,15 @@ catch (      final IllegalAccessException e) {
     final Collection<? extends String> clusters=configuration.field(CONFIG_CLUSTERS);
     if (clusters != null)     clustersToIndex.addAll(clusters);
     map=new OMVRBTreeDatabaseLazySave<Object,T>(getDatabase(),rid);
-    map.load();
+    try {
+      map.load();
+    }
+ catch (    Exception e) {
+      if (onCorruptionRepairDatabase(null,"load","Index will be rebuilt")) {
+        if (isAutomatic())         OLogManager.instance().warn(this,"Cannot load index '%s' from storage (rid=%s): rebuilt it from scratch",getName(),rid);
+        rebuild();
+      }
+    }
     installHooks(iConfig.getDatabase());
     return this;
   }

@@ -1,8 +1,8 @@
 {
   ODistributedDatabaseInfo db=getDatabase(iDb.getName());
-  if (db != null)   throw new ODistributedSynchronizationException("Database '" + iDb.getName() + "' is already shared on remote server node '"+ id+ "'");
-  final long time=System.currentTimeMillis();
+  if (db != null && db.isOnline())   throw new ODistributedSynchronizationException("Database '" + iDb.getName() + "' is already shared on remote server node '"+ id+ "'");
   db=createDatabaseEntry(iDb.getName(),SYNCH_TYPE.SYNCH);
+  final long time=System.currentTimeMillis();
   try {
     logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"copying database to the remote server via streaming across the network...");
     db.setSynchronizing();
@@ -10,11 +10,11 @@
     db.connection.copy(iDb,db.databaseName,db.userName,db.userPassword,iRemoteEngine);
   }
  catch (  IOException e) {
-    databases.remove(iDb.getName());
+    removeDatabase(iDb.getName());
     throw e;
   }
 catch (  Exception e) {
-    databases.remove(iDb.getName());
+    removeDatabase(iDb.getName());
     logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"Error on copying database");
     throw new OIOException("Error on copying database",e);
   }

@@ -1,0 +1,75 @@
+{
+  final Set<?> mySet=myFieldValue;
+  final Set<?> otherSet=otherFieldValue;
+  final int mySize=makeDbCall(iMyDb,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return mySet.size();
+    }
+  }
+);
+  final int otherSize=makeDbCall(iOtherDb,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return otherSet.size();
+    }
+  }
+);
+  if (mySize != otherSize)   return false;
+  boolean oldMyAutoConvert=false;
+  boolean oldOtherAutoConvert=false;
+  if (mySet instanceof ORecordLazyMultiValue) {
+    oldMyAutoConvert=((ORecordLazyMultiValue)mySet).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)mySet).setAutoConvertToRecord(false);
+  }
+  if (otherSet instanceof ORecordLazyMultiValue) {
+    oldOtherAutoConvert=((ORecordLazyMultiValue)otherSet).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)otherSet).setAutoConvertToRecord(false);
+  }
+  try {
+    final Iterator<?> myIterator=makeDbCall(iMyDb,new ODbRelatedCall<Iterator<?>>(){
+      public Iterator<?> call(){
+        return mySet.iterator();
+      }
+    }
+);
+    while (makeDbCall(iMyDb,new ODbRelatedCall<Boolean>(){
+      public Boolean call(){
+        return myIterator.hasNext();
+      }
+    }
+)) {
+      final Iterator<?> otherIterator=makeDbCall(iOtherDb,new ODbRelatedCall<Iterator<?>>(){
+        public Iterator<?> call(){
+          return otherSet.iterator();
+        }
+      }
+);
+      final Object myNextVal=makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+        public Object call(){
+          return myIterator.next();
+        }
+      }
+);
+      boolean found=false;
+      while (!found && makeDbCall(iOtherDb,new ODbRelatedCall<Boolean>(){
+        public Boolean call(){
+          return otherIterator.hasNext();
+        }
+      }
+)) {
+        final Object otherNextVal=makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return otherIterator.next();
+          }
+        }
+);
+        found=hasSameContentItem(myNextVal,iMyDb,otherNextVal,iOtherDb);
+      }
+      if (!found)       return false;
+    }
+    return true;
+  }
+  finally {
+    if (mySet instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)mySet).setAutoConvertToRecord(oldMyAutoConvert);
+    if (otherSet instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)otherSet).setAutoConvertToRecord(oldOtherAutoConvert);
+  }
+}

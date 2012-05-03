@@ -1,0 +1,37 @@
+{
+  listener.onMessage("\nImporting indexes ...");
+  final String indexMgrRecordId=database.getStorage().getConfiguration().indexMgrRecordId;
+  database.load(new ORecordId(indexMgrRecordId)).clear().save();
+  OIndexManagerProxy indexManager=database.getMetadata().getIndexManager();
+  indexManager.reload();
+  jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
+  int n=0;
+  while (jsonReader.lastChar() != ']') {
+    jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+    String indexName=null;
+    String indexType=null;
+    Set<String> clustersToIndex=new HashSet<String>();
+    OIndexDefinition indexDefinition=null;
+    while (jsonReader.lastChar() != '}') {
+      final String fieldName=jsonReader.readString(OJSONReader.FIELD_ASSIGNMENT);
+      if (fieldName.equals("name"))       indexName=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
+ else       if (fieldName.equals("type"))       indexType=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
+ else       if (fieldName.equals("clustersToIndex"))       clustersToIndex=importClustersToIndex();
+ else       if (fieldName.equals("definition"))       indexDefinition=importIndexDefinition();
+    }
+    jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+    listener.onMessage("\n- Index '" + indexName + "'...");
+    indexManager.dropIndex(indexName);
+    int[] clusterIdsToIndex=new int[clustersToIndex.size()];
+    int i=0;
+    for (    final String clusterName : clustersToIndex) {
+      clusterIdsToIndex[i]=database.getClusterIdByName(clusterName);
+      i++;
+    }
+    indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null);
+    n++;
+    listener.onMessage("OK");
+  }
+  listener.onMessage("\nDone. Created " + n + " indexes.");
+  jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
+}

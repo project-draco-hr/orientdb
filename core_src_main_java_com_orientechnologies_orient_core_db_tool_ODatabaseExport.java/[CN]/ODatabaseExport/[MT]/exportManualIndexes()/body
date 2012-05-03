@@ -1,0 +1,47 @@
+{
+  listener.onMessage("\nExporting manual indexes content...");
+  final OIndexManagerProxy indexManager=database.getMetadata().getIndexManager();
+  indexManager.reload();
+  final Collection<? extends OIndex> indexes=indexManager.getIndexes();
+  ODocument exportEntry=new ODocument();
+  int manualIndexes=0;
+  writer.beginCollection(1,true,"manualIndexes");
+  for (  OIndex index : indexes) {
+    if (!index.isAutomatic()) {
+      listener.onMessage("\nExporting index " + index.getName() + " ...");
+      writer.beginObject(2,true,null);
+      writer.writeAttribute(3,true,"name",index.getName());
+      List<ODocument> indexContent=database.query(new OSQLSynchQuery<ODocument>("select from index:" + index.getName()));
+      writer.beginCollection(3,true,"content");
+      int i=0;
+      for (      ODocument indexEntry : indexContent) {
+        if (i > 0)         writer.append(",");
+        final OIndexDefinition indexDefinition=index.getDefinition();
+        exportEntry.reset();
+        if (indexDefinition instanceof ORuntimeKeyIndexDefinition && ((ORuntimeKeyIndexDefinition)indexDefinition).getSerializer() != null) {
+          final OBinarySerializer binarySerializer=((ORuntimeKeyIndexDefinition)indexDefinition).getSerializer();
+          int dataSize=binarySerializer.getObjectSize(indexEntry.field("key"));
+          byte[] binaryContent=new byte[dataSize];
+          binarySerializer.serialize(indexEntry.field("key"),binaryContent,0);
+          exportEntry.field("binary",true);
+          exportEntry.field("key",binaryContent);
+        }
+ else {
+          exportEntry.field("binary",false);
+          exportEntry.field("key",indexEntry.field("key"));
+        }
+        exportEntry.field("rid",indexEntry.field("rid"));
+        i++;
+        writer.append(exportEntry.toJSON());
+        final long percent=indexContent.size() / 10;
+        if (percent > 0 && (i % percent) == 0)         listener.onMessage(".");
+      }
+      writer.endCollection(3,true);
+      writer.endObject(2,true);
+      listener.onMessage("\nExport of " + index.getName() + " index was completed.");
+      manualIndexes++;
+    }
+  }
+  writer.endCollection(1,true);
+  listener.onMessage("\nOK (" + manualIndexes + " manual indexes)");
+}

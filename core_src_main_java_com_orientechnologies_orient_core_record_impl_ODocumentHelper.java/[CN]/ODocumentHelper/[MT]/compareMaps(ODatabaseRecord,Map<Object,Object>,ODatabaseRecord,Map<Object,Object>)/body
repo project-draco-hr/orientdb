@@ -1,0 +1,81 @@
+{
+  final Map<Object,Object> myMap=myFieldValue;
+  final Map<Object,Object> otherMap=otherFieldValue;
+  if (myMap.size() != otherMap.size())   return false;
+  boolean oldMyAutoConvert=false;
+  boolean oldOtherAutoConvert=false;
+  if (myMap instanceof ORecordLazyMultiValue) {
+    oldMyAutoConvert=((ORecordLazyMultiValue)myMap).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)myMap).setAutoConvertToRecord(false);
+  }
+  if (otherMap instanceof ORecordLazyMultiValue) {
+    oldOtherAutoConvert=((ORecordLazyMultiValue)otherMap).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)otherMap).setAutoConvertToRecord(false);
+  }
+  try {
+    final Iterator<Entry<Object,Object>> myEntryIterator=makeDbCall(iMyDb,new ODbRelatedCall<Iterator<Entry<Object,Object>>>(){
+      public Iterator<Entry<Object,Object>> call(){
+        return myMap.entrySet().iterator();
+      }
+    }
+);
+    while (makeDbCall(iMyDb,new ODbRelatedCall<Boolean>(){
+      public Boolean call(){
+        return myEntryIterator.hasNext();
+      }
+    }
+)) {
+      final Entry<Object,Object> myEntry=makeDbCall(iMyDb,new ODbRelatedCall<Entry<Object,Object>>(){
+        public Entry<Object,Object> call(){
+          return myEntryIterator.next();
+        }
+      }
+);
+      final Object myKey=makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+        public Object call(){
+          return myEntry.getKey();
+        }
+      }
+);
+      if (makeDbCall(iOtherDb,new ODbRelatedCall<Boolean>(){
+        public Boolean call(){
+          return !otherMap.containsKey(myKey);
+        }
+      }
+))       return false;
+      if (myEntry.getValue() instanceof ODocument) {
+        if (!hasSameContentOf(makeDbCall(iMyDb,new ODbRelatedCall<ODocument>(){
+          public ODocument call(){
+            return (ODocument)myEntry.getValue();
+          }
+        }
+),iMyDb,makeDbCall(iOtherDb,new ODbRelatedCall<ODocument>(){
+          public ODocument call(){
+            return (ODocument)otherMap.get(myEntry.getKey());
+          }
+        }
+),iOtherDb))         return false;
+      }
+ else {
+        final Object myValue=makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return myEntry.getValue();
+          }
+        }
+);
+        final Object otherValue=makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return otherMap.get(myEntry.getKey());
+          }
+        }
+);
+        if (!compareScalarValues(myValue,otherValue))         return false;
+      }
+    }
+    return true;
+  }
+  finally {
+    if (myMap instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)myMap).setAutoConvertToRecord(oldMyAutoConvert);
+    if (otherMap instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)otherMap).setAutoConvertToRecord(oldOtherAutoConvert);
+  }
+}

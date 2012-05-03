@@ -1,0 +1,59 @@
+{
+  if (iOther == null)   return false;
+  if (!iCurrent.equals(iOther) && iCurrent.getIdentity().isValid())   return false;
+  makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+    public Object call(){
+      if (iCurrent.getInternalStatus() == STATUS.NOT_LOADED)       iCurrent.reload();
+      return null;
+    }
+  }
+);
+  makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+    public Object call(){
+      if (iOther.getInternalStatus() == STATUS.NOT_LOADED)       iOther.reload();
+      return null;
+    }
+  }
+);
+  makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+    public Object call(){
+      iCurrent.checkForFields();
+      return null;
+    }
+  }
+);
+  makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+    public Object call(){
+      iOther.checkForFields();
+      return null;
+    }
+  }
+);
+  if (iCurrent._fieldValues.size() != iOther._fieldValues.size())   return false;
+  Object myFieldValue;
+  Object otherFieldValue;
+  for (  Entry<String,Object> f : iCurrent._fieldValues.entrySet()) {
+    myFieldValue=f.getValue();
+    otherFieldValue=iOther._fieldValues.get(f.getKey());
+    if (myFieldValue == null) {
+      if (otherFieldValue != null)       return false;
+    }
+ else     if (otherFieldValue == null)     return false;
+    if (myFieldValue != null)     if (myFieldValue instanceof Set && otherFieldValue instanceof Set) {
+      if (!compareSets(iMyDb,(Set<?>)myFieldValue,iOtherDb,(Set<?>)otherFieldValue))       return false;
+    }
+ else     if (myFieldValue instanceof Collection && otherFieldValue instanceof Collection) {
+      if (!compareCollections(iMyDb,(Collection<?>)myFieldValue,iOtherDb,(Collection<?>)otherFieldValue))       return false;
+    }
+ else     if (myFieldValue instanceof Map && otherFieldValue instanceof Map) {
+      if (!compareMaps(iMyDb,(Map<Object,Object>)myFieldValue,iOtherDb,(Map<Object,Object>)otherFieldValue))       return false;
+    }
+ else     if (myFieldValue instanceof ODocument && otherFieldValue instanceof ODocument) {
+      return hasSameContentOf((ODocument)myFieldValue,iMyDb,(ODocument)otherFieldValue,iOtherDb);
+    }
+ else {
+      if (!compareScalarValues(myFieldValue,otherFieldValue))       return false;
+    }
+  }
+  return true;
+}

@@ -1,0 +1,54 @@
+{
+  final Collection<?> myCollection=myFieldValue;
+  final Collection<?> otherCollection=otherFieldValue;
+  if (myCollection.size() != otherCollection.size())   return false;
+  boolean oldMyAutoConvert=false;
+  boolean oldOtherAutoConvert=false;
+  if (myCollection instanceof ORecordLazyMultiValue) {
+    oldMyAutoConvert=((ORecordLazyMultiValue)myCollection).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)myCollection).setAutoConvertToRecord(false);
+  }
+  if (otherCollection instanceof ORecordLazyMultiValue) {
+    oldOtherAutoConvert=((ORecordLazyMultiValue)otherCollection).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)otherCollection).setAutoConvertToRecord(false);
+  }
+  try {
+    final Iterator<?> myIterator=makeDbCall(iMyDb,new ODbRelatedCall<Iterator<?>>(){
+      public Iterator<?> call(){
+        return myCollection.iterator();
+      }
+    }
+);
+    final Iterator<?> otherIterator=makeDbCall(iOtherDb,new ODbRelatedCall<Iterator<?>>(){
+      public Iterator<?> call(){
+        return otherCollection.iterator();
+      }
+    }
+);
+    while (makeDbCall(iMyDb,new ODbRelatedCall<Boolean>(){
+      public Boolean call(){
+        return myIterator.hasNext();
+      }
+    }
+)) {
+      final Object myNextVal=makeDbCall(iMyDb,new ODbRelatedCall<Object>(){
+        public Object call(){
+          return myIterator.next();
+        }
+      }
+);
+      final Object otherNextVal=makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+        public Object call(){
+          return otherIterator.next();
+        }
+      }
+);
+      if (!hasSameContentItem(myNextVal,iMyDb,otherNextVal,iOtherDb))       return false;
+    }
+    return true;
+  }
+  finally {
+    if (myCollection instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)myCollection).setAutoConvertToRecord(oldMyAutoConvert);
+    if (otherCollection instanceof ORecordLazyMultiValue)     ((ORecordLazyMultiValue)otherCollection).setAutoConvertToRecord(oldOtherAutoConvert);
+  }
+}

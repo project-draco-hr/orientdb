@@ -1,0 +1,190 @@
+{
+  listener.onMessage("\nStarting index comparison:");
+  boolean ok=true;
+  final OIndexManager indexManagerOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<OIndexManager>(){
+    public OIndexManager call(){
+      return databaseDocumentTxOne.getMetadata().getIndexManager();
+    }
+  }
+);
+  final OIndexManager indexManagerTwo=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<OIndexManager>(){
+    public OIndexManager call(){
+      return databaseDocumentTxTwo.getMetadata().getIndexManager();
+    }
+  }
+);
+  final Collection<? extends OIndex> indexesOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Collection<? extends OIndex>>(){
+    public Collection<? extends OIndex> call(){
+      return indexManagerOne.getIndexes();
+    }
+  }
+);
+  final int indexesSizeOne=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return indexesOne.size();
+    }
+  }
+);
+  final int indexesSizeTwo=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return indexManagerTwo.getIndexes().size();
+    }
+  }
+);
+  if (indexesSizeOne != indexesSizeTwo) {
+    ok=false;
+    listener.onMessage("\n- ERR: Amount of indexes are different.");
+    listener.onMessage("\n--- DB1: " + indexesSizeOne);
+    listener.onMessage("\n--- DB2: " + indexesSizeTwo);
+    listener.onMessage("\n");
+    ++differences;
+  }
+  final Iterator<? extends OIndex> iteratorOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Iterator<? extends OIndex>>(){
+    public Iterator<? extends OIndex> call(){
+      return indexesOne.iterator();
+    }
+  }
+);
+  while (makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Boolean>(){
+    public Boolean call(){
+      return iteratorOne.hasNext();
+    }
+  }
+)) {
+    final OIndex indexOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<OIndex>(){
+      public OIndex call(){
+        return iteratorOne.next();
+      }
+    }
+);
+    final OIndex indexTwo=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<OIndex>(){
+      public OIndex call(){
+        return indexManagerTwo.getIndex(indexOne.getName());
+      }
+    }
+);
+    if (indexTwo == null) {
+      ok=false;
+      listener.onMessage("\n- ERR: Index " + indexOne.getName() + " is absent in DB2.");
+      ++differences;
+      continue;
+    }
+    if (!indexOne.getType().equals(indexTwo.getType())) {
+      ok=false;
+      listener.onMessage("\n- ERR: Index types for index " + indexOne.getName() + " are different.");
+      listener.onMessage("\n--- DB1: " + indexOne.getType());
+      listener.onMessage("\n--- DB2: " + indexTwo.getType());
+      listener.onMessage("\n");
+      ++differences;
+      continue;
+    }
+    if (!indexOne.getClusters().equals(indexTwo.getClusters())) {
+      ok=false;
+      listener.onMessage("\n- ERR: Clusters to index for index " + indexOne.getName() + " are different.");
+      listener.onMessage("\n--- DB1: " + indexOne.getClusters());
+      listener.onMessage("\n--- DB2: " + indexTwo.getClusters());
+      listener.onMessage("\n");
+      ++differences;
+      continue;
+    }
+    if (indexOne.getDefinition() == null && indexTwo.getDefinition() != null) {
+      ok=false;
+      listener.onMessage("\n- ERR: Index definition for index " + indexOne.getName() + " for DB2 is not null.");
+      ++differences;
+      continue;
+    }
+ else     if (indexOne.getDefinition() != null && indexTwo.getDefinition() == null) {
+      ok=false;
+      listener.onMessage("\n- ERR: Index definition for index " + indexOne.getName() + " for DB2 is null.");
+      ++differences;
+      continue;
+    }
+ else     if (indexOne.getDefinition() != null && !indexOne.getDefinition().equals(indexTwo.getDefinition())) {
+      ok=false;
+      listener.onMessage("\n- ERR: Index definitions for index " + indexOne.getName() + " are different.");
+      listener.onMessage("\n--- DB1: " + indexOne.getDefinition());
+      listener.onMessage("\n--- DB2: " + indexTwo.getDefinition());
+      listener.onMessage("\n");
+      ++differences;
+      continue;
+    }
+    final long indexOneSize=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Long>(){
+      public Long call(){
+        return indexOne.getSize();
+      }
+    }
+);
+    final long indexTwoSize=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<Long>(){
+      public Long call(){
+        return indexTwo.getSize();
+      }
+    }
+);
+    if (indexOneSize != indexTwoSize) {
+      ok=false;
+      listener.onMessage("\n- ERR: Amount of entries for index " + indexOne.getName() + " are different.");
+      listener.onMessage("\n--- DB1: " + indexOneSize);
+      listener.onMessage("\n--- DB2: " + indexTwoSize);
+      listener.onMessage("\n");
+      ++differences;
+    }
+    if (compareEntriesForAutomaticIndexes || !indexOne.isAutomatic()) {
+      final Iterator<Map.Entry<Object,Object>> indexIteratorOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Iterator<Map.Entry<Object,Object>>>(){
+        public Iterator<Map.Entry<Object,Object>> call(){
+          return indexOne.iterator();
+        }
+      }
+);
+      while (makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Boolean>(){
+        public Boolean call(){
+          return indexIteratorOne.hasNext();
+        }
+      }
+)) {
+        final Map.Entry<Object,Object> indexOneEntry=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Map.Entry<Object,Object>>(){
+          public Map.Entry<Object,Object> call(){
+            return indexIteratorOne.next();
+          }
+        }
+);
+        final Object key=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return indexOneEntry.getKey();
+          }
+        }
+);
+        final Object indexOneValue=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return indexOneEntry.getValue();
+          }
+        }
+);
+        final Object indexTwoValue=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<Object>(){
+          public Object call(){
+            return indexTwo.get(key);
+          }
+        }
+);
+        if (indexTwoValue == null) {
+          ok=false;
+          listener.onMessage("\n- ERR: Entree with key " + key + " is absent in index "+ indexOne.getName()+ " for DB2.");
+          ++differences;
+          continue;
+        }
+        if (indexOneValue instanceof Set && indexTwoValue instanceof Set) {
+          final Set<Object> indexOneValueSet=(Set<Object>)indexOneValue;
+          final Set<Object> indexTwoValueSet=(Set<Object>)indexTwoValue;
+          if (!ODocumentHelper.compareSets(databaseDocumentTxOne,indexOneValueSet,databaseDocumentTxTwo,indexTwoValueSet)) {
+            ok=false;
+            reportIndexDiff(indexOne,key,indexOneValue,indexTwoValue);
+          }
+        }
+ else         if (!indexOneValue.equals(indexTwoValue)) {
+          ok=false;
+          reportIndexDiff(indexOne,key,indexOneValue,indexTwoValue);
+        }
+      }
+    }
+  }
+  if (ok)   listener.onMessage("OK");
+}

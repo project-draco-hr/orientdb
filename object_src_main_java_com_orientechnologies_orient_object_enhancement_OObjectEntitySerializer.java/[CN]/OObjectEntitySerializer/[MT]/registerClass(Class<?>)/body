@@ -4,19 +4,23 @@
   for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
     classes.add(currentClass);
     Class<?> fieldType;
-    int fieldModifier;
     for (    Field f : currentClass.getDeclaredFields()) {
-      fieldModifier=f.getModifiers();
+      final String fieldName=f.getName();
+      final int fieldModifier=f.getModifiers();
       if (Modifier.isStatic(fieldModifier) || Modifier.isNative(fieldModifier) || Modifier.isTransient(fieldModifier))       continue;
-      if (f.getName().equals("this$0")) {
-        if (transientFields.get(currentClass) == null)         transientFields.put(currentClass,new ArrayList<String>());
-        transientFields.get(currentClass).add(f.getName());
+      if (fieldName.equals("this$0")) {
+        List<String> classTransientFields=transientFields.get(currentClass);
+        if (classTransientFields == null)         classTransientFields=new ArrayList<String>();
+        classTransientFields.add(fieldName);
+        transientFields.put(currentClass,classTransientFields);
       }
       if (OObjectSerializerHelper.jpaTransientClass != null) {
         Annotation ann=f.getAnnotation(OObjectSerializerHelper.jpaTransientClass);
         if (ann != null) {
-          if (transientFields.get(currentClass) == null)           transientFields.put(currentClass,new ArrayList<String>());
-          transientFields.get(currentClass).add(f.getName());
+          List<String> classTransientFields=transientFields.get(currentClass);
+          if (classTransientFields == null)           classTransientFields=new ArrayList<String>();
+          classTransientFields.add(fieldName);
+          transientFields.put(currentClass,classTransientFields);
         }
       }
       fieldType=f.getType();
@@ -38,8 +42,10 @@
         }
       }
       if (directBinding) {
-        if (directAccessFields.get(currentClass) == null)         directAccessFields.put(currentClass,new ArrayList<String>());
-        directAccessFields.get(currentClass).add(f.getName());
+        List<String> classDirectAccessFields=directAccessFields.get(currentClass);
+        if (classDirectAccessFields == null)         classDirectAccessFields=new ArrayList<String>();
+        classDirectAccessFields.add(fieldName);
+        directAccessFields.put(currentClass,classDirectAccessFields);
       }
       if (f.getAnnotation(ODocumentInstance.class) != null)       boundDocumentFields.put(currentClass,f);
       boolean idFound=false;
@@ -69,8 +75,9 @@
  else         if (fieldType != String.class && fieldType != Object.class && !Number.class.isAssignableFrom(fieldType))         OLogManager.instance().warn(OObjectSerializerHelper.class,"Field '%s' cannot be managed as type: %s",f.toString(),fieldType);
       }
       if (OObjectSerializerHelper.jpaEmbeddedClass != null && f.getAnnotation(OObjectSerializerHelper.jpaEmbeddedClass) != null) {
-        if (embeddedFields.get(currentClass) == null)         embeddedFields.put(currentClass,new ArrayList<String>());
-        embeddedFields.get(currentClass).add(f.getName());
+        List<String> classEmbeddedFields=embeddedFields.get(currentClass);
+        if (classEmbeddedFields == null)         classEmbeddedFields=new ArrayList<String>();
+        classEmbeddedFields.add(fieldName);
       }
     }
     registerCallbacks(currentClass);

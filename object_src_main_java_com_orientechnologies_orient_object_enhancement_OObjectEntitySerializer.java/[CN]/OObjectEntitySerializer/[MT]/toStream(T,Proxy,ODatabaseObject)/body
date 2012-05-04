@@ -41,26 +41,33 @@
   String fieldName;
   Object fieldValue;
   invokeCallback(pojoClass,iProxiedPojo,iRecord,OBeforeSerialization.class);
-  for (  Field p : pojoClass.getDeclaredFields()) {
-    fieldName=p.getName();
-    if ((idField != null && fieldName.equals(idField.getName()) || (vField != null && fieldName.equals(vField.getName())) || (transientFields.get(pojoClass) != null && transientFields.get(pojoClass).contains(fieldName))))     continue;
-    fieldValue=serializeFieldValue(p.getType(),getFieldValue(p,iPojo));
-    schemaProperty=iRecord.getSchemaClass() != null ? iRecord.getSchemaClass().getProperty(fieldName) : null;
-    if (fieldValue != null) {
-      if (isEmbeddedObject(p)) {
-        if (iRecord.getSchemaClass() == null) {
-          db.getMetadata().getSchema().createClass(iPojo.getClass());
-          iRecord.setClassNameIfExists(iPojo.getClass().getSimpleName());
-        }
-        if (schemaProperty == null) {
-          OType t=OType.getTypeByClass(fieldValue.getClass());
-          if (t == null)           t=OType.EMBEDDED;
-          schemaProperty=iRecord.getSchemaClass().createProperty(fieldName,t);
+  Class<?> currentClass=pojoClass;
+  while (!currentClass.equals(Object.class) && classes.contains(pojoClass)) {
+    for (    Field p : currentClass.getDeclaredFields()) {
+      if (Modifier.isStatic(p.getModifiers()) || Modifier.isNative(p.getModifiers()) || Modifier.isTransient(p.getModifiers()))       continue;
+      fieldName=p.getName();
+      List<String> classTransientFields=transientFields.get(pojoClass);
+      if ((idField != null && fieldName.equals(idField.getName()) || (vField != null && fieldName.equals(vField.getName())) || (classTransientFields != null && classTransientFields.contains(fieldName))))       continue;
+      fieldValue=serializeFieldValue(p.getType(),getFieldValue(p,iPojo));
+      schemaProperty=schemaClass != null ? schemaClass.getProperty(fieldName) : null;
+      if (fieldValue != null) {
+        if (isEmbeddedObject(p)) {
+          if (iRecord.getSchemaClass() == null) {
+            db.getMetadata().getSchema().createClass(iPojo.getClass());
+            iRecord.setClassNameIfExists(iPojo.getClass().getSimpleName());
+          }
+          if (schemaProperty == null) {
+            OType t=OType.getTypeByClass(fieldValue.getClass());
+            if (t == null)             t=OType.EMBEDDED;
+            schemaProperty=iRecord.getSchemaClass().createProperty(fieldName,t);
+          }
         }
       }
+      fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,db,iRecord);
+      iRecord.field(fieldName,fieldValue);
     }
-    fieldValue=typeToStream(fieldValue,schemaProperty != null ? schemaProperty.getType() : null,db,iRecord);
-    iRecord.field(fieldName,fieldValue);
+    currentClass=currentClass.getSuperclass();
+    if (currentClass == null || currentClass.equals(ODocument.class))     currentClass=Object.class;
   }
   invokeCallback(pojoClass,iProxiedPojo,iRecord,OAfterSerialization.class);
   OObjectSerializationThreadLocal.INSTANCE.get().remove(identityRecord);

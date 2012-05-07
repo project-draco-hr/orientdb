@@ -1,24 +1,22 @@
 {
   setDataCommandInfo("Replication command");
-  final String action=channel.readString();
-  final String dbName=channel.readString();
-  final String remoteServer=channel.readString();
+  final ODocument request=new ODocument(channel.readBytes());
   final ODistributedServerManager manager=OServerMain.server().getHandler(ODistributedServerManager.class);
-  final ODistributedNode node=manager.getReplicator().getOrCreateDistributedNode(remoteServer);
-  final ODistributedDatabaseInfo db=node.getOrCreateDatabaseEntry(dbName);
-  if (action.equals("start")) {
+  final ODistributedNode node=manager.getReplicator().getOrCreateDistributedNode((String)request.field("node"));
+  final ODistributedDatabaseInfo db=node.getOrCreateDatabaseEntry((String)request.field("db"));
+  ODocument response=null;
+  final String operation=request.field("operation");
+  if (operation.equals("start")) {
     checkServerAccess("server.replication.start");
     node.startDatabaseReplication(db);
   }
- else   if (action.equals("stop")) {
+ else   if (operation.equals("stop")) {
     checkServerAccess("server.replication.stop");
     node.stopDatabaseReplication(db);
   }
-  beginResponse();
-  try {
-    sendOk(clientTxId);
+ else   if (operation.equals("align")) {
+    checkServerAccess("server.replication.align");
+    node.startDatabaseAlignment(node.getOrCreateDatabaseEntry(db.databaseName),(String)request.field("options"));
   }
-  finally {
-    endResponse();
-  }
+  sendResponse(response);
 }

@@ -7,11 +7,16 @@
     final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,iRecordType);
     iClusterSegment.addPhysicalPosition(ppos);
     iRid.clusterPosition=ppos.clusterPosition;
-    ppos.dataSegmentId=iDataSegment.getId();
-    ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
-    iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
-    incrementVersion();
-    return ppos;
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    try {
+      ppos.dataSegmentId=iDataSegment.getId();
+      ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
+      iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
+      return ppos;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    }
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on creating record in cluster: " + iClusterSegment,e);

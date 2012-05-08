@@ -1,0 +1,26 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx(database.getURL());
+  try {
+    db.open("admin","admin");
+    if (!db.getMetadata().getSchema().existsClass("BaseTestClass")) {
+      OClass baseClass=db.getMetadata().getSchema().createClass("BaseTestClass");
+      OClass childClass=db.getMetadata().getSchema().createClass("ChildTestClass");
+      OClass anotherChildClass=db.getMetadata().getSchema().createClass("AnotherChildTestClass");
+      if (!baseClass.isSuperClassOf(childClass))       childClass.setSuperClass(baseClass);
+      if (!baseClass.isSuperClassOf(anotherChildClass))       anotherChildClass.setSuperClass(baseClass);
+      baseClass.createProperty("testParentProperty",OType.LONG).createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+      db.getMetadata().getSchema().save();
+    }
+    ODocument childClassDocument=db.newInstance("ChildTestClass");
+    childClassDocument.field("testParentProperty",10L);
+    childClassDocument.save();
+    ODocument anotherChildClassDocument=db.newInstance("AnotherChildTestClass");
+    anotherChildClassDocument.field("testParentProperty",11L);
+    anotherChildClassDocument.save();
+    Assert.assertFalse(new ORecordId(-1,-1).equals(childClassDocument));
+    Assert.assertFalse(new ORecordId(-1,-1).equals(anotherChildClassDocument));
+  }
+  finally {
+    db.close();
+  }
+}

@@ -14,6 +14,20 @@
             index.acquireExclusiveLock();
             lockedIndexes.add(index);
           }
+          final Collection<? extends OIndex<?>> indexes=database.getMetadata().getIndexManager().getIndexes();
+          if (indexes != null && !indexes.isEmpty())           for (          Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
+            final ORecord<?> record=entry.getValue().record.getRecord();
+            if (record instanceof ODocument) {
+              ODocument doc=(ODocument)record;
+              for (              OIndex<?> index : indexes) {
+                if (doc.getSchemaClass() != null && doc.getSchemaClass().isSubClassOf(index.getDefinition().getClassName())) {
+                  ((OIndexMVRBTreeAbstract<?>)index.getInternal()).acquireExclusiveLock();
+                  if (lockedIndexes == null)                   lockedIndexes=new ArrayList<OIndexMVRBTreeAbstract<?>>();
+                  lockedIndexes.add((OIndexMVRBTreeAbstract<?>)index.getInternal());
+                }
+              }
+            }
+          }
           database.getStorage().commit(OTransactionOptimistic.this);
           final ODocument indexEntries=getIndexChanges();
           if (indexEntries != null) {

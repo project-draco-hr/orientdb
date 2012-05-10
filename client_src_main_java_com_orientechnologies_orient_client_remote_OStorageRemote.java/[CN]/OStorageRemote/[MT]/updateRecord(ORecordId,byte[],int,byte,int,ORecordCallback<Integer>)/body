@@ -1,5 +1,6 @@
 {
   checkConnection();
+  if (iMode == 1 && iCallback == null)   iMode=2;
   do {
     try {
       final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
@@ -13,36 +14,43 @@
   finally {
         endRequest(network);
       }
-      if (iMode == 1)       return iVersion;
-      if (iCallback == null)       try {
-        beginResponse(network);
-        return network.readInt();
-      }
+switch (iMode) {
+case 0:
+        try {
+          beginResponse(network);
+          return network.readInt();
+        }
   finally {
-        endResponse(network);
-      }
- else {
+          endResponse(network);
+        }
+case 1:
+      if (iCallback != null) {
+        final int sessionId=getSessionId();
         Callable<Object> response=new Callable<Object>(){
           public Object call() throws Exception {
             int result;
             try {
+              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
               beginResponse(network);
               result=network.readInt();
             }
   finally {
               endResponse(network);
+              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
             }
-            iCallback.call(result);
+            iCallback.call(iRid,result);
             return null;
           }
         }
 ;
         asynchExecutor.submit(new FutureTask<Object>(response));
       }
-    }
- catch (    Exception e) {
-      handleException("Error on update record " + iRid,e);
-    }
   }
+  return iVersion;
+}
+ catch (Exception e) {
+  handleException("Error on update record " + iRid,e);
+}
+}
  while (true);
 }

@@ -6,11 +6,15 @@
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
       final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
-      if (ppos == null)       return false;
+      if (ppos == null) {
+        if (iCallback != null)         iCallback.call(iRid,false);
+        return false;
+      }
       if (iVersion > -1 && ppos.recordVersion != iVersion)       throw new OConcurrentModificationException("Cannot delete record " + iRid + " because the version is not the latest. Probably you are deleting an old record or it has been modified by another user (db=v"+ ppos.recordVersion+ " your=v"+ iVersion+ ")",iRid,ppos.recordVersion,iVersion);
       cluster.removePhysicalPosition(iRid.clusterPosition);
       final ODataSegmentMemory dataSegment=(ODataSegmentMemory)getDataSegmentById(ppos.dataSegmentId);
       dataSegment.deleteRecord(ppos.dataSegmentPos);
+      if (iCallback != null)       iCallback.call(null,true);
       return true;
     }
   finally {

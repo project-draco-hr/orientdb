@@ -2,15 +2,30 @@
   database=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
   try {
     startRecordNumber=database.countClusterElements("Account");
-    for (long i=startRecordNumber; i < startRecordNumber + TOT_RECORDS; ++i) {
+    final AtomicInteger callBackCalled=new AtomicInteger();
+    final long total=startRecordNumber + TOT_RECORDS;
+    for (long i=startRecordNumber; i < total; ++i) {
       record.reset();
       record.setClassName("Account");
       record.field("id",i);
       record.field("name","Asynch insertion test");
       record.field("location","Italy");
       record.field("salary",(i + 300));
-      database.save(record,OPERATION_MODE.ASYNCHRONOUS);
+      database.save(record,OPERATION_MODE.ASYNCHRONOUS,new ORecordCallback<Long>(){
+        public void call(        ORecordId iRID,        Long iParameter){
+          System.out.println("asynchInsertion callback for record " + iRID + ": "+ callBackCalled.incrementAndGet());
+        }
+      }
+);
     }
+    while (callBackCalled.intValue() < total) {
+      try {
+        Thread.sleep(100);
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+    Assert.assertEquals(callBackCalled.intValue(),total);
     final ODatabaseDocumentTx db=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
     long tot;
     while ((tot=db.countClusterElements("Account")) < startRecordNumber + TOT_RECORDS) {

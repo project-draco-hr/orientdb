@@ -1,0 +1,26 @@
+{
+  if (!(iRecord instanceof ODocument))   return (RET)super.save(iRecord,iMode,iCallback);
+  ODocument doc=(ODocument)iRecord;
+  doc.validate();
+  doc.convertAllMultiValuesToTrackedVersions();
+  try {
+    if (doc.getIdentity().isNew()) {
+      if (doc.getClassName() != null)       checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_CREATE,doc.getClassName());
+      if (doc.getSchemaClass() != null && doc.getIdentity().getClusterId() < 0) {
+        String clusterName=getClusterNameById(doc.getSchemaClass().getDefaultClusterId());
+        return (RET)super.save(doc,clusterName,iMode,iCallback);
+      }
+    }
+ else {
+      if (doc.getClassName() != null)       checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_UPDATE,doc.getClassName());
+    }
+    doc=super.save(doc,iMode,iCallback);
+  }
+ catch (  OException e) {
+    throw e;
+  }
+catch (  Exception e) {
+    OLogManager.instance().exception("Error on saving record %s of class '%s'",e,ODatabaseException.class,iRecord.getIdentity(),(doc.getClassName() != null ? doc.getClassName() : "?"));
+  }
+  return (RET)doc;
+}

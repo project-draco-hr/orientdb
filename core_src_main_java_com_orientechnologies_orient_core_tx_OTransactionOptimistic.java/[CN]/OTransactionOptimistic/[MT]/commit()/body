@@ -6,6 +6,7 @@
     database.getStorage().callInLock(new Callable<Void>(){
       public Void call() throws Exception {
         final List<String> involvedIndexes=getInvolvedIndexes();
+        if (involvedIndexes != null)         Collections.sort(involvedIndexes);
         List<OIndexMVRBTreeAbstract<?>> lockedIndexes=null;
         try {
           if (involvedIndexes != null)           for (          String indexName : involvedIndexes) {
@@ -15,11 +16,21 @@
             lockedIndexes.add(index);
           }
           final Collection<? extends OIndex<?>> indexes=database.getMetadata().getIndexManager().getIndexes();
-          if (indexes != null && !indexes.isEmpty())           for (          Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
+          List<? extends OIndex<?>> indexesToLock=null;
+          if (indexes != null) {
+            indexesToLock=new ArrayList<OIndex<?>>(indexes);
+            Collections.sort(indexesToLock,new Comparator<OIndex<?>>(){
+              public int compare(              final OIndex<?> indexOne,              final OIndex<?> indexTwo){
+                return indexOne.getName().compareTo(indexTwo.getName());
+              }
+            }
+);
+          }
+          if (indexesToLock != null && !indexesToLock.isEmpty())           for (          Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
             final ORecord<?> record=entry.getValue().record.getRecord();
             if (record instanceof ODocument) {
               ODocument doc=(ODocument)record;
-              for (              OIndex<?> index : indexes) {
+              for (              OIndex<?> index : indexesToLock) {
                 if (doc.getSchemaClass() != null && doc.getSchemaClass().isSubClassOf(index.getDefinition().getClassName())) {
                   ((OIndexMVRBTreeAbstract<?>)index.getInternal()).acquireExclusiveLock();
                   if (lockedIndexes == null)                   lockedIndexes=new ArrayList<OIndexMVRBTreeAbstract<?>>();

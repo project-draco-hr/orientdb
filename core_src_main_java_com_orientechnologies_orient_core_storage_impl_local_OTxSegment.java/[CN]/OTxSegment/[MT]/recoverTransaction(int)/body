@@ -1,39 +1,50 @@
 {
-  final OPhysicalPosition ppos=new OPhysicalPosition();
   int recordsRecovered=0;
   final ORecordId rid=new ORecordId();
+  final List<Long> txRecordPositions=new ArrayList<Long>();
   for (long beginEntry=0; eof(beginEntry); beginEntry=nextEntry(beginEntry)) {
     long offset=beginEntry;
     final byte status=file.readByte(offset);
     offset+=OBinaryProtocol.SIZE_BYTE;
     if (status != STATUS_FREE) {
-      final byte operation=file.readByte(offset);
       offset+=OBinaryProtocol.SIZE_BYTE;
       final int txId=file.readInt(offset);
       if (txId == iTxId) {
-        offset+=OBinaryProtocol.SIZE_INT;
-        rid.clusterId=file.readShort(offset);
-        offset+=OBinaryProtocol.SIZE_SHORT;
-        rid.clusterPosition=file.readLong(offset);
-        offset+=OBinaryProtocol.SIZE_LONG;
-        final byte recordType=file.readByte(offset);
-        offset+=OBinaryProtocol.SIZE_BYTE;
-        final int recordVersion=file.readInt(offset);
-        offset+=OBinaryProtocol.SIZE_INT;
-        final int recordSize=file.readInt(offset);
-        offset+=OBinaryProtocol.SIZE_INT;
-        final byte[] buffer;
-        if (recordSize > 0) {
-          buffer=new byte[recordSize];
-          file.read(offset,buffer,recordSize);
-          offset+=recordSize;
-        }
- else         buffer=null;
-        recoverTransactionEntry(status,operation,txId,rid,recordType,recordVersion,buffer,ppos);
-        recordsRecovered++;
-        file.writeByte(beginEntry,STATUS_FREE);
+        txRecordPositions.add(beginEntry);
       }
     }
+  }
+  for (int i=txRecordPositions.size() - 1; i >= 0; i--) {
+    final long beginEntry=txRecordPositions.get(i);
+    long offset=beginEntry;
+    final byte status=file.readByte(offset);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    final byte operation=file.readByte(offset);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    final int txId=file.readInt(offset);
+    offset+=OBinaryProtocol.SIZE_INT;
+    rid.clusterId=file.readShort(offset);
+    offset+=OBinaryProtocol.SIZE_SHORT;
+    rid.clusterPosition=file.readLong(offset);
+    offset+=OBinaryProtocol.SIZE_LONG;
+    final byte recordType=file.readByte(offset);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    final int recordVersion=file.readInt(offset);
+    offset+=OBinaryProtocol.SIZE_INT;
+    final int dataSegmentId=file.readInt(offset);
+    offset+=OBinaryProtocol.SIZE_INT;
+    final int recordSize=file.readInt(offset);
+    offset+=OBinaryProtocol.SIZE_INT;
+    final byte[] buffer;
+    if (recordSize > 0) {
+      buffer=new byte[recordSize];
+      file.read(offset,buffer,recordSize);
+      offset+=recordSize;
+    }
+ else     buffer=null;
+    recoverTransactionEntry(status,operation,txId,rid,recordType,recordVersion,buffer,dataSegmentId);
+    recordsRecovered++;
+    file.writeByte(beginEntry,STATUS_FREE);
   }
   return recordsRecovered;
 }

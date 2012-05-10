@@ -4,16 +4,23 @@
   try {
     ODocument cfg=new ODocument().field("nodes",iDbCfg,OType.EMBEDDEDSET);
     connect();
-    final OChannelBinaryClient network=beginRequest(OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE);
+    final ODatabaseComplex<?> database=OServerMain.server().openDatabase("document",iDatabaseName,replicator.getReplicatorUser().name,replicator.getReplicatorUser().password);
     try {
-      network.writeString(iDatabaseName);
-      network.writeBytes(cfg.toStream());
-      network.flush();
+      conflictResolver.init(database);
+      final OChannelBinaryClient network=beginRequest(OClusterProtocol.REQUEST_NODE2NODE_REPLICATION_SYNCHRONIZE);
+      try {
+        network.writeString(iDatabaseName);
+        network.writeBytes(cfg.toStream());
+        network.flush();
+      }
+  finally {
+        endRequest();
+      }
+      parseResponse();
     }
   finally {
-      endRequest();
+      database.close();
     }
-    parseResponse();
   }
  catch (  OException e) {
     throw e;

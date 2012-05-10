@@ -5,31 +5,37 @@
     connect();
     final String path=OServerMain.server().getStoragePath(iDatabaseName);
     final ODatabaseComplex<?> database=OServerMain.server().openDatabase("document",path,replicator.getReplicatorUser().name,replicator.getReplicatorUser().password);
-    final int blockSize=OGlobalConfiguration.DISTRIBUTED_ALIGN_RECORD_BLOCK.getValueAsInteger();
-    final ODocument cfg=new ODocument();
-    cfg.field("db",iDatabaseName);
-    final ODocument block=new ODocument().addOwner(cfg);
-    cfg.field("block",block);
-    int current=0;
-    final OPhysicalPosition ppos=new OPhysicalPosition();
-    for (    OCluster cluster : database.getStorage().getClusterInstances()) {
-      final OClusterPositionIterator iterator=cluster.absoluteIterator();
-      while (iterator.hasNext()) {
-        ppos.clusterPosition=iterator.next();
-        try {
-          cluster.getPhysicalPosition(ppos);
-          block.field(cluster.getId() + "_" + ppos.clusterPosition,ppos.recordVersion);
-          if (++current % blockSize == 0) {
-            sendAlignmentBlock(cfg);
-            current=0;
+    try {
+      conflictResolver.init(database);
+      final int blockSize=OGlobalConfiguration.DISTRIBUTED_ALIGN_RECORD_BLOCK.getValueAsInteger();
+      final ODocument cfg=new ODocument();
+      cfg.field("db",iDatabaseName);
+      final ODocument block=new ODocument().addOwner(cfg);
+      cfg.field("block",block);
+      int current=0;
+      final OPhysicalPosition ppos=new OPhysicalPosition();
+      for (      OCluster cluster : database.getStorage().getClusterInstances()) {
+        final OClusterPositionIterator iterator=cluster.absoluteIterator();
+        while (iterator.hasNext()) {
+          ppos.clusterPosition=iterator.next();
+          try {
+            cluster.getPhysicalPosition(ppos);
+            block.field(cluster.getId() + "_" + ppos.clusterPosition,ppos.recordVersion);
+            if (++current % blockSize == 0) {
+              sendAlignmentBlock(cfg);
+              current=0;
+            }
+          }
+ catch (          Exception e) {
+            logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"Error on loading record %d:%d because: %s",cluster.getId(),ppos.clusterPosition,e.toString());
           }
         }
- catch (        Exception e) {
-          logger.log(this,Level.INFO,TYPE.REPLICATION,DIRECTION.OUT,"Error on loading record %d:%d because: %s",cluster.getId(),ppos.clusterPosition,e.toString());
-        }
       }
+      if (current > 0)       sendAlignmentBlock(cfg);
     }
-    if (current > 0)     sendAlignmentBlock(cfg);
+  finally {
+      database.close();
+    }
   }
  catch (  OException e) {
     throw e;

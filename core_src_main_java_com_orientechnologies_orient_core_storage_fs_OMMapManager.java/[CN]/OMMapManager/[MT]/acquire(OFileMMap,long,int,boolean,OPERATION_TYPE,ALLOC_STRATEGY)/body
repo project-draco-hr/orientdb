@@ -1,67 +1,73 @@
 {
   if (iStrategy == ALLOC_STRATEGY.MMAP_NEVER)   return null;
-  lastStrategy=iStrategy;
-  OMMapBufferEntry entry=searchBetweenLastBlocks(iFile,iBeginOffset,iSize);
+  lock.writeLock().lock();
   try {
-    if (entry != null && entry.buffer != null)     return entry;
-    List<OMMapBufferEntry> fileEntries=bufferPoolPerFile.get(iFile);
-    if (fileEntries == null) {
-      fileEntries=new ArrayList<OMMapBufferEntry>();
-      bufferPoolPerFile.put(iFile,fileEntries);
-    }
-    int position=searchEntry(fileEntries,iBeginOffset,iSize);
-    if (position > -1) {
-      entry=fileEntries.get(position);
+    lastStrategy=iStrategy;
+    OMMapBufferEntry entry=searchBetweenLastBlocks(iFile,iBeginOffset,iSize);
+    try {
       if (entry != null && entry.buffer != null)       return entry;
-    }
-    int p=(position + 2) * -1;
-    if (!allocIfOverlaps(iBeginOffset,iSize,fileEntries,p)) {
-      OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
-      return null;
-    }
-    int bufferSize=computeBestEntrySize(iFile,iBeginOffset,iSize,iForce,fileEntries,p);
-    if (totalMemory + bufferSize > maxMemory && (iStrategy == ALLOC_STRATEGY.MMAP_ONLY_AVAIL_POOL || iOperationType == OPERATION_TYPE.READ && iStrategy == ALLOC_STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_AVAIL_POOL)) {
-      OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
-      return null;
-    }
-    entry=null;
-    do {
-      if (totalMemory + bufferSize > maxMemory)       freeResources();
-      fileEntries=bufferPoolPerFile.get(iFile);
-      position=searchEntry(fileEntries,iBeginOffset,iSize);
+      List<OMMapBufferEntry> fileEntries=bufferPoolPerFile.get(iFile);
+      if (fileEntries == null) {
+        fileEntries=new ArrayList<OMMapBufferEntry>();
+        bufferPoolPerFile.put(iFile,fileEntries);
+      }
+      int position=searchEntry(fileEntries,iBeginOffset,iSize);
       if (position > -1) {
         entry=fileEntries.get(position);
         if (entry != null && entry.buffer != null)         return entry;
       }
-      try {
-        entry=mapBuffer(iFile,iBeginOffset,bufferSize);
+      int p=(position + 2) * -1;
+      if (!allocIfOverlaps(iBeginOffset,iSize,fileEntries,p)) {
+        OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
+        return null;
       }
- catch (      IllegalArgumentException e) {
-        throw e;
+      int bufferSize=computeBestEntrySize(iFile,iBeginOffset,iSize,iForce,fileEntries,p);
+      if (totalMemory + bufferSize > maxMemory && (iStrategy == ALLOC_STRATEGY.MMAP_ONLY_AVAIL_POOL || iOperationType == OPERATION_TYPE.READ && iStrategy == ALLOC_STRATEGY.MMAP_WRITE_ALWAYS_READ_IF_AVAIL_POOL)) {
+        OProfiler.getInstance().updateCounter("OMMapManager.usedChannel",1);
+        return null;
       }
-catch (      Exception e) {
-        maxMemory=maxMemory * 90 / 100;
-        OLogManager.instance().warn(OMMapManager.class,"Memory mapping error, try to reduce max memory to %d and retry...",e,maxMemory);
+      entry=null;
+      do {
+        if (totalMemory + bufferSize > maxMemory)         freeResources();
+        fileEntries=bufferPoolPerFile.get(iFile);
+        position=searchEntry(fileEntries,iBeginOffset,iSize);
+        if (position > -1) {
+          entry=fileEntries.get(position);
+          if (entry != null && entry.buffer != null)           return entry;
+        }
+        try {
+          entry=mapBuffer(iFile,iBeginOffset,bufferSize);
+        }
+ catch (        IllegalArgumentException e) {
+          throw e;
+        }
+catch (        Exception e) {
+          maxMemory=maxMemory * 90 / 100;
+          OLogManager.instance().warn(OMMapManager.class,"Memory mapping error, try to reduce max memory to %d and retry...",e,maxMemory);
+        }
       }
-    }
  while (entry == null && maxMemory > MIN_MEMORY);
-    if (entry == null || !entry.isValid())     throw new OIOException("You cannot access to the file portion " + iBeginOffset + "-"+ iBeginOffset+ iSize+ " bytes");
-    totalMemory+=bufferSize;
-    bufferPoolLRU.add(entry);
-    p=(position + 2) * -1;
-    if (p < 0)     p=0;
-    if (fileEntries == null) {
-      fileEntries=new ArrayList<OMMapBufferEntry>();
-      bufferPoolPerFile.put(iFile,fileEntries);
+      if (entry == null || !entry.isValid())       throw new OIOException("You cannot access to the file portion " + iBeginOffset + "-"+ iBeginOffset+ iSize+ " bytes");
+      totalMemory+=bufferSize;
+      bufferPoolLRU.add(entry);
+      p=(position + 2) * -1;
+      if (p < 0)       p=0;
+      if (fileEntries == null) {
+        fileEntries=new ArrayList<OMMapBufferEntry>();
+        bufferPoolPerFile.put(iFile,fileEntries);
+      }
+      fileEntries.add(p,entry);
+      if (entry != null && entry.buffer != null)       return entry;
     }
-    fileEntries.add(p,entry);
-    if (entry != null && entry.buffer != null)     return entry;
+  finally {
+      if (entry != null) {
+        entry.acquire();
+        if (iOperationType == OPERATION_TYPE.WRITE)         entry.setDirty();
+      }
+    }
+    return null;
   }
   finally {
-    if (entry != null) {
-      entry.acquire();
-      if (iOperationType == OPERATION_TYPE.WRITE)       entry.setDirty();
-    }
+    lock.writeLock().unlock();
   }
-  return null;
 }

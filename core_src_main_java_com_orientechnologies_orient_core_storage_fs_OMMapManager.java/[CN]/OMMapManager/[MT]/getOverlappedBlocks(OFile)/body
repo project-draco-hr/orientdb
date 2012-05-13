@@ -1,13 +1,19 @@
 {
-  int count=0;
-  final List<OMMapBufferEntry> blocks=bufferPoolPerFile.get(iFile);
-  long lastPos=-1;
-  for (  OMMapBufferEntry block : blocks) {
-    if (lastPos > -1 && lastPos > block.beginOffset) {
-      OLogManager.instance().warn(null,"Found overlapped block for file %s at position %d. Previous offset+size was %d",iFile,block.beginOffset,lastPos);
-      count++;
+  lock.readLock().lock();
+  try {
+    int count=0;
+    final List<OMMapBufferEntry> blocks=bufferPoolPerFile.get(iFile);
+    long lastPos=-1;
+    for (    OMMapBufferEntry block : blocks) {
+      if (lastPos > -1 && lastPos > block.beginOffset) {
+        OLogManager.instance().warn(null,"Found overlapped block for file %s at position %d. Previous offset+size was %d",iFile,block.beginOffset,lastPos);
+        count++;
+      }
+      lastPos=block.beginOffset + block.size;
     }
-    lastPos=block.beginOffset + block.size;
+    return count;
   }
-  return count;
+  finally {
+    lock.readLock().unlock();
+  }
 }

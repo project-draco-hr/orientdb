@@ -1,51 +1,57 @@
 {
-  int unreadResponse=0;
-  final long startClock=iTimeout > 0 ? System.currentTimeMillis() : 0;
-  do {
-    if (iTimeout <= 0)     lockRead.lock();
- else     if (!lockRead.tryLock(iTimeout,TimeUnit.MILLISECONDS))     throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
-    if (!channelRead) {
-      channelRead=true;
-      try {
-        currentStatus=readByte();
-        currentSessionId=readInt();
-        if (debug)         OLogManager.instance().debug(this,"%s - Read response: %d-%d",socket.getRemoteSocketAddress(),(int)currentStatus,currentSessionId);
-      }
- catch (      IOException e) {
-        lockRead.unlock();
-        channelRead=false;
-        throw e;
-      }
-    }
-    if (currentSessionId == iRequesterId)     break;
-    if (debug)     OLogManager.instance().debug(this,"%s - Session %d skip response, it is for %d",socket.getRemoteSocketAddress(),iRequesterId,currentSessionId);
-    if (iTimeout > 0 && (System.currentTimeMillis() - startClock) > iTimeout)     throw new OTimeoutException("Timeout on reading response from the server for the request " + iRequesterId);
-    if (unreadResponse > maxUnreadResponses) {
-      final StringBuilder dirtyBuffer=new StringBuilder();
-      int i=0;
-      while (in.available() > 0) {
-        char c=(char)in.read();
-        ++i;
-        if (dirtyBuffer.length() < MAX_LENGTH_DEBUG) {
-          if (dirtyBuffer.length() > 0)           dirtyBuffer.append('-');
-          dirtyBuffer.append(c);
+  try {
+    int unreadResponse=0;
+    final long startClock=iTimeout > 0 ? System.currentTimeMillis() : 0;
+    do {
+      if (iTimeout <= 0)       lockRead.lock();
+ else       if (!lockRead.tryLock(iTimeout,TimeUnit.MILLISECONDS))       throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
+      if (!channelRead) {
+        channelRead=true;
+        try {
+          currentStatus=readByte();
+          currentSessionId=readInt();
+          if (debug)           OLogManager.instance().debug(this,"%s - Read response: %d-%d",socket.getRemoteSocketAddress(),(int)currentStatus,currentSessionId);
+        }
+ catch (        IOException e) {
+          lockRead.unlock();
+          channelRead=false;
+          throw e;
         }
       }
-      OLogManager.instance().error(this,"Received unread response from " + socket.getRemoteSocketAddress() + " for session="+ currentSessionId+ ", probably corrupted data from the network connection. Cleared dirty data in the buffer ("+ i+ " bytes): ["+ dirtyBuffer+ (i > dirtyBuffer.length() ? "..." : "")+ "]",OIOException.class);
-    }
-    lockRead.unlock();
+      if (currentSessionId == iRequesterId)       break;
+      if (debug)       OLogManager.instance().debug(this,"%s - Session %d skip response, it is for %d",socket.getRemoteSocketAddress(),iRequesterId,currentSessionId);
+      if (iTimeout > 0 && (System.currentTimeMillis() - startClock) > iTimeout)       throw new OTimeoutException("Timeout on reading response from the server for the request " + iRequesterId);
+      if (unreadResponse > maxUnreadResponses) {
+        final StringBuilder dirtyBuffer=new StringBuilder();
+        int i=0;
+        while (in.available() > 0) {
+          char c=(char)in.read();
+          ++i;
+          if (dirtyBuffer.length() < MAX_LENGTH_DEBUG) {
+            if (dirtyBuffer.length() > 0)             dirtyBuffer.append('-');
+            dirtyBuffer.append(c);
+          }
+        }
+        OLogManager.instance().error(this,"Received unread response from " + socket.getRemoteSocketAddress() + " for session="+ currentSessionId+ ", probably corrupted data from the network connection. Cleared dirty data in the buffer ("+ i+ " bytes): ["+ dirtyBuffer+ (i > dirtyBuffer.length() ? "..." : "")+ "]",OIOException.class);
+      }
+      lockRead.unlock();
 synchronized (this) {
-      try {
-        final long start=System.currentTimeMillis();
-        wait(1000);
-        if (System.currentTimeMillis() - start >= 1000)         unreadResponse++;
-      }
- catch (      InterruptedException e) {
-        Thread.currentThread().interrupt();
+        try {
+          final long start=System.currentTimeMillis();
+          wait(1000);
+          if (System.currentTimeMillis() - start >= 1000)           unreadResponse++;
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
       }
     }
-  }
  while (true);
-  if (debug)   OLogManager.instance().debug(this,"%s - Session %d handle response",socket.getRemoteSocketAddress(),iRequesterId);
-  handleStatus(currentStatus,currentSessionId);
+    if (debug)     OLogManager.instance().debug(this,"%s - Session %d handle response",socket.getRemoteSocketAddress(),iRequesterId);
+    handleStatus(currentStatus,currentSessionId);
+  }
+ catch (  InterruptedException e) {
+    Thread.currentThread().interrupt();
+    e.printStackTrace();
+  }
 }

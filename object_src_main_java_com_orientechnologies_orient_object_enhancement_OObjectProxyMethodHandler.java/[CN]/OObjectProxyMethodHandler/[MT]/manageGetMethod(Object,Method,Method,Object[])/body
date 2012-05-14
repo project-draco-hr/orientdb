@@ -37,11 +37,19 @@
         }
  else {
           Object docValue=doc.field(fieldName);
-          if (docValue == null)           doc.field(fieldName,value);
+          if (docValue == null) {
+            if (value.getClass().isArray()) {
+              OClass schemaClass=doc.getSchemaClass();
+              OProperty schemaProperty=null;
+              if (schemaClass != null)               schemaProperty=schemaClass.getProperty(fieldName);
+              doc.field(fieldName,OObjectEntitySerializer.typeToStream(value,schemaProperty != null ? schemaProperty.getType() : null,getDatabase(),doc));
+            }
+ else             doc.field(fieldName,value);
+          }
  else           if (!loadedFields.containsKey(fieldName)) {
             value=docValue;
             Method setMethod=getSetMethod(self.getClass().getSuperclass(),getSetterFieldName(fieldName),value);
-            setMethod.invoke(self,value);
+            setMethod.invoke(self,manageArrayFieldObject(fieldName,self,value));
           }
  else           if ((value instanceof Set || value instanceof Map) && loadedFields.get(fieldName).intValue() < doc.getVersion()) {
             if (value instanceof Set)             value=new OObjectLazySet(doc,(Set<?>)docValue);

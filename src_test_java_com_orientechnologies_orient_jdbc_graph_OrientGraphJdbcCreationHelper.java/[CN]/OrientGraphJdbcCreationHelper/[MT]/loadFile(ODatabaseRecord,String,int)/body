@@ -1,23 +1,22 @@
 {
-  if (bufferSize > 0) {
-    File binaryFile=new File(filePath);
-    long binaryFileLength=binaryFile.length();
-    int numberOfRecords=(int)(binaryFileLength / bufferSize);
-    int remainder=(int)(binaryFileLength % bufferSize);
-    if (remainder > 0)     numberOfRecords++;
-    List<ORecordBytes> binaryChuncks=new ArrayList<ORecordBytes>(numberOfRecords);
-    BufferedInputStream binaryStream=new BufferedInputStream(new FileInputStream(binaryFile));
-    byte[] chunk;
-    ORecordBytes recordChunck;
-    for (int i=0; i < numberOfRecords; i++) {
-      if (i == numberOfRecords - 1)       chunk=new byte[remainder];
- else       chunk=new byte[bufferSize];
-      binaryStream.read(chunk);
-      recordChunck=new ORecordBytes(database,chunk);
-      recordChunck.save();
-      binaryChuncks.add(recordChunck);
-    }
-    return binaryChuncks;
+  File binaryFile=new File(filePath);
+  long binaryFileLength=binaryFile.length();
+  int numberOfRecords=(int)(binaryFileLength / bufferSize);
+  int remainder=(int)(binaryFileLength % bufferSize);
+  if (remainder > 0)   numberOfRecords++;
+  List<ORID> binaryChuncks=new ArrayList<ORID>(numberOfRecords);
+  BufferedInputStream binaryStream=new BufferedInputStream(new FileInputStream(binaryFile));
+  byte[] chunk;
+  database.declareIntent(new OIntentMassiveInsert());
+  ORecordBytes recordChunck;
+  for (int i=0; i < numberOfRecords; i++) {
+    if (i == numberOfRecords - 1)     chunk=new byte[remainder];
+ else     chunk=new byte[bufferSize];
+    binaryStream.read(chunk);
+    recordChunck=new ORecordBytes(database,chunk);
+    database.save(recordChunck);
+    binaryChuncks.add(recordChunck.getIdentity());
   }
-  return asList(loadFile(database,filePath));
+  database.declareIntent(null);
+  return binaryChuncks;
 }

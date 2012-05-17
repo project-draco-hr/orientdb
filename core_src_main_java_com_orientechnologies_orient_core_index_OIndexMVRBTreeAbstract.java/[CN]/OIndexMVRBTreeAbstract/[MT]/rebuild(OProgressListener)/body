@@ -12,23 +12,27 @@
     long documentTotal=0;
     for (    final String cluster : clustersToIndex)     documentTotal+=getDatabase().countClusterElements(cluster);
     if (iProgressListener != null)     iProgressListener.onBegin(this,documentTotal);
-    for (    final String clusterName : clustersToIndex)     for (    final ORecord<?> record : getDatabase().browseCluster(clusterName)) {
-      if (record instanceof ODocument) {
-        final ODocument doc=(ODocument)record;
-        if (indexDefinition == null)         throw new OConfigurationException("Index '" + name + "' cannot be rebuilt because has no a valid definition ("+ indexDefinition+ ")");
-        final Object fieldValue=indexDefinition.getDocumentValueToIndex(doc);
-        if (fieldValue != null) {
-          if (fieldValue instanceof Collection) {
-            for (            final Object fieldValueItem : (Collection<?>)fieldValue) {
-              put(fieldValueItem,doc);
+    for (    final String clusterName : clustersToIndex)     try {
+      for (      final ORecord<?> record : getDatabase().browseCluster(clusterName)) {
+        if (record instanceof ODocument) {
+          final ODocument doc=(ODocument)record;
+          if (indexDefinition == null)           throw new OConfigurationException("Index '" + name + "' cannot be rebuilt because has no a valid definition ("+ indexDefinition+ ")");
+          final Object fieldValue=indexDefinition.getDocumentValueToIndex(doc);
+          if (fieldValue != null) {
+            if (fieldValue instanceof Collection) {
+              for (              final Object fieldValueItem : (Collection<?>)fieldValue) {
+                put(fieldValueItem,doc);
+              }
             }
+ else             put(fieldValue,doc);
+            ++documentIndexed;
           }
- else           put(fieldValue,doc);
-          ++documentIndexed;
         }
+        documentNum++;
+        if (iProgressListener != null)         iProgressListener.onProgress(this,documentNum,documentNum * 100f / documentTotal);
       }
-      documentNum++;
-      if (iProgressListener != null)       iProgressListener.onProgress(this,documentNum,documentNum * 100f / documentTotal);
+    }
+ catch (    NoSuchElementException e) {
     }
     lazySave();
     if (iProgressListener != null)     iProgressListener.onCompletition(this,true);

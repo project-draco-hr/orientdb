@@ -1,7 +1,6 @@
 {
   if (txEntry.type != ORecordOperation.DELETED && !txEntry.getRecord().isDirty())   return;
   final ORecordId rid=(ORecordId)txEntry.getRecord().getIdentity();
-  final boolean wasNew=rid.isNew();
   if (rid.clusterId == ORID.CLUSTER_ID_INVALID && txEntry.getRecord() instanceof ODocument && ((ODocument)txEntry.getRecord()).getSchemaClass() != null) {
     rid.clusterId=((ODocument)txEntry.getRecord()).getSchemaClass().getDefaultClusterId();
   }
@@ -16,12 +15,6 @@ case ORecordOperation.LOADED:
 case ORecordOperation.CREATED:
 {
     byte[] stream=txEntry.getRecord().toStream();
-    if (wasNew) {
-      if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_CREATE,txEntry.getRecord()))       stream=txEntry.getRecord().toStream();
-    }
- else {
-      if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_UPDATE,txEntry.getRecord()))       stream=txEntry.getRecord().toStream();
-    }
     if (rid.isNew()) {
       txEntry.getRecord().onBeforeIdentityChanged(rid);
       rid.clusterId=cluster.getId();
@@ -33,7 +26,6 @@ case ORecordOperation.CREATED:
       rid.clusterPosition=ppos.clusterPosition;
       txEntry.getRecord().setVersion(ppos.recordVersion);
       txEntry.getRecord().onAfterIdentityChanged(txEntry.getRecord());
-      iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_CREATE,txEntry.getRecord());
     }
  else {
       if (iUseLog)       txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
@@ -44,18 +36,14 @@ case ORecordOperation.CREATED:
 case ORecordOperation.UPDATED:
 {
   byte[] stream=txEntry.getRecord().toStream();
-  if (iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_UPDATE,txEntry.getRecord()))   stream=txEntry.getRecord().toStream();
   if (iUseLog)   txEntry.getRecord().setVersion(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType()));
  else   txEntry.getRecord().setVersion(iTx.getDatabase().getStorage().updateRecord(rid,stream,txEntry.getRecord().getVersion(),txEntry.getRecord().getRecordType(),(byte)0,null));
-  iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_UPDATE,txEntry.getRecord());
   break;
 }
 case ORecordOperation.DELETED:
 {
-iTx.getDatabase().callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,txEntry.getRecord());
 if (iUseLog) deleteRecord(iTx.getId(),cluster,rid.clusterPosition,txEntry.getRecord().getVersion());
  else iTx.getDatabase().getStorage().deleteRecord(rid,txEntry.getRecord().getVersion(),(byte)0,null);
-iTx.getDatabase().callbackHooks(ORecordHook.TYPE.AFTER_DELETE,txEntry.getRecord());
 }
 break;
 }

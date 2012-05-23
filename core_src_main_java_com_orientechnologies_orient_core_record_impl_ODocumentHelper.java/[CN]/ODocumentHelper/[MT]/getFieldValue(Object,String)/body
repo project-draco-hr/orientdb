@@ -19,7 +19,10 @@
  else       fieldName=iFieldName;
     }
     if (nextSeparator == '[') {
-      if (fieldName != null && fieldName.length() > 0)       value=getIdentifiableValue(currentRecord,fieldName);
+      if (fieldName != null && fieldName.length() > 0) {
+        if (currentRecord != null)         value=getIdentifiableValue(currentRecord,fieldName);
+ else         if (value instanceof Map<?,?>)         value=getMapEntry((Map<String,?>)value,fieldName);
+      }
       if (value == null)       return null;
  else       if (value instanceof OIdentifiable)       currentRecord=(OIdentifiable)value;
       final int end=iFieldName.indexOf(']',nextSeparatorPos);
@@ -54,7 +57,8 @@
         final List<String> indexRanges=OStringSerializerHelper.smartSplit(index,'-');
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=',' ');
         if (indexParts.size() == 1 && indexRanges.size() == 1 && indexCondition.size() == 1) {
-          value=OMultiValue.getValue(value,Integer.parseInt(index));
+          if (value instanceof Map<?,?>)           value=getMapEntry((Map<String,?>)value,index);
+ else           value=OMultiValue.getValue(value,Integer.parseInt(index));
         }
  else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
@@ -72,7 +76,7 @@
           final String conditionFieldName=indexCondition.get(0);
           Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
           if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
-          final List<ODocument> values=new ArrayList<ODocument>();
+          final List<Object> values=new ArrayList<Object>();
           for (          Object v : OMultiValue.getMultiValueIterable(value)) {
             if (v instanceof ODocument) {
               final ODocument doc=(ODocument)v;
@@ -80,6 +84,14 @@
               fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
               if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
                 values.add(doc);
+              }
+            }
+ else             if (v instanceof Map<?,?>) {
+              final Map<String,?> map=(Map<String,?>)v;
+              Object fieldValue=getMapEntry(map,conditionFieldName);
+              fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
+              if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
+                values.add(map);
               }
             }
           }

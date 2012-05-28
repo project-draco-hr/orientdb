@@ -2,11 +2,7 @@
   if (dataProvider == null)   return 1;
   int totalDisconnected=0;
   final ORID rid=dataProvider.getIdentity();
-  if ((!dataProvider.isEntryDirty() && !dataProvider.getIdentity().isTemporary() || iForceDirty) && !pTree.isNodeEntryPoint(this)) {
-    totalDisconnected=1;
-    pTree.removeNodeFromMemory(this);
-    clear();
-  }
+  boolean disconnectedFromParent=false;
   if (parent != null) {
     if (canDisconnectFrom(parent) || iForceDirty) {
       if (parent.left == this) {
@@ -18,23 +14,42 @@
  else       OLogManager.instance().warn(this,"Node " + rid + " has the parent ("+ parent+ ") unlinked to itself. It links to "+ parent);
       totalDisconnected+=parent.disconnect(iForceDirty,iLevel + 1);
       parent=null;
+      disconnectedFromParent=true;
     }
   }
+ else {
+    disconnectedFromParent=true;
+  }
+  boolean disconnectedFromLeft=false;
   if (left != null) {
     if (canDisconnectFrom(left) || iForceDirty) {
       if (left.parent == this)       left.parent=null;
  else       OLogManager.instance().warn(this,"Node " + rid + " has the left ("+ left+ ") unlinked to itself. It links to "+ left.parent);
       totalDisconnected+=left.disconnect(iForceDirty,iLevel + 1);
       left=null;
+      disconnectedFromLeft=true;
     }
   }
+ else {
+    disconnectedFromLeft=true;
+  }
+  boolean disconnectedFromRight=false;
   if (right != null) {
     if (canDisconnectFrom(right) || iForceDirty) {
       if (right.parent == this)       right.parent=null;
  else       OLogManager.instance().warn(this,"Node " + rid + " has the right ("+ right+ ") unlinked to itself. It links to "+ right.parent);
       totalDisconnected+=right.disconnect(iForceDirty,iLevel + 1);
       right=null;
+      disconnectedFromRight=true;
     }
+  }
+ else {
+    disconnectedFromLeft=true;
+  }
+  if (disconnectedFromParent && disconnectedFromLeft && disconnectedFromRight)   if ((!dataProvider.isEntryDirty() && !dataProvider.getIdentity().isTemporary() || iForceDirty) && !pTree.isNodeEntryPoint(this)) {
+    totalDisconnected++;
+    pTree.removeNodeFromMemory(this);
+    clear();
   }
   return totalDisconnected;
 }

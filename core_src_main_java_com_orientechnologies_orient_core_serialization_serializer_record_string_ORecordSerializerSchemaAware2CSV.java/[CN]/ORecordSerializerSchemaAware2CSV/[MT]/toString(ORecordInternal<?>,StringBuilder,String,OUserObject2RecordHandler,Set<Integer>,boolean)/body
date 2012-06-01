@@ -100,7 +100,31 @@
           ((ORecordLazyMultiValue)fieldValue).setAutoConvertToRecord(true);
         }
       }
- else       if (fieldValue instanceof Map<?,?> && type == null)       type=OType.EMBEDDEDMAP;
+ else       if (fieldValue instanceof Map<?,?> && type == null) {
+        final int size=OMultiValue.getSize(fieldValue);
+        Boolean autoConvertLinks=null;
+        if (fieldValue instanceof ORecordLazyMap) {
+          autoConvertLinks=((ORecordLazyMap)fieldValue).isAutoConvertToRecord();
+          if (autoConvertLinks)           ((ORecordLazyMap)fieldValue).setAutoConvertToRecord(false);
+        }
+        if (size > 0) {
+          final Object firstValue=OMultiValue.getFirstValue(fieldValue);
+          if (firstValue != null) {
+            if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && (firstValue instanceof ODocument && !((ODocument)firstValue).isEmbedded()) && (firstValue instanceof ORecord<?> || (ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner() instanceof ODatabaseObject && ((ODatabaseObject)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner()).getEntityManager().getEntityClass(getClassName(firstValue)) != null))) {
+              linkedClass=getLinkInfo(ODatabaseRecordThreadLocal.INSTANCE.get(),getClassName(firstValue));
+              linkedType=OType.LINK;
+              type=OType.LINKMAP;
+            }
+ else {
+              type=OType.EMBEDDEDMAP;
+            }
+          }
+        }
+ else         type=OType.EMBEDDEDMAP;
+        if (fieldValue instanceof ORecordLazyMap && autoConvertLinks) {
+          ((ORecordLazyMap)fieldValue).setAutoConvertToRecord(true);
+        }
+      }
     }
     if (type == OType.TRANSIENT)     continue;
     if (type == null)     type=OType.EMBEDDED;

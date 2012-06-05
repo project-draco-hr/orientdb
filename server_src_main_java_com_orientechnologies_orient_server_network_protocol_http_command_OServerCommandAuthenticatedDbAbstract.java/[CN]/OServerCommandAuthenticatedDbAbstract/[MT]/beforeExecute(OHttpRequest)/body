@@ -1,17 +1,28 @@
 {
   final String[] urlParts=iRequest.url.substring(1).split("/");
   if (urlParts.length < 2)   throw new OHttpRequestException("Syntax error in URL. Expected is: <command>/<database>[/...]");
-  iRequest.databaseName=urlParts[1];
-  iRequest.databaseName=iRequest.databaseName.replace(DBNAME_DIR_SEPARATOR,'/');
-  if (iRequest.sessionId == null || (iRequest.sessionId != null && iRequest.sessionId.length() == 1)) {
+  iRequest.databaseName=urlParts[1].replace(DBNAME_DIR_SEPARATOR,'/');
+  final List<String> authenticationParts=iRequest.authorization != null ? OStringSerializerHelper.split(iRequest.authorization,':') : null;
+  if (iRequest.sessionId == null || iRequest.sessionId.length() == 1) {
     if (iRequest.authorization == null || SESSIONID_LOGOUT.equals(iRequest.sessionId)) {
       sendAuthorizationRequest(iRequest,iRequest.databaseName);
       return false;
     }
- else     return authenticate(iRequest,iRequest.databaseName);
+ else     return authenticate(iRequest,authenticationParts,iRequest.databaseName);
   }
  else {
-    if (iRequest.sessionId.length() > 1 && OHttpSessionManager.getInstance().getSession(iRequest.sessionId) == null) {
+    final OHttpSession currentSession=OHttpSessionManager.getInstance().getSession(iRequest.sessionId);
+    if (currentSession == null) {
+      sendAuthorizationRequest(iRequest,iRequest.databaseName);
+      return false;
+    }
+ else     if (!currentSession.getDatabaseName().equals(iRequest.databaseName)) {
+      OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s', but has been authenticated against the database '%s'",iRequest.sessionId,iRequest.databaseName,currentSession.getDatabaseName());
+      sendAuthorizationRequest(iRequest,iRequest.databaseName);
+      return false;
+    }
+ else     if (!currentSession.getUserName().equals(authenticationParts.get(0))) {
+      OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s' with user '%s', but has been authenticated with user '%s'",iRequest.sessionId,iRequest.databaseName,authenticationParts.get(0),currentSession.getUserName());
       sendAuthorizationRequest(iRequest,iRequest.databaseName);
       return false;
     }

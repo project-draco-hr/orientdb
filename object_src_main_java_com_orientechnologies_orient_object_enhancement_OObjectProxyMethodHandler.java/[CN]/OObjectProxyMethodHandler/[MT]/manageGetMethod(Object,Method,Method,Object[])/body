@@ -22,8 +22,12 @@
       if (((value instanceof Collection<?> || value instanceof Map<?,?>) && !(value instanceof OLazyObjectMultivalueElement)) || value.getClass().isArray()) {
         Class<?> genericMultiValueType=OReflectionHelper.getGenericMultivalueType(getField(fieldName,self.getClass()));
         if (genericMultiValueType != null && !OReflectionHelper.isJavaType(genericMultiValueType)) {
-          if (OObjectEntitySerializer.isSerializedType(getField(fieldName,self.getClass())) && !(value instanceof OLazyObjectCustomSerializer)) {
-            manageSerializedCollections(self,fieldName,value);
+          Field f=getField(fieldName,self.getClass());
+          if (OObjectEntitySerializer.isSerializedType(f) && !(value instanceof OLazyObjectCustomSerializer)) {
+            value=manageSerializedCollections(self,fieldName,value);
+          }
+ else           if (genericMultiValueType.isEnum() && !(value instanceof OLazyObjectEnumSerializer)) {
+            value=manageEnumCollections(self,f.getName(),genericMultiValueType,value);
           }
  else {
             value=manageObjectCollections(self,fieldName,value);
@@ -41,7 +45,7 @@
  else             doc.field(fieldName,value);
           }
  else           if (!loadedFields.containsKey(fieldName)) {
-            value=manageArrayFieldObject(fieldName,self,docValue);
+            value=manageArrayFieldObject(getField(fieldName,self.getClass()),self,docValue);
             Method setMethod=getSetMethod(self.getClass().getSuperclass(),getSetterFieldName(fieldName),value);
             setMethod.invoke(self,value);
           }

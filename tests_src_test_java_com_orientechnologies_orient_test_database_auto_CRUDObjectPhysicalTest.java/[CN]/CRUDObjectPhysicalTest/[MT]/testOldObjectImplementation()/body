@@ -1,0 +1,39 @@
+{
+  ODatabaseObjectTx db=new ODatabaseObjectTx(url).open("admin","admin");
+  db.getEntityManager().registerEntityClasses("com.e_soa.dbobjects");
+  Instrument instr=new Instrument("Fender Stratocaster");
+  db.save(instr);
+  Instrument instr2=new Instrument("Music Man");
+  db.save(instr2);
+  Musician man=new Musician();
+  man.setName("Jack");
+  OObjectIteratorClass<Object> list=db.browseClass("Instrument");
+  for (  Object anInstrument : list) {
+    man.getInstruments().add((Instrument)anInstrument);
+  }
+  db.save(man);
+  Musician man2=new Musician();
+  man2.setName("Roger");
+  String query="select from Instrument where name like 'Fender%'";
+  List<IdObject> list2=db.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertTrue(!(list2.get(0) instanceof Proxy));
+  man2.getInstruments().add((Instrument)list2.get(0));
+  db.save(man2);
+  db.close();
+  db=new ODatabaseObjectTx(url).open("admin","admin");
+  db.getEntityManager().registerEntityClasses("com.e_soa.dbobjects");
+  query="select from Musician limit 1";
+  List<IdObject> list3=db.query(new OSQLSynchQuery<ODocument>(query));
+  man=(Musician)list3.get(0);
+  Assert.assertTrue(!(man instanceof Proxy));
+  for (  Object aObject : man.getInstruments()) {
+    Assert.assertTrue(!(aObject instanceof Proxy));
+  }
+  db.close();
+  db=new ODatabaseObjectTx(url).open("admin","admin");
+  list3=db.query(new OSQLSynchQuery<ODocument>(query));
+  man=(Musician)list3.get(0);
+  man.setName("Big Jack");
+  db.save(man);
+  db.close();
+}

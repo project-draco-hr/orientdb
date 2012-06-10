@@ -1,0 +1,18 @@
+{
+  OIndexManager idxManager=database.getMetadata().getIndexManager();
+  idxManager.createIndex("IndexCountPlusCondition","NOTUNIQUE",new OSimpleKeyIndexDefinition(OType.INTEGER),null,null);
+  final OIndex<OIdentifiable> idx=(OIndex<OIdentifiable>)idxManager.getIndex("IndexCountPlusCondition");
+  final Map<Integer,Long> keyDocsCount=new HashMap<Integer,Long>();
+  for (int i=1; i < 100; i++) {
+    final Integer key=(int)Math.log(i);
+    final ODocument doc=new ODocument();
+    doc.save();
+    idx.put(key,doc);
+    if (keyDocsCount.containsKey(key))     keyDocsCount.put(key,keyDocsCount.get(key) + 1);
+ else     keyDocsCount.put(key,1L);
+  }
+  for (  Map.Entry<Integer,Long> entry : keyDocsCount.entrySet()) {
+    List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select count(*) from index:IndexCountPlusCondition where key = ?"),entry.getKey());
+    Assert.assertEquals(result.get(0).<Long>field("count"),entry.getValue());
+  }
+}

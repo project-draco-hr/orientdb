@@ -1,0 +1,42 @@
+{
+  for (  Entry<String,Object> indexEntry : remoteIndexEntries) {
+    final String indexName=indexEntry.getKey();
+    final ODocument indexDoc=(ODocument)indexEntry.getValue();
+    if (indexDoc == null)     continue;
+    OTransactionIndexChanges transactionIndexChanges=indexEntries.get(indexEntry.getKey());
+    if (transactionIndexChanges == null) {
+      transactionIndexChanges=new OTransactionIndexChanges();
+      indexEntries.put(indexEntry.getKey(),transactionIndexChanges);
+    }
+    final Boolean clearAll=(Boolean)indexDoc.field("clear");
+    if (clearAll != null && clearAll)     transactionIndexChanges.setCleared();
+    final Collection<ODocument> entries=indexDoc.field("entries");
+    if (entries == null)     continue;
+    for (    final ODocument entry : entries) {
+      final List<ODocument> operations=(List<ODocument>)entry.field("ops");
+      if (operations == null)       continue;
+      final Object key;
+      if (entry.field("k").equals("*"))       key=null;
+ else {
+        final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
+        if (serializedKey.startsWith("["))         key=new OCompositeKey((List<? extends Comparable<?>>)ORecordSerializerStringAbstract.fieldTypeFromStream(indexDoc,OType.EMBEDDEDLIST,OStringSerializerHelper.decode(serializedKey)));
+ else         key=ORecordSerializerStringAbstract.getTypeValue(serializedKey);
+      }
+      for (      final ODocument op : operations) {
+        final int operation=(Integer)op.rawField("o");
+        final OTransactionIndexChanges.OPERATION indexOperation=OTransactionIndexChanges.OPERATION.values()[operation];
+        final OIdentifiable value=op.field("v",OType.LINK);
+        if (key != null)         transactionIndexChanges.getChangesPerKey(key).add(value,indexOperation);
+ else         transactionIndexChanges.getChangesCrossKey().add(value,indexOperation);
+        if (value == null)         continue;
+        final ORID rid=value.getIdentity();
+        List<OTransactionRecordIndexOperation> txIndexOperations=recordIndexOperations.get(rid);
+        if (txIndexOperations == null) {
+          txIndexOperations=new ArrayList<OTransactionRecordIndexOperation>();
+          recordIndexOperations.put(rid,txIndexOperations);
+        }
+        txIndexOperations.add(new OTransactionRecordIndexOperation(indexName,key,indexOperation));
+      }
+    }
+  }
+}

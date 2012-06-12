@@ -1,0 +1,40 @@
+{
+  final Set<Member> members=new HashSet<Member>();
+  for (  String nodeId : iNodeIds) {
+    final Member m=clusterMembers.get(nodeId);
+    if (m == null)     OLogManager.instance().warn(this,"DISTRIBUTED -> cannot execute operation on remote member %s because is disconnected",nodeId);
+ else     members.add(m);
+  }
+  OLogManager.instance().debug(this,"DISTRIBUTED -> %s %s %s{%s}",members,ORecordOperation.getName(iOperation),dbName,rid);
+  final MultiTask<Object> task=new MultiTask<Object>(new OHazelcastReplicationTask(dbName,iOperation,rid,record.buffer,iVersion,record.recordType,iMode),members);
+  if (iMode == EXECUTION_MODE.SYNCHRONOUS)   try {
+    Hazelcast.getExecutorService().execute(task);
+    Collection<Object> result=task.get();
+    return result;
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of SYNCH operation against nodes: %s",members,e);
+    throw new ODistributedException("Error on executing remote operation against nodes: " + members,e);
+  }
+ else   if (iMode == EXECUTION_MODE.ASYNCHRONOUS)   try {
+    task.setExecutionCallback(new ExecutionCallback<Collection<Object>>(){
+      @Override public void done(      Future<Collection<Object>> future){
+        try {
+          if (!future.isCancelled()) {
+            Collection<Object> result=future.get();
+          }
+        }
+ catch (        Exception e) {
+          OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of ASYNCH operation against nodes: %s",members,e);
+        }
+      }
+    }
+);
+    Hazelcast.getExecutorService().execute(task);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation against nodes: %s",members,e);
+    throw new ODistributedException("Error on executing remote operation against nodes: " + members,e);
+  }
+  return null;
+}

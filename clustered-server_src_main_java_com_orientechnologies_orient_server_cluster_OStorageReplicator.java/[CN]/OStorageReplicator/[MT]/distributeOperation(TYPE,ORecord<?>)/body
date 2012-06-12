@@ -3,20 +3,20 @@
   final ORecordId rid=(ORecordId)iRecord.getIdentity();
 switch (iType) {
 case AFTER_CREATE:
-    operation=OReplicationTask.CREATE;
+    operation=OHazelcastReplicationTask.CREATE;
   break;
 case AFTER_UPDATE:
-operation=OReplicationTask.UPDATE;
+operation=OHazelcastReplicationTask.UPDATE;
 break;
 case AFTER_DELETE:
-operation=OReplicationTask.DELETE;
+operation=OHazelcastReplicationTask.DELETE;
 break;
 }
 if (operation > -1) {
 if (!isClusterReplicated(storage.getClusterById(rid.getClusterId()).getName())) return false;
 for (OReplicationLog localLog : logs.values()) {
 try {
-if (localLog.appendLog(operation,rid) == -1) {
+if (localLog.appendLog(operation,rid,iRecord.getVersion()) == -1) {
 OLogManager.instance().warn(this,"DISTRIBUTED -> replication log limit reached for file: %s. The node will be offline and a manual alignment will be needed",localLog);
 }
 }
@@ -26,11 +26,11 @@ OLogManager.instance().error(this,"DISTRIBUTED -> Error on appending log in file
 }
 final Set<String> members=cluster.getRemoteNodeIds();
 if (!members.isEmpty()) {
-final Collection<Object> results=cluster.executeOperation(members,operation,storageName,rid,new ORawBuffer((ORecordInternal<?>)iRecord));
+final Collection<Object> results=cluster.executeOperation(members,operation,storageName,rid,iRecord.getVersion(),new ORawBuffer((ORecordInternal<?>)iRecord));
 for (String member : members) {
 final OReplicationLog log=getLog(member);
 try {
-log.resetIfEmpty(1);
+log.resetIfEmpty();
 }
  catch (IOException e) {
 OLogManager.instance().error(this,"DISTRIBUTED -> Error on reset log file: %s",e,log);

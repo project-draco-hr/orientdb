@@ -1,0 +1,25 @@
+{
+  lock.acquireExclusiveLock();
+  try {
+    final long serial=totalEntries();
+    if (limit > -1 && serial > limit)     return -1;
+    pendingLogs++;
+    if (pendingLogs > 1)     OLogManager.instance().warn(this,"Journaled operation #%d as %s against record %s. Remain to synchronize: %d",serial,ORecordOperation.getName(iOperation),iRID,pendingLogs);
+ else     OLogManager.instance().debug(this,"Journaled operation #%d as %s against record %s",serial,ORecordOperation.getName(iOperation),iRID);
+    int offset=file.allocateSpace(RECORD_SIZE);
+    file.writeByte(offset,iOperation);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    file.writeShort(offset,(short)iRID.clusterId);
+    offset+=OBinaryProtocol.SIZE_SHORT;
+    file.writeLong(offset,iRID.clusterPosition);
+    offset+=OBinaryProtocol.SIZE_LONG;
+    file.writeInt(offset,iVersion);
+    offset+=OBinaryProtocol.SIZE_INT;
+    file.writeLong(offset,System.currentTimeMillis());
+    if (synchEnabled)     file.synch();
+    return serial;
+  }
+  finally {
+    lock.releaseExclusiveLock();
+  }
+}

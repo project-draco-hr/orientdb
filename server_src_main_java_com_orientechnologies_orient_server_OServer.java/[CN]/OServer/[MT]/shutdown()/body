@@ -2,6 +2,7 @@
   if (!running)   return;
   running=false;
   shutdownHook.cancel();
+  for (  OServerLifecycleListener l : lifecycleListeners)   l.onBeforeDeactivate();
   OLogManager.instance().info(this,"OrientDB Server is shutdowning...");
   try {
     Orient.instance().shutdown();
@@ -21,9 +22,9 @@
         }
       }
     }
-    if (protocols.size() > 0) {
+    if (networkProtocols.size() > 0) {
       OLogManager.instance().info(this,"Shutdowning protocols");
-      protocols.clear();
+      networkProtocols.clear();
     }
     try {
       MBeanServer mBeanServer=ManagementFactory.getPlatformMBeanServer();
@@ -33,9 +34,9 @@
  catch (    Exception e) {
       OLogManager.instance().error(this,"OrientDB Server v" + OConstants.ORIENT_VERSION + " unregisterMBean error.",e);
     }
-    if (listeners.size() > 0) {
+    if (networkListeners.size() > 0) {
       OLogManager.instance().info(this,"Shutdowning listeners:");
-      for (      OServerNetworkListener l : listeners) {
+      for (      OServerNetworkListener l : networkListeners) {
         OLogManager.instance().info(this,"- %s",l);
         try {
           l.shutdown();
@@ -47,6 +48,11 @@
   }
   finally {
     lock.unlock();
+  }
+  for (  OServerLifecycleListener l : lifecycleListeners)   try {
+    l.onAfterDeactivate();
+  }
+ catch (  Exception e) {
   }
   OLogManager.instance().info(this,"OrientDB Server shutdown complete");
   System.out.println();

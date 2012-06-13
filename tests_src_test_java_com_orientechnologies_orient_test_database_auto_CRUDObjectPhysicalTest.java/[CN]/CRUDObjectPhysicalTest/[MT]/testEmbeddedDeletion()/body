@@ -1,0 +1,32 @@
+{
+  OObjectDatabaseTx db=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  Parent parent=db.newInstance(Parent.class);
+  parent.setName("Big Parent");
+  EmbeddedChild embedded=db.newInstance(EmbeddedChild.class);
+  embedded.setName("Little Child");
+  parent.setEmbeddedChild(embedded);
+  parent=db.save(parent);
+  List<Parent> presult=db.query(new OSQLSynchQuery<Parent>("select from Parent"));
+  List<EmbeddedChild> cresult=db.query(new OSQLSynchQuery<EmbeddedChild>("select from EmbeddedChild"));
+  Assert.assertEquals(presult.size(),1);
+  Assert.assertEquals(cresult.size(),0);
+  EmbeddedChild child=db.newInstance(EmbeddedChild.class);
+  child.setName("Little Child");
+  parent.setChild(child);
+  parent=db.save(parent);
+  presult=db.query(new OSQLSynchQuery<Parent>("select from Parent"));
+  cresult=db.query(new OSQLSynchQuery<EmbeddedChild>("select from EmbeddedChild"));
+  Assert.assertEquals(presult.size(),1);
+  Assert.assertEquals(cresult.size(),1);
+  db.delete(parent);
+  presult=db.query(new OSQLSynchQuery<Parent>("select * from Parent"));
+  cresult=db.query(new OSQLSynchQuery<EmbeddedChild>("select * from EmbeddedChild"));
+  Assert.assertEquals(presult.size(),0);
+  Assert.assertEquals(cresult.size(),1);
+  db.delete(child);
+  presult=db.query(new OSQLSynchQuery<Parent>("select * from Parent"));
+  cresult=db.query(new OSQLSynchQuery<EmbeddedChild>("select * from EmbeddedChild"));
+  Assert.assertEquals(presult.size(),0);
+  Assert.assertEquals(cresult.size(),0);
+  db.close();
+}

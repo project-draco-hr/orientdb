@@ -1,0 +1,40 @@
+{
+  final ORecordOperation op=new ORecordOperation();
+  int[] aligned=new int[3];
+  final OSynchronizationLog log=getLog(iNodeId);
+  for (int i=0; log.needAlignment() && i < log.totalEntries(); ++i) {
+    try {
+      log.getEntry(i,op);
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"DISTRIBUTED -> align failed for log entry %d",e,i);
+      return aligned;
+    }
+    if (op.type < 0)     continue;
+    final ORecordId rid=(ORecordId)op.record.getIdentity();
+    final ORawBuffer record=storage.readRecord(rid,null,false,null);
+    if (record == null && op.type != ORecordOperation.DELETED)     OLogManager.instance().warn(this,"DISTRIBUTED -> align failed for record %s because doesn't exist anymore",rid);
+ else {
+      final OPERATION operation=OPERATION.values()[op.type];
+      cluster.executeOperation(iNodeId,operation,storageName,rid,op.version,record,EXECUTION_MODE.SYNCHRONOUS);
+switch (operation) {
+case RECORD_CREATE:
+        aligned[0]++;
+      break;
+case RECORD_UPDATE:
+    aligned[1]++;
+  break;
+case RECORD_DELETE:
+aligned[2]++;
+break;
+}
+}
+try {
+log.alignedEntry(i);
+}
+ catch (IOException e) {
+OLogManager.instance().error(this,"DISTRIBUTED -> error on reset log entry %d",e,i);
+}
+}
+return aligned;
+}

@@ -1,0 +1,37 @@
+{
+  OStorage stg=Orient.instance().getStorage(databaseName);
+  if (stg == null) {
+    final String url=OServerMain.server().getStorageURL(databaseName);
+    if (url == null) {
+      OLogManager.instance().error(this,"DISTRIBUTED <- database '%s' is not configured on this server. Copy the database here to enable the replication",rid,databaseName);
+      return null;
+    }
+    stg=Orient.instance().loadStorage(url);
+  }
+  if (stg.isClosed())   stg.open(null,null,null);
+  Object result=null;
+switch (operation) {
+case RECORD_CREATE:
+    OLogManager.instance().debug(this,"DISTRIBUTED <- creating record %s v.%d size=%s",rid,version,OFileUtils.getSizeAsString(content.length));
+  result=stg.createRecord(0,rid,content,version,recordType,0,null);
+break;
+case RECORD_READ:
+OLogManager.instance().debug(this,"DISTRIBUTED <- reading record %s v.%d size=%s",rid,version,OFileUtils.getSizeAsString(content.length));
+result=stg.readRecord(rid,null,false,null);
+break;
+case RECORD_UPDATE:
+OLogManager.instance().debug(this,"DISTRIBUTED <- updating record %s v.%d size=%s",rid,version,OFileUtils.getSizeAsString(content.length));
+result=stg.updateRecord(rid,content,version,recordType,0,null);
+break;
+case RECORD_DELETE:
+OLogManager.instance().debug(this,"DISTRIBUTED <- deleting record %s v.%d size=%s",rid,version,OFileUtils.getSizeAsString(content.length));
+result=stg.deleteRecord(rid,version,0,null);
+break;
+case COMMAND:
+OLogManager.instance().debug(this,"DISTRIBUTED <- deleting record %s v.%d size=%s",rid,version,OFileUtils.getSizeAsString(content.length));
+result=stg.deleteRecord(rid,version,0,null);
+break;
+}
+if (mode != EXECUTION_MODE.FIRE_AND_FORGET) return result;
+return null;
+}

@@ -1,0 +1,41 @@
+{
+  database=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  JavaComplexTestClass p=database.newInstance(JavaComplexTestClass.class);
+  p.setName("Dean Winchester");
+  ODocument testEmbeddedDocument=new ODocument();
+  testEmbeddedDocument.field("testEmbeddedField","testEmbeddedValue");
+  p.setEmbeddedDocument(testEmbeddedDocument);
+  ODocument testDocument=new ODocument();
+  testDocument.field("testField","testValue");
+  p.setDocument(testDocument);
+  ORecordBytes testRecordBytes=new ORecordBytes("this is a bytearray test. if you read this Object database has stored it correctly".getBytes());
+  p.setByteArray(testRecordBytes);
+  database.save(p);
+  ORID rid=database.getRecordByUserObject(p,false).getIdentity();
+  database.close();
+  database=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  JavaComplexTestClass loaded=database.load(rid);
+  Assert.assertTrue(loaded.getByteArray() instanceof ORecordBytes);
+  try {
+    ByteArrayOutputStream out=new ByteArrayOutputStream();
+    try {
+      loaded.getByteArray().toOutputStream(out);
+      Assert.assertEquals("this is a bytearray test. if you read this Object database has stored it correctly".getBytes(),out.toByteArray());
+      Assert.assertEquals("this is a bytearray test. if you read this Object database has stored it correctly",new String(out.toByteArray()));
+    }
+  finally {
+      out.close();
+    }
+  }
+ catch (  IOException ioe) {
+    Assert.assertTrue(false);
+    OLogManager.instance().error(this,"Error reading byte[]",ioe);
+  }
+  Assert.assertTrue(loaded.getDocument() instanceof ODocument);
+  Assert.assertEquals("testValue",loaded.getDocument().field("testField"));
+  Assert.assertTrue(loaded.getDocument().getIdentity().isPersistent());
+  Assert.assertTrue(loaded.getEmbeddedDocument() instanceof ODocument);
+  Assert.assertEquals("testEmbeddedValue",loaded.getEmbeddedDocument().field("testEmbeddedField"));
+  Assert.assertTrue(!loaded.getEmbeddedDocument().getIdentity().isValid());
+  database.close();
+}

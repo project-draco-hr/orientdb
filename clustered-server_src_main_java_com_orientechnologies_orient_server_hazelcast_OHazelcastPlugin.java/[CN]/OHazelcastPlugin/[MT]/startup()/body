@@ -2,6 +2,8 @@
   if (!enabled)   return;
   remoteClusterNodes.clear();
   synchronizers.clear();
+  aligningNodes.clear();
+  initDistributedDatabases();
   try {
     hazelcastInstance=Hazelcast.init(new FileSystemXmlConfig(configFile));
   }
@@ -9,9 +11,11 @@
     throw new OConfigurationException("Error on creating Hazelcast instance",e);
   }
   localNodeId=getNodeId(hazelcastInstance.getCluster().getLocalMember());
+  aligningNodes.add(getLocalNodeId());
   timeOffset=System.currentTimeMillis() - getHazelcastInstance().getCluster().getClusterTime();
+  hazelcastInstance.getCluster().addMembershipListener(this);
+  for (  Member m : hazelcastInstance.getCluster().getMembers())   registerAndAlignNode(m,true);
+  aligningNodes.remove(getLocalNodeId());
   publishNodeConfiguration();
-  Hazelcast.getCluster().addMembershipListener(this);
-  for (  Member m : Hazelcast.getCluster().getMembers())   registerAndAlignNode(m,true);
   super.startup();
 }

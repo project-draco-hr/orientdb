@@ -1,5 +1,6 @@
 {
   final ORecordOperation op=new ORecordOperation();
+  final String currentNodeId=cluster.getLocalNodeId();
   int[] aligned=new int[3];
   final OSynchronizationLog log=getLog(iNodeId);
   for (int i=0; log.needAlignment() && i < log.totalEntries(); ++i) {
@@ -11,23 +12,38 @@
       return aligned;
     }
     if (op.type < 0)     continue;
+    boolean alignedOperation=false;
     final ORecordId rid=(ORecordId)op.record.getIdentity();
+    if (rid.isNew())     rid.clusterPosition=storage.getClusterDataRange(rid.clusterId)[1];
     final ORawBuffer record=storage.readRecord(rid,null,false,null);
     if (record == null && op.type != ORecordOperation.DELETED)     OLogManager.instance().warn(this,"DISTRIBUTED -> align failed for record %s because doesn't exist anymore",rid);
  else {
-      final OPERATION operation=OPERATION.values()[op.type];
-      cluster.executeOperation(iNodeId,operation,storageName,rid,op.version,record,EXECUTION_MODE.SYNCHRONOUS);
-switch (operation) {
-case RECORD_CREATE:
-        aligned[0]++;
+      final OAbstractDistributedTask<?> task=createTaskFromOperation(op.type,currentNodeId,EXECUTION_MODE.SYNCHRONOUS,rid,record);
+      final Object result=cluster.sendOperation2Node(iNodeId,task);
+switch (op.type) {
+case ORecordOperation.CREATED:
+        if (op.record.getIdentity().getClusterPosition() != ((OPhysicalPosition)result).clusterPosition)         OLogManager.instance().warn(this,"DISTRIBUTED -> detected conflict on aligning journaled operation #%d %s RID local %s != remote #%d:%d",i,ORecordOperation.getName(op.type),rid,rid.getClusterId(),((OPhysicalPosition)result).clusterPosition);
+ else {
+          alignedOperation=true;
+          aligned[0]++;
+        }
       break;
-case RECORD_UPDATE:
-    aligned[1]++;
+case ORecordOperation.UPDATED:
+    if (op.record.getRecord().getVersion() != ((Integer)result))     OLogManager.instance().warn(this,"DISTRIBUTED -> detected conflict on aligning journaled operation #%d %s record %s VERSION local %d != remote %d",i,ORecordOperation.getName(op.type),rid,op.record.getRecord().getVersion(),result);
+ else {
+      alignedOperation=true;
+      aligned[1]++;
+    }
   break;
-case RECORD_DELETE:
+case ORecordOperation.DELETED:
+alignedOperation=true;
 aligned[2]++;
 break;
 }
+}
+if (!alignedOperation) {
+OLogManager.instance().error(this,"DISTRIBUTED -> error on alignment: databases are not synchronized");
+break;
 }
 try {
 log.alignedEntry(i);

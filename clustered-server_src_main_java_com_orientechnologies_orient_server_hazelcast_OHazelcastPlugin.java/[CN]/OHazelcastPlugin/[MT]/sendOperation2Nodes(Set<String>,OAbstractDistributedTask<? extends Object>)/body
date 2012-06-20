@@ -1,0 +1,32 @@
+{
+  final Set<Member> members=new HashSet<Member>();
+  for (  String nodeId : iNodeIds) {
+    final Member m=remoteClusterNodes.get(nodeId);
+    if (m == null)     OLogManager.instance().warn(this,"DISTRIBUTED -> cannot execute operation on remote member %s because is disconnected",nodeId);
+ else     members.add(m);
+  }
+  final MultiTask<Object> task=new MultiTask<Object>((Callable<Object>)iTask,members);
+  ExecutionCallback<Object> callback=null;
+  if (iTask.getMode() == EXECUTION_MODE.ASYNCHRONOUS)   callback=new ExecutionCallback<Object>(){
+    @SuppressWarnings("unused") @Override public void done(    Future<Object> future){
+      try {
+        if (!future.isCancelled()) {
+          Object result=future.get();
+        }
+      }
+ catch (      Exception e) {
+        OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in ASYNCH mode against nodes: %s",members,e);
+      }
+    }
+  }
+;
+  Collection<Object> result=null;
+  try {
+    result=(Collection<Object>)executeOperation(task,iTask.getMode(),callback);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against nodes: %s",e,iTask.getMode(),members);
+    throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against nodes: "+ members,e);
+  }
+  return result;
+}

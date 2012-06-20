@@ -1,0 +1,24 @@
+{
+  final String clusterName=storage.getClusterById(rid.getClusterId()).getName();
+  iTask.setMode(getOperationMode(clusterName,iTask.getName()));
+  final Set<String> targetNodes=cluster.getRemoteNodeIdsBut(iTask.getNodeSource());
+  if (!targetNodes.isEmpty()) {
+    iTask.setNodeSource(cluster.getLocalNodeId());
+    iTask.setRedistribute(false);
+    try {
+      cluster.sendOperation2Nodes(targetNodes,iTask);
+      for (      String member : targetNodes) {
+        final OSynchronizationLog log=getLog(member);
+        try {
+          log.success();
+        }
+ catch (        IOException e) {
+          OLogManager.instance().error(this,"DISTRIBUTED -> Error on reset log file: %s",e,log);
+        }
+      }
+    }
+ catch (    ODistributedException e) {
+      OLogManager.instance().error(this,"DISTRIBUTED -> Error on distributing operation, start buffering changes",e);
+    }
+  }
+}

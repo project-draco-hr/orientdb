@@ -1,0 +1,34 @@
+{
+  Thread.currentThread().setName("Updater - " + Thread.currentThread().getId());
+  countDownLatch.await();
+  while (updateCounter < DOCUMENT_COUNT) {
+    if (updateCounter > createCounter.get()) {
+      continue;
+    }
+    ODatabaseRecordThreadLocal.INSTANCE.set(db);
+    List<ODocument> execute;
+    System.out.println(Thread.currentThread() + " : before search cycle(update)" + updateCounter);
+    do {
+      execute=db.command(new OSQLSynchQuery<Object>("select * from " + STUDENT_CLASS_NAME + " where counter = ?")).execute(updateCounter);
+    }
+ while (!deleted.contains(updateCounter) && (execute == null || execute.isEmpty()));
+    if (!deleted.contains(updateCounter)) {
+      System.out.println(Thread.currentThread() + " : after search cycle(update) " + updateCounter);
+      ODocument document=execute.get(0);
+      document.field("counter2",document.field("counter"));
+      try {
+        document.save();
+        System.out.println(Thread.currentThread() + " : document " + updateCounter+ " updated");
+        updateCounter++;
+      }
+ catch (      OConcurrentModificationException e) {
+        System.out.println(Thread.currentThread() + " : concurrent modification exception while updating! " + updateCounter);
+      }
+    }
+ else {
+      System.out.println(Thread.currentThread() + " : document " + updateCounter+ " already deleted couldn't update!");
+      updateCounter++;
+    }
+  }
+  return null;
+}

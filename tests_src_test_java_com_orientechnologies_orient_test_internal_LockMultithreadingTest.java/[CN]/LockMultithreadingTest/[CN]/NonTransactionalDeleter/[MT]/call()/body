@@ -1,0 +1,27 @@
+{
+  Thread.currentThread().setName("Deleter - " + Thread.currentThread().getId());
+  countDownLatch.await();
+  int number=deleteCounter.getAndIncrement();
+  while (number < DOCUMENT_COUNT) {
+    while (number > createCounter.get())     ;
+    try {
+      ODatabaseRecordThreadLocal.INSTANCE.set(db);
+      List<ODocument> execute;
+      System.out.println(Thread.currentThread() + " : before search cycle (delete) " + number);
+      do {
+        execute=db.command(new OSQLSynchQuery<Object>("select * from " + STUDENT_CLASS_NAME + " where counter2 = ?")).execute(number);
+      }
+ while (execute == null || execute.isEmpty());
+      System.out.println(Thread.currentThread() + " : after search cycle (delete)" + number);
+      ODocument document=execute.get(0);
+      document.delete();
+      deleted.add(number);
+      System.out.println(Thread.currentThread() + " : document deleted " + number);
+      number=deleteCounter.getAndIncrement();
+    }
+ catch (    OConcurrentModificationException e) {
+      System.out.println(Thread.currentThread() + " : exception while deleted " + number);
+    }
+  }
+  return null;
+}

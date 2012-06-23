@@ -1,0 +1,25 @@
+{
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"DISTRIBUTED <-[%s] %s %s v.%d",nodeSource,getName(),rid,version);
+  final OStorageSynchronizer dbSynchronizer=getDatabaseSynchronizer();
+  final long runId=getDistributedServerManager().getRunId();
+  final long operationSerial=getDistributedServerManager().incrementDistributedSerial(databaseName);
+  final long operationLogOffset;
+  try {
+    operationLogOffset=dbSynchronizer.getLog().journalOperation(runId,operationSerial,getOperationType(),this);
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on logging operation %s %s v.%d",e,nodeSource,getName(),rid,version);
+    throw new ODistributedException("Error on logging operation",e);
+  }
+  final T result=executeOnLocalNode(dbSynchronizer);
+  try {
+    setAsCompleted(dbSynchronizer,operationLogOffset);
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on changing the log status for operation %s %s v.%d",e,nodeSource,getName(),rid,version);
+    throw new ODistributedException("Error on changing the log status",e);
+  }
+  if (isRedistribute())   dbSynchronizer.distributeOperation(ORecordOperation.CREATED,rid,this);
+  if (mode != EXECUTION_MODE.FIRE_AND_FORGET)   return result;
+  return null;
+}

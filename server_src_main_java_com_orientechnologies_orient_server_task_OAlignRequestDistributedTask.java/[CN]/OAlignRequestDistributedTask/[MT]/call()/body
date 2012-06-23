@@ -1,0 +1,19 @@
+{
+  OLogManager.instance().warn(this,"DISTRIBUTED <- align request from %s for database %s starting from %d.%d",nodeSource,databaseName,lastRunId,lastOperationId);
+  int aligned=0;
+  final ODistributedServerManager dManager=getDistributedServerManager();
+  final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
+  final ODatabaseJournal log=synchronizer.getLog();
+  for (Iterator<Long> it=log.browse(new long[]{lastRunId,lastOperationId}); it.hasNext(); ) {
+    final long pos=it.next();
+    final OAbstractDistributedTask<?> operation=log.getOperation(pos);
+    operation.setNodeSource(dManager.getLocalNodeId());
+    operation.setDatabaseName(databaseName);
+    operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
+    dManager.sendOperation2Node(nodeSource,(OAbstractDistributedTask<?>)operation);
+    operation.setAsCompleted(synchronizer,pos);
+    aligned++;
+  }
+  OLogManager.instance().warn(this,"DISTRIBUTED <- aligned %d operations on database %s",aligned,databaseName);
+  return null;
+}

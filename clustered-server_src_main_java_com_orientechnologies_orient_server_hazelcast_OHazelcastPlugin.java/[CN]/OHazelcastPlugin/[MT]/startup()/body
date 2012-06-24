@@ -2,7 +2,6 @@
   if (!enabled)   return;
   remoteClusterNodes.clear();
   synchronizers.clear();
-  aligningNodes.clear();
   initDistributedDatabases();
   try {
     hazelcastInstance=Hazelcast.init(new FileSystemXmlConfig(configFile));
@@ -10,13 +9,13 @@
  catch (  FileNotFoundException e) {
     throw new OConfigurationException("Error on creating Hazelcast instance",e);
   }
-  getConfigurationMap().putIfAbsent("runId",hazelcastInstance.getCluster().getClusterTime());
-  runId=(Long)getConfigurationMap().get("runId");
   localNodeId=getNodeId(hazelcastInstance.getCluster().getLocalMember());
-  aligningNodes.add(getLocalNodeId());
+  final IMap<String,Object> configurationMap=getConfigurationMap();
+  configurationMap.addEntryListener(this,true);
+  setStatus("aligning");
+  configurationMap.putIfAbsent("runId",hazelcastInstance.getCluster().getClusterTime());
+  runId=(Long)getConfigurationMap().get("runId");
   timeOffset=System.currentTimeMillis() - getHazelcastInstance().getCluster().getClusterTime();
   registerAndAlignNodes();
-  aligningNodes.remove(getLocalNodeId());
-  publishNodeConfiguration();
   super.startup();
 }

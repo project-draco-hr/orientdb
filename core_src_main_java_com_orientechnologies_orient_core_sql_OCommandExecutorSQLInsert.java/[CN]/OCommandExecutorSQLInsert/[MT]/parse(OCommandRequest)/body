@@ -4,33 +4,27 @@
   init(((OCommandRequestText)iRequest).getText());
   className=null;
   newRecords=null;
-  StringBuilder word=new StringBuilder();
-  int pos=OSQLHelper.nextWord(text,textUpperCase,0,word,true);
-  if (pos == -1 || !word.toString().equals(OCommandExecutorSQLInsert.KEYWORD_INSERT))   throw new OCommandSQLParsingException("Keyword " + OCommandExecutorSQLInsert.KEYWORD_INSERT + " not found. Use "+ getSyntax(),text,0);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-  if (pos == -1 || !word.toString().equals(KEYWORD_INTO))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_INTO + " not found. Use "+ getSyntax(),text,0);
-  pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-  if (pos == -1)   throw new OCommandSQLParsingException("Invalid subject name. Expected cluster, class or index. Use " + getSyntax(),text,pos);
-  String subjectName=word.toString();
+  parseRequiredWords("INSERT","INTO");
+  String subjectName=parseRequiredWord(true,"Invalid subject name. Expected cluster, class or index");
   if (subjectName.startsWith(OCommandExecutorSQLAbstract.CLUSTER_PREFIX))   clusterName=subjectName.substring(OCommandExecutorSQLAbstract.CLUSTER_PREFIX.length());
  else   if (subjectName.startsWith(OCommandExecutorSQLAbstract.INDEX_PREFIX))   indexName=subjectName.substring(OCommandExecutorSQLAbstract.INDEX_PREFIX.length());
  else {
     if (subjectName.startsWith(OCommandExecutorSQLAbstract.CLASS_PREFIX))     subjectName=subjectName.substring(OCommandExecutorSQLAbstract.CLASS_PREFIX.length());
     final OClass cls=database.getMetadata().getSchema().getClass(subjectName);
-    if (cls == null)     throw new OCommandSQLParsingException("Class " + subjectName + " not found in database",text,pos);
+    if (cls == null)     throw new OCommandSQLParsingException("Class " + subjectName + " not found in database",text,currentPos);
     className=cls.getName();
   }
-  final int beginFields=OStringParser.jumpWhiteSpaces(text,pos);
-  if (beginFields == -1 || (text.charAt(beginFields) != '(' && !text.startsWith(KEYWORD_SET,beginFields)))   throw new OCommandSQLParsingException("Set of fields is missed. Example: (name, surname) or SET name = 'Bill'. Use " + getSyntax(),text,pos);
+  final int beginFields=OStringParser.jumpWhiteSpaces(text,currentPos);
+  if (beginFields == -1 || (text.charAt(beginFields) != '(' && !text.startsWith(KEYWORD_SET,beginFields)))   throw new OCommandSQLParsingException("Set of fields is missed. Example: (name, surname) or SET name = 'Bill'. Use " + getSyntax(),text,currentPos);
   newRecords=new ArrayList<Map<String,Object>>();
   if (text.charAt(beginFields) == '(') {
-    parseBracesFields(word,beginFields);
+    parseBracesFields(beginFields);
   }
  else {
     final LinkedHashMap<String,Object> fields=new LinkedHashMap<String,Object>();
     newRecords.add(fields);
-    pos=OSQLHelper.nextWord(text,textUpperCase,pos,word,true);
-    parseSetFields(word,pos,fields);
+    parseRequiredWord(false);
+    parseSetFields(fields);
   }
   return this;
 }

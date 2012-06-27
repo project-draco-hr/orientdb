@@ -1,0 +1,35 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(url).open("admin","admin");
+  for (int i=0; ; ++i) {
+    try {
+      final List<ODocument> result=db.command(new OCommandSQL("select from Person where name = '" + parentName + "'")).execute();
+      ODocument parent=result.get(0);
+      if (parent == null) {
+        db.close();
+        return;
+      }
+      db.begin();
+      Collection<ODocument> out=parent.field("out");
+      if (out.size() > 0) {
+        ODocument edge=out.iterator().next();
+        if (edge != null) {
+          out.remove(edge);
+          final List<ODocument> result2=db.command(new OCommandSQL("traverse out from " + edge.getIdentity())).execute();
+          for (          ODocument d : result2) {
+            db.delete(d);
+          }
+        }
+      }
+      parent.save();
+      db.commit();
+      break;
+    }
+ catch (    ONeedRetryException e) {
+      System.out.println("Concurrency change, retry " + i);
+    }
+catch (    Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+  db.close();
+}

@@ -1,0 +1,54 @@
+{
+  OGlobalConfiguration.CACHE_LEVEL1_ENABLED.setValue(false);
+  OGlobalConfiguration.CACHE_LEVEL1_SIZE.setValue(0);
+  OGlobalConfiguration.CACHE_LEVEL2_ENABLED.setValue(false);
+  OGlobalConfiguration.CACHE_LEVEL2_SIZE.setValue(0);
+  int tries=20;
+  for (int cnt=0; cnt < tries; cnt++) {
+    try {
+      ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
+      System.out.println("Recreating database");
+      if (ODatabaseHelper.existsDatabase(db)) {
+        db.setProperty("security",Boolean.FALSE);
+        ODatabaseHelper.dropDatabase(db,url);
+      }
+      ODatabaseHelper.createDatabase(db,url);
+      db.close();
+    }
+ catch (    IOException ex) {
+      System.out.println("Exception: " + ex);
+    }
+    ODatabaseDocumentTx db=new ODatabaseDocumentTx(url).open("admin","admin");
+    OClass vertexClass=db.getMetadata().getSchema().createClass("OGraphVertex");
+    OClass edgeClass=db.getMetadata().getSchema().createClass("OGraphEdge");
+    vertexClass.createProperty("in",OType.LINKSET,edgeClass);
+    vertexClass.createProperty("out",OType.LINKSET,edgeClass);
+    edgeClass.createProperty("in",OType.LINK,vertexClass);
+    edgeClass.createProperty("out",OType.LINK,vertexClass);
+    OClass personClass=db.getMetadata().getSchema().createClass("Person",vertexClass);
+    personClass.createProperty("name",OType.STRING).createIndex(OClass.INDEX_TYPE.UNIQUE);
+    personClass.createProperty("identifier",OType.STRING).createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    db.getMetadata().getSchema().save();
+    db.begin();
+    PersonTree tree=new PersonTree();
+    tree.AddRoot("A","B");
+    buildTree(tree,tree.root.getIdentity(),"A",subnodes,depth,'A');
+    db.commit();
+    char startLetter='A' + subnodes;
+    try {
+      AddThread t1=new AddThread("A",startLetter++);
+      DeleteThread t2=new DeleteThread("A");
+      DeleteThread t3=new DeleteThread("A");
+      AddThread t4=new AddThread("A",startLetter);
+      t1.t.join();
+      t2.t.join();
+      t3.t.join();
+      t4.t.join();
+    }
+ catch (    InterruptedException ex) {
+      System.out.println("Interrupted");
+    }
+    if (!checkIndexConsistency(db))     cnt=tries;
+    db.close();
+  }
+}

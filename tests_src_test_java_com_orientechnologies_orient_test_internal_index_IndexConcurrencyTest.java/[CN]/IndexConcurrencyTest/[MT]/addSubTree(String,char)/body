@@ -1,0 +1,32 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(url).open("admin","admin");
+  for (int i=0; ; ++i) {
+    try {
+      ODocument parent;
+      final List<ODocument> result=db.command(new OCommandSQL("select from Person where name = '" + parentName + "'")).execute();
+      parent=result.get(0);
+      if (parent == null) {
+        db.close();
+        return;
+      }
+      String newName=parentName;
+      newName+=Character.toString(startLetter);
+      StringBuilder newIdentifier=new StringBuilder(newName);
+      newIdentifier.setCharAt(0,'B');
+      db.begin();
+      PersonTree tree=new PersonTree();
+      tree.SetRoot(parent);
+      ODocument child=tree.AddChild(parent,newName,newIdentifier.toString());
+      buildTree(tree,child.getIdentity(),newName,subnodes,depth - 1,startLetter);
+      db.commit();
+      break;
+    }
+ catch (    ONeedRetryException e) {
+      System.out.println("Concurrency change, retry " + i);
+    }
+catch (    Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+  db.close();
+}

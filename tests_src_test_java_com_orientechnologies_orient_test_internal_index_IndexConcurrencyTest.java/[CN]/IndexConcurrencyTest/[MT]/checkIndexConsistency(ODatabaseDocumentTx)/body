@@ -1,0 +1,28 @@
+{
+  Map<String,ODocument> persons=new HashMap<String,ODocument>();
+  Map<String,ORID> indexPersons=new HashMap<String,ORID>();
+  final List<ODocument> result=db.command(new OCommandSQL("select from cluster:Person")).execute();
+  for (  ODocument d : result) {
+    persons.put((String)d.field("name"),d);
+  }
+  final List<ODocument> indexResult=db.command(new OCommandSQL("select from index:Person.name")).execute();
+  for (  ODocument d : indexResult) {
+    d.setLazyLoad(false);
+    indexPersons.put((String)d.field("key"),(ORID)d.field("rid"));
+  }
+  System.out.println("PersonCount: " + persons.size() + ", IndexCount: "+ indexPersons.size());
+  boolean missing=false;
+  for (  Map.Entry<String,ODocument> e : persons.entrySet()) {
+    if (!indexPersons.containsKey(e.getKey())) {
+      System.out.println("Key found in cluster but not in index: " + e.getValue() + " key: "+ e.getKey());
+      missing=true;
+    }
+  }
+  for (  Map.Entry<String,ORID> e : indexPersons.entrySet()) {
+    if (!persons.containsKey(e.getKey())) {
+      System.out.println("Key found in index but not in cluster: " + e.getValue() + " key: "+ e.getKey());
+      missing=true;
+    }
+  }
+  return persons.size() == indexPersons.size() && !missing;
+}

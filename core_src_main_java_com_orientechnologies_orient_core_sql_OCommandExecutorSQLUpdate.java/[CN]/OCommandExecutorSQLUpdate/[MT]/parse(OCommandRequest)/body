@@ -9,21 +9,23 @@
   incrementEntries.clear();
   query=null;
   recordCount=0;
-  parseRequiredKeyword("UPDATE");
-  subjectName=parseRequiredWord(true,"Invalid target");
-  final int newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,true);
-  if (newPos == -1 || (!tempParseWord.toString().equals(KEYWORD_SET) && !tempParseWord.toString().equals(KEYWORD_ADD) && !tempParseWord.toString().equals(KEYWORD_PUT)&& !tempParseWord.toString().equals(KEYWORD_REMOVE)&& !tempParseWord.toString().equals(KEYWORD_INCREMENT)))   throw new OCommandSQLParsingException("Expected keyword " + KEYWORD_SET + ","+ KEYWORD_ADD+ ","+ KEYWORD_PUT+ ","+ KEYWORD_REMOVE+ " or "+ KEYWORD_INCREMENT+ ". Use "+ getSyntax(),text,currentPos);
-  currentPos=newPos;
-  while (currentPos != -1 && !tempParseWord.toString().equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE)) {
-    if (tempParseWord.toString().equals(KEYWORD_SET))     currentPos=parseSetFields(setEntries);
- else     if (tempParseWord.toString().equals(KEYWORD_ADD))     currentPos=parseAddFields();
- else     if (tempParseWord.toString().equals(KEYWORD_PUT))     currentPos=parsePutFields();
- else     if (tempParseWord.toString().equals(KEYWORD_REMOVE))     currentPos=parseRemoveFields();
- else     if (tempParseWord.toString().equals(KEYWORD_INCREMENT))     currentPos=parseIncrementFields();
+  parserRequiredKeyword("UPDATE");
+  subjectName=parserRequiredWord(true,"Invalid target");
+  parserNextWord(true);
+  String word=parserGetLastWord();
+  if (parserIsEnded() || (!word.equals(KEYWORD_SET) && !word.equals(KEYWORD_ADD) && !word.equals(KEYWORD_PUT)&& !word.equals(KEYWORD_REMOVE)&& !word.equals(KEYWORD_INCREMENT)))   throwSyntaxErrorException("Expected keyword " + KEYWORD_SET + ","+ KEYWORD_ADD+ ","+ KEYWORD_PUT+ ","+ KEYWORD_REMOVE+ " or "+ KEYWORD_INCREMENT);
+  while (!parserIsEnded() && !parserGetLastWord().equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE)) {
+    word=parserGetLastWord();
+    if (word.equals(KEYWORD_SET))     parseSetFields(setEntries);
+ else     if (word.equals(KEYWORD_ADD))     parseAddFields();
+ else     if (word.equals(KEYWORD_PUT))     parsePutFields();
+ else     if (word.equals(KEYWORD_REMOVE))     parseRemoveFields();
+ else     if (word.equals(KEYWORD_INCREMENT))     parseIncrementFields();
  else     break;
+    parserNextWord(true);
   }
-  final String additionalStatement=tempParseWord.toString();
-  if (additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE) || additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_LIMIT))   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName + " "+ additionalStatement+ " "+ text.substring(currentPos),this);
+  final String additionalStatement=parserGetLastWord();
+  if (additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE) || additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_LIMIT))   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName + " "+ additionalStatement+ " "+ text.substring(parserGetCurrentPosition()),this);
  else   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName,this);
   return this;
 }

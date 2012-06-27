@@ -1,32 +1,11 @@
 {
   String fieldName;
   String fieldValue;
-  int newPos=currentPos;
-  while (currentPos != -1 && (addEntries.size() == 0 || tempParseWord.toString().equals(",")) && !tempParseWord.toString().equals(KEYWORD_WHERE)) {
-    newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,false);
-    if (newPos == -1)     throw new OCommandSQLParsingException("Field name expected. Use " + getSyntax(),text,currentPos);
-    currentPos=newPos;
-    fieldName=tempParseWord.toString();
-    newPos=OStringParser.jumpWhiteSpaces(text,currentPos);
-    if (newPos == -1 || text.charAt(newPos) != '=')     throw new OCommandSQLParsingException("Character '=' was expected. Use " + getSyntax(),text,currentPos);
-    currentPos=newPos + 1;
-    newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,false," =><");
-    if (currentPos == -1)     throw new OCommandSQLParsingException("Value expected. Use " + getSyntax(),text,currentPos);
-    fieldValue=tempParseWord.toString();
-    if (fieldValue.startsWith("{") || fieldValue.startsWith("[") || fieldValue.startsWith("[")) {
-      newPos=OStringParser.jumpWhiteSpaces(text,currentPos);
-      final StringBuilder buffer=new StringBuilder();
-      newPos=OStringSerializerHelper.parse(text,buffer,newPos,-1,OStringSerializerHelper.DEFAULT_FIELD_SEPARATOR,true,OStringSerializerHelper.DEFAULT_IGNORE_CHARS);
-      fieldValue=buffer.toString();
-    }
-    if (fieldValue.endsWith(",")) {
-      currentPos=newPos - 1;
-      fieldValue=fieldValue.substring(0,fieldValue.length() - 1);
-    }
- else     currentPos=newPos;
+  while (!parserIsEnded() && (addEntries.size() == 0 || parserGetLastSeparator() == ',') && !parserGetLastWord().equals(KEYWORD_WHERE)) {
+    fieldName=parserRequiredWord(false,"Field name expected");
+    parserRequiredKeyword("=");
+    fieldValue=parserRequiredWord(false,"Value expected"," =><,\r\n");
     addEntries.add(new OPair<String,Object>(fieldName,getFieldValueCountingParameters(fieldValue)));
-    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,true);
   }
-  if (addEntries.size() == 0)   throw new OCommandSQLParsingException("Entries to add <field> = <value> are missed. Example: name = 'Bill', salary = 300.2. Use " + getSyntax(),text,currentPos);
-  return currentPos;
+  if (addEntries.size() == 0)   throwSyntaxErrorException("Entries to add <field> = <value> are missed. Example: name = 'Bill', salary = 300.2.");
 }

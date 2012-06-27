@@ -6,18 +6,16 @@
   if (context == null)   context=new OBasicCommandContext();
   compiledFilter=OSQLEngine.getInstance().parseFromWhereCondition(text.substring(pos,endPosition),context);
   optimize();
-  currentPos=compiledFilter.currentPos < 0 ? endPosition : compiledFilter.currentPos + pos;
-  if (currentPos > -1 && currentPos < text.length()) {
-    currentPos=OStringParser.jump(text,currentPos," \r\n");
-    final StringBuilder word=new StringBuilder();
-    String w;
-    while (currentPos > -1) {
-      currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
-      if (currentPos > -1) {
-        w=word.toString();
-        if (w.equals(KEYWORD_ORDER))         parseOrderBy(word);
- else         if (w.equals(KEYWORD_LIMIT))         parseLimit(word);
- else         if (w.equals(KEYWORD_SKIP))         parseSkip(word);
+  parserSetCurrentPosition(compiledFilter.parserIsEnded() ? endPosition : compiledFilter.parserGetCurrentPosition() + pos);
+  if (!parserIsEnded()) {
+    parserSkipWhiteSpaces();
+    while (!parserIsEnded()) {
+      parserNextWord(true);
+      if (!parserIsEnded()) {
+        final String w=parserGetLastWord();
+        if (w.equals(KEYWORD_ORDER))         parseOrderBy(w);
+ else         if (w.equals(KEYWORD_LIMIT))         parseLimit(w);
+ else         if (w.equals(KEYWORD_SKIP))         parseSkip(w);
  else         throw new OCommandSQLParsingException("Invalid keyword '" + w + "'");
       }
     }

@@ -1,14 +1,14 @@
 {
-  if (!jumpWhiteSpaces())   return null;
-  int begin=currentPos;
+  if (!parserSkipWhiteSpaces())   return null;
+  int begin=parserGetCurrentPosition();
   char c;
   char stringBeginCharacter=' ';
   int openBraces=0;
   int openBraket=0;
   boolean escaped=false;
   boolean escapingOn=false;
-  for (; currentPos < text.length(); ++currentPos) {
-    c=text.charAt(currentPos);
+  while (!parserIsEnded()) {
+    c=parserGetCurrentChar();
     if (stringBeginCharacter == ' ' && (c == '"' || c == '\'')) {
       stringBeginCharacter=c;
     }
@@ -21,14 +21,14 @@
         if (c == stringBeginCharacter && !escapingOn) {
           stringBeginCharacter=' ';
           if (openBraket == 0 && openBraces == 0) {
-            if (iAdvanceWhenNotFound)             currentPos++;
+            if (iAdvanceWhenNotFound)             parserMoveCurrentPosition(+1);
             break;
           }
         }
         if (escapingOn)         escapingOn=false;
       }
     }
- else     if (c == '#' && currentPos == begin) {
+ else     if (c == '#' && parserGetCurrentPosition() == begin) {
     }
  else     if (c == '(') {
       openBraces++;
@@ -48,10 +48,13 @@
       break;
     }
  else     if (!Character.isLetter(c) && !Character.isDigit(c) && c != '.' && c != '$' && c != ':' && c != '-' && c != '_' && c != '+' && c != '@' && openBraces == 0 && openBraket == 0) {
-      if (iAdvanceWhenNotFound)       currentPos++;
+      if (iAdvanceWhenNotFound)       parserMoveCurrentPosition(+1);
       break;
     }
+    parserMoveCurrentPosition(+1);
   }
-  if (escaped)   return new String[]{OStringSerializerHelper.decode(textUpperCase.substring(begin,currentPos)),OStringSerializerHelper.decode(text.substring(begin,currentPos))};
- else   return new String[]{textUpperCase.substring(begin,currentPos),text.substring(begin,currentPos)};
+  int pos=parserGetCurrentPosition();
+  if (pos == -1)   pos=text.length();
+  if (escaped)   return new String[]{OStringSerializerHelper.decode(textUpperCase.substring(begin,pos)),OStringSerializerHelper.decode(text.substring(begin,pos))};
+ else   return new String[]{textUpperCase.substring(begin,pos),text.substring(begin,pos)};
 }

@@ -3,18 +3,19 @@
   for (int i=0; i < iExpectedWords; ++i) {
     final String[] words=nextValue(true);
     if (words == null)     break;
+    final int lastPosition=parserIsEnded() ? text.length() : parserGetCurrentPosition();
     if (words[0].length() > 0 && words[0].charAt(0) == OStringSerializerHelper.EMBEDDED_BEGIN) {
       braces++;
-      currentPos=currentPos - words[0].length() + 1;
+      parserSetCurrentPosition(lastPosition - words[0].length() + 1);
       final Object subCondition=extractConditions(null);
-      if (!jumpWhiteSpaces() || text.charAt(currentPos) == ')')       braces--;
-      if (currentPos > -1)       currentPos++;
+      if (!parserSkipWhiteSpaces() || parserGetCurrentChar() == ')')       braces--;
+      parserMoveCurrentPosition(+1);
       result[i]=subCondition;
     }
  else     if (words[0].charAt(0) == OStringSerializerHelper.COLLECTION_BEGIN) {
-      currentPos=currentPos - words[0].length();
+      parserSetCurrentPosition(lastPosition - words[0].length());
       final List<String> stringItems=new ArrayList<String>();
-      currentPos=OStringSerializerHelper.getCollection(text,currentPos,stringItems);
+      parserSetCurrentPosition(OStringSerializerHelper.getCollection(text,parserGetCurrentPosition(),stringItems));
       if (stringItems.get(0).charAt(0) == OStringSerializerHelper.COLLECTION_BEGIN) {
         final List<List<Object>> coll=new ArrayList<List<Object>>();
         for (        String stringItem : stringItems) {
@@ -27,7 +28,7 @@
  else {
         result[i]=convertCollectionItems(stringItems);
       }
-      currentPos++;
+      parserMoveCurrentPosition(+1);
     }
  else     if (words[0].startsWith(OSQLFilterItemFieldAll.NAME + OStringSerializerHelper.EMBEDDED_BEGIN)) {
       result[i]=new OSQLFilterItemFieldAll(this,words[1]);

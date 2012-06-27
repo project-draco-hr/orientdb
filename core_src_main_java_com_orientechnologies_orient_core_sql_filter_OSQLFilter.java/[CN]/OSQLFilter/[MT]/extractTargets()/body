@@ -1,16 +1,14 @@
 {
-  currentPos=OStringParser.jumpWhiteSpaces(text,currentPos);
-  if (currentPos == -1)   throw new OQueryParsingException("No query target found",text,0);
-  final char c=text.charAt(currentPos);
+  parserSkipWhiteSpaces();
+  if (parserIsEnded())   throw new OQueryParsingException("No query target found",text,0);
+  final char c=parserGetCurrentChar();
   if (c == '#' || Character.isDigit(c)) {
-    final StringBuilder word=new StringBuilder();
-    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
     targetRecords=new ArrayList<OIdentifiable>();
-    ((List<OIdentifiable>)targetRecords).add(new ORecordId(word.toString()));
+    ((List<OIdentifiable>)targetRecords).add(new ORecordId(parserRequiredWord(true,"No valid RID")));
   }
  else   if (c == '(') {
     final StringBuilder subText=new StringBuilder();
-    currentPos=OStringSerializerHelper.getEmbedded(text,currentPos,-1,subText);
+    parserSetCurrentPosition(OStringSerializerHelper.getEmbedded(text,parserGetCurrentPosition(),-1,subText));
     final OCommandSQL subCommand=new OCommandSQLResultset(subText.toString());
     final OCommandExecutor executor=OCommandManager.instance().getExecutor(subCommand);
     executor.setProgressListener(subCommand.getProgressListener());
@@ -24,30 +22,18 @@
   }
  else   if (c == OStringSerializerHelper.COLLECTION_BEGIN) {
     final List<String> rids=new ArrayList<String>();
-    currentPos=OStringSerializerHelper.getCollection(text,currentPos,rids);
+    parserSetCurrentPosition(OStringSerializerHelper.getCollection(text,parserGetCurrentPosition(),rids));
     targetRecords=new ArrayList<OIdentifiable>();
     for (    String rid : rids)     ((List<OIdentifiable>)targetRecords).add(new ORecordId(rid));
-    if (currentPos > -1)     currentPos++;
+    parserMoveCurrentPosition(1);
   }
  else {
-    String subjectName;
-    String alias;
-    String subjectToMatch;
-    int newPos;
-    final StringBuilder word=new StringBuilder();
-    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
-    while (currentPos > -1 && (targetClasses == null && targetClusters == null && targetIndex == null)) {
-      subjectName=word.toString();
-      newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
-      if (newPos > -1 && word.toString().equals("AS")) {
-        currentPos=newPos;
-        newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,word,true);
-        if (newPos == -1)         throw new OQueryParsingException("No alias found. Example: SELECT FROM Customer AS c",text,currentPos);
-        currentPos=newPos;
-        alias=word.toString();
-      }
+    while (!parserIsEnded() && (targetClasses == null && targetClusters == null && targetIndex == null)) {
+      String subjectName=parserRequiredWord(true,"Target not found");
+      final String alias;
+      if (subjectName.equals("AS"))       alias=parserRequiredWord(true,"Alias not found");
  else       alias=subjectName;
-      subjectToMatch=subjectName;
+      final String subjectToMatch=subjectName;
       if (subjectToMatch.startsWith(OCommandExecutorSQLAbstract.CLUSTER_PREFIX)) {
         if (targetClusters == null)         targetClusters=new HashMap<String,String>();
         targetClusters.put(subjectName.substring(OCommandExecutorSQLAbstract.CLUSTER_PREFIX.length()),alias);
@@ -64,5 +50,5 @@
       }
     }
   }
-  return currentPos > -1;
+  return !parserIsEnded();
 }

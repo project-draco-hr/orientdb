@@ -1,26 +1,11 @@
 {
   String fieldName;
   String fieldValue;
-  int newPos=currentPos;
-  while (currentPos != -1 && (incrementEntries.size() == 0 || tempParseWord.toString().equals(",")) && !tempParseWord.toString().equals(KEYWORD_WHERE)) {
-    newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,false);
-    if (newPos == -1)     throw new OCommandSQLParsingException("Field name expected. Use " + getSyntax(),text,currentPos);
-    currentPos=newPos;
-    fieldName=tempParseWord.toString();
-    newPos=OStringParser.jumpWhiteSpaces(text,currentPos);
-    if (newPos == -1 || text.charAt(newPos) != '=')     throw new OCommandSQLParsingException("Character '=' was expected. Use " + getSyntax(),text,currentPos);
-    currentPos=newPos;
-    newPos=OSQLHelper.nextWord(text,textUpperCase,currentPos + 1,tempParseWord,false," =><");
-    if (currentPos == -1)     throw new OCommandSQLParsingException("Value expected. Use " + getSyntax(),text,currentPos);
-    fieldValue=tempParseWord.toString();
-    if (fieldValue.endsWith(",")) {
-      currentPos=newPos - 1;
-      fieldValue=fieldValue.substring(0,fieldValue.length() - 1);
-    }
- else     currentPos=newPos;
+  while (!parserIsEnded() && (incrementEntries.size() == 0 || parserGetLastSeparator() == ',') && !parserGetLastWord().equals(KEYWORD_WHERE)) {
+    fieldName=parserRequiredWord(false,"Field name expected");
+    parserRequiredKeyword("=");
+    fieldValue=getBlock(parserRequiredWord(false,"Value expected"));
     incrementEntries.put(fieldName,(Number)getFieldValueCountingParameters(fieldValue));
-    currentPos=OSQLHelper.nextWord(text,textUpperCase,currentPos,tempParseWord,true);
   }
-  if (incrementEntries.size() == 0)   throw new OCommandSQLParsingException("Entries to increment <field> = <value> are missed. Example: salary = -100. Use " + getSyntax(),text,currentPos);
-  return currentPos;
+  if (incrementEntries.size() == 0)   throwSyntaxErrorException("Entries to increment <field> = <value> are missed. Example: salary = -100");
 }

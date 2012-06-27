@@ -1,15 +1,15 @@
 {
-  if (!jumpWhiteSpaces())   return null;
-  if (text.charAt(currentPos) == ')')   return null;
-  String word;
-  word=nextWord(true," 0123456789'\"");
+  if (!parserSkipWhiteSpaces())   return null;
+  if (parserGetCurrentChar() == ')')   return null;
+  parserNextWord(true," 0123456789'\"");
+  final String word=parserGetLastWord();
   if (checkForEnd(word))   return null;
   for (  OQueryOperator op : OSQLEngine.getInstance().getRecordOperators()) {
     if (word.startsWith(op.keyword)) {
       final List<String> params=new ArrayList<String>();
       if (word.length() > op.keyword.length() && word.charAt(op.keyword.length()) == OStringSerializerHelper.EMBEDDED_BEGIN) {
-        int paramBeginPos=currentPos - (word.length() - op.keyword.length());
-        currentPos=OStringSerializerHelper.getParameters(text,paramBeginPos,-1,params);
+        int paramBeginPos=parserGetCurrentPosition() - (word.length() - op.keyword.length());
+        parserSetCurrentPosition(OStringSerializerHelper.getParameters(text,paramBeginPos,-1,params));
       }
  else       if (!word.equals(op.keyword))       throw new OQueryParsingException("Malformed usage of operator '" + op.toString() + "'. Parsed operator is: "+ word);
       try {
@@ -20,5 +20,5 @@
       }
     }
   }
-  throw new OQueryParsingException("Unknown operator " + word,text,currentPos);
+  throw new OQueryParsingException("Unknown operator " + word,text,parserGetCurrentPosition());
 }

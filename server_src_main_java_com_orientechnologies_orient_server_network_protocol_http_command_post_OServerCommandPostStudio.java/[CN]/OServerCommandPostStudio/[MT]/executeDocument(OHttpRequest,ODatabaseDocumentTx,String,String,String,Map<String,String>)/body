@@ -7,20 +7,22 @@
     for (    Entry<String,String> f : fields.entrySet()) {
       final Object oldValue=doc.rawField(f.getKey());
       String userValue=f.getValue();
-      if (userValue.equals("undefined"))       continue;
-      Object newValue=ORecordSerializerStringAbstract.getTypeValue(userValue);
-      if (newValue != null) {
-        if (newValue instanceof Collection) {
-          final ArrayList<Object> array=new ArrayList<Object>();
-          for (          String s : (Collection<String>)newValue) {
-            Object v=ORecordSerializerStringAbstract.getTypeValue(s);
-            array.add(v);
+      if (userValue != null && userValue.equals("undefined"))       doc.removeField(f.getKey());
+ else {
+        Object newValue=ORecordSerializerStringAbstract.getTypeValue(userValue);
+        if (newValue != null) {
+          if (newValue instanceof Collection) {
+            final ArrayList<Object> array=new ArrayList<Object>();
+            for (            String s : (Collection<String>)newValue) {
+              Object v=ORecordSerializerStringAbstract.getTypeValue(s);
+              array.add(v);
+            }
+            newValue=array;
           }
-          newValue=array;
         }
+        if (oldValue != null && oldValue.equals(userValue))         continue;
+        doc.field(f.getKey(),newValue);
       }
-      if (oldValue != null && oldValue.equals(userValue))       continue;
-      doc.field(f.getKey(),newValue);
     }
     doc.save();
     sendTextContent(iRequest,OHttpUtils.STATUS_OK_CODE,"OK",null,OHttpUtils.CONTENT_TEXT_PLAIN,"Record " + rid + " updated successfully.");

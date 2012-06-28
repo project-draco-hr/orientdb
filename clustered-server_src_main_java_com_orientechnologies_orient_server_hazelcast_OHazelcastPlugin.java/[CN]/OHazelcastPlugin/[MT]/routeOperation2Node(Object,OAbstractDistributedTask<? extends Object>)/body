@@ -1,5 +1,5 @@
 {
-  final String nodeId=getOwnerNode(iKey);
+  String nodeId=getOwnerNode(iKey);
   if (isAligningNode(nodeId)) {
     OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is aligning. Waiting for completition...",nodeId);
     while (isAligningNode(nodeId)) {
@@ -9,10 +9,11 @@
  catch (      InterruptedException e) {
         Thread.interrupted();
       }
+      nodeId=getOwnerNode(iKey);
     }
     OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is aligned. Flushing pending operations...",nodeId);
   }
-  for (int retry=0; retry < 10; ++retry) {
+  for (int retry=0; retry < SEND_RETRY_MAX; ++retry) {
     try {
       if (isLocalNodeOwner(iKey)) {
         return iTask.call();
@@ -26,26 +27,28 @@
           if (remoteResult != null && localResult != null)           if (!remoteResult.equals(localResult))           OLogManager.instance().warn(this,"DISTRIBUTED -> detected conflict on %s in %s mode against %s/%s: remote {%s} != local {%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,nodeId,iTask.getDatabaseName(),remoteResult,localResult);
           return localResult;
         }
- catch (        OServerOfflineException e) {
-          OLogManager.instance().warn(this,"DISTRIBUTED -> remote node %s is not online, retrying %d...",nodeId,retry + 1);
-          try {
-            Thread.sleep(200);
-          }
- catch (          InterruptedException ex) {
-            Thread.interrupted();
-          }
-        }
-catch (        MemberLeftException e) {
+ catch (        MemberLeftException e) {
           OLogManager.instance().warn(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s because node left. Re-route it in transparent way",e,EXECUTION_MODE.SYNCHRONOUS,nodeId);
           return routeOperation2Node(iKey,iTask);
         }
+catch (        ExecutionException e) {
+          if (e.getCause() instanceof OServerOfflineException) {
+            OLogManager.instance().warn(this,"DISTRIBUTED -> remote node %s is not online, retrying %d...",nodeId,retry + 1);
+            try {
+              Thread.sleep(200);
+            }
+ catch (            InterruptedException ex) {
+              Thread.interrupted();
+            }
+          }
+ else {
+            OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s",e,EXECUTION_MODE.SYNCHRONOUS,nodeId);
+            throw e;
+          }
+        }
       }
     }
- catch (    ExecutionException e) {
-      OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s",e,EXECUTION_MODE.SYNCHRONOUS,nodeId);
-      throw e;
-    }
-catch (    InterruptedException e) {
+ catch (    InterruptedException e) {
       Thread.interrupted();
     }
 catch (    Exception e) {

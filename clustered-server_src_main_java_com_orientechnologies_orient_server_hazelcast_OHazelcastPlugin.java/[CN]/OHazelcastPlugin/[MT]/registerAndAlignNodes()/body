@@ -2,24 +2,26 @@
   hazelcastInstance.getCluster().addMembershipListener(this);
   for (  Member clusterMember : hazelcastInstance.getCluster().getMembers()) {
     final String nodeId=getNodeId(clusterMember);
-    if (getLocalNodeId().equals(nodeId)) {
-      continue;
-    }
-    remoteClusterNodes.put(nodeId,clusterMember);
+    if (!getLocalNodeId().equals(nodeId))     remoteClusterNodes.put(nodeId,clusterMember);
   }
   OLogManager.instance().warn(this,"DISTRIBUTED -> detected running nodes %s",remoteClusterNodes.keySet());
-synchronized (synchronizers) {
+  if (remoteClusterNodes.isEmpty())   setStatus("online");
+ else synchronized (synchronizers) {
     for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
-      final String dbName=entry.getKey();
+      final String databaseName=entry.getKey();
       try {
         final long[] lastOperationId=entry.getValue().getLog().getLastOperationId();
-        OLogManager.instance().warn(this,"DISTRIBUTED --> send align request for database %s",dbName);
-        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(getLocalNodeId(),dbName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
+        OLogManager.instance().warn(this,"DISTRIBUTED --> send align request for database %s",databaseName);
+synchronized (pendingAlignments) {
+          for (          String node : remoteClusterNodes.keySet()) {
+            pendingAlignments.add(node + "/" + databaseName);
+          }
+        }
+        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(getLocalNodeId(),databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
       }
  catch (      IOException e) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",dbName);
+        OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",databaseName);
       }
     }
   }
-  setStatus("online");
 }

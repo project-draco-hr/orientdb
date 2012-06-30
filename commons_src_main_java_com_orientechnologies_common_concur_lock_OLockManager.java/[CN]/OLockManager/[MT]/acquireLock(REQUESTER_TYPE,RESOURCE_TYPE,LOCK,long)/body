@@ -1,11 +1,13 @@
 {
   if (!enabled)   return;
   CountableLock lock;
-synchronized (map) {
+  final Object internalLock=internalLock(iResourceId);
+synchronized (internalLock) {
     lock=map.get(iResourceId);
     if (lock == null) {
-      lock=new CountableLock(iTimeout > 0);
-      map.put(getImmutableResourceId(iResourceId),lock);
+      final CountableLock newLock=new CountableLock(iTimeout > 0);
+      lock=map.putIfAbsent(getImmutableResourceId(iResourceId),newLock);
+      if (lock == null)       lock=newLock;
     }
     lock.countLocks++;
   }
@@ -30,7 +32,7 @@ synchronized (map) {
     }
   }
  catch (  RuntimeException e) {
-synchronized (map) {
+synchronized (internalLock) {
       lock.countLocks--;
       if (lock.countLocks == 0)       map.remove(iResourceId);
     }

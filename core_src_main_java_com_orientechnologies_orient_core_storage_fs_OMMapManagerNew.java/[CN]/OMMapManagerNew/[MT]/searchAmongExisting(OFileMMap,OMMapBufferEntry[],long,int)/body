@@ -1,0 +1,45 @@
+{
+  if (fileEntries.length == 0) {
+    return EMPTY_BUFFER_ENTRIES;
+  }
+  final OMMapBufferEntry lastEntry=fileEntries[fileEntries.length - 1];
+  if (lastEntry.beginOffset + lastEntry.size <= beginOffset) {
+    return EMPTY_BUFFER_ENTRIES;
+  }
+  final LastMMapEntrySearchInfo entrySearchInfo=mapEntrySearchInfo.get(file);
+  final int beginSearchPosition;
+  final int endSearchPosition;
+  if (entrySearchInfo == null) {
+    beginSearchPosition=0;
+    endSearchPosition=fileEntries.length - 1;
+  }
+ else {
+    if (entrySearchInfo.requestedPosition <= beginOffset) {
+      beginSearchPosition=entrySearchInfo.foundMmapIndex;
+      endSearchPosition=fileEntries.length - 1;
+    }
+ else {
+      beginSearchPosition=0;
+      endSearchPosition=entrySearchInfo.foundMmapIndex;
+    }
+  }
+  final int resultFirstPosition;
+  if (endSearchPosition - beginSearchPosition > BINARY_SEARCH_THRESHOLD)   resultFirstPosition=binarySearch(fileEntries,beginOffset,beginSearchPosition,endSearchPosition);
+ else   resultFirstPosition=linearSearch(fileEntries,beginOffset,beginSearchPosition,endSearchPosition);
+  if (beginSearchPosition < 0)   return EMPTY_BUFFER_ENTRIES;
+  int resultLastPosition=fileEntries.length - 1;
+  for (int i=resultFirstPosition; i <= resultLastPosition; i++) {
+    final OMMapBufferEntry entry=fileEntries[i];
+    if (entry.beginOffset + entry.size >= beginOffset + size) {
+      resultLastPosition=i;
+      break;
+    }
+  }
+  final int length=resultLastPosition - resultFirstPosition + 1;
+  final OMMapBufferEntry[] foundEntries=new OMMapBufferEntry[length];
+  if (length > 0) {
+    System.arraycopy(fileEntries,resultFirstPosition,foundEntries,0,length);
+    mapEntrySearchInfo.put(file,new LastMMapEntrySearchInfo(resultFirstPosition,beginOffset));
+  }
+  return foundEntries;
+}

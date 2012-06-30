@@ -1,13 +1,22 @@
 {
   iOffset=checkRegions(iOffset,iLenght);
-  final OMMapBufferEntry entry=OMMapManager.acquire(this,iOffset,iLenght,OPERATION_TYPE.READ,strategy);
-  if (entry != null) {
+  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,iLenght,OMMapManager.OPERATION_TYPE.READ,strategy);
+  if (entries != null) {
     try {
-      entry.buffer.position((int)(iOffset - entry.beginOffset));
-      entry.buffer.get(iDestBuffer,0,iLenght);
+      int position=(int)(iOffset - entries[0].beginOffset);
+      int remaining;
+      int remainingLength=iLenght;
+      for (      OMMapBufferEntry entry : entries) {
+        entry.buffer.position(position);
+        remaining=entry.buffer.remaining();
+        int toRead=Math.min(remaining,remainingLength);
+        entry.buffer.get(iDestBuffer,iLenght - remainingLength,toRead);
+        position=0;
+        remainingLength-=toRead;
+      }
     }
   finally {
-      entry.release();
+      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
     }
   }
  else {

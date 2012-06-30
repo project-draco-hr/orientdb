@@ -1,0 +1,27 @@
+{
+  for (Iterator<Map.Entry<OFileMMap,OMMapBufferEntry[]>> it=bufferPoolPerFile.entrySet().iterator(); it.hasNext(); ) {
+    OFileMMap file;
+    final Map.Entry<OFileMMap,OMMapBufferEntry[]> mapEntry=it.next();
+    file=mapEntry.getKey();
+    lockManager.acquireLock(Thread.currentThread(),file,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      if (file.isClosed()) {
+        OMMapBufferEntry[] notFlushed=EMPTY_BUFFER_ENTRIES;
+        for (        OMMapBufferEntry entry : mapEntry.getValue()) {
+          if (!removeEntry(entry)) {
+            notFlushed=addEntry(notFlushed,entry);
+          }
+        }
+        if (notFlushed.length == 0) {
+          it.remove();
+        }
+ else {
+          mapEntry.setValue(notFlushed);
+        }
+      }
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),file,OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+}

@@ -1,12 +1,17 @@
 {
   iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_SHORT);
-  final OMMapBufferEntry entry=OMMapManager.acquire(this,iOffset,OBinaryProtocol.SIZE_SHORT,OPERATION_TYPE.WRITE,strategy);
-  if (entry != null) {
+  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_SHORT,OMMapManager.OPERATION_TYPE.WRITE,strategy);
+  if (entries != null) {
     try {
-      entry.buffer.putShort((int)(iOffset - entry.beginOffset),iValue);
+      if (entries.length == 1)       entries[0].buffer.putShort((int)(iOffset - entries[0].beginOffset),iValue);
+ else {
+        entries[0].buffer.position((int)(iOffset - entries[0].beginOffset));
+        entries[1].buffer.position(0);
+        OByteBufferUtils.splitShortToBuffers(entries[0].buffer,entries[1].buffer,iValue);
+      }
     }
   finally {
-      entry.release();
+      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.WRITE);
     }
   }
  else {

@@ -1,0 +1,43 @@
+{
+  if (iStrategy == OMMapManager.ALLOC_STRATEGY.MMAP_NEVER) {
+    return null;
+  }
+  OMMapBufferEntry[] fileEntries=bufferPoolPerFile.get(iFile);
+  if (fileEntries == null) {
+    fileEntries=EMPTY_BUFFER_ENTRIES;
+    bufferPoolPerFile.putIfAbsent(iFile,fileEntries);
+  }
+  OMMapBufferEntry[] foundEntries=searchAmongExisting(iFile,fileEntries,iBeginOffset,iSize);
+  if (foundEntries.length > 0) {
+    final OMMapBufferEntry lastEntry=foundEntries[foundEntries.length - 1];
+    if (lastEntry.beginOffset + lastEntry.size >= iBeginOffset + iSize) {
+      acquireLocksOnEntries(foundEntries,iOperationType);
+      return foundEntries;
+    }
+  }
+  final OMMapBufferEntry newMappedEntry;
+  lockManager.acquireLock(Thread.currentThread(),iFile,OLockManager.LOCK.EXCLUSIVE);
+  try {
+    fileEntries=bufferPoolPerFile.get(iFile);
+    foundEntries=searchAmongExisting(iFile,fileEntries,iBeginOffset,iSize);
+    long totalMappedSize=0;
+    if (fileEntries.length > 0) {
+      final OMMapBufferEntry lastEntry=fileEntries[fileEntries.length - 1];
+      totalMappedSize=lastEntry.beginOffset + lastEntry.size;
+    }
+    try {
+      newMappedEntry=mapNew(iFile,totalMappedSize);
+    }
+ catch (    IOException ex) {
+      return null;
+    }
+    final OMMapBufferEntry[] newEntries=addEntry(fileEntries,newMappedEntry);
+    bufferPoolPerFile.put(iFile,newEntries);
+    final OMMapBufferEntry[] resultEntries=addEntry(foundEntries,newMappedEntry);
+    acquireLocksOnEntries(resultEntries,iOperationType);
+    return resultEntries;
+  }
+  finally {
+    lockManager.releaseLock(Thread.currentThread(),iFile,OLockManager.LOCK.EXCLUSIVE);
+  }
+}

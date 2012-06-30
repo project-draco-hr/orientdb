@@ -1,0 +1,37 @@
+{
+  if (useSystemJNADisabled)   disableUsingSystemJNA();
+  try {
+    int errorCode=MemoryLockerLinux.INSTANCE.mlockall(MemoryLockerLinux.LOCK_CURRENT_MEMORY);
+    if (errorCode != 0) {
+      final String errorMessage;
+      int lastError=Native.getLastError();
+switch (lastError) {
+case MemoryLockerLinux.EPERM:
+        errorMessage="The calling process does not have the appropriate privilege to perform the requested operation(EPERM).";
+      break;
+case MemoryLockerLinux.EAGAIN:
+    errorMessage="Some or all of the memory identified by the operation could not be locked when the call was made(EAGAIN).";
+  break;
+case MemoryLockerLinux.ENOMEM:
+errorMessage="Unable to lock JVM memory. This can result in part of the JVM being swapped out, especially if mmapping of files enabled. Increase RLIMIT_MEMLOCK or run OrientDB server as root(ENOMEM).";
+break;
+case MemoryLockerLinux.EINVAL:
+errorMessage="The flags argument is zero, or includes unimplemented flags(EINVAL).";
+break;
+case MemoryLockerLinux.ENOSYS:
+errorMessage="The implementation does not support this memory locking interface(ENOSYS).";
+break;
+default :
+errorMessage="Unexpected exception with code " + lastError + ".";
+break;
+}
+OLogManager.instance().error(null,"[MemoryLocker.lockMemory] Error occurred while locking memory!\n" + errorMessage);
+}
+ else {
+OLogManager.instance().info(null,"[MemoryLocker.lockMemory] Memory locked successfully!");
+}
+}
+ catch (UnsatisfiedLinkError e) {
+OLogManager.instance().warn(null,"[MemoryLocker.lockMemory] Error on locking memory! It seems that you operation system doesn't support native mlockall call!");
+}
+}

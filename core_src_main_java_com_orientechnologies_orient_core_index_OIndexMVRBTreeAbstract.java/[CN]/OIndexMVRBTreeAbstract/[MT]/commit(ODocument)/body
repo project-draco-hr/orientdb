@@ -9,8 +9,23 @@
     for (    final ODocument entry : entries) {
       final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
       final Object key;
-      if (serializedKey.startsWith("["))       key=new OCompositeKey((List<? extends Comparable<?>>)ORecordSerializerStringAbstract.fieldTypeFromStream(iDocument,OType.EMBEDDEDLIST,OStringSerializerHelper.decode(serializedKey)));
- else       key=ORecordSerializerStringAbstract.getTypeValue(serializedKey);
+      try {
+        if (serializedKey.equals("*"))         key="*";
+ else {
+          final ODocument keyContainer=new ODocument();
+          keyContainer.setLazyLoad(false);
+          keyContainer.fromString(serializedKey);
+          final Object storedKey=keyContainer.field("key");
+          if (storedKey instanceof List)           key=new OCompositeKey((List<? extends Comparable<?>>)storedKey);
+ else           if (Boolean.TRUE.equals(keyContainer.field("binary"))) {
+            key=OStreamSerializerAnyStreamable.INSTANCE.fromStream((byte[])storedKey);
+          }
+ else           key=storedKey;
+        }
+      }
+ catch (      IOException ioe) {
+        throw new OTransactionException("Error during index changes deserialization. ",ioe);
+      }
       final List<ODocument> operations=(List<ODocument>)entry.field("ops");
       if (operations != null) {
         for (        final ODocument op : operations) {

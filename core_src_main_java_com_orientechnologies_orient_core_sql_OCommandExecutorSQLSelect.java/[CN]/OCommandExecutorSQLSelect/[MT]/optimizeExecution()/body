@@ -1,0 +1,26 @@
+{
+  if (compiledFilter != null & compiledFilter.getRootCondition() == null && projections != null && projections.size() == 1) {
+    final Map.Entry<String,Object> entry=projections.entrySet().iterator().next();
+    if (entry.getValue() instanceof OSQLFunctionRuntime) {
+      if (((OSQLFunctionRuntime)entry.getValue()).function instanceof OSQLFunctionCount) {
+        long count=0;
+        if (compiledFilter.getTargetClasses() != null) {
+          final OClass cls=compiledFilter.getTargetClasses().keySet().iterator().next();
+          count=cls.count();
+        }
+ else         if (compiledFilter.getTargetClusters() != null) {
+          for (          String cluster : compiledFilter.getTargetClusters().keySet()) {
+            count+=getDatabase().countClusterElements(cluster);
+          }
+        }
+ else         if (compiledFilter.getTargetIndex() != null) {
+          count+=getDatabase().getMetadata().getIndexManager().getIndex(compiledFilter.getTargetIndex()).getSize();
+        }
+        if (tempResult == null)         tempResult=new ArrayList<OIdentifiable>();
+        tempResult.add(new ODocument().field(entry.getKey(),count));
+        return true;
+      }
+    }
+  }
+  return false;
+}

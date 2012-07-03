@@ -10,15 +10,21 @@
     OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on logging operation %s %s v.%d",e,nodeSource,getName(),rid,version);
     throw new ODistributedException("Error on logging operation",e);
   }
-  final T result=executeOnLocalNode(dbSynchronizer);
+  ODistributedThreadLocal.INSTANCE.distributedExecution=true;
   try {
-    setAsCompleted(dbSynchronizer,operationLogOffset);
+    final T result=executeOnLocalNode(dbSynchronizer);
+    try {
+      setAsCompleted(dbSynchronizer,operationLogOffset);
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on changing the log status for operation %s %s v.%d",e,nodeSource,getName(),rid,version);
+      throw new ODistributedException("Error on changing the log status",e);
+    }
+    if (status == STATUS.DISTRIBUTE)     dbSynchronizer.distributeOperation(ORecordOperation.CREATED,rid,this);
+    if (mode != EXECUTION_MODE.FIRE_AND_FORGET)     return result;
+    return null;
   }
- catch (  IOException e) {
-    OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on changing the log status for operation %s %s v.%d",e,nodeSource,getName(),rid,version);
-    throw new ODistributedException("Error on changing the log status",e);
+  finally {
+    ODistributedThreadLocal.INSTANCE.distributedExecution=false;
   }
-  if (status == STATUS.DISTRIBUTE)   dbSynchronizer.distributeOperation(ORecordOperation.CREATED,rid,this);
-  if (mode != EXECUTION_MODE.FIRE_AND_FORGET)   return result;
-  return null;
 }

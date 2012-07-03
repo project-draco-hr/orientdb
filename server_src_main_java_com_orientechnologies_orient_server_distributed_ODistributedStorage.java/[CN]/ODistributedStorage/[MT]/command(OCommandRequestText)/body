@@ -1,3 +1,17 @@
 {
-  return wrapped.command(iCommand);
+  ODistributedThreadLocal.INSTANCE.distributedExecution=true;
+  try {
+    final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
+    executor.setProgressListener(iCommand.getProgressListener());
+    executor.parse(iCommand);
+    final Object localResult=wrapped.executeCommand(iCommand,executor);
+    final OCommandExecutor cmd=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
+    if (cmd instanceof OCommandDistributedRequest) {
+      final Collection<Object> distributedResult=dManager.sendOperation2Nodes(dManager.getRemoteNodeIds(),new OSQLCommandDistributedTask(dManager.getLocalNodeId(),wrapped.getName(),createRecordMode,iCommand.getText()));
+    }
+    return localResult;
+  }
+  finally {
+    ODistributedThreadLocal.INSTANCE.distributedExecution=false;
+  }
 }

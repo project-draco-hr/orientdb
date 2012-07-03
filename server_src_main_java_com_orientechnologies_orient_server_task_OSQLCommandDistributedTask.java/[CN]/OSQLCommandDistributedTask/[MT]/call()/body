@@ -1,6 +1,14 @@
 {
   OLogManager.instance().debug(this,"DISTRIBUTED <- command: %s",text.toString());
-  Object result=new OCommandSQL(text).execute();
-  if (mode != EXECUTION_MODE.FIRE_AND_FORGET)   return result;
-  return null;
+  final ODatabaseDocumentTx db=OSharedDocumentDatabase.acquire(databaseName,"admin","admin");
+  ODistributedThreadLocal.INSTANCE.distributedExecution=true;
+  try {
+    Object result=getStorage().command(new OCommandSQL(text));
+    if (mode != EXECUTION_MODE.FIRE_AND_FORGET)     return result;
+    return null;
+  }
+  finally {
+    ODistributedThreadLocal.INSTANCE.distributedExecution=false;
+    db.close();
+  }
 }

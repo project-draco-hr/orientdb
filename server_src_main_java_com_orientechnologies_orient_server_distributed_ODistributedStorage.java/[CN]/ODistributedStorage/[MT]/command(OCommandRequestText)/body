@@ -2,7 +2,11 @@
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
-  final boolean distribute=(executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor) instanceof OCommandDistributedReplicateRequest;
+  final boolean distribute;
+  final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
+  if (exec instanceof OCommandDistributedConditionalReplicateRequest)   distribute=((OCommandDistributedConditionalReplicateRequest)exec).isReplicated();
+ else   if (exec instanceof OCommandDistributedReplicateRequest)   distribute=true;
+ else   distribute=false;
   if (distribute)   ODistributedThreadLocal.INSTANCE.distributedExecution=true;
   try {
     final Object localResult=wrapped.executeCommand(iCommand,executor);

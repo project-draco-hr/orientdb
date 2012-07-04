@@ -5,6 +5,8 @@
   final String localNode=dManager.getLocalNodeId();
   final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
   final ODatabaseJournal log=synchronizer.getLog();
+  final OMultipleDistributedTasks tasks=new OMultipleDistributedTasks(localNode,databaseName,EXECUTION_MODE.SYNCHRONOUS);
+  final List<Long> positions=new ArrayList<Long>();
   for (Iterator<Long> it=log.browse(new long[]{lastRunId,lastOperationId}); it.hasNext(); ) {
     final long pos=it.next();
     final OAbstractDistributedTask<?> operation=log.getOperation(pos);
@@ -12,10 +14,11 @@
     operation.setNodeSource(localNode);
     operation.setDatabaseName(databaseName);
     operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
-    dManager.sendOperation2Node(nodeSource,(OAbstractDistributedTask<?>)operation);
-    operation.setAsCompleted(synchronizer,pos);
-    aligned++;
+    tasks.addTask(operation);
+    positions.add(pos);
+    if (tasks.getTasks() >= OP_BUFFER)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
   }
+  if (tasks.getTasks() > 0)   aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
   OLogManager.instance().warn(this,"DISTRIBUTED ->[%s/%s] aligned %d operations",nodeSource,databaseName,aligned);
   dManager.sendOperation2Node(nodeSource,new OAlignResponseDistributedTask(localNode,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,aligned));
   return aligned;

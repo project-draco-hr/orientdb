@@ -1,25 +1,33 @@
 {
   OLogManager.instance().warn(this,"DISTRIBUTED <-[%s/%s] align request starting from %d.%d",nodeSource,databaseName,lastRunId,lastOperationId);
-  int aligned=0;
+  int aligned;
   final ODistributedServerManager dManager=getDistributedServerManager();
   final String localNode=dManager.getLocalNodeId();
   final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
   final ODatabaseJournal log=synchronizer.getLog();
-  final OMultipleDistributedTasks tasks=new OMultipleDistributedTasks(localNode,databaseName,EXECUTION_MODE.SYNCHRONOUS);
-  final List<Long> positions=new ArrayList<Long>();
-  for (Iterator<Long> it=log.browse(new long[]{lastRunId,lastOperationId}); it.hasNext(); ) {
-    final long pos=it.next();
-    final OAbstractDistributedTask<?> operation=log.getOperation(pos);
-    OLogManager.instance().warn(this,"DISTRIBUTED ->[%s/%s] operation %s",nodeSource,databaseName,operation);
-    operation.setNodeSource(localNode);
-    operation.setDatabaseName(databaseName);
-    operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
-    tasks.addTask(operation);
-    positions.add(pos);
-    if (tasks.getTasks() >= OP_BUFFER)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+  final Lock alignmentLock=dManager.getLock("align." + databaseName);
+  if (alignmentLock.tryLock())   try {
+    aligned=0;
+    final OMultipleDistributedTasks tasks=new OMultipleDistributedTasks(localNode,databaseName,EXECUTION_MODE.SYNCHRONOUS);
+    final List<Long> positions=new ArrayList<Long>();
+    for (Iterator<Long> it=log.browse(new long[]{lastRunId,lastOperationId}); it.hasNext(); ) {
+      final long pos=it.next();
+      final OAbstractDistributedTask<?> operation=log.getOperation(pos);
+      OLogManager.instance().warn(this,"DISTRIBUTED ->[%s/%s] operation %s",nodeSource,databaseName,operation);
+      operation.setNodeSource(localNode);
+      operation.setDatabaseName(databaseName);
+      operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
+      tasks.addTask(operation);
+      positions.add(pos);
+      if (tasks.getTasks() >= OP_BUFFER)       aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    }
+    if (tasks.getTasks() > 0)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    OLogManager.instance().warn(this,"DISTRIBUTED ->[%s/%s] aligned %d operations",nodeSource,databaseName,aligned);
   }
-  if (tasks.getTasks() > 0)   aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
-  OLogManager.instance().warn(this,"DISTRIBUTED ->[%s/%s] aligned %d operations",nodeSource,databaseName,aligned);
+  finally {
+    alignmentLock.unlock();
+  }
+ else   aligned=-1;
   dManager.sendOperation2Node(nodeSource,new OAlignResponseDistributedTask(localNode,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,aligned));
   return aligned;
 }

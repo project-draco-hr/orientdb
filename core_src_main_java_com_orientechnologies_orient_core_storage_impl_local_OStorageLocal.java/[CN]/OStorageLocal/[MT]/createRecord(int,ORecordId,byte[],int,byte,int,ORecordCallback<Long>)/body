@@ -3,14 +3,20 @@
   final OCluster cluster=getClusterById(iRid.clusterId);
   final ODataLocal dataSegment=getDataSegmentById(iDataSegmentId);
   final OPhysicalPosition ppos;
-  if (txManager.isCommitting()) {
-    ppos=txManager.createRecord(txManager.getCurrentTransaction().getId(),dataSegment,cluster,iRid,iContent,iRecordVersion,iRecordType,iDataSegmentId);
-    iRid.clusterPosition=ppos.clusterPosition;
-  }
+  modificationLock.requestModificationLock();
+  try {
+    if (txManager.isCommitting()) {
+      ppos=txManager.createRecord(txManager.getCurrentTransaction().getId(),dataSegment,cluster,iRid,iContent,iRecordVersion,iRecordType,iDataSegmentId);
+      iRid.clusterPosition=ppos.clusterPosition;
+    }
  else {
-    ppos=createRecord(dataSegment,cluster,iContent,iRecordType,iRid,iRecordVersion);
-    if (OGlobalConfiguration.NON_TX_RECORD_UPDATE_SYNCH.getValueAsBoolean())     synchRecordUpdate(cluster,ppos);
-    if (iCallback != null)     iCallback.call(iRid,ppos.clusterPosition);
+      ppos=createRecord(dataSegment,cluster,iContent,iRecordType,iRid,iRecordVersion);
+      if (OGlobalConfiguration.NON_TX_RECORD_UPDATE_SYNCH.getValueAsBoolean())       synchRecordUpdate(cluster,ppos);
+      if (iCallback != null)       iCallback.call(iRid,ppos.clusterPosition);
+    }
+  }
+  finally {
+    modificationLock.releaseModificationLock();
   }
   return ppos;
 }

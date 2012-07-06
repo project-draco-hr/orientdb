@@ -1,5 +1,6 @@
 {
-  try {
+  boolean retry=true;
+  while (retry)   try {
     final OChannelBinaryClient network=storage.beginRequest(iRequest);
     try {
       network.writeBytes(iPayLoad.toStream());
@@ -8,6 +9,7 @@
       storage.endRequest(network);
     }
     storage.beginResponse(network);
+    retry=false;
     try {
       return new ODocument(network.readBytes());
     }
@@ -15,7 +17,10 @@
       storage.endResponse(network);
     }
   }
- catch (  Exception e) {
+ catch (  OModificationOperationProhibitedException ompe) {
+    retry=handleDBFreeze();
+  }
+catch (  Exception e) {
     OLogManager.instance().exception("Error on executing '%s'",e,OStorageException.class,iActivity);
   }
   return null;

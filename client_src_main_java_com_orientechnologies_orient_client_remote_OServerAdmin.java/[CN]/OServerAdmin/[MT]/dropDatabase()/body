@@ -1,6 +1,7 @@
 {
   storage.checkConnection();
-  try {
+  boolean retry=true;
+  while (retry)   try {
     final OChannelBinaryClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_DB_DROP);
     try {
       network.writeString(storage.getName());
@@ -9,8 +10,12 @@
       storage.endRequest(network);
     }
     storage.getResponse(network);
+    retry=false;
   }
- catch (  Exception e) {
+ catch (  OModificationOperationProhibitedException oope) {
+    retry=handleDBFreeze();
+  }
+catch (  Exception e) {
     OLogManager.instance().exception("Cannot delete the remote storage: " + storage.getName(),e,OStorageException.class);
   }
   for (  OStorage s : Orient.instance().getStorages()) {

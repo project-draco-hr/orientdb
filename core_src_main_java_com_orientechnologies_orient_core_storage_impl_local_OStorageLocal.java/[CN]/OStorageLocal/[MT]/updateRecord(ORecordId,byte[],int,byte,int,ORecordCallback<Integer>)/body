@@ -1,12 +1,20 @@
 {
   checkOpeness();
   final OCluster cluster=getClusterById(iRid.clusterId);
-  if (txManager.isCommitting())   return txManager.updateRecord(txManager.getCurrentTransaction().getId(),cluster,iRid,iContent,iVersion,iRecordType);
+  modificationLock.requestModificationLock();
+  try {
+    if (txManager.isCommitting()) {
+      return txManager.updateRecord(txManager.getCurrentTransaction().getId(),cluster,iRid,iContent,iVersion,iRecordType);
+    }
  else {
-    final OPhysicalPosition ppos=updateRecord(cluster,iRid,iContent,iVersion,iRecordType);
-    if (ppos != null && OGlobalConfiguration.NON_TX_RECORD_UPDATE_SYNCH.getValueAsBoolean())     synchRecordUpdate(cluster,ppos);
-    final int returnValue=(int)(ppos != null ? ppos.recordVersion : -1);
-    if (iCallback != null)     iCallback.call(iRid,returnValue);
-    return returnValue;
+      final OPhysicalPosition ppos=updateRecord(cluster,iRid,iContent,iVersion,iRecordType);
+      if (ppos != null && OGlobalConfiguration.NON_TX_RECORD_UPDATE_SYNCH.getValueAsBoolean())       synchRecordUpdate(cluster,ppos);
+      final int returnValue=(int)(ppos != null ? ppos.recordVersion : -1);
+      if (iCallback != null)       iCallback.call(iRid,returnValue);
+      return returnValue;
+    }
+  }
+  finally {
+    modificationLock.releaseModificationLock();
   }
 }

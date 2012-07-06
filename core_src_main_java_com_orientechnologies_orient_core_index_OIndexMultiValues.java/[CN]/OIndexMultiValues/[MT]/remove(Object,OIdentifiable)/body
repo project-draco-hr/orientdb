@@ -1,15 +1,22 @@
 {
-  acquireExclusiveLock();
+  modificationLock.requestModificationLock();
   try {
-    final Set<OIdentifiable> recs=get(iKey);
-    if (recs.remove(iValue)) {
-      if (recs.isEmpty())       map.remove(iKey);
- else       map.put(iKey,recs);
-      return true;
+    acquireExclusiveLock();
+    try {
+      Set<OIdentifiable> recs=map.get(iKey);
+      if (recs == null)       return false;
+      if (recs.remove(iValue)) {
+        if (recs.isEmpty())         map.remove(iKey);
+ else         map.put(iKey,recs);
+        return true;
+      }
+      return false;
     }
-    return false;
+  finally {
+      releaseExclusiveLock();
+    }
   }
   finally {
-    releaseExclusiveLock();
+    modificationLock.releaseModificationLock();
   }
 }

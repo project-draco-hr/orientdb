@@ -1,0 +1,66 @@
+{
+  Thread.currentThread().setName("TransactionalUpdater - " + Thread.currentThread().getId());
+  ODatabaseDocumentTx database=new ODatabaseDocumentTx(URL);
+  database.open("admin","admin");
+  try {
+    ODatabaseRecordThreadLocal.INSTANCE.set(database);
+    countDownLatch.await();
+    while (updateCounter < TRANSACTIONAL_DOCUMENT_COUNT) {
+      if (updateCounter > transactionalCreateCounter.get()) {
+        continue;
+      }
+      List<ODocument> execute=null;
+      if (updateCounter % 10 == 0)       System.out.println(Thread.currentThread() + " : before search cycle(update)" + updateCounter);
+      do {
+        try {
+          execute=database.command(new OSQLSynchQuery<Object>("select * from " + TRANSACTIONAL_WORD + STUDENT_CLASS_NAME+ " where counter = ?")).execute(updateCounter);
+        }
+ catch (        ORecordNotFoundException onfe) {
+        }
+catch (        OException e) {
+          if (e.getMessage().contains("Error during loading record with id")) {
+            System.out.println(Thread.currentThread() + "exception record already deleted");
+            continue;
+          }
+          if (e.getCause() instanceof ConcurrentModificationException) {
+            System.out.println(Thread.currentThread() + "exception concurrent modification");
+            continue;
+          }
+          throw e;
+        }
+      }
+ while (!deletedInTransaction.contains(updateCounter) && (execute == null || execute.isEmpty()));
+      if (!deletedInTransaction.contains(updateCounter)) {
+        if (updateCounter % 10 == 0)         System.out.println(Thread.currentThread() + " : after search cycle(update) " + updateCounter);
+        database.begin();
+        ODocument document=execute.get(0);
+        document.field("counter2",document.field("counter"));
+        try {
+          document.save();
+          database.commit();
+          if (updateCounter % 10 == 0)           System.out.println(Thread.currentThread() + " : document " + updateCounter+ " updated");
+          updateCounter++;
+        }
+ catch (        ORecordNotFoundException ornfe) {
+          System.out.println(Thread.currentThread() + " exception record already deleted");
+        }
+catch (        OConcurrentModificationException e) {
+          System.out.println(Thread.currentThread() + " : concurrent modification exception while updating! " + updateCounter);
+        }
+catch (        Exception e) {
+          e.printStackTrace();
+          throw e;
+        }
+      }
+ else {
+        System.out.println(Thread.currentThread() + " : document " + updateCounter+ " already deleted couldn't update!");
+        updateCounter++;
+      }
+    }
+    return null;
+  }
+  finally {
+    System.out.println(Thread.currentThread() + "************************CLOSE************************************");
+    database.close();
+  }
+}

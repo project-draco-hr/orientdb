@@ -1,0 +1,17 @@
+{
+  lock.readLock().lock();
+  if (!veto)   return;
+  if (throwException) {
+    lock.readLock().unlock();
+    throw new OModificationOperationProhibitedException("Modification requests are prohibited");
+  }
+  boolean wasInterrupted=false;
+  Thread thread=Thread.currentThread();
+  waiters.add(thread);
+  while (veto) {
+    LockSupport.park(this);
+    if (Thread.interrupted())     wasInterrupted=true;
+  }
+  waiters.remove(thread);
+  if (wasInterrupted)   thread.interrupt();
+}

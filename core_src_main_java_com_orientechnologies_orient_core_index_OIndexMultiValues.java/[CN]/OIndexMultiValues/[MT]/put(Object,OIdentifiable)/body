@@ -1,15 +1,21 @@
 {
-  acquireExclusiveLock();
+  modificationLock.requestModificationLock();
   try {
-    checkForKeyType(iKey);
-    Set<OIdentifiable> values=map.get(iKey);
-    if (values == null)     values=new OMVRBTreeRIDSet().setAutoConvert(false);
-    if (!iSingleValue.getIdentity().isValid())     ((ORecord<?>)iSingleValue).save();
-    values.add(iSingleValue.getIdentity());
-    map.put(iKey,values);
-    return this;
+    acquireExclusiveLock();
+    try {
+      checkForKeyType(iKey);
+      Set<OIdentifiable> values=map.get(iKey);
+      if (values == null)       values=new OMVRBTreeRIDSet().setAutoConvert(false);
+      if (!iSingleValue.getIdentity().isValid())       ((ORecord<?>)iSingleValue).save();
+      values.add(iSingleValue.getIdentity());
+      map.put(iKey,values);
+      return this;
+    }
+  finally {
+      releaseExclusiveLock();
+    }
   }
   finally {
-    releaseExclusiveLock();
+    modificationLock.releaseModificationLock();
   }
 }

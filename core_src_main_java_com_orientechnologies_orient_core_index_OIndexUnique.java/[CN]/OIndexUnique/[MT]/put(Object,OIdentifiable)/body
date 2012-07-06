@@ -1,17 +1,23 @@
 {
-  acquireExclusiveLock();
+  modificationLock.requestModificationLock();
   try {
-    checkForKeyType(iKey);
-    final OIdentifiable value=map.get(iKey);
-    if (value != null) {
-      if (!value.equals(iSingleValue))       throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "' for record "+ iSingleValue.getIdentity()+ ". The record already present in the index is "+ value.getIdentity());
- else       return this;
+    acquireExclusiveLock();
+    try {
+      checkForKeyType(iKey);
+      final OIdentifiable value=map.get(iKey);
+      if (value != null) {
+        if (!value.equals(iSingleValue))         throw new OIndexException("Found duplicated key '" + iKey + "' on unique index '"+ name+ "' for record "+ iSingleValue.getIdentity()+ ". The record already present in the index is "+ value.getIdentity());
+ else         return this;
+      }
+      if (!iSingleValue.getIdentity().isPersistent())       ((ORecord<?>)iSingleValue.getRecord()).save();
+      map.put(iKey,iSingleValue.getIdentity());
+      return this;
     }
-    if (!iSingleValue.getIdentity().isPersistent())     ((ORecord<?>)iSingleValue.getRecord()).save();
-    map.put(iKey,iSingleValue.getIdentity());
-    return this;
+  finally {
+      releaseExclusiveLock();
+    }
   }
   finally {
-    releaseExclusiveLock();
+    modificationLock.releaseModificationLock();
   }
 }

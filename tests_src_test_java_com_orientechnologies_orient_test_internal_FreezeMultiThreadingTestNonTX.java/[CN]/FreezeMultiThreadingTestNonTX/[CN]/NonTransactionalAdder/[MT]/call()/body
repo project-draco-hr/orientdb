@@ -1,0 +1,31 @@
+{
+  Thread.currentThread().setName("Adder - " + Thread.currentThread().getId());
+  ODatabaseDocumentTx database=new ODatabaseDocumentTx(URL);
+  database.open("admin","admin");
+  try {
+    ODatabaseRecordThreadLocal.INSTANCE.set(database);
+    countDownLatch.await();
+    long value=createCounter.getAndIncrement();
+    while (value < DOCUMENT_COUNT) {
+      Thread.sleep(200);
+      ODocument document=new ODocument(STUDENT_CLASS_NAME);
+      document.field("counter",value);
+      document.save();
+      if (value % 10 == 0)       System.out.println(Thread.currentThread() + " : document " + value+ " added");
+      value=createCounter.getAndIncrement();
+    }
+    return null;
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw e;
+  }
+catch (  Throwable e) {
+    e.printStackTrace();
+    return null;
+  }
+ finally {
+    System.out.println(Thread.currentThread() + "************************CLOSE************************************");
+    database.close();
+  }
+}

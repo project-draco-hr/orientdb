@@ -1,0 +1,41 @@
+{
+  Thread.currentThread().setName("Locker - " + Thread.currentThread().getId());
+  ODatabaseDocumentTx database=new ODatabaseDocumentTx(URL);
+  try {
+    countDownLatch.await();
+    while (createCounter.get() < DOCUMENT_COUNT) {
+      ODatabaseHelper.freezeDatabase(database);
+      database.open("admin","admin");
+      final List<ODocument> beforeNonTxDocuments=database.query(new OSQLSynchQuery<Object>("select from " + STUDENT_CLASS_NAME));
+      final List<ODocument> beforeTxDocuments=database.query(new OSQLSynchQuery<Object>("select from " + TRANSACTIONAL_WORD + STUDENT_CLASS_NAME));
+      database.close();
+      System.out.println("Freeze DB - nonTx : " + beforeNonTxDocuments.size() + " Tx : "+ beforeTxDocuments.size());
+      try {
+        Thread.sleep(10000);
+      }
+  finally {
+        database.open("admin","admin");
+        final List<ODocument> afterNonTxDocuments=database.query(new OSQLSynchQuery<Object>("select from " + STUDENT_CLASS_NAME));
+        final List<ODocument> afterTxDocuments=database.query(new OSQLSynchQuery<Object>("select from " + TRANSACTIONAL_WORD + STUDENT_CLASS_NAME));
+        assertDocumentAreEquals(beforeNonTxDocuments,afterNonTxDocuments);
+        assertDocumentAreEquals(beforeTxDocuments,afterTxDocuments);
+        database.close();
+        System.out.println("Release DB - nonTx : " + afterNonTxDocuments.size() + " Tx : "+ afterTxDocuments.size());
+        ODatabaseHelper.releaseDatabase(database);
+      }
+      Thread.sleep(10000);
+    }
+    return null;
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw e;
+  }
+catch (  Throwable e) {
+    e.printStackTrace();
+    return null;
+  }
+ finally {
+    System.out.println(Thread.currentThread() + "************************CLOSE************************************");
+  }
+}

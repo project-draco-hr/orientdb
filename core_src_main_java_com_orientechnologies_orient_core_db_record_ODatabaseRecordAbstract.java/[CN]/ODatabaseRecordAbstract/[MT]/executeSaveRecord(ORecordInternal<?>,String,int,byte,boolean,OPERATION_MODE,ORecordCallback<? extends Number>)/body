@@ -28,17 +28,23 @@
     }
     final int realVersion=!mvcc || iVersion == -1 ? -1 : iRecord.getVersion();
     final int dataSegmentId=dataSegmentStrategy.assignDataSegmentId(this,iRecord);
-    final int version=underlying.save(dataSegmentId,rid,stream == null ? new byte[0] : stream,realVersion,iRecord.getRecordType(),iMode.ordinal(),iCallback);
-    if (isNew) {
-      ((ORecordId)iRecord.getIdentity()).copyFrom(rid);
-      iRecord.onAfterIdentityChanged(iRecord);
-      iRecord.fill(rid,version,stream,stream == null || stream.length == 0);
-    }
+    try {
+      final int version=underlying.save(dataSegmentId,rid,stream == null ? new byte[0] : stream,realVersion,iRecord.getRecordType(),iMode.ordinal(),iCallback);
+      if (isNew) {
+        ((ORecordId)iRecord.getIdentity()).copyFrom(rid);
+        iRecord.onAfterIdentityChanged(iRecord);
+        iRecord.fill(rid,version,stream,stream == null || stream.length == 0);
+      }
  else {
-      iRecord.fill(rid,version,stream,stream == null || stream.length == 0);
+        iRecord.fill(rid,version,stream,stream == null || stream.length == 0);
+      }
+      if (iCallTriggers && stream != null && stream.length > 0)       callbackHooks(wasNew ? TYPE.AFTER_CREATE : TYPE.AFTER_UPDATE,iRecord);
+      if (stream != null && stream.length > 0)       getLevel1Cache().updateRecord(iRecord);
     }
-    if (iCallTriggers)     callbackHooks(wasNew ? TYPE.AFTER_CREATE : TYPE.AFTER_UPDATE,iRecord);
-    if (stream != null && stream.length > 0)     getLevel1Cache().updateRecord(iRecord);
+ catch (    Throwable t) {
+      if (iCallTriggers && stream != null && stream.length > 0)       callbackHooks(wasNew ? TYPE.CREATE_FAILED : TYPE.UPDATE_FAILED,iRecord);
+      throw t;
+    }
   }
  catch (  OException e) {
     throw e;

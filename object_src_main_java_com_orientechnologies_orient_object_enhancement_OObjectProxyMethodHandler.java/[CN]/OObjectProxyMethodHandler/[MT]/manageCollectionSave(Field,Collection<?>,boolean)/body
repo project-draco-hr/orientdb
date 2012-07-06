@@ -1,0 +1,47 @@
+{
+  final Class genericType=OReflectionHelper.getGenericMultivalueType(f);
+  if (customSerialization) {
+    if (value instanceof List<?>) {
+      List<Object> list=new ArrayList<Object>();
+      doc.field(f.getName(),list);
+      value=new OObjectCustomSerializerList(OObjectEntitySerializer.getSerializedType(f),doc,new ArrayList<Object>(),(List<Object>)value);
+    }
+ else {
+      Set<Object> set=new HashSet<Object>();
+      doc.field(f.getName(),set);
+      value=new OObjectCustomSerializerSet(OObjectEntitySerializer.getSerializedType(f),doc,set,(Set<Object>)value);
+    }
+  }
+ else   if (genericType.isEnum()) {
+    if (value instanceof List<?>) {
+      List<Object> list=new ArrayList<Object>();
+      doc.field(f.getName(),list);
+      value=new OObjectEnumLazyList(genericType,doc,list,(List<Object>)value);
+    }
+ else {
+      Set<Object> set=new HashSet<Object>();
+      doc.field(f.getName(),set);
+      value=new OObjectEnumLazySet(genericType,doc,set,(Set<Object>)value);
+    }
+  }
+ else   if (!(value instanceof OLazyObjectMultivalueElement)) {
+    if (value instanceof List) {
+      List<OIdentifiable> docList=doc.field(f.getName());
+      if (docList == null) {
+        docList=new ORecordLazyList(doc);
+        doc.field(f.getName(),docList);
+      }
+      value=new OObjectLazyList(doc,docList,value);
+    }
+ else     if (value instanceof Set) {
+      Set<OIdentifiable> docSet=doc.field(f.getName(),OType.LINKSET);
+      if (docSet == null) {
+        docSet=new ORecordLazySet(doc);
+        doc.field(f.getName(),docSet);
+      }
+      value=new OObjectLazySet(doc,docSet,(Set<?>)value);
+    }
+  }
+  if (!((ODatabaseObject)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner()).isLazyLoading())   ((OLazyObjectMultivalueElement)value).detach();
+  return value;
+}

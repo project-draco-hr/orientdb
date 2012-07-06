@@ -11,60 +11,7 @@
     if (doc.getIdentity().isValid() && !doc.getIdentity().isTemporary())     OObjectEntitySerializer.setVersionField(m.getDeclaringClass(),self,doc.getVersion());
   }
   Object value=proceed.invoke(self,args);
-  if (!idOrVersionField) {
-    if (value == null) {
-      Object docValue=doc.field(fieldName,OType.getTypeByClass(getField(fieldName,self.getClass()).getType()));
-      if (docValue != null) {
-        value=lazyLoadField(self,fieldName,docValue);
-      }
-    }
- else {
-      if (((value instanceof Collection<?> || value instanceof Map<?,?>) && !(value instanceof OLazyObjectMultivalueElement)) || value.getClass().isArray()) {
-        Class<?> genericMultiValueType=OReflectionHelper.getGenericMultivalueType(getField(fieldName,self.getClass()));
-        if (genericMultiValueType != null && !OReflectionHelper.isJavaType(genericMultiValueType)) {
-          Field f=getField(fieldName,self.getClass());
-          if (OObjectEntitySerializer.isSerializedType(f) && !(value instanceof OLazyObjectCustomSerializer)) {
-            value=manageSerializedCollections(self,fieldName,value);
-          }
- else           if (genericMultiValueType.isEnum() && !(value instanceof OLazyObjectEnumSerializer)) {
-            value=manageEnumCollections(self,f.getName(),genericMultiValueType,value);
-          }
- else {
-            value=manageObjectCollections(self,fieldName,value);
-          }
-        }
- else {
-          Object docValue=doc.field(fieldName);
-          if (docValue == null) {
-            if (value.getClass().isArray()) {
-              OClass schemaClass=doc.getSchemaClass();
-              OProperty schemaProperty=null;
-              if (schemaClass != null)               schemaProperty=schemaClass.getProperty(fieldName);
-              doc.field(fieldName,OObjectEntitySerializer.typeToStream(value,schemaProperty != null ? schemaProperty.getType() : null,getDatabase(),doc));
-            }
- else             doc.field(fieldName,value);
-          }
- else           if (!loadedFields.containsKey(fieldName)) {
-            value=manageArrayFieldObject(getField(fieldName,self.getClass()),self,docValue);
-            Method setMethod=getSetMethod(self.getClass().getSuperclass(),getSetterFieldName(fieldName),value);
-            setMethod.invoke(self,value);
-          }
- else           if ((value instanceof Set || value instanceof Map) && loadedFields.get(fieldName).intValue() < doc.getVersion()) {
-            if (value instanceof Set)             value=new OObjectLazySet(doc,(Set<?>)docValue);
- else             value=new OObjectLazyMap(doc,(Map<?,?>)docValue);
-            Method setMethod=getSetMethod(self.getClass().getSuperclass(),getSetterFieldName(fieldName),value);
-            setMethod.invoke(self,value);
-          }
-        }
-      }
- else       if (!loadedFields.containsKey(fieldName)) {
-        Object docValue=doc.field(fieldName);
-        if (docValue != null && !docValue.equals(value)) {
-          value=lazyLoadField(self,fieldName,docValue);
-        }
-      }
-    }
-  }
+  value=getValue(self,fieldName,idOrVersionField,value);
   if (doc.getIdentity().isValid() && !doc.getIdentity().isTemporary())   loadedFields.put(fieldName,doc.getVersion());
  else   loadedFields.put(fieldName,0);
   return value;

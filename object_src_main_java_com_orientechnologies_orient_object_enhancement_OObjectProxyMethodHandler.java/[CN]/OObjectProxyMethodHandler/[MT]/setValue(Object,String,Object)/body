@@ -1,0 +1,75 @@
+{
+  if (valueToSet == null) {
+    doc.field(fieldName,valueToSet);
+  }
+ else   if (!valueToSet.getClass().isAnonymousClass()) {
+    if (valueToSet instanceof Proxy) {
+      ODocument docToSet=OObjectEntitySerializer.getDocument((Proxy)valueToSet);
+      if (OObjectEntitySerializer.isEmbeddedField(self.getClass(),fieldName))       docToSet.addOwner(doc);
+      doc.field(fieldName,docToSet);
+    }
+ else     if (valueToSet instanceof OIdentifiable) {
+      if (valueToSet instanceof ODocument && OObjectEntitySerializer.isEmbeddedField(self.getClass(),fieldName))       ((ODocument)valueToSet).addOwner(doc);
+      doc.field(fieldName,valueToSet);
+    }
+ else     if (((valueToSet instanceof Collection<?> || valueToSet instanceof Map<?,?>)) || valueToSet.getClass().isArray()) {
+      Class<?> genericMultiValueType=OReflectionHelper.getGenericMultivalueType(getField(fieldName,self.getClass()));
+      if (genericMultiValueType != null && !OReflectionHelper.isJavaType(genericMultiValueType)) {
+        if (!(valueToSet instanceof OLazyObjectMultivalueElement)) {
+          if (valueToSet instanceof Collection<?>) {
+            boolean customSerialization=false;
+            Field f=getField(fieldName,self.getClass());
+            if (OObjectEntitySerializer.isSerializedType(f)) {
+              customSerialization=true;
+            }
+            valueToSet=manageCollectionSave(f,(Collection<?>)valueToSet,customSerialization);
+          }
+ else           if (valueToSet instanceof Map<?,?>) {
+            boolean customSerialization=false;
+            Field f=getField(fieldName,self.getClass());
+            if (OObjectEntitySerializer.isSerializedType(f)) {
+              customSerialization=true;
+            }
+            valueToSet=manageMapSave(f,(Map<?,?>)valueToSet,customSerialization);
+          }
+ else           if (valueToSet.getClass().isArray()) {
+            valueToSet=manageArraySave(fieldName,(Object[])valueToSet);
+          }
+        }
+      }
+ else {
+        if (OObjectEntitySerializer.isToSerialize(valueToSet.getClass())) {
+          doc.field(fieldName,OObjectEntitySerializer.serializeFieldValue(getField(fieldName,self.getClass()).getType(),valueToSet));
+        }
+ else {
+          if (valueToSet.getClass().isArray()) {
+            OClass schemaClass=doc.getSchemaClass();
+            OProperty schemaProperty=null;
+            if (schemaClass != null)             schemaProperty=schemaClass.getProperty(fieldName);
+            doc.field(fieldName,OObjectEntitySerializer.typeToStream(valueToSet,schemaProperty != null ? schemaProperty.getType() : null,getDatabase(),doc));
+          }
+ else           doc.field(fieldName,valueToSet);
+        }
+      }
+    }
+ else {
+      if (OObjectEntitySerializer.isToSerialize(valueToSet.getClass())) {
+        doc.field(fieldName,OObjectEntitySerializer.serializeFieldValue(getField(fieldName,self.getClass()).getType(),valueToSet));
+      }
+ else       if (getDatabase().getEntityManager().getEntityClass(valueToSet.getClass().getSimpleName()) != null && !valueToSet.getClass().isEnum()) {
+        valueToSet=OObjectEntitySerializer.serializeObject(valueToSet,getDatabase());
+        ODocument docToSet=OObjectEntitySerializer.getDocument((Proxy)valueToSet);
+        if (OObjectEntitySerializer.isEmbeddedField(self.getClass(),fieldName))         docToSet.addOwner(doc);
+        doc.field(fieldName,docToSet);
+      }
+ else {
+        doc.field(fieldName,valueToSet);
+      }
+    }
+    loadedFields.put(fieldName,doc.getVersion());
+  }
+ else {
+    OLogManager.instance().warn(this,"Setting property '%s' in proxied class '%s' with an anonymous class '%s'. The document won't have this property.",fieldName,self.getClass().getName(),valueToSet.getClass().getName());
+  }
+  return valueToSet;
+}

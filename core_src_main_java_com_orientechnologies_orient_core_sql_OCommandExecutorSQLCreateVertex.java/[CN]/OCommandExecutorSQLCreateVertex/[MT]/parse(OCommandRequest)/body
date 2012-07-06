@@ -5,19 +5,21 @@
   String className=null;
   parserRequiredKeyword("CREATE");
   parserRequiredKeyword("VERTEX");
-  String temp=parserOptionalWord(true);
-  boolean set=temp != null && temp.equals("SET");
-  if (temp != null && !set) {
-    className=temp;
-    set=parserOptionalKeyword("SET");
+  String temp=parseOptionalWord(true);
+  while (temp != null) {
+    if (temp.equals("CLUSTER")) {
+      clusterName=parseRequiredWord(false);
+    }
+ else     if (temp.equals("SET")) {
+      fields=new LinkedHashMap<String,Object>();
+      parseSetFields(fields);
+    }
+ else     if (className == null && temp.length() > 0)     className=temp;
+    temp=parserOptionalWord(true);
+    if (parserIsEnded())     break;
   }
- else   className="V";
+  if (className == null)   className="V";
   clazz=database.getMetadata().getSchema().getClass(className);
   if (clazz == null)   throw new OCommandSQLParsingException("Class " + className + " was not found");
-  parserSkipWhiteSpaces();
-  if (!parserIsEnded() && set) {
-    fields=new LinkedHashMap<String,Object>();
-    parseSetFields(fields);
-  }
   return this;
 }

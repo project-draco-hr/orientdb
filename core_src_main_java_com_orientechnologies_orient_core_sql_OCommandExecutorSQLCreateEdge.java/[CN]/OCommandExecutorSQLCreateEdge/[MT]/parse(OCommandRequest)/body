@@ -5,21 +5,27 @@
   String className=null;
   parserRequiredKeyword("CREATE");
   parserRequiredKeyword("EDGE");
-  String temp=parseRequiredWord(true);
-  if (temp != null && !temp.equals("FROM")) {
-    className=temp;
-    parserRequiredKeyword("FROM");
+  String temp=parseOptionalWord(true);
+  while (temp != null) {
+    if (temp.equals("CLUSTER")) {
+      clusterName=parseRequiredWord(false);
+    }
+ else     if (temp.equals("FROM")) {
+      from=parseRequiredWord(false);
+    }
+ else     if (temp.equals("TO")) {
+      to=parseRequiredWord(false);
+    }
+ else     if (temp.equals("SET")) {
+      fields=new LinkedHashMap<String,Object>();
+      parseSetFields(fields);
+    }
+ else     if (className == null && temp.length() > 0)     className=temp;
+    temp=parseOptionalWord(true);
+    if (parserIsEnded())     break;
   }
- else   className="E";
+  if (className == null)   className="E";
   clazz=database.getMetadata().getSchema().getClass(className);
-  from=parseRequiredWord(false);
-  parserRequiredKeyword("TO");
-  to=parseRequiredWord(false);
-  final boolean set=parserOptionalKeyword("SET");
-  parserSkipWhiteSpaces();
-  if (!parserIsEnded() && set) {
-    fields=new LinkedHashMap<String,Object>();
-    parseSetFields(fields);
-  }
+  if (clazz == null)   throw new OCommandSQLParsingException("Class " + className + " was not found");
   return this;
 }

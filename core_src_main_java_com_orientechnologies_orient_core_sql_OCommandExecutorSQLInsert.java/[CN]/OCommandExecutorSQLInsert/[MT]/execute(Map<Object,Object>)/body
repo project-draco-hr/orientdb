@@ -1,11 +1,12 @@
 {
   if (newRecords == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  final OCommandParameters commandParameters=new OCommandParameters(iArgs);
   if (indexName != null) {
     final OIndex<?> index=getDatabase().getMetadata().getIndexManager().getIndex(indexName);
     if (index == null)     throw new OCommandExecutionException("Target index '" + indexName + "' not found");
     Map<String,Object> result=null;
     for (    Map<String,Object> candidate : newRecords) {
-      index.put(candidate.get(KEYWORD_KEY),(OIdentifiable)candidate.get(KEYWORD_RID));
+      index.put(getIndexKeyValue(commandParameters,candidate),getIndexValue(commandParameters,candidate));
       result=candidate;
     }
     return new ODocument(result);
@@ -14,7 +15,7 @@
     final List<ODocument> docs=new ArrayList<ODocument>();
     for (    Map<String,Object> candidate : newRecords) {
       final ODocument doc=className != null ? new ODocument(className) : new ODocument();
-      OSQLHelper.bindParameters(doc,candidate,new OCommandParameters(iArgs));
+      OSQLHelper.bindParameters(doc,candidate,commandParameters);
       if (clusterName != null) {
         doc.save(clusterName);
       }

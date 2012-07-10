@@ -1,4 +1,15 @@
 {
   OLogManager.instance().warn(this,"DISTRIBUTED <-[%s/%s] CREATE RECORD %s v.%d",nodeSource,databaseName,rid,version);
-  return getStorage().createRecord(0,rid,content,version,recordType,0,null);
+  final ORecordInternal<?> record=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  final ODatabaseDocumentTx database=getDatabase();
+  try {
+    record.fill(rid,version,content,true);
+    if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()));
+ else     record.save();
+    rid=(ORecordId)record.getIdentity();
+    return new OPhysicalPosition(rid.getClusterPosition(),record.getVersion());
+  }
+  finally {
+    database.close();
+  }
 }

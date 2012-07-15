@@ -2,26 +2,37 @@
   if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"DISTRIBUTED <-[%s] %s %s v.%d",nodeSource,getName(),rid,version);
   if (status != STATUS.ALIGN && !getDistributedServerManager().checkStatus("online"))   throw new OServerOfflineException();
   final OStorageSynchronizer dbSynchronizer=getDatabaseSynchronizer();
+  final OPERATION_TYPES opType=getOperationType();
   final long operationLogOffset;
-  try {
-    operationLogOffset=dbSynchronizer.getLog().journalOperation(runId,operationSerial,getOperationType(),this);
+  if (opType != null)   try {
+    operationLogOffset=dbSynchronizer.getLog().journalOperation(runId,operationSerial,opType,this);
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on logging operation %s %s v.%d",e,nodeSource,getName(),rid,version);
     throw new ODistributedException("Error on logging operation",e);
   }
+ else   operationLogOffset=-1;
   ODistributedThreadLocal.INSTANCE.distributedExecution=true;
   try {
-    final T result=executeOnLocalNode(dbSynchronizer);
-    try {
+    final T localResult=executeOnLocalNode(dbSynchronizer);
+    if (opType != null)     try {
       setAsCompleted(dbSynchronizer,operationLogOffset);
     }
  catch (    IOException e) {
       OLogManager.instance().error(this,"DISTRIBUTED <-[%s] error on changing the log status for operation %s %s v.%d",e,nodeSource,getName(),rid,version);
       throw new ODistributedException("Error on changing the log status",e);
     }
-    if (status == STATUS.DISTRIBUTE)     dbSynchronizer.distributeOperation(ORecordOperation.CREATED,rid,this);
-    if (mode != EXECUTION_MODE.FIRE_AND_FORGET)     return result;
+    if (status == STATUS.DISTRIBUTE) {
+      final Map<String,Object> distributedResult=dbSynchronizer.distributeOperation(ORecordOperation.CREATED,rid,this);
+      if (distributedResult != null)       for (      Entry<String,Object> entry : distributedResult.entrySet()) {
+        final String remoteNode=entry.getKey();
+        final Object remoteResult=entry.getValue();
+        if (localResult != remoteResult && (localResult == null && remoteResult != null || localResult != null && remoteResult == null || remoteResult.equals(localResult))) {
+          handleConflict(remoteNode,localResult,remoteResult);
+        }
+      }
+    }
+    if (mode != EXECUTION_MODE.FIRE_AND_FORGET)     return localResult;
     return null;
   }
   finally {

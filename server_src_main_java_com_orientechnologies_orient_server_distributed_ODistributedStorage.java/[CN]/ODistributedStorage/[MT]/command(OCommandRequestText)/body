@@ -11,7 +11,14 @@
   try {
     final Object localResult=wrapped.executeCommand(iCommand,executor);
     if (distribute) {
-      final Collection<Object> distributedResult=dManager.sendOperation2Nodes(dManager.getRemoteNodeIds(),new OSQLCommandDistributedTask(dManager.getLocalNodeId(),wrapped.getName(),createRecordMode,iCommand.getText()));
+      final Map<String,Object> distributedResult=dManager.sendOperation2Nodes(dManager.getRemoteNodeIds(),new OSQLCommandDistributedTask(dManager.getLocalNodeId(),wrapped.getName(),createRecordMode,iCommand.getText()));
+      for (      Entry<String,Object> entry : distributedResult.entrySet()) {
+        final Object remoteResult=entry.getValue();
+        if (localResult != remoteResult && (localResult == null && remoteResult != null || localResult != null && remoteResult == null || remoteResult.equals(localResult))) {
+          final OReplicationConflictResolver resolver=dbSynchronizer.getConflictResolver();
+          resolver.handleCommandConflict(entry.getKey(),iCommand,localResult,remoteResult);
+        }
+      }
     }
     return localResult;
   }

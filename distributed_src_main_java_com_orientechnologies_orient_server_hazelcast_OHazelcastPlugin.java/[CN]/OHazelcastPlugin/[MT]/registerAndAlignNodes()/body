@@ -5,24 +5,13 @@
     if (!getLocalNodeId().equals(nodeId))     remoteClusterNodes.put(nodeId,clusterMember);
   }
   OLogManager.instance().warn(this,"DISTRIBUTED -> detected running nodes %s",remoteClusterNodes.keySet());
-  if (remoteClusterNodes.isEmpty())   setStatus("online");
- else synchronized (synchronizers) {
-    for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
-      final String databaseName=entry.getKey();
-      try {
-        final long[] lastOperationId=entry.getValue().getLog().getLastOperationId();
-        OLogManager.instance().warn(this,"DISTRIBUTED --> send align request in broadcast for database %s",databaseName);
-synchronized (pendingAlignments) {
-          for (          String node : remoteClusterNodes.keySet()) {
-            pendingAlignments.put(node + "/" + databaseName,Boolean.FALSE);
-            OLogManager.instance().info(this,"DISTRIBUTED ->[%s/%s] setting node in alignment state",node,databaseName);
-          }
-        }
-        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(getLocalNodeId(),databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
-      }
- catch (      IOException e) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",databaseName);
-      }
+  if (!alignmentStartup)   setStatus("online");
+ else   if (remoteClusterNodes.isEmpty())   setStatus("online");
+ else   alignNodes();
+  if (alignmentTimer > 0)   Orient.getTimer().schedule(new TimerTask(){
+    @Override public void run(){
+      alignNodes();
     }
   }
+,alignmentTimer,alignmentTimer);
 }

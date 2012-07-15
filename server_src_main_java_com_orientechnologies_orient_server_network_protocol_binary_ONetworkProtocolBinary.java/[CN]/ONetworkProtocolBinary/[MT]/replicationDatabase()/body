@@ -1,6 +1,8 @@
 {
   setDataCommandInfo("Replication command");
   final ODocument request=new ODocument(channel.readBytes());
+  final ODistributedServerManager dManager=server.getDistributedManager();
+  if (dManager == null)   throw new OConfigurationException("No distributed manager configured");
   ODocument response=null;
   final String operation=request.field("operation");
   if (operation.equals("start")) {
@@ -19,9 +21,8 @@
     checkServerAccess("server.replication.resetJournal");
   }
  else   if (operation.equals("getAllConflicts")) {
-    checkServerAccess("server.replication.getAllConflicts");
-    final OServerUserConfiguration replicatorUser=OServerMain.server().getUser("replicator");
-    final ODatabaseDocumentTx db=(ODatabaseDocumentTx)OServerMain.server().openDatabase(ODatabaseDocument.TYPE,(String)request.field("db"),replicatorUser.name,replicatorUser.password);
+    final OStorageSynchronizer dbSynch=dManager.getDatabaseSynchronizer((String)request.field("db"));
+    response=dbSynch.getConflictResolver().getAllConflicts();
   }
   sendResponse(response);
 }

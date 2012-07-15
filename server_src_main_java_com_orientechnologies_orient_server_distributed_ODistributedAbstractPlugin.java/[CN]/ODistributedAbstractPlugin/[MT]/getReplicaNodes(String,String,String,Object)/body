@@ -1,0 +1,30 @@
+{
+  Object replicas=getDatabaseClusterConfiguration(iDatabaseName,iClusterName).field(iMode);
+  if (replicas == null)   replicas=getDatabaseClusterConfiguration(iDatabaseName,"*").field(iMode);
+  if (replicas == null)   return Collections.emptyList();
+  final Set<String> remoteNodes=getRemoteNodeIds();
+  final List<String> result=new ArrayList<String>();
+  if (replicas instanceof String || replicas instanceof Integer) {
+    int tot=0;
+    if (replicas instanceof String) {
+      final String replicasAsText=(String)replicas;
+      if (replicasAsText.charAt(replicasAsText.length() - 1) == '%') {
+        final int perc=Integer.parseInt(replicasAsText.substring(0,replicasAsText.length() - 1));
+        tot=Math.round(perc * remoteNodes.size() / 100);
+      }
+ else       tot=Integer.parseInt(replicasAsText);
+    }
+ else     tot=(Integer)replicas;
+    for (    String nodeId : remoteNodes) {
+      if (result.size() > tot)       break;
+      result.add(nodeId);
+    }
+  }
+ else   if (replicas instanceof Collection) {
+    final Collection<String> nodeCollection=(Collection<String>)replicas;
+    for (    String nodeId : nodeCollection) {
+      if (remoteNodes.contains(nodeId))       result.add(nodeId);
+    }
+  }
+  return result;
+}

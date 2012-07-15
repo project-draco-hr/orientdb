@@ -1,12 +1,19 @@
 {
   cluster=iCluster;
-  storageName=iStorageName;
-  storage=openStorage(iStorageName);
-  final String logDirectory=OSystemVariableResolver.resolveSystemVariables(OServerMain.server().getDatabaseDirectory() + "/" + iStorageName);
+  final OStorage storage=openStorage(storageName);
+  try {
+    resolver=iCluster.getConfictResolverClass().newInstance();
+    resolver.startup(iCluster,storageName);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Cannot create the conflict resolver instance of class '%s'",iCluster.getConfictResolverClass(),e);
+  }
+  final String logDirectory=OSystemVariableResolver.resolveSystemVariables(OServerMain.server().getDatabaseDirectory() + "/" + storageName);
   log=new ODatabaseJournal(storage,logDirectory);
   for (  ORecordId rid : log.getUncommittedOperations()) {
     try {
-      final ORawBuffer record=(ORawBuffer)iCluster.routeOperation2Node(rid,new OReadRecordDistributedTask(iCluster.getLocalNodeId(),iStorageName,rid));
+      if (getConflictResolver().existConflictsForRecord(rid))       continue;
+      final ORawBuffer record=(ORawBuffer)iCluster.routeOperation2Node(getClusterNameByRID(storage,rid),rid,new OReadRecordDistributedTask(iCluster.getLocalNodeId(),storageName,rid));
       if (record == null)       storage.deleteRecord(rid,-1,0,null);
  else       storage.updateRecord(rid,record.buffer,record.version,record.recordType,0,null);
     }

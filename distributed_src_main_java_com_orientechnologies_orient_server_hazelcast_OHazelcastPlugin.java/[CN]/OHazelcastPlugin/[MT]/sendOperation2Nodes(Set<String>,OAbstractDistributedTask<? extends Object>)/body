@@ -1,50 +1,9 @@
 {
-  final Set<Member> members=new HashSet<Member>();
+  final Map<String,Object> result=new HashMap<String,Object>();
   for (  String nodeId : iNodeIds) {
     final Member m=remoteClusterNodes.get(nodeId);
     if (m == null)     OLogManager.instance().warn(this,"DISTRIBUTED -> cannot execute operation on remote member %s because is disconnected",nodeId);
- else     members.add(m);
+ else     result.put(nodeId,sendOperation2Node(nodeId,iTask));
   }
-  final MultiTask<Object> task=new MultiTask<Object>((Callable<Object>)iTask,members);
-  ExecutionCallback<Object> callback=null;
-  if (iTask.getMode() == EXECUTION_MODE.ASYNCHRONOUS)   callback=new ExecutionCallback<Object>(){
-    @SuppressWarnings("unused") @Override public void done(    Future<Object> future){
-      try {
-        if (!future.isCancelled()) {
-          Object result=future.get();
-        }
-      }
- catch (      Exception e) {
-        OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in ASYNCH mode against nodes: %s",e,members);
-      }
-    }
-  }
-;
-  Collection<Object> result=null;
-  for (int retry=0; retry < SEND_RETRY_MAX; ++retry) {
-    try {
-      result=(Collection<Object>)executeOperation(task,iTask.getMode(),callback);
-      return result;
-    }
- catch (    ExecutionException e) {
-      if (e.getCause() instanceof OServerOfflineException) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> a remote node is not online, retrying %d...",retry + 1);
-        try {
-          Thread.sleep(200 + (retry * 50));
-        }
- catch (        InterruptedException ex) {
-          Thread.interrupted();
-        }
-      }
- else {
-        OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
-        throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against nodes: "+ members,e);
-      }
-    }
-catch (    Exception e) {
-      OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against nodes: %s",e,iTask.getMode(),members);
-      throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against nodes: "+ members,e);
-    }
-  }
-  throw new ODistributedException("Cannot complete the operation because the cluster is offline");
+  return result;
 }

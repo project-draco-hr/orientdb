@@ -1,24 +1,52 @@
 {
-  final OIndexDefinition indexDefinition=index.getDefinition();
+  final OCompositeIndexDefinition indexDefinition=(OCompositeIndexDefinition)index.getDefinition();
   final List<String> indexFields=indexDefinition.getFields();
+  final String multiValueField=indexDefinition.getMultiValueField();
   for (  final String indexField : indexFields) {
     if (dirtyFields.contains(indexField)) {
       final List<Object> origValues=new ArrayList<Object>(indexFields.size());
       for (      final String field : indexFields) {
-        if (dirtyFields.contains(field)) {
+        if (!field.equals(multiValueField))         if (dirtyFields.contains(field)) {
           origValues.add(iRecord.getOriginalValue(field));
         }
  else {
           origValues.add(iRecord.<Object>field(field));
         }
       }
-      final Object origValue=indexDefinition.createValue(origValues);
-      final Object newValue=indexDefinition.getDocumentValueToIndex(iRecord);
-      if (origValue != null) {
-        index.remove(origValue,iRecord);
+      if (multiValueField == null) {
+        final Object origValue=indexDefinition.createValue(origValues);
+        final Object newValue=indexDefinition.getDocumentValueToIndex(iRecord);
+        if (origValue != null)         index.remove(origValue,iRecord);
+        if (newValue != null)         index.put(newValue,iRecord.placeholder());
       }
-      if (newValue != null) {
-        index.put(newValue,iRecord.placeholder());
+ else {
+        final OMultiValueChangeTimeLine<?,?> multiValueChangeTimeLine=iRecord.getCollectionTimeLine(multiValueField);
+        if (multiValueChangeTimeLine == null) {
+          if (dirtyFields.contains(multiValueField))           origValues.add(indexDefinition.getMultiValueDefinitionIndex(),iRecord.getOriginalValue(multiValueField));
+ else           origValues.add(indexDefinition.getMultiValueDefinitionIndex(),iRecord.field(multiValueField));
+          final Object origValue=indexDefinition.createValue(origValues);
+          final Object newValue=indexDefinition.getDocumentValueToIndex(iRecord);
+          processIndexUpdateFieldAssignment(index,iRecord,origValue,newValue);
+        }
+ else {
+          if (dirtyFields.size() == 1) {
+            final Map<OCompositeKey,Integer> keysToAdd=new HashMap<OCompositeKey,Integer>();
+            final Map<OCompositeKey,Integer> keysToRemove=new HashMap<OCompositeKey,Integer>();
+            for (            OMultiValueChangeEvent<?,?> changeEvent : multiValueChangeTimeLine.getMultiValueChangeEvents()) {
+              indexDefinition.processChangeEvent(changeEvent,keysToAdd,keysToRemove,origValues.toArray());
+            }
+            for (            final Object keyToRemove : keysToRemove.keySet())             index.remove(keyToRemove,iRecord);
+            for (            final Object keyToAdd : keysToAdd.keySet())             index.put(keyToAdd,iRecord.placeholder());
+          }
+ else {
+            final OTrackedMultiValue fieldValue=iRecord.field(multiValueField);
+            final Object restoredMultiValue=fieldValue.returnOriginalState(multiValueChangeTimeLine.getMultiValueChangeEvents());
+            origValues.add(indexDefinition.getMultiValueDefinitionIndex(),restoredMultiValue);
+            final Object origValue=indexDefinition.createValue(origValues);
+            final Object newValue=indexDefinition.getDocumentValueToIndex(iRecord);
+            processIndexUpdateFieldAssignment(index,iRecord,origValue,newValue);
+          }
+        }
       }
       return;
     }

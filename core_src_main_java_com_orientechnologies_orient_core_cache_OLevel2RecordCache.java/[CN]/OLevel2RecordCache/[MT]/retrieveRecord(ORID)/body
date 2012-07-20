@@ -1,14 +1,21 @@
 {
   if (!isEnabled() || iRID.getClusterId() == excludedCluster)   return null;
-  final ORecordInternal<?> record;
+  ORecordInternal<?> record;
   underlying.lock(iRID);
   try {
     record=underlying.remove(iRID);
-    if (record == null || record.isDirty())     return null;
-    if (strategy == STRATEGY.COPY_RECORD)     underlying.put((ORecordInternal<?>)record.flatCopy());
+    if (record == null || record.isDirty()) {
+      OProfiler.getInstance().updateCounter(CACHE_MISS,1);
+      return null;
+    }
+    if (strategy == STRATEGY.COPY_RECORD) {
+      final ORecordInternal<?> resident=OGlobalConfiguration.ENVIRONMENT_CONCURRENT.getValueAsBoolean() ? (ORecordInternal<?>)record.flatCopy() : record;
+      underlying.put(resident);
+    }
   }
   finally {
     underlying.unlock(iRID);
   }
+  OProfiler.getInstance().updateCounter(CACHE_HIT,1);
   return record;
 }

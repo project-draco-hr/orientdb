@@ -32,7 +32,7 @@ synchronized (networkPool) {
         beginResponse(network);
         sessionId=network.readInt();
         setSessionId(sessionId);
-        OLogManager.instance().debug(null,"Client connected with session id: " + sessionId);
+        OLogManager.instance().debug(this,"Client connected with session id: " + sessionId);
         readDatabaseInformation(network);
         updateClusterConfiguration(network.readBytes());
         status=STATUS.OPEN;
@@ -42,8 +42,17 @@ synchronized (networkPool) {
         endResponse(network);
       }
     }
- catch (    Exception e) {
+ catch (    IOException e) {
+      OLogManager.instance().debug(this,"Error while reading response on creation of connection ",e);
+    }
+catch (    OTimeoutException e) {
+      OLogManager.instance().debug(this,"Error while reading response on creation of connection ",e);
+    }
+catch (    Exception e) {
       handleException("Cannot create a connection to remote server address(es): " + serverURLs,e);
+    }
+synchronized (networkPool) {
+      availableConnections=!networkPool.isEmpty();
     }
   }
   throw new OStorageException("Cannot create a connection to remote server address(es): " + serverURLs);

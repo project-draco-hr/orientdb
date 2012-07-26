@@ -9,6 +9,7 @@
     iContent=iContent.substring(pos + 1);
   }
  else   record.setClassNameIfExists(null);
+  if (iFields != null && iFields.length == 1 && iFields[0].equals("@class"))   return iRecord;
   final List<String> fields=OStringSerializerHelper.smartSplit(iContent,OStringSerializerHelper.RECORD_SEPARATOR);
   String field;
   String fieldName=null;
@@ -24,7 +25,17 @@
       pos=field.indexOf(FIELD_VALUE_SEPARATOR);
       if (pos > -1) {
         fieldName=field.substring(0,pos);
+        if (record.containsField(fieldName))         continue;
+        if (iFields != null && iFields.length > 0) {
+          boolean found=false;
+          for (          String f : iFields)           if (f.equals(fieldName)) {
+            found=true;
+            break;
+          }
+          if (!found)           continue;
+        }
         fieldValue=field.length() > pos + 1 ? field.substring(pos + 1) : null;
+        boolean setFieldType=false;
         prop=record.getSchemaClass() != null ? record.getSchemaClass().getProperty(fieldName) : null;
         if (prop != null) {
           type=prop.getType();
@@ -33,6 +44,7 @@
         }
  else {
           type=record.fieldType(fieldName);
+          if (type != null)           setFieldType=true;
           linkedClass=null;
           linkedType=null;
           if (fieldValue != null && type == null) {
@@ -78,7 +90,7 @@
  else             type=getType(fieldValue);
           }
         }
-        if (type == OType.EMBEDDEDLIST || type == OType.EMBEDDEDSET || type == OType.EMBEDDEDMAP || type == OType.EMBEDDED)         record.field(fieldName,fieldFromStream(iRecord,type,linkedClass,linkedType,fieldName,fieldValue),type);
+        if (setFieldType || type == OType.EMBEDDEDLIST || type == OType.EMBEDDEDSET || type == OType.EMBEDDEDMAP || type == OType.EMBEDDED)         record.field(fieldName,fieldFromStream(iRecord,type,linkedClass,linkedType,fieldName,fieldValue),type);
  else         record.field(fieldName,fieldFromStream(iRecord,type,linkedClass,linkedType,fieldName,fieldValue));
         if (uncertainType)         record.setFieldType(fieldName,null);
       }

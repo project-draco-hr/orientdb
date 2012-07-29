@@ -1,24 +1,32 @@
 {
   if (!parserSkipWhiteSpaces())   return null;
   if (parserGetCurrentChar() == ')')   return null;
-  parserNextWord(true," 0123456789'\"");
-  final String word=parserGetLastWord();
-  if (checkForEnd(word))   return null;
-  for (  OQueryOperator op : OSQLEngine.getInstance().getRecordOperators()) {
-    if (word.startsWith(op.keyword)) {
-      final List<String> params=new ArrayList<String>();
-      if (word.length() > op.keyword.length() && word.charAt(op.keyword.length()) == OStringSerializerHelper.EMBEDDED_BEGIN) {
-        int paramBeginPos=parserGetCurrentPosition() - (word.length() - op.keyword.length());
-        parserSetCurrentPosition(OStringSerializerHelper.getParameters(parserText,paramBeginPos,-1,params));
-      }
- else       if (!word.equals(op.keyword))       throw new OQueryParsingException("Malformed usage of operator '" + op.toString() + "'. Parsed operator is: "+ word);
-      try {
-        return op.configure(params);
-      }
- catch (      Exception e) {
-        throw new OQueryParsingException("Syntax error using the operator '" + op.toString() + "'. Syntax is: "+ op.getSyntax());
-      }
+  final OQueryOperator[] operators=OSQLEngine.getInstance().getRecordOperators();
+  final String[] candidateOperators=new String[operators.length];
+  for (int i=0; i < candidateOperators.length; ++i)   candidateOperators[i]=operators[i].keyword;
+  final int operatorPos=parserNextChars(true,false,candidateOperators);
+  if (operatorPos == -1) {
+    parserGoBack();
+    return null;
+  }
+  final OQueryOperator op=operators[operatorPos];
+  if (op.expectsParameters) {
+    parserGoBack();
+    parserNextWord(true," 0123456789'\"");
+    final String word=parserGetLastWord();
+    final List<String> params=new ArrayList<String>();
+    if (word.length() > op.keyword.length() && word.charAt(op.keyword.length()) == OStringSerializerHelper.EMBEDDED_BEGIN) {
+      int paramBeginPos=parserGetCurrentPosition() - (word.length() - op.keyword.length());
+      parserSetCurrentPosition(OStringSerializerHelper.getParameters(parserText,paramBeginPos,-1,params));
+    }
+ else     if (!word.equals(op.keyword))     throw new OQueryParsingException("Malformed usage of operator '" + op.toString() + "'. Parsed operator is: "+ word);
+    try {
+      return op.configure(params);
+    }
+ catch (    Exception e) {
+      throw new OQueryParsingException("Syntax error using the operator '" + op.toString() + "'. Syntax is: "+ op.getSyntax());
     }
   }
-  throw new OQueryParsingException("Unknown operator " + word,parserText,parserGetCurrentPosition());
+ else   parserMoveCurrentPosition(+1);
+  return op;
 }

@@ -1,0 +1,34 @@
+{
+  parserPreviousPos=parserCurrentPos;
+  parserSkipWhiteSpaces();
+  parserLastWord.setLength(0);
+  final String[] processedWords=Arrays.copyOf(iCandidateWords,iCandidateWords.length);
+  final String text2Use=iUpperCase ? parserTextUpperCase : parserText;
+  final int max=text2Use.length();
+  for (int i=0; parserCurrentPos <= max; ++i) {
+    final char ch=parserCurrentPos < max ? text2Use.charAt(parserCurrentPos) : '\n';
+    final boolean separator=ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t' || ch == '(';
+    if (!separator)     parserLastWord.append(ch);
+    int candidatesWordsCount=0;
+    int candidatesWordsPos=-1;
+    for (int c=0; c < processedWords.length; ++c) {
+      final String w=processedWords[c];
+      if (w != null) {
+        final int wordSize=w.length();
+        if ((separator && wordSize > i) || (!separator && (i > wordSize - 1 || w.charAt(i) != ch)))         processedWords[c]=null;
+ else {
+          candidatesWordsCount++;
+          if (candidatesWordsCount == 1)           candidatesWordsPos=c;
+        }
+      }
+    }
+    if (candidatesWordsCount == 1) {
+      final String w=processedWords[candidatesWordsPos];
+      if (w.length() == i + (separator ? 0 : 1) && !Character.isLetter(ch))       return candidatesWordsPos;
+    }
+    if (candidatesWordsCount == 0 || separator)     break;
+    parserCurrentPos++;
+  }
+  if (iMandatory)   throwSyntaxErrorException("Found unexpected keyword '" + parserLastWord + "' while it was expected '"+ Arrays.toString(iCandidateWords)+ "'");
+  return -1;
+}

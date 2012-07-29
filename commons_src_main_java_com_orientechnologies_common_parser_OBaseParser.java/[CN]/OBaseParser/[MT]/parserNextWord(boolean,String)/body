@@ -18,32 +18,63 @@
     parserCurrentPos++;
   }
   try {
-    while (parserCurrentPos < text2Use.length()) {
+    int openParenthesis=0;
+    int openBraket=0;
+    int openGraph=0;
+    boolean escape=false;
+    for (; parserCurrentPos < text2Use.length(); parserCurrentPos++) {
       final char c=text2Use.charAt(parserCurrentPos);
-      if (c == '\'' || c == '"') {
+      if (openBraket == 0 && openGraph == 0 && openParenthesis == 0 && !escape && c == '\\' && ((parserCurrentPos + 1) < text2Use.length())) {
+        final char nextChar=text2Use.charAt(parserCurrentPos + 1);
+        if (nextChar == 'u') {
+          parserCurrentPos=OStringParser.readUnicode(text2Use,parserCurrentPos + 2,parserLastWord);
+        }
+ else         if (nextChar == 'n') {
+          parserLastWord.append("\n");
+          parserCurrentPos++;
+        }
+ else         if (nextChar == 'r') {
+          parserLastWord.append("\r");
+          parserCurrentPos++;
+        }
+ else         if (nextChar == 't') {
+          parserLastWord.append("\t");
+          parserCurrentPos++;
+        }
+ else         if (nextChar == 'f') {
+          parserLastWord.append("\f");
+          parserCurrentPos++;
+        }
+ else         escape=true;
+        continue;
+      }
+      if (openBraket == 0 && openGraph == 0 && openParenthesis == 0 && !escape && (c == '\'' || c == '"')) {
         if (stringBeginChar != ' ') {
           if (stringBeginChar == c) {
             stringBeginChar=' ';
           }
         }
- else {
-          stringBeginChar=c;
-        }
+ else         stringBeginChar=c;
       }
  else       if (stringBeginChar == ' ') {
-        for (int sepIndex=0; sepIndex < iSeparatorChars.length(); ++sepIndex) {
-          if (iSeparatorChars.charAt(sepIndex) == c && parserLastWord.length() > 0) {
-            parserLastSeparator=c;
-            return;
-          }
+        if (openBraket == 0 && openGraph == 0 && openParenthesis == 0 && parserCheckSeparator(c,iSeparatorChars)) {
+          break;
         }
+ else         if (c == '(')         openParenthesis++;
+ else         if (c == ')' && openParenthesis > 0)         openParenthesis--;
+ else         if (c == '[')         openBraket++;
+ else         if (c == ']' && openBraket > 0)         openBraket--;
+ else         if (c == '{')         openGraph++;
+ else         if (c == '}' && openGraph > 0)         openGraph--;
       }
       parserLastWord.append(c);
-      parserCurrentPos++;
+      if (escape)       escape=false;
     }
-    parserLastSeparator=' ';
   }
   finally {
-    if (parserCurrentPos >= text2Use.length())     parserCurrentPos=-1;
+    if (parserCurrentPos >= text2Use.length()) {
+      parserCurrentPos=-1;
+      parserLastSeparator=' ';
+    }
   }
 }

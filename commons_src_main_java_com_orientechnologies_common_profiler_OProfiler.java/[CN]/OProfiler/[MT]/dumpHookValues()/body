@@ -1,26 +1,32 @@
 {
-  if (recording < 0)   return "HookValues: <no recording>";
+  if (recordingFrom < 0)   return "HookValues: <no recording>";
   final StringBuilder buffer=new StringBuilder();
+  acquireSharedLock();
+  try {
 synchronized (hooks) {
-    if (hooks.size() == 0)     return "";
-    buffer.append("HOOK VALUES:");
-    buffer.append(String.format("\n%50s +-------------------------------------------------------------------+",""));
-    buffer.append(String.format("\n%50s | Value                                                             |","Name"));
-    buffer.append(String.format("\n%50s +-------------------------------------------------------------------+",""));
-    final List<String> names=new ArrayList<String>(hooks.values());
-    Collections.sort(names);
-    for (    String k : names) {
-      for (      Map.Entry<OProfilerHookValue,String> v : hooks.entrySet()) {
-        if (v.getValue().equals(k)) {
-          final OProfilerHookValue hook=v.getKey();
-          if (hook != null) {
-            final Object hookValue=hook.getValue();
-            buffer.append(String.format("\n%-50s | %-65s |",k,hookValue != null ? hookValue.toString() : "null"));
+      if (hooks.size() == 0)       return "";
+      buffer.append("HOOK VALUES:");
+      buffer.append(String.format("\n%50s +-------------------------------------------------------------------+",""));
+      buffer.append(String.format("\n%50s | Value                                                             |","Name"));
+      buffer.append(String.format("\n%50s +-------------------------------------------------------------------+",""));
+      final List<String> names=new ArrayList<String>(hooks.values());
+      Collections.sort(names);
+      for (      String k : names) {
+        for (        Map.Entry<OProfilerHookValue,String> v : hooks.entrySet()) {
+          if (v.getValue().equals(k)) {
+            final OProfilerHookValue hook=v.getKey();
+            if (hook != null) {
+              final Object hookValue=hook.getValue();
+              buffer.append(String.format("\n%-50s | %-65s |",k,hookValue != null ? hookValue.toString() : "null"));
+            }
+            break;
           }
-          break;
         }
       }
     }
+  }
+  finally {
+    releaseSharedLock();
   }
   buffer.append(String.format("\n%50s +-------------------------------------------------------------------+",""));
   return buffer.toString();

@@ -1,0 +1,26 @@
+{
+  final Map<String,Object> hookValuesSnapshots=archiveHooks();
+  acquireExclusiveLock();
+  try {
+synchronized (snapshots) {
+      lastSnapshot.setHookValues(hookValuesSnapshots);
+      lastSnapshot.endRecording();
+      snapshots.add(lastSnapshot);
+      lastSnapshot=new OProfilerData();
+      if (snapshots.size() >= maxSnapshots) {
+synchronized (summaries) {
+          final OProfilerData summary=new OProfilerData();
+          for (          OProfilerData a : snapshots) {
+            summary.mergeWith(a);
+          }
+          summaries.add(summary);
+          if (summaries.size() > maxSummaries)           summaries.remove(0);
+        }
+        snapshots.clear();
+      }
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

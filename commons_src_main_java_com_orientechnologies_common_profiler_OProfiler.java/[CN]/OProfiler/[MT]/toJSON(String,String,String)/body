@@ -1,0 +1,50 @@
+{
+  final StringBuilder buffer=new StringBuilder();
+  Map<String,Object> hookValuesSnapshots=null;
+  if (iQuery.equals("realtime"))   hookValuesSnapshots=archiveHooks();
+  buffer.append("{ \"" + iQuery + "\":");
+  acquireSharedLock();
+  try {
+    if (iQuery.equals("realtime")) {
+      realTime.setHookValues(hookValuesSnapshots);
+      realTime.toJSON(buffer);
+    }
+ else     if (iQuery.equals("last")) {
+      lastSnapshot.toJSON(buffer);
+    }
+ else {
+      if (iFrom == null || iTo == null)       throw new IllegalArgumentException("Invalid range format. Use: <from> <to>, where * means any");
+      final long from=iFrom.equals("*") ? 0 : Long.parseLong(iFrom);
+      final long to=iTo.equals("*") ? Long.MAX_VALUE : Long.parseLong(iTo);
+      boolean firstItem=true;
+      buffer.append("[");
+      if (iQuery.equals("archive")) {
+        for (int i=0; i < snapshots.size(); ++i) {
+          final OProfilerData a=snapshots.get(i);
+          if (a.isInRange(from,to)) {
+            if (firstItem)             firstItem=false;
+ else             buffer.append(',');
+            a.toJSON(buffer);
+          }
+        }
+      }
+ else       if (iQuery.equals("summary")) {
+        for (int i=0; i < summaries.size(); ++i) {
+          final OProfilerData a=summaries.get(i);
+          if (a.isInRange(from,to)) {
+            if (firstItem)             firstItem=false;
+ else             buffer.append(',');
+            a.toJSON(buffer);
+          }
+        }
+      }
+ else       throw new IllegalArgumentException("Invalid archive query: use realtime|last|archive|summary");
+      buffer.append("]");
+    }
+    buffer.append("}");
+  }
+  finally {
+    releaseSharedLock();
+  }
+  return buffer.toString();
+}

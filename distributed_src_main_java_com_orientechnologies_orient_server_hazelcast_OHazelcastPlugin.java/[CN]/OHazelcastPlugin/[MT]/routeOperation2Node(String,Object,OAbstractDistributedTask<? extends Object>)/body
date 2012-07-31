@@ -2,7 +2,7 @@
   final String dbName=iTask.getDatabaseName();
   String masterNodeId=getMasterNode(dbName,iClusterName,iKey);
   if (!masterNodeId.equals(localNodeId) && isOfflineNode(masterNodeId)) {
-    OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is aligning. Waiting for completition...",masterNodeId);
+    OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is offline (status=%s). Waiting for completition...",masterNodeId,getRemoteNodeStatus(masterNodeId));
     while (isOfflineNode(masterNodeId)) {
       try {
         Thread.sleep(200);
@@ -10,7 +10,11 @@
  catch (      InterruptedException e) {
         Thread.interrupted();
       }
-      masterNodeId=getMasterNode(dbName,iClusterName,iKey);
+      final String newMasterNodeId=getMasterNode(dbName,iClusterName,iKey);
+      if (!newMasterNodeId.equals(masterNodeId)) {
+        OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is the new owner of the requested key set",masterNodeId,getRemoteNodeStatus(masterNodeId));
+        masterNodeId=newMasterNodeId;
+      }
     }
     OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is aligned. Flushing pending operations...",masterNodeId);
   }

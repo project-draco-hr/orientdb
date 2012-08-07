@@ -1,0 +1,53 @@
+{
+  long positionToMerge=calcPositionToMerge();
+  if (positionToMerge < 0) {
+    g--;
+    if (g < GROUP_COUNT) {
+      g=2 * GROUP_COUNT - 1;
+      nextPageSize=pageSize;
+      pageSize=pageSize >>> 1;
+      roundCapacity=pageSize;
+      splittedBuckets=new BitSet((int)pageSize);
+    }
+    splittedBuckets.set(0,(int)pageSize);
+    recordSplitPointer=roundCapacity;
+    rebuildGroupOverflowChain();
+    positionToMerge=calcPositionToMerge();
+  }
+  splittedBuckets.clear((int)positionToMerge);
+  Map<Long,OClusterLocalLHPEBucket> bucketMap=new HashMap<Long,OClusterLocalLHPEBucket>(g);
+  List<Long> bucketsToMerge=new ArrayList<Long>(g);
+  for (long ptr=positionToMerge; ptr <= positionToMerge + pageSize * g; ptr+=pageSize) {
+    final OClusterLocalLHPEBucket bucket=loadMainBucket(ptr);
+    bucketMap.put(ptr,bucket);
+    bucketsToMerge.add(ptr);
+  }
+  for (  long currentBucketPosition : bucketsToMerge) {
+    OClusterLocalLHPEBucket currentBucket=bucketMap.get(currentBucketPosition);
+    while (true) {
+      for (int i=0; i < currentBucket.getSize(); ) {
+        long bucketKey=currentBucket.getKey(i);
+        long position=calculatePageIndex(bucketKey)[0];
+        OClusterLocalLHPEBucket bucketToAdd=bucketMap.get(position);
+        if (currentBucketPosition != position) {
+          while (bucketToAdd.getSize() >= OClusterLocalLHPEBucket.BUCKET_CAPACITY && bucketToAdd.getOverflowBucket() > -1)           bucketToAdd=loadOverflowBucket(bucketToAdd.getOverflowBucket());
+          if (bucketToAdd.getSize() >= OClusterLocalLHPEBucket.BUCKET_CAPACITY) {
+            OverflowBucketInfo overflowBucket=popOverflowBucket();
+            bucketToAdd.setOverflowBucket(overflowBucket.index);
+            bucketToAdd=overflowBucket.bucket;
+          }
+          bucketToAdd.addPhysicalPosition(currentBucket.getPhysicalPosition(i));
+          currentBucket.removePhysicalPosition(i);
+        }
+ else         i++;
+      }
+      if (currentBucket.getOverflowBucket() > -1)       currentBucket=loadOverflowBucket(currentBucket.getOverflowBucket());
+ else       break;
+    }
+  }
+  for (  long currentBucketPosition : bucketsToMerge) {
+    final OClusterLocalLHPEBucket currentBucket=bucketMap.get(currentBucketPosition);
+    compressChain(currentBucket,currentBucketPosition,positionToMerge);
+  }
+  recordSplitPointer=splittedBuckets.nextClearBit(0);
+}

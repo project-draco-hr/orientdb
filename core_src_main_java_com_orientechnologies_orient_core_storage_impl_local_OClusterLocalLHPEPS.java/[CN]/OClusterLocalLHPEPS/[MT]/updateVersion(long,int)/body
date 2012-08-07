@@ -1,0 +1,20 @@
+{
+  acquireExclusiveLock();
+  try {
+    final BucketInfo bucketInfo=findBucket(iPosition);
+    if (!bucketInfo.bucket.isOverflowBucket()) {
+      final int versionOffset=OClusterLocalLHPEBucket.getVersionOffset(bucketInfo.index);
+      final byte[] serializedVersion=OClusterLocalLHPEBucket.serializeVersion(iVersion);
+      final long filePos=bucketInfo.bucket.getFilePosition() + versionOffset;
+      final long[] pos=fileSegment.getRelativePosition(filePos);
+      final OFile file=fileSegment.files[(int)pos[0]];
+      long p=pos[1];
+      file.write(p,serializedVersion);
+    }
+ else     overflowSegment.updateVersion(bucketInfo.bucket,bucketInfo.index,iVersion);
+  }
+  finally {
+    clearCache();
+    releaseExclusiveLock();
+  }
+}

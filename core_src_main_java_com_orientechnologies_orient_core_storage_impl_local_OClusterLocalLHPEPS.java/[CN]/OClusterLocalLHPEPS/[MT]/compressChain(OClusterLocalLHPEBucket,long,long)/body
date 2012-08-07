@@ -1,0 +1,45 @@
+{
+  OClusterLocalLHPEBucket currentBucket=mainBucket;
+  while (true) {
+    if (currentBucket.getOverflowBucket() < 0)     break;
+    int diff=OClusterLocalLHPEBucket.BUCKET_CAPACITY - currentBucket.getSize();
+    OClusterLocalLHPEBucket nextBucket=loadOverflowBucket(currentBucket.getOverflowBucket());
+    while (nextBucket.getSize() == 0) {
+      if (nextBucket.getOverflowBucket() > -1)       nextBucket=loadOverflowBucket(nextBucket.getOverflowBucket());
+ else       break;
+    }
+    if (nextBucket.getSize() > 0)     for (int i=0; i < diff; i++) {
+      final OPhysicalPosition physicalPosition=nextBucket.getPhysicalPosition(nextBucket.getSize() - 1);
+      currentBucket.addPhysicalPosition(physicalPosition);
+      nextBucket.removePhysicalPosition(nextBucket.getSize() - 1);
+      while (nextBucket.getSize() == 0) {
+        if (nextBucket.getOverflowBucket() > -1)         nextBucket=loadOverflowBucket(nextBucket.getOverflowBucket());
+ else         break;
+      }
+      if (nextBucket.getSize() == 0)       break;
+    }
+    if (currentBucket.getSize() < OClusterLocalLHPEBucket.BUCKET_CAPACITY) {
+      break;
+    }
+    if (currentBucket.getOverflowBucket() > -1)     currentBucket=loadOverflowBucket(currentBucket.getOverflowBucket());
+ else {
+      break;
+    }
+  }
+  int chainLength=0;
+  final int prevChainLength=getMainBucketOverflowChainLength(index);
+  currentBucket=mainBucket;
+  while (true) {
+    if (currentBucket.getOverflowBucket() < 0)     break;
+    final OClusterLocalLHPEBucket nextBucket=loadOverflowBucket(currentBucket.getOverflowBucket());
+    if (nextBucket.getSize() == 0) {
+      putBucketToOverflowList(nextBucket,currentBucket.getOverflowBucket());
+      currentBucket.setOverflowBucket(-1);
+      break;
+    }
+    chainLength++;
+    currentBucket=nextBucket;
+  }
+  updateMainBucketOverflowChainLength(index,chainLength);
+  updateBucketGroupOverflowChainLength(offset,chainLength - prevChainLength);
+}

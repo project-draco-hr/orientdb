@@ -1,0 +1,46 @@
+{
+  final OFile file=fileSegment.files[0];
+  int pos=0;
+  file.writeHeaderLong(0,lastOverflowBucket);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,recordSplitPointer);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,roundCapacity);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,g);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,d);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,pageSize);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,nextPageSize);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,size);
+  pos+=OLongSerializer.LONG_SIZE;
+  file.writeHeaderLong(pos,mainBucketsSize);
+  OMemoryStream byteArrayOutputStream=new OMemoryStream(splittedBuckets.size() / 8);
+  ObjectOutputStream objectOutputStream=new ObjectOutputStream(byteArrayOutputStream);
+  objectOutputStream.writeObject(splittedBuckets);
+  objectOutputStream.flush();
+  objectOutputStream.close();
+  byte[] serializedBitSet=byteArrayOutputStream.toByteArray();
+  objectOutputStream=null;
+  byteArrayOutputStream=null;
+  final int statisticSize=(OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE) * mainBucketOverflowInfoByIndex.size() + serializedBitSet.length + 2 * OIntegerSerializer.INT_SIZE;
+  overflowStatistic.truncate();
+  final OFile statisticsFile=overflowStatistic.file;
+  statisticsFile.allocateSpace(statisticSize);
+  pos=0;
+  statisticsFile.writeInt(pos,serializedBitSet.length);
+  pos+=OIntegerSerializer.INT_SIZE;
+  statisticsFile.write(pos,serializedBitSet);
+  pos+=serializedBitSet.length;
+  serializedBitSet=null;
+  statisticsFile.writeInt(pos,mainBucketOverflowInfoByIndex.size());
+  for (  Map.Entry<Long,Integer> statisticEntry : mainBucketOverflowInfoByIndex.entrySet()) {
+    statisticsFile.writeLong(pos,statisticEntry.getKey());
+    pos+=OLongSerializer.LONG_SIZE;
+    statisticsFile.writeInt(pos,statisticEntry.getValue());
+    pos+=OIntegerSerializer.INT_SIZE;
+  }
+}

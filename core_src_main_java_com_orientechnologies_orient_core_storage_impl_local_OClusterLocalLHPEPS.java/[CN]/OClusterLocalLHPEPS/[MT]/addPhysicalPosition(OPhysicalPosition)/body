@@ -1,0 +1,40 @@
+{
+  acquireExclusiveLock();
+  try {
+    long[] pos=calculatePageIndex(iPPosition.clusterPosition);
+    long position=pos[0];
+    final long offset=pos[1];
+    final int prevChainLength=getMainBucketOverflowChainLength(position);
+    int chainLength=0;
+    OClusterLocalLHPEBucket currentBucket=loadMainBucket(position);
+    while (true) {
+      for (int i=0; i < currentBucket.getSize(); i++) {
+        long bucketKey=currentBucket.getKey(i);
+        if (bucketKey == iPPosition.clusterPosition)         return false;
+      }
+      if (currentBucket.getOverflowBucket() > -1) {
+        currentBucket=loadOverflowBucket(currentBucket.getOverflowBucket());
+        chainLength++;
+      }
+ else       break;
+    }
+    if (currentBucket.getSize() < OClusterLocalLHPEBucket.BUCKET_CAPACITY)     currentBucket.addPhysicalPosition(iPPosition);
+ else {
+      final OverflowBucketInfo bucketInfo=popOverflowBucket();
+      final OClusterLocalLHPEBucket overflowBucket=bucketInfo.bucket;
+      currentBucket.setOverflowBucket(bucketInfo.index);
+      overflowBucket.addPhysicalPosition(iPPosition);
+      chainLength++;
+      updateMainBucketOverflowChainLength(position,chainLength);
+      updateBucketGroupOverflowChainLength(offset,chainLength - prevChainLength);
+    }
+    size++;
+    splitBucketIfNeeded();
+    storeBuckets();
+    return true;
+  }
+  finally {
+    clearCache();
+    releaseExclusiveLock();
+  }
+}

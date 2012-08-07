@@ -1,0 +1,29 @@
+{
+  acquireSharedLock();
+  try {
+    long calculatedSize=fileSegment.getFilledUpTo();
+    long localSize=size;
+    long position=0;
+    while (localSize > 0) {
+      OClusterLocalLHPEBucket bucket=loadMainBucket(position);
+      while (true) {
+        for (int n=0; n < bucket.getSize(); n++) {
+          OPhysicalPosition ppos=new OPhysicalPosition();
+          ppos=getPhysicalPosition(ppos);
+          if (ppos.dataSegmentPos > -1 && ppos.recordVersion > -1)           calculatedSize+=storage.getDataSegmentById(ppos.dataSegmentId).getRecordSize(ppos.dataSegmentPos);
+          localSize--;
+        }
+        if (bucket.getOverflowBucket() < 0)         break;
+        bucket=loadOverflowBucket(bucket.getOverflowBucket());
+      }
+      position++;
+    }
+    return calculatedSize;
+  }
+ catch (  IOException e) {
+    throw new OIOException("Error on calculating cluster size for: " + getName(),e);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

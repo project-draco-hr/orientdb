@@ -5,16 +5,31 @@
   lock.acquireExclusiveLock();
   try {
     final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,iRecordType);
-    iClusterSegment.addPhysicalPosition(ppos);
-    iRid.clusterPosition=ppos.clusterPosition;
+    if (!iClusterSegment.generatePositionBeforeCreation()) {
+      iClusterSegment.addPhysicalPosition(ppos);
+      iRid.clusterPosition=ppos.clusterPosition;
+    }
+ else {
+      iRid.clusterPosition=positionGenerator.nextLong(Long.MAX_VALUE);
+    }
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
       ppos.dataSegmentId=iDataSegment.getId();
       ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
-      iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
-      if (iRecordVersion > -1 && iRecordVersion > ppos.recordVersion) {
-        iClusterSegment.updateVersion(iRid.clusterPosition,iRecordVersion);
+      if (!iClusterSegment.generatePositionBeforeCreation()) {
+        iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
+        if (iRecordVersion > -1 && iRecordVersion > ppos.recordVersion) {
+          iClusterSegment.updateVersion(iRid.clusterPosition,iRecordVersion);
+          ppos.recordVersion=iRecordVersion;
+        }
+      }
+ else {
         ppos.recordVersion=iRecordVersion;
+        ppos.clusterPosition=iRid.clusterPosition;
+        while (!iClusterSegment.addPhysicalPosition(ppos)) {
+          iRid.clusterPosition=positionGenerator.nextLong(Long.MAX_VALUE);
+          ppos.clusterPosition=iRid.clusterPosition;
+        }
       }
       return ppos;
     }

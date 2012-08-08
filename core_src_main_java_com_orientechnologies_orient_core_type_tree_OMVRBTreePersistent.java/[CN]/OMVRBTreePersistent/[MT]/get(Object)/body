@@ -1,12 +1,18 @@
 {
-  for (int i=0; i < OPTIMIZE_MAX_RETRY; ++i) {
-    try {
-      return super.get(iKey);
+  final long timer=Orient.instance().getProfiler().startChrono();
+  try {
+    for (int i=0; i < OPTIMIZE_MAX_RETRY; ++i) {
+      try {
+        return super.get(iKey);
+      }
+ catch (      OLowMemoryException e) {
+        OLogManager.instance().debug(this,"Optimization required during node search %d/%d",i,OPTIMIZE_MAX_RETRY);
+        freeMemory(i);
+      }
     }
- catch (    OLowMemoryException e) {
-      OLogManager.instance().debug(this,"Optimization required during node search %d/%d",i,OPTIMIZE_MAX_RETRY);
-      freeMemory(i);
-    }
+    throw new OLowMemoryException("OMVRBTreePersistent.get()");
   }
-  throw new OLowMemoryException("OMVRBTreePersistent.get()");
+  finally {
+    Orient.instance().getProfiler().stopChrono("OMVRBTree.get",timer);
+  }
 }

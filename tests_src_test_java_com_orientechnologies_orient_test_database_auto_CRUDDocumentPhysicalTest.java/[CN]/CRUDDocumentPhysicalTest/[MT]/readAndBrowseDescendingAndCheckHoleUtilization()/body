@@ -2,22 +2,25 @@
   database=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
   try {
     byte[] binary;
-    int i=0;
+    Set<Integer> ids=new HashSet<Integer>();
+    for (int i=0; i < TOT_RECORDS; i++)     ids.add(i);
     ORecordIteratorCluster<ODocument> it=database.browseCluster("Account");
     for (it.last(); it.hasPrevious(); ) {
       ODocument rec=it.previous();
-      Assert.assertEquals(((Number)rec.field("id")).intValue(),i);
-      Assert.assertEquals(rec.field("name"),"Gipsy");
-      Assert.assertEquals(rec.field("location"),"Italy");
-      Assert.assertEquals(((Number)rec.field("testLong")).longValue(),10000000000L);
-      Assert.assertEquals(((Number)rec.field("salary")).intValue(),i + 300);
-      Assert.assertNotNull(rec.field("extra"));
-      Assert.assertEquals(((Byte)rec.field("value",Byte.class)).byteValue(),(byte)10);
-      binary=rec.field("binary",OType.BINARY);
-      for (int b=0; b < binary.length; ++b)       Assert.assertEquals(binary[b],(byte)b);
-      i++;
+      if (rec != null) {
+        int id=((Number)rec.field("id")).intValue();
+        Assert.assertTrue(ids.remove(id));
+        Assert.assertEquals(rec.field("name"),"Gipsy");
+        Assert.assertEquals(rec.field("location"),"Italy");
+        Assert.assertEquals(((Number)rec.field("testLong")).longValue(),10000000000L);
+        Assert.assertEquals(((Number)rec.field("salary")).intValue(),id + 300);
+        Assert.assertNotNull(rec.field("extra"));
+        Assert.assertEquals(((Byte)rec.field("value",Byte.class)).byteValue(),(byte)10);
+        binary=rec.field("binary",OType.BINARY);
+        for (int b=0; b < binary.length; ++b)         Assert.assertEquals(binary[b],(byte)b);
+      }
     }
-    Assert.assertEquals(i,TOT_RECORDS);
+    Assert.assertTrue(ids.isEmpty());
   }
   finally {
     database.close();

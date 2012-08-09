@@ -3,19 +3,29 @@
   if (currentRecord != null)   return true;
   if (limit > -1 && browsedRecords >= limit)   return false;
   if (browsedRecords >= totalAvailableRecords)   return false;
-  if (liveUpdated)   lastClusterPosition=database.getStorage().getClusterDataRange(current.clusterId)[1];
+  if (liveUpdated)   updateClusterRange();
   ORecordInternal<?> record=getRecord();
   while (currentClusterIdx < clusterIds.length) {
-    long recordsToBrowse=current.clusterPosition > -2 && lastClusterPosition > -1 ? lastClusterPosition - current.clusterPosition : 0;
-    while (recordsToBrowse > 0) {
-      currentRecord=readCurrentRecord(record,+1);
+    boolean thereAreRecordsToBrowse;
+    if (current.clusterPosition <= -2)     thereAreRecordsToBrowse=false;
+ else     if (currentEntry == lastClusterEntry && (currentPositions.length == 0 || currentPositionIndex >= currentPositions.length))     thereAreRecordsToBrowse=false;
+ else     thereAreRecordsToBrowse=true;
+    while (thereAreRecordsToBrowse) {
+      if (!nextPosition(+1)) {
+        currentRecord=null;
+        break;
+      }
+      final long currentPosition=currentPosition();
+      if (outsideOfTheRange(currentPosition))       continue;
+      currentRecord=readCurrentRecord(record,0);
       if (currentRecord != null)       if (include(currentRecord))       return true;
-      recordsToBrowse--;
     }
     currentClusterIdx++;
     if (currentClusterIdx >= clusterIds.length)     break;
     updateClusterRange();
-    current.clusterPosition=firstClusterPosition - 1;
+    currentEntry=firstClusterEntry;
+    currentPositionIndex=-1;
+    currentPositions=dbStorage.getClusterPositionsForEntry(current.clusterId,currentEntry);
   }
   if (txEntries != null && txEntries.size() - (currentTxEntryPosition + 1) > 0)   return true;
   currentRecord=null;

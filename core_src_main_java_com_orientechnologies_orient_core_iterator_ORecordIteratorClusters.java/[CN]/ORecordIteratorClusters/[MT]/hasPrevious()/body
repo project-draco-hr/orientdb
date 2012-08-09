@@ -3,16 +3,22 @@
   if (currentRecord != null)   return true;
   if (limit > -1 && browsedRecords >= limit)   return false;
   if (browsedRecords >= totalAvailableRecords)   return false;
-  if (liveUpdated)   firstClusterPosition=database.getStorage().getClusterDataRange(current.clusterId)[0];
+  if (liveUpdated)   updateClusterRange();
   ORecordInternal<?> record=getRecord();
   while (currentClusterIdx > -1) {
-    while (current.clusterPosition > firstClusterPosition) {
-      currentRecord=readCurrentRecord(record,-1);
+    while (currentEntry >= firstClusterEntry) {
+      if (!nextPosition(+1)) {
+        currentRecord=null;
+        break;
+      }
+      currentRecord=readCurrentRecord(record,0);
       if (currentRecord != null)       if (include(currentRecord))       return true;
     }
     currentClusterIdx--;
     updateClusterRange();
-    current.clusterPosition=lastClusterPosition + 1;
+    currentEntry=lastClusterEntry;
+    currentPositionIndex=currentPositions.length;
+    currentPositions=dbStorage.getClusterPositionsForEntry(current.clusterId,currentEntry);
   }
   if (txEntries != null && txEntries.size() - (currentTxEntryPosition + 1) > 0)   return true;
   currentRecord=null;

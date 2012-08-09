@@ -57,24 +57,34 @@
         }
  else {
           if (iRecord instanceof ODocument) {
-            final Object v=getValue((ODocument)iRecord,fieldName,fieldValue,fieldValueAsString,null,null,fieldTypes,noMap,iOptions);
+            final ODocument doc=((ODocument)iRecord);
+            OType type=null;
+            final OClass cls=doc.getSchemaClass();
+            if (cls != null) {
+              final OProperty prop=cls.getProperty(fieldName);
+              if (prop != null)               type=prop.getType();
+            }
+            final Object v=getValue(doc,fieldName,fieldValue,fieldValueAsString,type,null,fieldTypes,noMap,iOptions);
             if (v != null)             if (v instanceof Collection<?> && !((Collection<?>)v).isEmpty()) {
               if (v instanceof ORecordLazyList)               ((ORecordLazyList)v).setAutoConvertToRecord(false);
  else               if (v instanceof OMVRBTreeRIDSet)               ((OMVRBTreeRIDSet)v).setAutoConvert(false);
-              Object first=((Collection<?>)v).iterator().next();
-              if (first != null && first instanceof ORecord<?> && !((ORecord<?>)first).getIdentity().isValid()) {
-                ((ODocument)iRecord).field(fieldName,v,v instanceof Set<?> ? OType.EMBEDDEDSET : OType.EMBEDDEDLIST);
+              if (type == null) {
+                Object first=((Collection<?>)v).iterator().next();
+                if (first != null && first instanceof ORecord<?> && !((ORecord<?>)first).getIdentity().isValid())                 type=v instanceof Set<?> ? OType.EMBEDDEDSET : OType.EMBEDDEDLIST;
+              }
+              if (type != null) {
+                doc.field(fieldName,v,type);
                 continue;
               }
             }
  else             if (v instanceof Map<?,?> && !((Map<?,?>)v).isEmpty()) {
               Object first=((Map<?,?>)v).values().iterator().next();
               if (first != null && first instanceof ORecord<?> && !((ORecord<?>)first).getIdentity().isValid()) {
-                ((ODocument)iRecord).field(fieldName,v,OType.EMBEDDEDMAP);
+                doc.field(fieldName,v,OType.EMBEDDEDMAP);
                 continue;
               }
             }
-            ((ODocument)iRecord).field(fieldName,v);
+            doc.field(fieldName,v);
           }
         }
       }

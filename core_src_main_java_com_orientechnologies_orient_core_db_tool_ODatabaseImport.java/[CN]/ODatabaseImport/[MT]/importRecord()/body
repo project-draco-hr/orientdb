@@ -28,27 +28,8 @@
       if (record.getIdentity().getClusterId() == indexId || record.getIdentity().getClusterId() == oridsId)       return null;
     }
     final String rid=record.getIdentity().toString();
-    long nextAvailablePos=database.getStorage().getClusterDataRange(record.getIdentity().getClusterId())[1] + 1;
-    if (record.getIdentity().getClusterPosition() < nextAvailablePos) {
-      record.setVersion(Integer.MIN_VALUE + record.getVersion());
-      if (record instanceof ODocument)       record.save();
- else       ((ODatabaseRecord)database.getUnderlying()).save(record);
-    }
- else {
-      String clusterName=database.getClusterNameById(record.getIdentity().getClusterId());
-      if (record.getIdentity().getClusterPosition() > nextAvailablePos) {
-        int holes=(int)(record.getIdentity().getClusterPosition() - nextAvailablePos);
-        ODocument tempRecord=new ODocument();
-        for (int i=0; i < holes; ++i) {
-          tempRecord.reset();
-          ((ODatabaseRecord)database.getUnderlying()).save(tempRecord,clusterName);
-          recordToDelete.add(tempRecord.getIdentity().toString());
-        }
-      }
-      record.setIdentity(-1,-1);
-      if (record instanceof ODocument)       record.save(clusterName);
- else       ((ODatabaseRecord)database.getUnderlying()).save(record,clusterName);
-    }
+    if (!lhClustersAreUsed)     storeLocalClusterRecord();
+ else     storeLHClusterRecord(new ORecordId(rid));
     if (!record.getIdentity().toString().equals(rid))     throw new OSchemaException("Imported record '" + record.getIdentity() + "' has rid different from the original: "+ rid);
   }
  catch (  Exception t) {

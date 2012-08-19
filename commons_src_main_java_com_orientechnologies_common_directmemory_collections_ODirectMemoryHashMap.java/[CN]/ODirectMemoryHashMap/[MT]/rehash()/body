@@ -1,0 +1,39 @@
+{
+  final long oldCapacity=capacity;
+  final int oldEntries=entries;
+  capacity=capacity << 1;
+  if (!allocateInitialMemory(capacity)) {
+    capacity=oldCapacity;
+    entries=oldEntries;
+  }
+  for (long oldIndex=0; oldIndex < oldCapacity; oldIndex++) {
+    int oldHashLineSize=getHashLineSize(oldEntries,oldIndex);
+    for (int oldOffset=0; oldOffset < oldHashLineSize; oldOffset++) {
+      final int oldKeyPtr=getKeyPtr(oldEntries,oldIndex,oldOffset);
+      final int oldValuePtr=getValuePtr(oldEntries,oldIndex,oldOffset);
+      final long oldHashCode=getHashCode(oldEntries,oldIndex,oldOffset);
+      if (!rehashEntry(oldHashCode,oldKeyPtr,oldValuePtr)) {
+        clearLines(entries,capacity);
+        entries=oldEntries;
+        capacity=oldCapacity;
+      }
+    }
+    int oldHashLinePtr=getNextHashLinePtr(oldEntries,oldIndex);
+    while (oldHashLinePtr != ODirectMemory.NULL_POINTER) {
+      oldHashLineSize=getHashLineSizeFromHashLine(oldHashLinePtr);
+      for (int oldOffset=0; oldOffset < oldHashLineSize; oldOffset++) {
+        final int oldKeyPtr=getKeyPtrFromHashLine(oldHashLinePtr,oldOffset);
+        final long oldHashCode=getHashCodeFromHashLine(oldHashLinePtr,oldOffset);
+        final int oldValuePtr=getValuePtrFromHashLine(oldHashLinePtr,oldOffset);
+        if (!rehashEntry(oldHashCode,oldKeyPtr,oldValuePtr)) {
+          clearLines(entries,capacity);
+          entries=oldEntries;
+          capacity=oldCapacity;
+        }
+      }
+      oldHashLinePtr=getNextHashLinePtrFromHashLine(oldHashLinePtr);
+    }
+  }
+  nextThreshold=(long)(capacity * 0.75);
+  clearLines(oldEntries,oldCapacity);
+}

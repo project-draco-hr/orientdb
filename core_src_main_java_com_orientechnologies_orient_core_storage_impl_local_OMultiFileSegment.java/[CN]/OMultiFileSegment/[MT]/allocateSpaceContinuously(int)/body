@@ -1,0 +1,50 @@
+{
+  OFile file;
+  int remainingSize=iSize;
+  int offset=-1;
+  int fileNumber=-1;
+  if (files.length > 0) {
+    file=files[files.length - 1];
+    if (file.getFreeSpace() > 0) {
+      fileNumber=files.length - 1;
+      if (remainingSize > file.getFreeSpace()) {
+        remainingSize-=file.getFreeSpace();
+        offset=file.allocateSpace(file.getFreeSpace());
+      }
+ else {
+        return (long)(files.length - 1) * fileMaxSize + file.allocateSpace(remainingSize);
+      }
+    }
+    final int oversize=fileMaxSize - file.getFileSize();
+    if (oversize > 0 && remainingSize > 0) {
+      fileNumber=files.length - 1;
+      if (remainingSize > oversize) {
+        remainingSize-=oversize;
+        int newOffset=file.allocateSpace(oversize);
+        if (offset == -1)         offset=newOffset;
+      }
+ else {
+        int newOffset=file.allocateSpace(remainingSize);
+        if (offset == -1)         offset=newOffset;
+        if (fileNumber == -1) {
+          fileNumber=files.length - 1;
+        }
+        return (long)fileNumber * fileMaxSize + offset;
+      }
+    }
+  }
+  if (remainingSize > 0) {
+    if (maxSize > 0 && getSize() >= maxSize)     throw new OStorageException("Unable to allocate the requested space of " + iSize + " bytes because the segment is full: max-Size="+ maxSize+ ", currentSize="+ getFilledUpTo());
+    OFile[] newFiles=new OFile[files.length + 1];
+    for (int i=0; i < files.length; ++i)     newFiles[i]=files[i];
+    files=newFiles;
+    file=createNewFile();
+    file.allocateSpace(iSize);
+    config.root.update();
+    if (fileNumber == -1) {
+      fileNumber=files.length - 1;
+    }
+    if (offset == -1)     offset=0;
+  }
+  return (long)fileNumber * fileMaxSize + offset;
+}

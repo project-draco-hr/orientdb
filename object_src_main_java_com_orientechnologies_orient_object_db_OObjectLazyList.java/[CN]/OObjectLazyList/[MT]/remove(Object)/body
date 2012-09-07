@@ -2,9 +2,20 @@
   setDirty();
   if (o instanceof OIdentifiable) {
     int elementIndex=recordList.indexOf(o);
-    if (indexLoaded(elementIndex))     super.remove(elementIndex);
+    elementIndex=elementIndex > -1 ? elementIndex : recordList.indexOf(((OIdentifiable)o).getRecord());
+    if (elementIndex > -1 && indexLoaded(elementIndex))     super.remove(elementIndex);
+    if (orphanRemoval)     ((OObjectProxyMethodHandler)sourceRecord.getHandler()).getOrphans().add(((OIdentifiable)o).getIdentity());
     return recordList.remove(o);
   }
- else   if (o instanceof Proxy)   recordList.remove((OIdentifiable)OObjectEntitySerializer.getDocument((Proxy)o));
+ else   if (o instanceof Proxy) {
+    OIdentifiable record=(OIdentifiable)OObjectEntitySerializer.getDocument((Proxy)o);
+    if (orphanRemoval && record != null)     ((OObjectProxyMethodHandler)sourceRecord.getHandler()).getOrphans().add(record.getIdentity());
+    recordList.remove(record);
+  }
+ else {
+    OIdentifiable record=getDatabase().getRecordByUserObject(o,false);
+    if (orphanRemoval && record != null)     ((OObjectProxyMethodHandler)sourceRecord.getHandler()).getOrphans().add(record.getIdentity());
+    recordList.remove(record);
+  }
   return super.remove(o);
 }

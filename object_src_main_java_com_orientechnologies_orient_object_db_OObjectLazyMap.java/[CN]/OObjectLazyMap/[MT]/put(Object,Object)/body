@@ -1,11 +1,20 @@
 {
-  setDirty();
-  if (e instanceof OIdentifiable) {
-    converted=false;
-    return underlying.put(iKey,(OIdentifiable)e);
-  }
+  try {
+    if (e instanceof OIdentifiable) {
+      converted=false;
+      OIdentifiable o=underlying.put(iKey,(OIdentifiable)e);
+      if (orphanRemoval && o != null && !o.getIdentity().equals(((OIdentifiable)e).getIdentity()))       ((OObjectProxyMethodHandler)sourceRecord.getHandler()).getOrphans().add(o.getIdentity());
+      return o;
+    }
  else {
-    underlying.put(iKey,getDatabase().getRecordByUserObject(e,true));
-    return super.put(iKey,e);
+      OIdentifiable newValue=e != null ? getDatabase().getRecordByUserObject(e,true) : null;
+      OIdentifiable oldValue=underlying.get(iKey);
+      underlying.put(iKey,newValue);
+      if (orphanRemoval && ((newValue == null && oldValue != null) || (oldValue != null && !oldValue.getIdentity().equals(newValue.getIdentity()))))       ((OObjectProxyMethodHandler)sourceRecord.getHandler()).getOrphans().add(oldValue.getIdentity());
+      return super.put(iKey,e);
+    }
+  }
+  finally {
+    setDirty();
   }
 }

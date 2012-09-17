@@ -1,0 +1,28 @@
+{
+  checkOpeness();
+  if (iPojo == null)   return (RET)iPojo;
+ else   if (OMultiValue.isMultiValue(iPojo)) {
+    for (    Object pojo : OMultiValue.getMultiValueIterable(iPojo)) {
+      save(pojo,iClusterName);
+    }
+    return (RET)iPojo;
+  }
+ else {
+    OSerializationThreadLocal.INSTANCE.get().clear();
+    final Object proxiedObject=OObjectEntitySerializer.serializeObject(iPojo,this);
+    final ODocument record=getRecordByUserObject(proxiedObject,true);
+    try {
+      record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.MARSHALLING);
+      if (!saveOnlyDirty || record.isDirty()) {
+        deleteOrphans((((OObjectProxyMethodHandler)((ProxyObject)proxiedObject).getHandler())));
+        underlying.save(record,iClusterName,iMode,iForceCreate,iCallback);
+        ((OObjectProxyMethodHandler)((ProxyObject)proxiedObject).getHandler()).updateLoadedFieldMap();
+        registerUserObject(proxiedObject,record);
+      }
+    }
+  finally {
+      record.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.LOADED);
+    }
+    return (RET)proxiedObject;
+  }
+}

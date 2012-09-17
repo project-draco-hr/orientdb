@@ -1,0 +1,50 @@
+{
+  for (  String storageName : dhtConfiguration.getDistributedStorageNames()) {
+    final ODatabaseDocumentTx db=openDatabase(storageName);
+    final Set<String> clusterNames=db.getStorage().getClusterNames();
+    for (    String clusterName : clusterNames) {
+      if (dhtConfiguration.getUndistributableClusters().contains(clusterName.toLowerCase())) {
+        continue;
+      }
+      final ORecordIteratorCluster<? extends ORecordInternal<?>> it=db.browseCluster(clusterName);
+      while (it.hasNext()) {
+        final ORecordInternal<?> rec=it.next();
+        lockManager.acquireLock(Thread.currentThread(),rec.getIdentity(),OLockManager.LOCK.EXCLUSIVE);
+        try {
+          final long successorId=findSuccessor(rec.getIdentity().getClusterPosition());
+          if (successorId != id) {
+            final ODHTNode node=nodeLookup.findById(successorId);
+            node.createRecord(storageName,(ORecordId)rec.getIdentity(),rec.toStream(),rec.getVersion(),rec.getRecordType());
+            ODistributedThreadLocal.INSTANCE.distributedExecution=true;
+            try {
+              rec.delete();
+            }
+  finally {
+              ODistributedThreadLocal.INSTANCE.distributedExecution=false;
+            }
+          }
+        }
+  finally {
+          lockManager.releaseLock(Thread.currentThread(),rec.getIdentity(),OLockManager.LOCK.EXCLUSIVE);
+        }
+      }
+    }
+  }
+  if (state == NodeState.STABLE) {
+    final ODHTNode node=nodeLookup.findById(requesterNode);
+    node.notifyMigrationEnd(id);
+  }
+ else {
+    notificationQueue.add(requesterNode);
+    if (state == NodeState.STABLE) {
+      Long nodeToNotifyId=notificationQueue.poll();
+      while (nodeToNotifyId != null) {
+        final ODHTNode node=nodeLookup.findById(nodeToNotifyId);
+        node.notifyMigrationEnd(id);
+        nodeToNotifyId=notificationQueue.poll();
+      }
+    }
+  }
+  log("Migration was successfully finished for node " + requesterNode);
+  return null;
+}

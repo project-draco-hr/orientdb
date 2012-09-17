@@ -5,33 +5,31 @@
   lock.acquireExclusiveLock();
   try {
     final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,iRecordType);
-    if (!iClusterSegment.generatePositionBeforeCreation()) {
-      iClusterSegment.addPhysicalPosition(ppos);
-      iRid.clusterPosition=ppos.clusterPosition;
+    boolean sequentialPositionGeneration=false;
+    if (iClusterSegment.generatePositionBeforeCreation()) {
+      if (iRid.isNew()) {
+        iRid.clusterPosition=positionGenerator++;
+        sequentialPositionGeneration=true;
+      }
     }
  else {
-      iRid.clusterPosition=positionGenerator++;
+      iClusterSegment.addPhysicalPosition(ppos);
+      iRid.clusterPosition=ppos.clusterPosition;
     }
     lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
     try {
       ppos.dataSegmentId=iDataSegment.getId();
       ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
-      if (!iClusterSegment.generatePositionBeforeCreation()) {
+      if (iClusterSegment.generatePositionBeforeCreation()) {
+        if (iRecordVersion > -1 && iRecordVersion > ppos.recordVersion)         ppos.recordVersion=iRecordVersion;
+        ppos.clusterPosition=iRid.clusterPosition;
+        addPhysicalPosition(iDataSegment,iClusterSegment,iRid,ppos,sequentialPositionGeneration);
+      }
+ else {
         iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
         if (iRecordVersion > -1 && iRecordVersion > ppos.recordVersion) {
           iClusterSegment.updateVersion(iRid.clusterPosition,iRecordVersion);
           ppos.recordVersion=iRecordVersion;
-        }
-      }
- else {
-        if (iRecordVersion > -1 && iRecordVersion > ppos.recordVersion)         ppos.recordVersion=iRecordVersion;
-        ppos.clusterPosition=iRid.clusterPosition;
-        while (!iClusterSegment.addPhysicalPosition(ppos)) {
-          lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
-          iRid.clusterPosition=positionGenerator++;
-          ppos.clusterPosition=iRid.clusterPosition;
-          lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
-          iDataSegment.setRecordRid(ppos.dataSegmentPos,iRid);
         }
       }
       return ppos;

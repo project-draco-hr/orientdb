@@ -1,0 +1,29 @@
+{
+  try {
+    hazelcastInstance=Hazelcast.newHazelcastInstance(new FileSystemXmlConfig(configFile));
+  }
+ catch (  FileNotFoundException e) {
+    throw new OConfigurationException("Error on creation Hazelcast instance");
+  }
+  localNode=new OLocalDHTNode(getNodeId(hazelcastInstance.getCluster().getLocalMember()));
+  localNode.setNodeLookup(this);
+  localNode.setDhtConfiguration(dhtConfiguration);
+  INSTANCES.put(hazelcastInstance.getCluster().getLocalMember().getUuid(),this);
+  hazelcastInstance.getCluster().addMembershipListener(this);
+  for (  final Member member : hazelcastInstance.getCluster().getMembers()) {
+    final long nodeId=getNodeId(member);
+    if (nodeId != localNode.getNodeId())     idMemberMap.put(nodeId,member);
+  }
+  if (idMemberMap.isEmpty())   localNode.create();
+ else {
+    long oldestNodeId=getNodeId(hazelcastInstance.getCluster().getMembers().iterator().next());
+    while (!localNode.join(oldestNodeId))     oldestNodeId=getNodeId(hazelcastInstance.getCluster().getMembers().iterator().next());
+  }
+  timer.schedule(new TimerTask(){
+    @Override public void run(){
+      localNode.stabilize();
+      localNode.fixFingers();
+    }
+  }
+,10000,10000);
+}

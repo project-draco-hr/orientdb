@@ -2,6 +2,21 @@
   listener.onMessage("\nImporting clusters...");
   long total=0;
   jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
+  boolean recreateManualIndex=false;
+  if (exporterVersion < 4) {
+    recreateManualIndex=true;
+    listener.onMessage("\nExported database does not support manual index separation." + " Manual index cluster will be dropped.");
+    database.dropCluster(OMetadata.CLUSTER_MANUAL_INDEX_NAME);
+    final OSchema schema=database.getMetadata().getSchema();
+    schema.dropClass(OUser.CLASS_NAME);
+    schema.dropClass(ORole.CLASS_NAME);
+    schema.dropClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
+    schema.save();
+    database.dropCluster(OStorage.CLUSTER_DEFAULT_NAME);
+    database.getStorage().setDefaultClusterId(database.addCluster(OStorage.CLUSTER_TYPE.PHYSICAL.toString(),OStorage.CLUSTER_DEFAULT_NAME,null,null));
+    new ODocument().save(OStorage.CLUSTER_DEFAULT_NAME);
+    database.getMetadata().getSecurity().create();
+  }
   @SuppressWarnings("unused") ORecordId rid=null;
   while (jsonReader.lastChar() != ']') {
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
@@ -36,6 +51,11 @@
     jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
   }
   jsonReader.readNext(OJSONReader.COMMA_SEPARATOR);
+  if (recreateManualIndex) {
+    database.addCluster(OStorage.CLUSTER_TYPE.PHYSICAL.toString(),OMetadata.CLUSTER_MANUAL_INDEX_NAME,null,null);
+    database.getMetadata().getIndexManager().create();
+    listener.onMessage("\nManual index cluster was recreated.");
+  }
   listener.onMessage("\nDone. Imported " + total + " clusters");
   return total;
 }

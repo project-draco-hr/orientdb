@@ -1,6 +1,10 @@
 {
   if (Proxy.class.isAssignableFrom(iClass) || classes.contains(iClass))   return;
-  if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && !ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().existsClass(iClass.getSimpleName()))   ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().createClass(iClass.getSimpleName());
+  boolean reloadSchema=false;
+  if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && !ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().existsClass(iClass.getSimpleName())) {
+    ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().createClass(iClass.getSimpleName());
+    reloadSchema=true;
+  }
   for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
     if (!classes.contains(currentClass)) {
       classes.add(currentClass);
@@ -120,16 +124,28 @@
       }
       registerCallbacks(currentClass);
     }
-    String iClassName=iClass.getSimpleName();
+    String iClassName=currentClass.getSimpleName();
     currentClass=currentClass.getSuperclass();
     if (currentClass == null || currentClass.equals(ODocument.class))     currentClass=Object.class;
     if (ODatabaseRecordThreadLocal.INSTANCE.get() != null && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && !currentClass.equals(Object.class)) {
       OClass oSuperClass;
       OClass currentOClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().getClass(iClassName);
-      if (!ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().existsClass(currentClass.getSimpleName()))       oSuperClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().createClass(currentClass.getSimpleName());
- else       oSuperClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().getClass(currentClass.getSimpleName());
-      if (currentOClass.getSuperClass() == null || !currentOClass.getSuperClass().equals(oSuperClass))       currentOClass.setSuperClass(oSuperClass);
+      if (!ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().existsClass(currentClass.getSimpleName())) {
+        oSuperClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().createClass(currentClass.getSimpleName());
+        reloadSchema=true;
+      }
+ else {
+        oSuperClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().getClass(currentClass.getSimpleName());
+        reloadSchema=true;
+      }
+      if (currentOClass.getSuperClass() == null || !currentOClass.getSuperClass().equals(oSuperClass)) {
+        currentOClass.setSuperClass(oSuperClass);
+        reloadSchema=true;
+      }
     }
   }
-  if (ODatabaseRecordThreadLocal.INSTANCE.get() != null && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed())   ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().save();
+  if (ODatabaseRecordThreadLocal.INSTANCE.get() != null && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && reloadSchema) {
+    ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().save();
+    ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().reload();
+  }
 }

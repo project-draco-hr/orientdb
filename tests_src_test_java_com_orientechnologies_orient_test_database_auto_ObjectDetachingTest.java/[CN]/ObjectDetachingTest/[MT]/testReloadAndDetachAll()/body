@@ -1,0 +1,23 @@
+{
+  database=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  Address anAddress=new Address("Godewaersvelde");
+  anAddress=database.save(anAddress);
+  Address realAddress=database.detachAll(anAddress,true);
+  Profile aPerson=new Profile("Jack","Jack","Black",null);
+  aPerson.setLocation(realAddress);
+  aPerson=database.save(aPerson);
+  City aCity=new City("Paris");
+  aCity=database.save(aCity);
+  String command="update " + anAddress.getId() + " set city = "+ database.getIdentity(aCity);
+  database.command(new OCommandSQL(command)).execute();
+  realAddress=database.reload(anAddress,true);
+  Assert.assertNotNull(realAddress.getCity());
+  Profile newPerson=database.reload(aPerson,"*:-1",true);
+  Profile finalPerson=database.detachAll(newPerson,true);
+  Assert.assertNotNull(finalPerson.getLocation().getCity());
+  String query="select from Profile where name = 'Jack' and surname = 'Black'";
+  newPerson=(Profile)database.query(new OSQLSynchQuery<Object>(query),new Object[0]).get(0);
+  finalPerson=database.detachAll(newPerson,true);
+  Assert.assertNotNull(finalPerson.getLocation().getCity());
+  database.close();
+}

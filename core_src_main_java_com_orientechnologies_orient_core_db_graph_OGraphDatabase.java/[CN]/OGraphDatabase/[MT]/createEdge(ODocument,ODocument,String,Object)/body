@@ -13,34 +13,46 @@
  else       throw new IllegalArgumentException("Invalid fields: expecting a pairs of fields as String,Object or a single Map<String,Object>, but found: " + f);
     }
  else     for (int i=0; i < iFields.length; i+=2)     edge.field(iFields[i].toString(),iFields[i + 1]);
-    final Object outField=iOutVertex.field(VERTEX_FIELD_OUT);
-    final OMVRBTreeRIDSet out;
-    if (outField instanceof OMVRBTreeRIDSet) {
-      out=(OMVRBTreeRIDSet)outField;
-    }
- else     if (outField instanceof Collection<?>) {
-      out=new OMVRBTreeRIDSet(iOutVertex,(Collection<OIdentifiable>)outField);
-      iOutVertex.field(VERTEX_FIELD_OUT,out);
-    }
+    if (autoLock)     acquireWriteLock(iOutVertex);
+    try {
+      final Object outField=iOutVertex.field(VERTEX_FIELD_OUT);
+      final OMVRBTreeRIDSet out;
+      if (outField instanceof OMVRBTreeRIDSet) {
+        out=(OMVRBTreeRIDSet)outField;
+      }
+ else       if (outField instanceof Collection<?>) {
+        out=new OMVRBTreeRIDSet(iOutVertex,(Collection<OIdentifiable>)outField);
+        iOutVertex.field(VERTEX_FIELD_OUT,out);
+      }
  else {
-      out=new OMVRBTreeRIDSet(iOutVertex);
-      iOutVertex.field(VERTEX_FIELD_OUT,out);
+        out=new OMVRBTreeRIDSet(iOutVertex);
+        iOutVertex.field(VERTEX_FIELD_OUT,out);
+      }
+      out.add(edge);
     }
-    out.add(edge);
-    final Object inField=iInVertex.field(VERTEX_FIELD_IN);
-    final OMVRBTreeRIDSet in;
-    if (inField instanceof OMVRBTreeRIDSet) {
-      in=(OMVRBTreeRIDSet)inField;
+  finally {
+      if (autoLock)       releaseWriteLock(iOutVertex);
     }
- else     if (inField instanceof Collection<?>) {
-      in=new OMVRBTreeRIDSet(iInVertex,(Collection<OIdentifiable>)inField);
-      iInVertex.field(VERTEX_FIELD_IN,in);
-    }
+    if (autoLock)     acquireWriteLock(iInVertex);
+    try {
+      final Object inField=iInVertex.field(VERTEX_FIELD_IN);
+      final OMVRBTreeRIDSet in;
+      if (inField instanceof OMVRBTreeRIDSet) {
+        in=(OMVRBTreeRIDSet)inField;
+      }
+ else       if (inField instanceof Collection<?>) {
+        in=new OMVRBTreeRIDSet(iInVertex,(Collection<OIdentifiable>)inField);
+        iInVertex.field(VERTEX_FIELD_IN,in);
+      }
  else {
-      in=new OMVRBTreeRIDSet(iInVertex);
-      iInVertex.field(VERTEX_FIELD_IN,in);
+        in=new OMVRBTreeRIDSet(iInVertex);
+        iInVertex.field(VERTEX_FIELD_IN,in);
+      }
+      in.add(edge);
     }
-    in.add(edge);
+  finally {
+      if (autoLock)       releaseWriteLock(iInVertex);
+    }
     edge.setDirty();
     if (safeMode) {
       save(edge);

@@ -3,33 +3,39 @@
   try {
     ODocument otherVertex;
     Set<ODocument> otherEdges;
-    Set<ODocument> edges=iVertex.field(VERTEX_FIELD_OUT);
-    if (edges != null) {
-      for (      ODocument edge : edges) {
-        if (edge != null) {
-          otherVertex=edge.field(EDGE_FIELD_IN);
-          if (otherVertex != null) {
-            otherEdges=otherVertex.field(VERTEX_FIELD_IN);
-            if (otherEdges != null && otherEdges.remove(edge))             save(otherVertex);
+    if (autoLock)     acquireWriteLock(iVertex);
+    try {
+      Set<ODocument> edges=iVertex.field(VERTEX_FIELD_OUT);
+      if (edges != null) {
+        for (        ODocument edge : edges) {
+          if (edge != null) {
+            otherVertex=edge.field(EDGE_FIELD_IN);
+            if (otherVertex != null) {
+              otherEdges=otherVertex.field(VERTEX_FIELD_IN);
+              if (otherEdges != null && otherEdges.remove(edge))               save(otherVertex);
+            }
+            delete(edge);
           }
-          delete(edge);
         }
       }
-    }
-    edges=iVertex.field(VERTEX_FIELD_IN);
-    if (edges != null) {
-      for (      ODocument edge : edges) {
-        if (edge != null) {
-          otherVertex=edge.field(EDGE_FIELD_OUT);
-          if (otherVertex != null) {
-            otherEdges=otherVertex.field(VERTEX_FIELD_OUT);
-            if (otherEdges != null && otherEdges.remove(edge))             save(otherVertex);
+      edges=iVertex.field(VERTEX_FIELD_IN);
+      if (edges != null) {
+        for (        ODocument edge : edges) {
+          if (edge != null) {
+            otherVertex=edge.field(EDGE_FIELD_OUT);
+            if (otherVertex != null) {
+              otherEdges=otherVertex.field(VERTEX_FIELD_OUT);
+              if (otherEdges != null && otherEdges.remove(edge))               save(otherVertex);
+            }
+            delete(edge);
           }
-          delete(edge);
         }
       }
+      delete(iVertex);
     }
-    delete(iVertex);
+  finally {
+      if (autoLock)       releaseWriteLock(iVertex);
+    }
     commitBlock(safeMode);
   }
  catch (  RuntimeException e) {

@@ -5,18 +5,30 @@
   final boolean safeMode=beginBlock();
   try {
     final ODocument outVertex=edge.field(EDGE_FIELD_OUT);
-    if (outVertex != null) {
-      final Set<ODocument> out=((Set<ODocument>)outVertex.field(VERTEX_FIELD_OUT));
-      if (out != null)       out.remove(edge);
+    if (autoLock)     acquireWriteLock(outVertex);
+    try {
+      if (outVertex != null) {
+        final Set<ODocument> out=((Set<ODocument>)outVertex.field(VERTEX_FIELD_OUT));
+        if (out != null)         out.remove(edge);
+        save(outVertex);
+      }
+    }
+  finally {
+      if (autoLock)       releaseWriteLock(outVertex);
     }
     final ODocument inVertex=edge.field(EDGE_FIELD_IN);
-    if (inVertex != null) {
-      final Set<ODocument> in=((Set<ODocument>)inVertex.field(VERTEX_FIELD_IN));
-      if (in != null)       in.remove(edge);
+    if (autoLock)     acquireWriteLock(inVertex);
+    try {
+      if (inVertex != null) {
+        final Set<ODocument> in=((Set<ODocument>)inVertex.field(VERTEX_FIELD_IN));
+        if (in != null)         in.remove(edge);
+        save(inVertex);
+      }
+    }
+  finally {
+      if (autoLock)       releaseWriteLock(inVertex);
     }
     delete(edge);
-    if (outVertex != null)     save(outVertex);
-    if (inVertex != null)     save(inVertex);
     commitBlock(safeMode);
   }
  catch (  RuntimeException e) {

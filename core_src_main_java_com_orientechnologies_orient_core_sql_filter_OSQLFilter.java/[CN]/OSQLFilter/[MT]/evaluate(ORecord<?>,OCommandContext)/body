@@ -3,7 +3,15 @@
     for (    Entry<String,String> entry : let.entrySet()) {
       String varName=entry.getKey();
       if (varName.startsWith("$"))       varName=varName.substring(1);
-      context.setVariable(varName,ODocumentHelper.getFieldValue(iRecord,entry.getValue()));
+      Object varValue;
+      final String varValueAsString=entry.getValue().trim();
+      if (varValueAsString.startsWith("(")) {
+        final OSQLSynchQuery<Object> subQuery=new OSQLSynchQuery<Object>(varValueAsString.substring(1,varValueAsString.length() - 1));
+        subQuery.setContext(context);
+        varValue=ODatabaseRecordThreadLocal.INSTANCE.get().query(subQuery);
+      }
+ else       varValue=ODocumentHelper.getFieldValue(iRecord,varValueAsString);
+      context.setVariable(varName,varValue);
     }
   }
   if (rootCondition == null)   return true;

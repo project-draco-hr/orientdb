@@ -2,10 +2,16 @@
   if (clazz == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   ODatabaseRecord database=getDatabase();
   if (!(database instanceof OGraphDatabase))   database=new OGraphDatabase((ODatabaseRecordTx)database);
-  final ORecordId fromId=new ORecordId(from);
-  final ORecordId toId=new ORecordId(to);
-  final ODocument edge=((OGraphDatabase)database).createEdge(fromId,toId,clazz.getName());
-  OSQLHelper.bindParameters(edge,fields,new OCommandParameters(iArgs));
-  edge.save(clusterName);
-  return edge;
+  final ORecordId[] fromIds=parseTarget(database,from);
+  final ORecordId[] toIds=parseTarget(database,to);
+  List<ODocument> edges=new ArrayList<ODocument>();
+  for (  ORecordId from : fromIds) {
+    for (    ORecordId to : toIds) {
+      final ODocument edge=((OGraphDatabase)database).createEdge(from,to,clazz.getName());
+      OSQLHelper.bindParameters(edge,fields,new OCommandParameters(iArgs));
+      edge.save(clusterName);
+      edges.add(edge);
+    }
+  }
+  return edges;
 }

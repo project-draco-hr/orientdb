@@ -1,0 +1,87 @@
+{
+  iRequest.data.commandInfo="Get static content";
+  iRequest.data.commandDetail=iRequest.url;
+  if (filePath == null && rootPath == null) {
+    rootPath=iRequest.configuration.getValueAsString("orientdb.www.path","src/site");
+    if (rootPath == null) {
+      OLogManager.instance().warn(this,"No path configured. Specify the 'root.path', 'file.path' or the global 'orientdb.www.path' variable",rootPath);
+      return false;
+    }
+  }
+  if (filePath == null) {
+    final File wwwPathDirectory=new File(rootPath);
+    if (!wwwPathDirectory.exists())     OLogManager.instance().warn(this,"path variable points to '%s' but it doesn't exists",rootPath);
+    if (!wwwPathDirectory.isDirectory())     OLogManager.instance().warn(this,"path variable points to '%s' but it isn't a directory",rootPath);
+  }
+  if (cacheContents == null && OGlobalConfiguration.SERVER_CACHE_FILE_STATIC.getValueAsBoolean())   cacheContents=new HashMap<String,OStaticContentCachedEntry>();
+  InputStream is=null;
+  long contentSize=0;
+  String type=null;
+  try {
+    String path;
+    if (filePath != null)     path=filePath;
+ else {
+      final String url=getResource(iRequest);
+      if (url.startsWith("/www"))       path=rootPath + url.substring("/www".length(),url.length());
+ else       path=rootPath + url;
+    }
+    if (cacheContents != null) {
+synchronized (cacheContents) {
+        final OStaticContentCachedEntry cachedEntry=cacheContents.get(path);
+        if (cachedEntry != null) {
+          is=new ByteArrayInputStream(cachedEntry.content);
+          contentSize=cachedEntry.size;
+          type=cachedEntry.type;
+        }
+      }
+    }
+    if (is == null) {
+      File inputFile=new File(path);
+      if (!inputFile.exists()) {
+        OLogManager.instance().debug(this,"Static resource not found: %s",path);
+        iResponse.sendBinaryContent(iRequest,404,"File not found",null,null,0);
+        return false;
+      }
+      if (filePath == null && inputFile.isDirectory()) {
+        inputFile=new File(path + "/index.htm");
+        if (inputFile.exists())         path=path + "/index.htm";
+ else {
+          inputFile=new File(path + "/index.html");
+          if (inputFile.exists())           path=path + "/index.html";
+        }
+      }
+      if (path.endsWith(".htm") || path.endsWith(".html"))       type="text/html";
+ else       if (path.endsWith(".png"))       type="image/png";
+ else       if (path.endsWith(".jpeg"))       type="image/jpeg";
+ else       if (path.endsWith(".js"))       type="application/x-javascript";
+ else       if (path.endsWith(".css"))       type="text/css";
+ else       if (path.endsWith(".ico"))       type="image/x-icon";
+ else       if (path.endsWith(".otf"))       type="font/opentype";
+ else       type="text/plain";
+      is=new BufferedInputStream(new FileInputStream(inputFile));
+      contentSize=inputFile.length();
+      if (cacheContents != null) {
+        final byte[] buffer=new byte[(int)contentSize];
+        for (int i=0; i < contentSize; ++i)         buffer[i]=(byte)is.read();
+        OStaticContentCachedEntry cachedEntry=new OStaticContentCachedEntry();
+        cachedEntry.content=buffer;
+        cachedEntry.size=contentSize;
+        cachedEntry.type=type;
+        cacheContents.put(path,cachedEntry);
+        is=new ByteArrayInputStream(cachedEntry.content);
+      }
+    }
+    iResponse.sendBinaryContent(iRequest,OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,type,is,contentSize);
+  }
+ catch (  IOException e) {
+    e.printStackTrace();
+  }
+ finally {
+    if (is != null)     try {
+      is.close();
+    }
+ catch (    IOException e) {
+    }
+  }
+  return false;
+}

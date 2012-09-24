@@ -1,0 +1,36 @@
+{
+  ODatabaseDocumentTx db=null;
+  try {
+    final String[] urlParts=checkSyntax(iRequest.url,3,"Syntax error: studio/<database>/<context>");
+    db=getProfiledDatabaseInstance(iRequest);
+    final String req=iRequest.content;
+    String operation=null;
+    String rid=null;
+    String className=null;
+    final Map<String,String> fields=new HashMap<String,String>();
+    final String[] params=req.split("&");
+    String value;
+    for (    String p : params) {
+      String[] pairs=p.split("=");
+      value=pairs.length == 1 ? null : pairs[1];
+      if ("oper".equals(pairs[0]))       operation=value;
+ else       if ("0".equals(pairs[0]))       rid=value;
+ else       if ("1".equals(pairs[0]))       className=value;
+ else       if (pairs[0].startsWith(ODocumentHelper.ATTRIBUTE_CLASS))       className=value;
+ else       if (pairs[0].startsWith("@") || pairs[0].equals("id"))       continue;
+ else {
+        fields.put(pairs[0],value);
+      }
+    }
+    String context=urlParts[2];
+    if ("document".equals(context))     executeDocument(iRequest,iResponse,db,operation,rid,className,fields);
+ else     if ("classes".equals(context))     executeClasses(iRequest,iResponse,db,operation,rid,className,fields);
+ else     if ("clusters".equals(context))     executeClusters(iRequest,iResponse,db,operation,rid,className,fields);
+ else     if ("classProperties".equals(context))     executeClassProperties(iRequest,iResponse,db,operation,rid,className,fields);
+ else     if ("classIndexes".equals(context))     executeClassIndexes(iRequest,iResponse,db,operation,rid,className,fields);
+  }
+  finally {
+    if (db != null)     OSharedDocumentDatabase.release(db);
+  }
+  return false;
+}

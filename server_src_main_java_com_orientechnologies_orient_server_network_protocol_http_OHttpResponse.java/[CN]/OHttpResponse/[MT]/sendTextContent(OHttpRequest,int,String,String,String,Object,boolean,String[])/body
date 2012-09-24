@@ -1,0 +1,25 @@
+{
+  final String content;
+  final String contentType;
+  if ((iRequest.parameters != null) && iRequest.parameters.containsKey(OHttpUtils.CALLBACK_PARAMETER_NAME)) {
+    final String callbackFunction=iRequest.parameters.get(OHttpUtils.CALLBACK_PARAMETER_NAME);
+    content=callbackFunction + "(" + iContent+ ")";
+    contentType="text/javascript";
+  }
+ else {
+    content=iContent != null ? iContent.toString() : null;
+    contentType=iContentType;
+  }
+  final boolean empty=content == null || content.length() == 0;
+  sendStatus(iRequest,empty && iCode == 200 ? 204 : iCode,iReason);
+  sendResponseHeaders(iRequest,contentType,iKeepAlive);
+  if (iAdditionalHeaders != null)   for (  String h : iAdditionalHeaders)   writeLine(iRequest,h);
+  if (iHeaders != null)   writeLine(iRequest,iHeaders);
+  final String sessId=iRequest.sessionId != null ? iRequest.sessionId : "-";
+  writeLine(iRequest,"Set-Cookie: " + OHttpUtils.OSESSIONID + "="+ sessId+ "; Path=/; HttpOnly");
+  final byte[] binaryContent=empty ? null : OBinaryProtocol.string2bytes(content);
+  writeLine(iRequest,OHttpUtils.HEADER_CONTENT_LENGTH + (empty ? 0 : binaryContent.length));
+  writeLine(iRequest,null);
+  if (binaryContent != null)   out.write(binaryContent);
+  out.flush();
+}

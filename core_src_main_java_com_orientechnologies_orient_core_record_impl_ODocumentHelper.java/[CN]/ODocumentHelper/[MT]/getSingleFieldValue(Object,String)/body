@@ -78,22 +78,8 @@
           if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
           final List<Object> values=new ArrayList<Object>();
           for (          Object v : OMultiValue.getMultiValueIterable(value)) {
-            if (v instanceof ODocument) {
-              final ODocument doc=(ODocument)v;
-              Object fieldValue=doc.field(conditionFieldName);
-              fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
-              if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
-                values.add(doc);
-              }
-            }
- else             if (v instanceof Map<?,?>) {
-              final Map<String,?> map=(Map<String,?>)v;
-              Object fieldValue=getMapEntry(map,conditionFieldName);
-              fieldValue=OType.convert(fieldValue,conditionFieldValue.getClass());
-              if (fieldValue != null && fieldValue.equals(conditionFieldValue)) {
-                values.add(map);
-              }
-            }
+            Object filtered=filterItem(conditionFieldName,conditionFieldValue,v);
+            if (filtered != null)             values.add(filtered);
           }
           if (values.isEmpty())           value=null;
  else           if (values.size() == 1)           value=values.get(0);
@@ -104,7 +90,14 @@
  else {
       if (fieldName.contains("("))       value=evaluateFunction(value,fieldName);
  else {
-        if (currentRecord != null) {
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(fieldName,'=',' ');
+        if (indexCondition.size() == 2) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          value=filterItem(conditionFieldName,conditionFieldValue,value);
+        }
+ else         if (currentRecord != null) {
           value=getIdentifiableValue(currentRecord,fieldName);
           if (value != null && value instanceof ORecord<?> && ((ORecord<?>)value).getInternalStatus() == STATUS.NOT_LOADED)           ((ORecord<?>)value).reload();
         }

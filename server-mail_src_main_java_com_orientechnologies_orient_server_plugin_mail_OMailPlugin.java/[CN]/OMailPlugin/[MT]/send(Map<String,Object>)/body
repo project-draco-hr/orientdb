@@ -1,0 +1,32 @@
+{
+  final String profileName=(String)iConfiguration.get("profile");
+  OMailProfile profile=profiles.get(profileName);
+  if (profile == null)   throw new IllegalArgumentException("Mail profile '" + profileName + "' is not configured on server");
+  final Properties prop=profile.properties;
+  Authenticator auth=new OSMTPAuthenticator((String)prop.get("mail.smtp.user"),(String)prop.get("mail.smtp.password"));
+  Session session=Session.getInstance(prop,auth);
+  MimeMessage msg=new MimeMessage(session);
+  msg.setFrom(new InternetAddress((String)prop.get("mail.smtp.user")));
+  InternetAddress[] toAddresses={new InternetAddress((String)iConfiguration.get("to"))};
+  msg.setRecipients(Message.RecipientType.TO,toAddresses);
+  InternetAddress[] ccAddresses={new InternetAddress((String)iConfiguration.get("cc"))};
+  msg.setRecipients(Message.RecipientType.CC,ccAddresses);
+  InternetAddress[] bccAddresses={new InternetAddress((String)iConfiguration.get("bcc"))};
+  msg.setRecipients(Message.RecipientType.BCC,bccAddresses);
+  msg.setSubject((String)iConfiguration.get("subject"));
+  Date sendDate=(Date)iConfiguration.get("date");
+  if (sendDate == null)   sendDate=new Date();
+  msg.setSentDate(sendDate);
+  MimeBodyPart messageBodyPart=new MimeBodyPart();
+  messageBodyPart.setContent(iConfiguration.get("message"),"text/html");
+  Multipart multipart=new MimeMultipart();
+  multipart.addBodyPart(messageBodyPart);
+  final String[] attachments=(String[])iConfiguration.get("attachments");
+  if (attachments != null && attachments.length > 0) {
+    for (    String filePath : attachments) {
+      addAttachment(multipart,filePath);
+    }
+  }
+  msg.setContent(multipart);
+  Transport.send(msg);
+}

@@ -2,15 +2,18 @@
   final String language=request.getLanguage();
   parserText=request.getText();
   final ODatabaseRecordTx db=(ODatabaseRecordTx)getDatabase();
+  final OScriptManager scriptManager=Orient.instance().getScriptManager();
+  final ScriptEngine scriptEngine=scriptManager.getEngine(language);
+  final Bindings binding=scriptManager.bind(scriptEngine,db,iContext,iArgs);
   try {
-    final OScriptManager scriptManager=Orient.instance().getScriptManager();
-    final ScriptEngine scriptEngine=scriptManager.getEngine(language);
-    final Bindings binding=scriptManager.createBinding(scriptEngine,db,iContext,iArgs);
     parserText=scriptManager.getLibrary(db,language) + parserText;
     scriptEngine.eval(parserText);
     return scriptEngine.eval(parserText,binding);
   }
  catch (  ScriptException e) {
     throw new OCommandScriptException("Error on execution of the script",request.getText(),e.getColumnNumber(),e);
+  }
+ finally {
+    scriptManager.unbind(binding);
   }
 }

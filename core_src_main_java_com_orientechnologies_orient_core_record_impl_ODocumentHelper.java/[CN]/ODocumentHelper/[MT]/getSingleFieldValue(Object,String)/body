@@ -32,13 +32,21 @@
       if (value instanceof OIdentifiable) {
         final ORecord<?> record=currentRecord != null && currentRecord instanceof OIdentifiable ? ((OIdentifiable)currentRecord).getRecord() : null;
         final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
-        if (indexParts.size() == 1)         value=((ODocument)record).field(index);
- else {
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=',' ');
+        if (indexParts.size() == 1 && indexCondition.size() == 1)         value=((ODocument)record).field(index);
+ else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
             values[i]=((ODocument)record).field(indexParts.get(i));
           }
           value=values;
+        }
+ else         if (!indexCondition.isEmpty()) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          final Object fieldValue=getFieldValue(currentRecord,conditionFieldName);
+          if (fieldValue == null && !conditionFieldValue.equals("null") || fieldValue != null & !fieldValue.equals(conditionFieldValue))           value=null;
         }
       }
  else       if (value instanceof Map<?,?>) {

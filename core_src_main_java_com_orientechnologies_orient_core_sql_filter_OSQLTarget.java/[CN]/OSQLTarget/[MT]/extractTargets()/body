@@ -1,0 +1,55 @@
+{
+  parserSkipWhiteSpaces();
+  if (parserIsEnded())   throw new OQueryParsingException("No query target found",parserText,0);
+  final char c=parserGetCurrentChar();
+  if (c == '$') {
+    targetVariable=parserRequiredWord(true,"No valid target");
+    targetVariable=targetVariable.substring(1);
+  }
+ else   if (c == '#' || Character.isDigit(c)) {
+    targetRecords=new ArrayList<OIdentifiable>();
+    ((List<OIdentifiable>)targetRecords).add(new ORecordId(parserRequiredWord(true,"No valid RID")));
+  }
+ else   if (c == '(') {
+    final StringBuilder subText=new StringBuilder();
+    parserSetCurrentPosition(OStringSerializerHelper.getEmbedded(parserText,parserGetCurrentPosition(),-1,subText) + 1);
+    final OCommandSQL subCommand=new OCommandSQLResultset(subText.toString());
+    final OCommandExecutor executor=OCommandManager.instance().getExecutor(subCommand);
+    executor.setProgressListener(subCommand.getProgressListener());
+    executor.parse(subCommand);
+    context.setChild(executor.getContext());
+    if (!(executor instanceof Iterable<?>))     throw new OCommandSQLParsingException("Sub-query cannot be iterated because doesn't implement the Iterable interface: " + subCommand);
+    targetRecords=(Iterable<? extends OIdentifiable>)executor;
+  }
+ else   if (c == OStringSerializerHelper.COLLECTION_BEGIN) {
+    final List<String> rids=new ArrayList<String>();
+    parserSetCurrentPosition(OStringSerializerHelper.getCollection(parserText,parserGetCurrentPosition(),rids));
+    targetRecords=new ArrayList<OIdentifiable>();
+    for (    String rid : rids)     ((List<OIdentifiable>)targetRecords).add(new ORecordId(rid));
+    parserMoveCurrentPosition(1);
+  }
+ else {
+    while (!parserIsEnded() && (targetClasses == null && targetClusters == null && targetIndex == null)) {
+      String subjectName=parserRequiredWord(true,"Target not found");
+      final String alias;
+      if (subjectName.equals("AS"))       alias=parserRequiredWord(true,"Alias not found");
+ else       alias=subjectName;
+      final String subjectToMatch=subjectName;
+      if (subjectToMatch.startsWith(OCommandExecutorSQLAbstract.CLUSTER_PREFIX)) {
+        if (targetClusters == null)         targetClusters=new HashMap<String,String>();
+        targetClusters.put(subjectName.substring(OCommandExecutorSQLAbstract.CLUSTER_PREFIX.length()),alias);
+      }
+ else       if (subjectToMatch.startsWith(OCommandExecutorSQLAbstract.INDEX_PREFIX)) {
+        targetIndex=subjectName.substring(OCommandExecutorSQLAbstract.INDEX_PREFIX.length());
+      }
+ else {
+        if (subjectToMatch.startsWith(OCommandExecutorSQLAbstract.CLASS_PREFIX))         subjectName=subjectName.substring(OCommandExecutorSQLAbstract.CLASS_PREFIX.length());
+        if (targetClasses == null)         targetClasses=new HashMap<OClass,String>();
+        final OClass cls=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().getClass(subjectName);
+        if (cls == null)         throw new OCommandExecutionException("Class '" + subjectName + "' was not found in current database");
+        targetClasses.put(cls,alias);
+      }
+    }
+  }
+  return !parserIsEnded();
+}

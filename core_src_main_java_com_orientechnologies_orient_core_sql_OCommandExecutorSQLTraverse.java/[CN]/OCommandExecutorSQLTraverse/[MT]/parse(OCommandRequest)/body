@@ -5,10 +5,19 @@
   int endPosition=parserText.length();
   int endP=parserTextUpperCase.indexOf(" " + OCommandExecutorSQLTraverse.KEYWORD_LIMIT,parserGetCurrentPosition());
   if (endP > -1 && endP < endPosition)   endPosition=endP;
-  compiledFilter=OSQLEngine.getInstance().parseFromWhereCondition(parserText.substring(pos,endPosition),context,KEYWORD_WHILE);
-  traverse.predicate(compiledFilter);
-  optimize();
-  parserSetCurrentPosition(compiledFilter.parserIsEnded() ? endPosition : compiledFilter.parserGetCurrentPosition() + pos);
+  parsedTarget=OSQLEngine.getInstance().parseTarget(parserText.substring(pos,endPosition),getContext(),KEYWORD_WHILE);
+  if (!parsedTarget.parserIsEnded()) {
+    parserSetCurrentPosition(parsedTarget.parserGetCurrentPosition() + pos + 1);
+    parserNextWord(true);
+    if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE))     warnDeprecatedWhere();
+    if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE) || parserGetLastWord().equalsIgnoreCase(KEYWORD_WHILE)) {
+      compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition(),endPosition),getContext(),KEYWORD_WHILE);
+      traverse.predicate(compiledFilter);
+      optimize();
+      parserSetCurrentPosition(compiledFilter.parserIsEnded() ? endPosition : compiledFilter.parserGetCurrentPosition() + parserGetCurrentPosition());
+    }
+  }
+ else   parserSetCurrentPosition(-1);
   parserSkipWhiteSpaces();
   if (!parserIsEnded()) {
     if (parserOptionalKeyword(KEYWORD_LIMIT,KEYWORD_SKIP)) {
@@ -19,6 +28,6 @@
   }
   if (limit == 0 || limit < -1)   throw new IllegalArgumentException("Limit must be > 0 or = -1 (no limit)");
  else   traverse.limit(limit);
-  traverse.context(((OCommandRequestText)iRequest).getContext());
+  ((OCommandRequestText)iRequest).getContext().setChild(traverse.getContext());
   return this;
 }

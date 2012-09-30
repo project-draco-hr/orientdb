@@ -1,11 +1,15 @@
 {
-  if (!OHookThreadLocal.INSTANCE.push(id))   return false;
+  if (!OHookThreadLocal.INSTANCE.push(id))   return RESULT.RECORD_NOT_CHANGED;
   try {
     final ORecord<?> rec=id.getRecord();
-    if (rec == null)     return false;
+    if (rec == null)     return RESULT.RECORD_NOT_CHANGED;
     boolean recordChanged=false;
-    for (    ORecordHook hook : hooks)     if (hook.onTrigger(iType,rec))     recordChanged=true;
-    return recordChanged;
+    for (    ORecordHook hook : hooks) {
+      final RESULT res=hook.onTrigger(iType,rec);
+      if (res == RESULT.RECORD_CHANGED)       recordChanged=true;
+ else       if (res == RESULT.SKIP)       return res;
+    }
+    return recordChanged ? RESULT.RECORD_CHANGED : RESULT.RECORD_NOT_CHANGED;
   }
   finally {
     OHookThreadLocal.INSTANCE.pop(id);

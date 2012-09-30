@@ -1,12 +1,16 @@
 {
   final ODatabaseRecord database=getDatabase();
+  OClass identityClass=database.getMetadata().getSchema().getClass("OIdentity");
+  if (identityClass == null)   identityClass=database.getMetadata().getSchema().createAbstractClass("OIdentity");
   OClass roleClass=database.getMetadata().getSchema().getClass("ORole");
-  if (roleClass == null)   roleClass=database.getMetadata().getSchema().createClass("ORole");
+  if (roleClass == null)   roleClass=database.getMetadata().getSchema().createClass("ORole",identityClass);
+ else   if (roleClass.getSuperClass() == null)   roleClass.setSuperClass(identityClass);
   if (!roleClass.existsProperty("name"))   roleClass.createProperty("name",OType.STRING).setMandatory(true).setNotNull(true);
   if (!roleClass.existsProperty("mode"))   roleClass.createProperty("mode",OType.BYTE);
   if (!roleClass.existsProperty("rules"))   roleClass.createProperty("rules",OType.EMBEDDEDMAP,OType.BYTE);
   OClass userClass=database.getMetadata().getSchema().getClass("OUser");
-  if (userClass == null)   userClass=database.getMetadata().getSchema().createClass("OUser");
+  if (userClass == null)   userClass=database.getMetadata().getSchema().createClass("OUser",identityClass);
+ else   if (userClass.getSuperClass() == null)   userClass.setSuperClass(identityClass);
   if (!userClass.existsProperty("name"))   userClass.createProperty("name",OType.STRING).setMandatory(true).setNotNull(true);
   if (!userClass.existsProperty("password"))   userClass.createProperty("password",OType.STRING).setMandatory(true).setNotNull(true);
   if (!userClass.existsProperty("roles"))   userClass.createProperty("roles",OType.LINKSET,roleClass);
@@ -14,5 +18,8 @@
   if (adminRole == null)   adminRole=createRole(ORole.ADMIN,ORole.ALLOW_MODES.ALLOW_ALL_BUT);
   OUser adminUser=getUser(OUser.ADMIN);
   if (adminUser == null)   adminUser=createUser(OUser.ADMIN,OUser.ADMIN,new String[]{adminRole.getName()});
+  OClass restrictedClass=database.getMetadata().getSchema().getClass(RESTRICTED_CLASSNAME);
+  if (restrictedClass == null)   restrictedClass=database.getMetadata().getSchema().createClass(RESTRICTED_CLASSNAME);
+  if (!restrictedClass.existsProperty(ALLOW_FIELD))   restrictedClass.createProperty(ALLOW_FIELD,OType.LINKSET,database.getMetadata().getSchema().getClass("OIdentity"));
   return adminUser;
 }

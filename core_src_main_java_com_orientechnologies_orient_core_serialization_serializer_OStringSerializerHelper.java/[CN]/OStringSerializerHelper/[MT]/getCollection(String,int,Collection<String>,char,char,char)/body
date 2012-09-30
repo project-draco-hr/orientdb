@@ -2,15 +2,13 @@
   final StringBuilder buffer=new StringBuilder();
   int openPos=iText.indexOf(iCollectionBegin,iStartPosition);
   if (openPos == -1)   return -1;
+  boolean escape=false;
   int currentPos, deep;
+  int maxPos=iText.length() - 1;
   for (currentPos=openPos + 1, deep=1; deep > 0; currentPos++) {
-    if (currentPos >= iText.length()) {
-      return -1;
-    }
+    if (currentPos > maxPos)     return -1;
     char c=iText.charAt(currentPos);
-    if (buffer.length() == 0 && c == ' ') {
-      continue;
-    }
+    if (buffer.length() == 0 && c == ' ')     continue;
     if (c == iCollectionBegin) {
       buffer.append(c);
       deep++;
@@ -28,7 +26,33 @@
         buffer.setLength(0);
       }
     }
- else     buffer.append(c);
+ else {
+      if (!escape && c == '\\' && (currentPos + 1 <= maxPos)) {
+        final char nextChar=iText.charAt(currentPos + 1);
+        if (nextChar == 'u') {
+          currentPos=OStringParser.readUnicode(iText,currentPos + 2,buffer);
+        }
+ else         if (nextChar == 'n') {
+          buffer.append("\n");
+          currentPos++;
+        }
+ else         if (nextChar == 'r') {
+          buffer.append("\r");
+          currentPos++;
+        }
+ else         if (nextChar == 't') {
+          buffer.append("\t");
+          currentPos++;
+        }
+ else         if (nextChar == 'f') {
+          buffer.append("\f");
+          currentPos++;
+        }
+ else         escape=true;
+        continue;
+      }
+      buffer.append(c);
+    }
   }
   if (buffer.length() > 0)   iCollection.add(buffer.toString().trim());
   return --currentPos;

@@ -1,13 +1,23 @@
 {
   final OClass cls=iDocument.getSchemaClass();
   if (cls != null && cls.isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME)) {
-    Set<OIdentifiable> allowed=iDocument.field(OSecurityShared.ALLOW_ALL_FIELD);
-    if (allowed == null) {
-      allowed=new HashSet<OIdentifiable>();
-      iDocument.field(OSecurityShared.ALLOW_ALL_FIELD,allowed);
+    String fieldNames=((OClassImpl)cls).getCustom(OSecurityShared.ONCREATE_FIELD);
+    if (fieldNames == null)     fieldNames=OSecurityShared.ALLOW_ALL_FIELD;
+    final String[] fields=fieldNames.split(",");
+    String identityType=((OClassImpl)cls).getCustom(OSecurityShared.ONCREATE_IDENTITY_TYPE);
+    if (identityType == null)     identityType="user";
+    final ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    ODocument identity=null;
+    if (identityType.equals("user"))     identity=db.getUser().getDocument();
+ else     if (identityType.equals("role")) {
+      final Set<ORole> roles=db.getUser().getRoles();
+      if (!roles.isEmpty())       identity=roles.iterator().next().getDocument();
     }
-    allowed.add(ODatabaseRecordThreadLocal.INSTANCE.get().getUser().getDocument().getIdentity());
-    return RESULT.RECORD_CHANGED;
+ else     throw new OConfigurationException("Wrong custom field '" + OSecurityShared.ONCREATE_IDENTITY_TYPE + "' in class '"+ cls.getName()+ "' with value '"+ identityType+ "'. Supported ones are: 'user', 'role'");
+    if (identity != null) {
+      for (      String f : fields)       db.getMetadata().getSecurity().allowIdentity(iDocument,f,identity);
+      return RESULT.RECORD_CHANGED;
+    }
   }
   return RESULT.RECORD_NOT_CHANGED;
 }

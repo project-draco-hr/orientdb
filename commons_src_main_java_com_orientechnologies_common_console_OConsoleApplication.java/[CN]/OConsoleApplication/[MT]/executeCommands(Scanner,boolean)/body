@@ -1,9 +1,31 @@
 {
-  iScanner.useDelimiter(";");
+  final StringBuilder commandBuffer=new StringBuilder();
   try {
+    String commandLine=null;
+    iScanner.useDelimiter(commandSeparator);
     while (iScanner.hasNext()) {
-      String commandLine=iScanner.next();
-      final RESULT status=execute(commandLine);
+      commandLine=iScanner.next().trim();
+      if (commandLine.startsWith("js")) {
+        commandBuffer.append(commandLine);
+        commandLine=null;
+      }
+ else       if (commandLine.startsWith("end") && commandBuffer.length() > 0) {
+        commandLine=commandBuffer.toString();
+        commandBuffer.setLength(0);
+      }
+ else       if (commandBuffer.length() > 0) {
+        commandBuffer.append(';');
+        commandBuffer.append(commandLine);
+        commandLine=null;
+      }
+      if (commandLine != null) {
+        final RESULT status=execute(commandLine);
+        commandLine=null;
+        if (status == RESULT.EXIT || status == RESULT.ERROR && iExitOnException)         return false;
+      }
+    }
+    if (commandBuffer.length() > 0) {
+      final RESULT status=execute(commandBuffer.toString());
       if (status == RESULT.EXIT || status == RESULT.ERROR && iExitOnException)       return false;
     }
   }

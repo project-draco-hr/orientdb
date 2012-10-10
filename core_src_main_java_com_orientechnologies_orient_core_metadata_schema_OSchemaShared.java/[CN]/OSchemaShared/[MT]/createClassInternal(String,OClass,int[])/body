@@ -2,8 +2,9 @@
   if (iClassName == null || iClassName.length() == 0)   throw new OSchemaException("Found class name null");
   final Character wrongCharacter=checkNameIfValid(iClassName);
   if (wrongCharacter != null)   throw new OSchemaException("Found invalid class name. Character '" + wrongCharacter + "' cannot be used in class name.");
-  if (iClusterIds == null || iClusterIds.length == 0)   iClusterIds=new int[]{getDatabase().addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName,null,null)};
-  getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+  final ODatabaseRecord database=getDatabase();
+  if (iClusterIds == null || iClusterIds.length == 0)   iClusterIds=new int[]{database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName,null,null)};
+  database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
   final String key=iClassName.toLowerCase();
   lock.acquireExclusiveLock();
   try {
@@ -11,7 +12,13 @@
     final OClassImpl cls=new OClassImpl(this,iClassName,iClusterIds);
     classes.put(key,cls);
     if (cls.getShortName() != null)     classes.put(cls.getShortName().toLowerCase(),cls);
-    if (iSuperClass != null)     cls.setSuperClassInternal(iSuperClass);
+    if (iSuperClass != null) {
+      cls.setSuperClassInternal(iSuperClass);
+      final int[] clustersToIndex=iSuperClass.getPolymorphicClusterIds();
+      final String[] clusterNames=new String[clustersToIndex.length];
+      for (int i=0; i < clustersToIndex.length; i++)       clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
+      for (      OIndex<?> index : iSuperClass.getIndexes())       for (      String clusterName : clusterNames)       index.getInternal().addCluster(clusterName);
+    }
     return cls;
   }
   finally {

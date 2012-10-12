@@ -1,19 +1,22 @@
 {
-  if (from == null && to == null && rid == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  ODatabaseRecord database=getDatabase();
+  if (from == null && to == null && rid == null && query == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  database=getDatabase();
   if (!(database instanceof OGraphDatabase))   database=new OGraphDatabase((ODatabaseRecordTx)database);
-  final int removed;
   if (rid != null) {
     if (((OGraphDatabase)database).removeEdge(rid))     removed=1;
- else     removed=0;
   }
  else {
     final Set<OIdentifiable> edges;
-    if (from != null && to != null)     edges=((OGraphDatabase)database).getEdgesBetweenVertexes(from,to);
- else     if (from != null)     edges=new HashSet<OIdentifiable>(((OGraphDatabase)database).getOutEdges(from));
- else     edges=new HashSet<OIdentifiable>(((OGraphDatabase)database).getInEdges(to));
-    removed=edges.size();
-    for (    OIdentifiable edge : edges)     ((OGraphDatabase)database).removeEdge(edge);
+    if (query == null) {
+      if (from != null && to != null)       edges=((OGraphDatabase)database).getEdgesBetweenVertexes(from,to);
+ else       if (from != null)       edges=new HashSet<OIdentifiable>(((OGraphDatabase)database).getOutEdges(from));
+ else       if (to != null)       edges=new HashSet<OIdentifiable>(((OGraphDatabase)database).getInEdges(to));
+ else       throw new OCommandExecutionException("Invalid target");
+      removed=edges.size();
+      for (      OIdentifiable edge : edges)       ((OGraphDatabase)database).removeEdge(edge);
+    }
+ else     if (query != null)     query.execute(iArgs);
+ else     throw new OCommandExecutionException("Invalid target");
   }
   return removed;
 }

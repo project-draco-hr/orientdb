@@ -16,8 +16,13 @@
  else       instance=new OIndexManagerShared(database);
       if (iLoad)       instance.load();
       if (iLoad && OGlobalConfiguration.INDEX_AUTO_REBUILD_AFTER_NOTSOFTCLOSE.getValueAsBoolean() && (database.getStorage() instanceof OStorageLocal)&& !((OStorageLocal)database.getStorage()).isClusterSoftlyClosed(OMetadata.CLUSTER_INDEX_NAME))       for (      OIndex<?> idx : instance.getIndexes())       if (idx.isAutomatic()) {
-        OLogManager.instance().info(idx,"Rebuilding index " + idx.getName());
-        idx.rebuild();
+        try {
+          OLogManager.instance().info(idx,"Rebuilding index " + idx.getName() + "..");
+          idx.rebuild();
+        }
+ catch (        Exception e) {
+          OLogManager.instance().info(idx,"Continue with remaining indexes...");
+        }
       }
       return instance;
     }
@@ -33,12 +38,12 @@
     }
   }
 ),database);
-  functionLibrary=(OFunctionLibraryImpl)database.getStorage().getResource(OFunctionLibrary.class.getSimpleName(),new Callable<OFunctionLibrary>(){
+  functionLibrary=new OFunctionLibraryProxy(database.getStorage().getResource(OFunctionLibrary.class.getSimpleName(),new Callable<OFunctionLibrary>(){
     public OFunctionLibrary call(){
       final OFunctionLibraryImpl instance=new OFunctionLibraryImpl();
       if (iLoad)       instance.load();
       return instance;
     }
   }
-);
+),database);
 }

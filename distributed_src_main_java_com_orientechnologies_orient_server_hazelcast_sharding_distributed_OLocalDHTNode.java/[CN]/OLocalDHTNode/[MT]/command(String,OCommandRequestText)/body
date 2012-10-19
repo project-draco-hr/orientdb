@@ -1,0 +1,48 @@
+{
+  while (state != NodeState.STABLE) {
+    log("Wait till node will be joined.");
+    try {
+      Thread.sleep(100);
+    }
+ catch (    InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+  final ODatabaseDocumentTx database=openDatabase(storageName);
+  final OCommandExecutor executor=OCommandManager.instance().getExecutor(request);
+  executor.setProgressListener(request.getProgressListener());
+  executor.parse(request);
+  final long from;
+  if (predecessor.get() == -1) {
+    if (fingerPoints.get(0) == id) {
+      from=id;
+    }
+ else {
+      throw new OCommandExecutionException("Predecessor node has failed");
+    }
+  }
+ else {
+    from=predecessor.get();
+  }
+  if (executor instanceof OCommandExecutorSQLDelegate && ((OCommandExecutorSQLDelegate)executor).getDelegate() instanceof OCommandExecutorSQLSelect) {
+    ((OCommandExecutorSQLSelect)((OCommandExecutorSQLDelegate)executor).getDelegate()).boundToLocalNode(from,id);
+  }
+ else   if (executor instanceof OCommandExecutorSQLSelect) {
+    ((OCommandExecutorSQLSelect)executor).boundToLocalNode(from,id);
+  }
+  if (request.isIdempotent() && !executor.isIdempotent())   throw new OCommandExecutionException("Cannot execute non idempotent command");
+  try {
+    final Object result=executor.execute(request.getParameters());
+    request.setContext(executor.getContext());
+    return result;
+  }
+ catch (  OException e) {
+    throw e;
+  }
+catch (  Exception e) {
+    throw new OCommandExecutionException("Error on execution of command: " + request,e);
+  }
+ finally {
+    closeDatabase(database);
+  }
+}

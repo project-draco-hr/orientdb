@@ -1,0 +1,20 @@
+{
+  final ODistributedQueryHelper helper=new ODistributedQueryHelper(iCommand,undistributedClusters);
+  if (!helper.isDistributable()) {
+    return wrapped.command(iCommand);
+  }
+  iCommand=helper.getPreparedRemoteCommand();
+  try {
+    for (    final ODHTNode node : getDHTNodes()) {
+      Object result=node.command(wrapped.getName(),iCommand);
+      if (result != null && !node.isLocal()) {
+        result=OCommandResultSerializationHelper.readFromStream((byte[])result);
+      }
+      helper.addToResult(result);
+    }
+  }
+ catch (  IOException e) {
+    throw new OCommandExecutionException("Failed to deserialize result",e);
+  }
+  return helper.getResult();
+}

@@ -2,7 +2,6 @@
   final String[] parts=checkSyntax(iRequest.url,3,"Syntax error: function/<database>/<name>[/param]*");
   iRequest.data.commandInfo="Execute a function";
   ODatabaseDocumentTx db=null;
-  Object result=null;
   try {
     db=getProfiledDatabaseInstance(iRequest);
     db.getMetadata().getFunctionLibrary().load();
@@ -17,14 +16,7 @@
     final OBasicCommandContext context=new OBasicCommandContext();
     context.setVariable("request",new OHttpRequestWrapper(iRequest));
     context.setVariable("response",new OHttpResponseWrapper(iResponse));
-    result=f.executeInContext(context,args);
-    if (result != null) {
-      if (result instanceof ODocument && ((ODocument)result).isEmbedded()) {
-        iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_JSON,((ODocument)result).toJSON(),null,true);
-      }
- else       iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,result,null,true);
-    }
- else     iResponse.send(OHttpUtils.STATUS_OK_NOCONTENT_CODE,"",OHttpUtils.CONTENT_TEXT_PLAIN,null,null,true);
+    iResponse.writeResult(f.executeInContext(context,args));
   }
  catch (  OCommandScriptException e) {
     final StringBuilder msg=new StringBuilder();

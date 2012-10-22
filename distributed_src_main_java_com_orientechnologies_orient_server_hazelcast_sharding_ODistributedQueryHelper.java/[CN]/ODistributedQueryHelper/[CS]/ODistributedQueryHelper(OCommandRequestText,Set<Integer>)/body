@@ -5,6 +5,7 @@
   final OCommandExecutor realExecutor=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
   if (realExecutor instanceof OCommandExecutorSQLSelect) {
     final OCommandExecutorSQLSelect selectExecutor=(OCommandExecutorSQLSelect)realExecutor;
+    select=true;
     distributable=true;
     for (    Integer c : selectExecutor.getInvolvedClusters()) {
       if (undistributedClusters.contains(c)) {
@@ -14,6 +15,7 @@
     }
     order=selectExecutor.getOrderedFields();
     anyFunctionAggregate=selectExecutor.isAnyFunctionAggregates();
+    limit=selectExecutor.getLimit();
     if (selectExecutor.getProjections() != null) {
       for (      Map.Entry<String,Object> projection : selectExecutor.getProjections().entrySet()) {
         if (projection.getValue() instanceof OSQLFunctionRuntime) {
@@ -27,11 +29,15 @@
         }
       }
     }
-  }
-  if (iCommand.getResultListener() != null && iCommand.getResultListener().getClass().equals(ONetworkProtocolBinary.AsyncResultListener.class)) {
-    asyncResultListener=iCommand.getResultListener();
+    if (iCommand.getResultListener() != null && !(iCommand.getResultListener() instanceof OSQLSynchQuery)) {
+      resultListener=iCommand.getResultListener();
+    }
+ else {
+      resultListener=null;
+    }
   }
  else {
-    asyncResultListener=null;
+    select=false;
+    distributable=ALWAYS_DISTRIBUTABLE.contains(realExecutor.getClass());
   }
 }

@@ -3,18 +3,33 @@
   if (!helper.isDistributable()) {
     return wrapped.command(iCommand);
   }
-  iCommand=helper.getPreparedRemoteCommand();
-  try {
-    for (    final ODHTNode node : getDHTNodes()) {
-      Object result=node.command(wrapped.getName(),iCommand);
-      if (result != null && !node.isLocal()) {
-        result=OCommandResultSerializationHelper.readFromStream((byte[])result);
+  final OCommandRequestText distributedCommand=helper.getPreparedRemoteCommand();
+  final List<ODHTNode> nodes=getDHTNodes();
+  final List<Future> tasks=new ArrayList<Future>(nodes.size());
+  for (  final ODHTNode node : nodes) {
+    tasks.add(distributedQueryExecutors.submit(new Runnable(){
+      @Override public void run(){
+        try {
+          Object result=node.command(wrapped.getName(),distributedCommand,false);
+          if (result != null && !node.isLocal()) {
+            result=OCommandResultSerializationHelper.readFromStream((byte[])result);
+          }
+          helper.addToResult(result);
+        }
+ catch (        IOException e) {
+          OLogManager.instance().error(this,"Error deserializing result from node " + node.getNodeId(),e);
+        }
       }
-      helper.addToResult(result);
     }
+));
   }
- catch (  IOException e) {
-    throw new OCommandExecutionException("Failed to deserialize result",e);
+  for (  final Future task : tasks) {
+    try {
+      task.get();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"Error getting task",e);
+    }
   }
   return helper.getResult();
 }

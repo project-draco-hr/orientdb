@@ -1,0 +1,56 @@
+{
+  final Map<String,Object> values=new HashMap<String,Object>();
+  for (  OPair<String,OSQLFunction> merger : mergers) {
+    final List<Object> dataToMerge=new ArrayList<Object>();
+    for (    OIdentifiable o : result) {
+      dataToMerge.add(((ODocument)o).field(merger.getKey()));
+    }
+    values.put(merger.getKey(),merger.getValue().mergeDistributedResult(dataToMerge));
+  }
+  if (distinct != null) {
+    final List<OIdentifiable> resultToMerge=new ArrayList<OIdentifiable>(result);
+    result.clear();
+    for (    OIdentifiable record : resultToMerge) {
+      Object ret=distinct.getValue().execute(record,new Object[]{((ODocument)record).field(distinct.getKey())},null);
+      if (ret != null) {
+        final ODocument resultItem=new ODocument().setOrdered(true);
+        ((ORecordId)resultItem.getIdentity()).clusterId=-2;
+        resultItem.field(distinct.getKey(),ret);
+        result.add(resultItem);
+      }
+    }
+  }
+  if (anyFunctionAggregate && !result.isEmpty()) {
+    final OIdentifiable doc=result.get(0);
+    result.clear();
+    result.add(doc);
+  }
+  if (!values.isEmpty()) {
+    for (    Map.Entry<String,Object> entry : values.entrySet()) {
+      for (      OIdentifiable item : result) {
+        ((ODocument)item).field(entry.getKey(),entry.getValue());
+      }
+    }
+  }
+  if (order != null) {
+    ODocumentHelper.sort(result,order);
+  }
+  if (limit != -1 && result.size() > limit) {
+    do {
+      result.remove(result.size() - 1);
+    }
+ while (result.size() > limit);
+  }
+  if (!result.isEmpty() && result.get(0).getIdentity().getClusterId() == -2) {
+    long position=0;
+    for (    OIdentifiable id : result) {
+      ((ORecordId)id.getIdentity()).clusterPosition=position++;
+    }
+  }
+  if (resultListener != null) {
+    for (    Object o : result) {
+      resultListener.result(o);
+    }
+  }
+  return result;
+}

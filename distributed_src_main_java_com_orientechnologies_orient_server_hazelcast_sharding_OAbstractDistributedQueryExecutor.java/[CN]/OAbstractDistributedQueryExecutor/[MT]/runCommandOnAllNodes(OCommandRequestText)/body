@@ -1,0 +1,31 @@
+{
+  final List<ODHTNode> nodes=serverInstance.getDHTNodes();
+  final int nodesNumber=nodes.size();
+  final List<Future> tasks=new ArrayList<Future>(nodesNumber);
+  for (  final ODHTNode node : nodes) {
+    tasks.add(distributedQueryExecutors.submit(new Runnable(){
+      @Override public void run(){
+        try {
+          Object result=node.command(wrapped.getName(),iDistributedCommand,false);
+          if (result != null && !node.isLocal()) {
+            result=OCommandResultSerializationHelper.readFromStream((byte[])result);
+          }
+          addResult(result);
+        }
+ catch (        IOException e) {
+          OLogManager.instance().error(this,"Error deserializing result from node " + node.getNodeId(),e);
+        }
+      }
+    }
+));
+  }
+  for (  final Future task : tasks) {
+    try {
+      task.get();
+    }
+ catch (    Exception e) {
+      failedNodes.incrementAndGet();
+    }
+  }
+  return nodesNumber;
+}

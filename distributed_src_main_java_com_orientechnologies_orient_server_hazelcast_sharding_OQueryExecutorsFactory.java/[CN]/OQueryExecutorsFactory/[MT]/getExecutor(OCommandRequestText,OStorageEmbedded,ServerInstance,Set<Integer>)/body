@@ -1,0 +1,22 @@
+{
+  final OCommandExecutor executorDelegate=OCommandManager.instance().getExecutor(iCommand);
+  executorDelegate.parse(iCommand);
+  final OCommandExecutor actualExecutor=executorDelegate instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executorDelegate).getDelegate() : executorDelegate;
+  if (actualExecutor instanceof OCommandExecutorSQLSelect) {
+    final OCommandExecutorSQLSelect selectExecutor=(OCommandExecutorSQLSelect)actualExecutor;
+    if (isSelectDistributable(selectExecutor,undistributedClusters)) {
+      return new ODistributedSelectQueryExecutor(iCommand,selectExecutor,wrapped,serverInstance);
+    }
+ else {
+      return new OLocalQueryExecutor(iCommand,wrapped);
+    }
+  }
+ else {
+    if (isCommandDistributable(actualExecutor)) {
+      return new ODistributedQueryExecutor(iCommand,wrapped,serverInstance);
+    }
+ else {
+      return new OLocalQueryExecutor(iCommand,wrapped);
+    }
+  }
+}

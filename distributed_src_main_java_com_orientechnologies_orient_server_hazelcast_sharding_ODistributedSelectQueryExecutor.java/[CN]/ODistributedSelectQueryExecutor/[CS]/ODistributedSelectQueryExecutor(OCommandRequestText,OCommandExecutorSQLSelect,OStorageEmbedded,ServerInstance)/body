@@ -1,0 +1,25 @@
+{
+  super(iCommand,wrapped,serverInstance);
+  this.selectId=SELECT_ID_GENERATOR.incrementAndGet();
+  this.storageId=serverInstance.getLocalNode().getNodeId();
+  this.anyFunctionAggregate=executor.isAnyFunctionAggregates();
+  if (executor.getProjections() != null) {
+    for (    Map.Entry<String,Object> projection : executor.getProjections().entrySet()) {
+      if (projection.getValue() instanceof OSQLFunctionRuntime) {
+        final OSQLFunctionRuntime fr=(OSQLFunctionRuntime)projection.getValue();
+        if (fr.getFunction().shouldMergeDistributedResult()) {
+          mergers.add(new OPair<String,OSQLFunction>(projection.getKey(),fr.getFunction()));
+        }
+ else         if (fr.getFunction() instanceof OSQLFunctionDistinct) {
+          distinct=new OPair<String,OSQLFunctionDistinct>(projection.getKey(),(OSQLFunctionDistinct)fr.getFunction());
+        }
+      }
+    }
+  }
+  this.order=executor.getOrderedFields();
+  this.limit=executor.getLimit();
+  this.resultListener=(iCommand.getResultListener() != null && !(iCommand.getResultListener() instanceof OSQLSynchQuery)) ? iCommand.getResultListener() : null;
+  this.async=resultListener != null && !anyFunctionAggregate && distinct == null && mergers.isEmpty() && order == null;
+  this.resultTopic=ServerInstance.getHazelcast().getTopic(getResultTopicName(storageId,selectId));
+  this.resultTopic.addMessageListener(this);
+}

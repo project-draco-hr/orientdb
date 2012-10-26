@@ -1,0 +1,42 @@
+{
+  int remainingExecutors=runCommandOnAllNodes(new OSQLAsynchQuery(iCommand.getText(),new OHazelcastResultListener(ServerInstance.getHazelcast(),storageId,selectId)));
+  int processed=0;
+  final List<OIdentifiable> result=new ArrayList<OIdentifiable>();
+  while (true) {
+    try {
+      final byte[] plainItem=plainResult.take();
+      final Object item=OCommandResultSerializationHelper.readFromStream(plainItem);
+      if (item instanceof OIdentifiable) {
+        if (async) {
+          resultListener.result(item);
+        }
+ else {
+          result.add((OIdentifiable)item);
+        }
+        processed++;
+      }
+ else       if (item instanceof OHazelcastResultListener.EndOfResult) {
+        remainingExecutors--;
+      }
+ else {
+        throw new IllegalArgumentException("Invalid type provided");
+      }
+    }
+ catch (    InterruptedException e) {
+      OLogManager.instance().warn(this,"Failed to take message from queue");
+    }
+catch (    IOException e) {
+      OLogManager.instance().warn(this,"Error deserializing result");
+    }
+    if (remainingExecutors <= failedNodes.get() || (async && limit != -1 && processed >= limit)) {
+      break;
+    }
+  }
+  resultTopic.destroy();
+  if (async) {
+    return null;
+  }
+ else {
+    return processResult(result);
+  }
+}

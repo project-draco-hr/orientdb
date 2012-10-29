@@ -1,17 +1,133 @@
 {
   if (value == null)   return null;
-  if (value instanceof Collection || value.getClass().isArray()) {
-    final List<Object> tempResult=new ArrayList<Object>();
-    for (    Object o : OMultiValue.getMultiValueIterable(value)) {
-      final Object result=ODocumentHelper.getFieldValue(o,iFieldName);
-      if (result != null) {
-        if (OMultiValue.isMultiValue(result)) {
-          for (          Object item : OMultiValue.getMultiValueIterable(result))           tempResult.add(item);
+  final int fieldNameLength=iFieldName.length();
+  if (fieldNameLength == 0)   return (RET)value;
+  OIdentifiable currentRecord=value instanceof OIdentifiable ? (OIdentifiable)value : null;
+  int beginPos=iFieldName.charAt(0) == '.' ? 1 : 0;
+  int nextSeparatorPos=iFieldName.charAt(0) == '.' ? 1 : 0;
+  do {
+    char nextSeparator=' ';
+    for (; nextSeparatorPos < fieldNameLength; ++nextSeparatorPos) {
+      nextSeparator=iFieldName.charAt(nextSeparatorPos);
+      if (nextSeparator == '.' || nextSeparator == '[')       break;
+    }
+    final String fieldName;
+    if (nextSeparatorPos < fieldNameLength)     fieldName=iFieldName.substring(beginPos,nextSeparatorPos);
+ else {
+      nextSeparator=' ';
+      if (beginPos > 0)       fieldName=iFieldName.substring(beginPos);
+ else       fieldName=iFieldName;
+    }
+    if (nextSeparator == '[') {
+      if (fieldName != null && fieldName.length() > 0) {
+        if (currentRecord != null)         value=getIdentifiableValue(currentRecord,fieldName);
+ else         if (value instanceof Map<?,?>)         value=getMapEntry((Map<String,?>)value,fieldName);
+      }
+      if (value == null)       return null;
+ else       if (value instanceof OIdentifiable)       currentRecord=(OIdentifiable)value;
+      final int end=iFieldName.indexOf(']',nextSeparatorPos);
+      if (end == -1)       throw new IllegalArgumentException("Missed closed ']'");
+      final String index=OStringSerializerHelper.getStringContent(iFieldName.substring(nextSeparatorPos + 1,end));
+      nextSeparatorPos=end;
+      if (value instanceof OIdentifiable) {
+        final ORecord<?> record=currentRecord != null && currentRecord instanceof OIdentifiable ? ((OIdentifiable)currentRecord).getRecord() : null;
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=',' ');
+        if (indexParts.size() == 1 && indexCondition.size() == 1)         value=((ODocument)record).field(index);
+ else         if (indexParts.size() > 1) {
+          final Object[] values=new Object[indexParts.size()];
+          for (int i=0; i < indexParts.size(); ++i) {
+            values[i]=((ODocument)record).field(indexParts.get(i));
+          }
+          value=values;
         }
- else         tempResult.add(result);
+ else         if (!indexCondition.isEmpty()) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          final Object fieldValue=getFieldValue(currentRecord,conditionFieldName);
+          if (fieldValue == null && !conditionFieldValue.equals("null") || fieldValue != null & !fieldValue.equals(conditionFieldValue))           value=null;
+        }
+      }
+ else       if (value instanceof Map<?,?>) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        if (indexParts.size() == 1)         value=((Map<?,?>)value).get(index);
+ else {
+          final Object[] values=new Object[indexParts.size()];
+          for (int i=0; i < indexParts.size(); ++i) {
+            values[i]=((Map<?,?>)value).get(indexParts.get(i));
+          }
+          value=values;
+        }
+      }
+ else       if (value instanceof Collection<?> || value.getClass().isArray()) {
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(index,',');
+        final List<String> indexRanges=OStringSerializerHelper.smartSplit(index,'-');
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(index,'=',' ');
+        if (indexParts.size() == 1 && indexRanges.size() == 1 && indexCondition.size() == 1) {
+          if (value instanceof Map<?,?>)           value=getMapEntry((Map<String,?>)value,index);
+ else           value=OMultiValue.getValue(value,Integer.parseInt(index));
+        }
+ else         if (indexParts.size() > 1) {
+          final Object[] values=new Object[indexParts.size()];
+          for (int i=0; i < indexParts.size(); ++i)           values[i]=OMultiValue.getValue(value,Integer.parseInt(indexParts.get(i)));
+          value=values;
+        }
+ else         if (indexRanges.size() > 1) {
+          final int rangeFrom=Integer.parseInt(indexRanges.get(0));
+          final int rangeTo=Math.min(Integer.parseInt(indexRanges.get(1)),OMultiValue.getSize(value) - 1);
+          final Object[] values=new Object[rangeTo - rangeFrom + 1];
+          for (int i=rangeFrom; i <= rangeTo; ++i)           values[i - rangeFrom]=OMultiValue.getValue(value,i);
+          value=values;
+        }
+ else         if (!indexCondition.isEmpty()) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          final List<Object> values=new ArrayList<Object>();
+          for (          Object v : OMultiValue.getMultiValueIterable(value)) {
+            Object filtered=filterItem(conditionFieldName,conditionFieldValue,v);
+            if (filtered != null)             values.add(filtered);
+          }
+          if (values.isEmpty())           value=null;
+ else           if (values.size() == 1)           value=values.get(0);
+ else           value=values;
+        }
       }
     }
-    return (RET)tempResult;
+ else {
+      if (fieldName.length() == 0) {
+        beginPos=++nextSeparatorPos;
+        continue;
+      }
+      if (fieldName.contains("("))       value=evaluateFunction(value,fieldName);
+ else {
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(fieldName,'=',' ');
+        if (indexCondition.size() == 2) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          value=filterItem(conditionFieldName,conditionFieldValue,value);
+        }
+ else         if (currentRecord != null) {
+          value=getIdentifiableValue(currentRecord,fieldName);
+          if (value != null && value instanceof ORecord<?> && ((ORecord<?>)value).getInternalStatus() == STATUS.NOT_LOADED)           ((ORecord<?>)value).reload();
+        }
+ else         if (value instanceof Map<?,?>)         value=getMapEntry((Map<String,?>)value,fieldName);
+ else         if (value instanceof Collection<?>) {
+          final List<Object> values=new ArrayList<Object>();
+          for (          Object v : OMultiValue.getMultiValueIterable(value))           if (v instanceof OIdentifiable)           values.add(getIdentifiableValue((OIdentifiable)v,fieldName));
+ else           if (v instanceof Map)           values.add(((Map<?,?>)v).get(fieldName));
+ else           return null;
+          value=values;
+        }
+ else         return null;
+      }
+    }
+    if (value instanceof OIdentifiable)     currentRecord=(OIdentifiable)value;
+ else     currentRecord=null;
+    beginPos=++nextSeparatorPos;
   }
- else   return (RET)getSingleFieldValue(value,iFieldName);
+ while (nextSeparatorPos < fieldNameLength && value != null);
+  return (RET)value;
 }

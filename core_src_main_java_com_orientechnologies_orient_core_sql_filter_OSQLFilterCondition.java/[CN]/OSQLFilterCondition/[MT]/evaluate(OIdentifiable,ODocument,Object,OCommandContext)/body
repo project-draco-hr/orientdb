@@ -1,0 +1,32 @@
+{
+  if (iCurrentRecord.getRecord().getInternalStatus() == ORecordElement.STATUS.NOT_LOADED) {
+    try {
+      iCurrentRecord=iCurrentRecord.getRecord().load();
+    }
+ catch (    ORecordNotFoundException e) {
+      return null;
+    }
+  }
+  if (iValue instanceof OSQLFilterItem) {
+    if (iCurrentResult != null) {
+      final Object v=((OSQLFilterItem)iValue).getValue(iCurrentResult,iContext);
+      if (v != null)       return v;
+    }
+    return ((OSQLFilterItem)iValue).getValue(iCurrentRecord,iContext);
+  }
+  if (iValue instanceof OSQLFilterCondition)   return ((OSQLFilterCondition)iValue).evaluate(iCurrentRecord,iCurrentResult,iContext);
+  if (iValue instanceof OSQLFunctionRuntime) {
+    final OSQLFunctionRuntime f=(OSQLFunctionRuntime)iValue;
+    return f.execute(iCurrentRecord,iCurrentResult,iContext);
+  }
+  final Iterable<?> multiValue=OMultiValue.getMultiValueIterable(iValue);
+  if (multiValue != null) {
+    final ArrayList<Object> result=new ArrayList<Object>(OMultiValue.getSize(iValue));
+    for (    final Object value : multiValue) {
+      if (value instanceof OSQLFilterItem)       result.add(((OSQLFilterItem)value).getValue(iCurrentRecord,iContext));
+ else       result.add(value);
+    }
+    return result;
+  }
+  return iValue;
+}

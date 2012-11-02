@@ -1,12 +1,11 @@
 {
-  getDatabase();
-  if (document.getDatabase().getTransaction().isActive())   throw new OSchemaException("Cannot change the schema while a transaction is active. Schema changes are not transactional");
-  lock.acquireExclusiveLock();
-  try {
-    document.setDirty();
-    super.save(OMetadata.CLUSTER_INTERNAL_NAME);
+  final ODatabaseRecord db=getDatabase();
+  if (db.getTransaction().isActive())   throw new OSchemaException("Cannot change the schema while a transaction is active. Schema changes are not transactional");
+  db.getStorage().callInLock(new Callable<Object>(){
+    @Override public Object call() throws Exception {
+      saveInternal(OMetadata.CLUSTER_INTERNAL_NAME);
+      return null;
+    }
   }
-  finally {
-    lock.releaseExclusiveLock();
-  }
+,true);
 }

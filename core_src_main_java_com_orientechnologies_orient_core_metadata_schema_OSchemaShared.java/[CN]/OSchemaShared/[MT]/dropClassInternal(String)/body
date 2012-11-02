@@ -3,19 +3,19 @@
   if (iClassName == null)   throw new IllegalArgumentException("Class name is null");
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_DELETE);
   final String key=iClassName.toLowerCase();
-  lock.acquireExclusiveLock();
-  try {
-    final OClass cls=classes.get(key);
-    if (cls == null)     throw new OSchemaException("Class " + iClassName + " was not found in current database");
-    if (cls.getBaseClasses().hasNext())     throw new OSchemaException("Class " + iClassName + " cannot be dropped because it has sub classes. Remove the dependencies before trying to drop it again");
-    if (cls.getSuperClass() != null) {
-      ((OClassImpl)cls.getSuperClass()).removeBaseClassInternal(cls);
+  getDatabase().getStorage().callInLock(new Callable<Object>(){
+    @Override public Object call() throws Exception {
+      final OClass cls=classes.get(key);
+      if (cls == null)       throw new OSchemaException("Class " + iClassName + " was not found in current database");
+      if (cls.getBaseClasses().hasNext())       throw new OSchemaException("Class " + iClassName + " cannot be dropped because it has sub classes. Remove the dependencies before trying to drop it again");
+      if (cls.getSuperClass() != null) {
+        ((OClassImpl)cls.getSuperClass()).removeBaseClassInternal(cls);
+      }
+      dropClassIndexes(cls);
+      classes.remove(key);
+      if (cls.getShortName() != null)       classes.remove(cls.getShortName().toLowerCase());
+      return null;
     }
-    dropClassIndexes(cls);
-    classes.remove(key);
-    if (cls.getShortName() != null)     classes.remove(cls.getShortName().toLowerCase());
   }
-  finally {
-    lock.releaseExclusiveLock();
-  }
+,true);
 }

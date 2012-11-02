@@ -9,8 +9,9 @@
   incrementEntries.clear();
   query=null;
   recordCount=0;
-  parserRequiredKeyword("UPDATE");
-  subjectName=parserRequiredWord(true,"Invalid target");
+  parserRequiredKeyword(KEYWORD_UPDATE);
+  subjectName=parserRequiredWord(true,"Invalid target"," =><,\r\n");
+  if (subjectName == null)   throwSyntaxErrorException("Invalid subject name. Expected cluster, class, index or sub-query");
   parserNextWord(true);
   String word=parserGetLastWord();
   if (parserIsEnded() || (!word.equals(KEYWORD_SET) && !word.equals(KEYWORD_ADD) && !word.equals(KEYWORD_PUT)&& !word.equals(KEYWORD_REMOVE)&& !word.equals(KEYWORD_INCREMENT)))   throwSyntaxErrorException("Expected keyword " + KEYWORD_SET + ","+ KEYWORD_ADD+ ","+ KEYWORD_PUT+ ","+ KEYWORD_REMOVE+ " or "+ KEYWORD_INCREMENT);
@@ -25,7 +26,12 @@
     parserNextWord(true);
   }
   final String additionalStatement=parserGetLastWord();
-  if (additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE) || additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_LIMIT))   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName + " "+ additionalStatement+ " "+ parserText.substring(parserGetCurrentPosition()),this);
+  if (subjectName.startsWith("(")) {
+    subjectName=subjectName.trim();
+    query=database.command(new OSQLAsynchQuery<ODocument>(subjectName.substring(1,subjectName.length() - 1),this));
+    if (additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE) || additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_LIMIT))     compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition()),getContext(),KEYWORD_WHERE);
+  }
+ else   if (additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_WHERE) || additionalStatement.equals(OCommandExecutorSQLAbstract.KEYWORD_LIMIT))   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName + " "+ additionalStatement+ " "+ parserText.substring(parserGetCurrentPosition()),this);
  else   query=new OSQLAsynchQuery<ODocument>("select from " + subjectName,this);
   return this;
 }

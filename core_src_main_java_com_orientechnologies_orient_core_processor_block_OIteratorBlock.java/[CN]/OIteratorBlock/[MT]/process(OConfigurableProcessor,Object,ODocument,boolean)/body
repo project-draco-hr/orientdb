@@ -1,0 +1,17 @@
+{
+  if (!(iContent instanceof ODocument))   throw new OProcessException("Content in not a JSON");
+  final ODocument content=(ODocument)iContent;
+  final Object foreach=content.field("foreach");
+  if (!(foreach instanceof ODocument))   throw new OProcessException("'foreach' must be a block");
+  final Object execute=content.field("execute");
+  if (!(execute instanceof ODocument))   throw new OProcessException("'execute' must be a block");
+  final Object result=iManager.process((ODocument)foreach,iContext,iReadOnly);
+  if (!OMultiValue.isIterable(result))   throw new OProcessException("Result of 'foreach' block (" + foreach + ") must be iterable but found "+ result.getClass());
+  final String executeBlockType=((ODocument)execute).field("type");
+  final List<Object> list=new ArrayList<Object>();
+  for (  Object item : OMultiValue.getMultiValueIterable(result)) {
+    checkForBlock(item);
+    list.add(iManager.process(executeBlockType,item,iContext,iReadOnly));
+  }
+  return list;
+}

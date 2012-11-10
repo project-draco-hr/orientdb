@@ -1,0 +1,20 @@
+{
+  final Object source=resolveInContext(getFieldOfClass(iConfig,"source",String.class),iContext);
+  final Object values=resolveInContext(getRequiredField(iConfig,"values"),iContext);
+  final String bind=getFieldOfClass(iConfig,"bind",String.class);
+  final Boolean merge=getFieldOfClass(iConfig,"merge",Boolean.class);
+  if (!OMultiValue.isIterable(values))   throw new OProcessException("Field 'values' in not a multi-value (collection, array, map). Found type '" + values.getClass() + "'");
+  final List<Object> list=new ArrayList<Object>();
+  for (  Object item : OMultiValue.getMultiValueIterable(values)) {
+    final Object result;
+    if (isBlock(item))     result=iManager.process((ODocument)item,iContext,iReadOnly);
+ else {
+      if (source != null)       item=ODocumentHelper.getFieldValue(source,item.toString());
+      result=resolveInContext(item,iContext);
+    }
+    if (result != null)     if (merge != null && merge && result instanceof List<?>)     list.addAll((Collection<? extends Object>)result);
+ else     list.add(result);
+  }
+  if (bind != null)   iContext.setVariable(bind,list);
+  return list;
+}

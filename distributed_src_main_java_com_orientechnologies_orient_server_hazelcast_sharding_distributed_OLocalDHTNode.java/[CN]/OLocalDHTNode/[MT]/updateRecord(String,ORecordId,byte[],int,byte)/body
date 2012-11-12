@@ -1,13 +1,28 @@
 {
-  final ORecordInternal<?> record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
+  final ORecordInternal<?> newRecord=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
   lockManager.acquireLock(Thread.currentThread(),iRecordId,OLockManager.LOCK.EXCLUSIVE);
   try {
     final ODatabaseDocumentTx database=openDatabase(storageName);
     try {
-      record.fill(iRecordId,iVersion,iContent,true);
-      if (iRecordId.getClusterId() == -1)       record.save();
- else       record.save(database.getClusterNameById(iRecordId.getClusterId()));
-      return record.getVersion();
+      newRecord.fill(iRecordId,iVersion,iContent,true);
+      final ORecordInternal<?> currentRecord;
+      if (newRecord instanceof ODocument) {
+        currentRecord=database.load(iRecordId);
+        if (currentRecord == null) {
+          throw new ORecordNotFoundException(iRecordId.toString());
+        }
+        ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
+      }
+ else {
+        currentRecord=newRecord;
+      }
+      currentRecord.setVersion(iVersion);
+      if (iRecordId.getClusterId() == -1)       currentRecord.save();
+ else       currentRecord.save(database.getClusterNameById(iRecordId.getClusterId()));
+      if (currentRecord.getIdentity().toString().equals(database.getStorage().getConfiguration().indexMgrRecordId) && !database.getStatus().equals(ODatabase.STATUS.IMPORTING)) {
+        database.getMetadata().getIndexManager().reload();
+      }
+      return currentRecord.getVersion();
     }
   finally {
       closeDatabase(database);

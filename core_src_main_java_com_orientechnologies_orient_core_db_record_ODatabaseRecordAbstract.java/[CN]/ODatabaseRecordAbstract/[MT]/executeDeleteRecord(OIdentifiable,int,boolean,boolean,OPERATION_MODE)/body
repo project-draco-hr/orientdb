@@ -9,23 +9,23 @@
     ORecord<?> rec=iRecord.getRecord();
     if (iCallTriggers)     callbackHooks(TYPE.BEFORE_DELETE,rec);
     final int realVersion=mvcc ? iVersion : -1;
-    OStorageOperationResult<Boolean> operationResult=null;
     try {
-      operationResult=underlying.delete(rid,realVersion,iRequired,(byte)iMode.ordinal());
+      final OStorageOperationResult<Boolean> operationResult=underlying.delete(rid,realVersion,iRequired,(byte)iMode.ordinal());
+      if (iCallTriggers) {
+        if (!operationResult.isMoved()) {
+          callbackHooks(TYPE.AFTER_DELETE,rec);
+        }
+ else {
+          callbackHooks(TYPE.DELETE_REPLICATED,rec);
+        }
+      }
+      if (!operationResult.isMoved()) {
+        getLevel1Cache().deleteRecord(rid);
+      }
     }
  catch (    Throwable t) {
       if (iCallTriggers)       callbackHooks(TYPE.DELETE_FAILED,rec);
-    }
-    if (iCallTriggers) {
-      if (operationResult == null || !operationResult.isMoved()) {
-        callbackHooks(TYPE.AFTER_DELETE,rec);
-      }
- else {
-        callbackHooks(TYPE.DELETE_REPLICATED,rec);
-      }
-    }
-    if (operationResult == null || !operationResult.isMoved()) {
-      getLevel1Cache().deleteRecord(rid);
+      throw t;
     }
   }
  catch (  OException e) {

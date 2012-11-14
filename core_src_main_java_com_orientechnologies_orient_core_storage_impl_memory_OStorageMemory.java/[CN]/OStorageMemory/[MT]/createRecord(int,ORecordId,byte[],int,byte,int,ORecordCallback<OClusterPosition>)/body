@@ -1,0 +1,21 @@
+{
+  final long timer=Orient.instance().getProfiler().startChrono();
+  lock.acquireSharedLock();
+  try {
+    final ODataSegmentMemory data=getDataSegmentById(iDataSegmentId);
+    final long offset=data.createRecord(iContent);
+    final OCluster cluster=getClusterById(iRid.clusterId);
+    final OPhysicalPosition ppos=new OPhysicalPosition(iDataSegmentId,offset,iRecordType);
+    cluster.addPhysicalPosition(ppos);
+    iRid.clusterPosition=ppos.clusterPosition;
+    if (iCallback != null)     iCallback.call(iRid,iRid.clusterPosition);
+    return new OStorageOperationResult<OPhysicalPosition>(ppos);
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on create record in cluster: " + iRid.clusterId,e);
+  }
+ finally {
+    lock.releaseSharedLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in memory database",timer);
+  }
+}

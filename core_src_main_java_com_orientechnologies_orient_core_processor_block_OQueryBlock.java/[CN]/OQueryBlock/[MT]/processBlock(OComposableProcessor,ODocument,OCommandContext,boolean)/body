@@ -1,8 +1,16 @@
 {
   if (!(iConfig instanceof ODocument))   throw new OTransactionException("QueryBlock: expected document as content");
   String command=parse((ODocument)iConfig,iContext);
-  command=(String)resolveInContext(command,iContext);
+  command=(String)resolve(command,iContext);
   debug(iContext,"Executing: " + (iReadOnly ? "query" : "command") + ": "+ command+ "...");
   final OCommandRequestText cmd=new OSQLSynchQuery<OIdentifiable>(command.toString());
+  cmd.getContext().setParent(iContext);
+  final String returnVariable=getFieldOfClass(iConfig,"return",String.class);
+  if (returnVariable != null) {
+    final List<?> result=cmd.execute();
+    debug(iContext,"Returned %d records",result.size());
+    assignVariable(iContext,returnVariable,result);
+    return null;
+  }
   return cmd;
 }

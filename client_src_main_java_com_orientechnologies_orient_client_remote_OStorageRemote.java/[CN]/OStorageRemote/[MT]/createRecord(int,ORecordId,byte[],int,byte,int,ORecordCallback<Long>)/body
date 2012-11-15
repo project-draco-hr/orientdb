@@ -1,0 +1,67 @@
+{
+  checkConnection();
+  if (iMode == 1 && iCallback == null)   iMode=2;
+  final OPhysicalPosition ppos=new OPhysicalPosition(iDataSegmentId,-1,iRecordType);
+  do {
+    try {
+      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+      try {
+        if (network.getSrvProtocolVersion() >= 10)         network.writeInt(iDataSegmentId);
+        network.writeShort((short)iRid.clusterId);
+        network.writeBytes(iContent);
+        network.writeByte(iRecordType);
+        network.writeByte((byte)iMode);
+      }
+  finally {
+        endRequest(network);
+      }
+switch (iMode) {
+case 0:
+        try {
+          beginResponse(network);
+          iRid.clusterPosition=network.readLong();
+          ppos.clusterPosition=iRid.clusterPosition;
+          if (network.getSrvProtocolVersion() >= 11)           ppos.recordVersion=network.readInt();
+ else           ppos.recordVersion=0;
+          return new OStorageOperationResult<OPhysicalPosition>(ppos);
+        }
+  finally {
+          endResponse(network);
+        }
+case 1:
+      if (iCallback != null) {
+        final int sessionId=getSessionId();
+        Callable<Object> response=new Callable<Object>(){
+          public Object call() throws Exception {
+            final Long result;
+            try {
+              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
+              System.out.println("BEGIN ASYNCH READ " + OStorageRemoteThreadLocal.INSTANCE.get().sessionId);
+              beginResponse(network);
+              result=network.readLong();
+              if (network.getSrvProtocolVersion() >= 11)               network.readInt();
+            }
+  finally {
+              endResponse(network);
+              System.out.println("END   ASYNCH READ " + OStorageRemoteThreadLocal.INSTANCE.get().sessionId);
+              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
+            }
+            iCallback.call(iRid,result);
+            return null;
+          }
+        }
+;
+        asynchExecutor.submit(new FutureTask<Object>(response));
+      }
+  }
+  return new OStorageOperationResult<OPhysicalPosition>(ppos);
+}
+ catch (OModificationOperationProhibitedException mope) {
+  handleDBFreeze();
+}
+catch (Exception e) {
+  handleException("Error on create record in cluster: " + iRid.clusterId,e);
+}
+}
+ while (true);
+}

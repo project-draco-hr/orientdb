@@ -1,0 +1,27 @@
+{
+  if (undistributedClusters.contains(iRecordId.getClusterId())) {
+    return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+  }
+  OPhysicalPosition result;
+  int retryCount=0;
+  while (true) {
+    try {
+      if (iRecordId.isNew())       iRecordId.clusterPosition=Math.abs(positionGenerator.nextLong());
+      final ODHTNode node=serverInstance.findSuccessor(iRecordId.clusterPosition);
+      if (node.isLocal()) {
+        OLogManager.instance().info(this,"Record " + iRecordId.toString() + " has been distributed to this node.");
+        return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+      }
+ else       result=node.createRecord(wrapped.getName(),iRecordId,iContent,iRecordVersion,iRecordType);
+      break;
+    }
+ catch (    ORecordDuplicatedException e) {
+      if (retryCount > 10) {
+        throw e;
+      }
+      retryCount++;
+    }
+  }
+  iRecordId.clusterPosition=result.clusterPosition;
+  return new OStorageOperationResult<OPhysicalPosition>(result,true);
+}

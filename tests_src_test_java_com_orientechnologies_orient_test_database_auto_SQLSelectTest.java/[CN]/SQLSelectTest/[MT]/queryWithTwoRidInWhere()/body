@@ -1,17 +1,9 @@
 {
   int clusterId=database.getClusterIdByName("profile");
-  List<OClusterPosition> positions=getValidPositions(clusterId);
+  List<Long> positions=getValidPositions(clusterId);
   final OSQLSynchQuery<ODocument> query=new OSQLSynchQuery<ODocument>("select @rid.trim() as oid, name from Profile where (@rid in [#" + clusterId + ":"+ positions.get(5)+ "] or @rid in [#"+ clusterId+ ":"+ positions.get(25)+ "]) AND @rid > ? LIMIT 10000");
-  final OClusterPosition minPos;
-  final OClusterPosition maxPos;
-  if (positions.get(5).compareTo(positions.get(25)) > 0) {
-    minPos=positions.get(25);
-    maxPos=positions.get(5);
-  }
- else {
-    minPos=positions.get(5);
-    maxPos=positions.get(25);
-  }
+  final long minPos=Math.min(positions.get(5),positions.get(25));
+  final long maxPos=Math.max(positions.get(5),positions.get(25));
   List<ODocument> resultset=database.query(query,new ORecordId(clusterId,minPos));
   Assert.assertEquals(resultset.size(),1);
   Assert.assertEquals(resultset.get(0).field("oid"),new ORecordId(clusterId,maxPos).toString());

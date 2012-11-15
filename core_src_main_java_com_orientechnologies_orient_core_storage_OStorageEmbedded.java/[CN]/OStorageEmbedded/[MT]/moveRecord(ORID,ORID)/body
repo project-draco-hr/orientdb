@@ -4,7 +4,7 @@
   if (destinationCluster.getDataSegmentId() != originalCluster.getDataSegmentId())   throw new OStorageException("Original and destination clusters use different data segment ids " + originalCluster.getDataSegmentId() + "<->"+ destinationCluster.getDataSegmentId());
   if (!destinationCluster.generatePositionBeforeCreation()) {
     if (originalId.getClusterId() == newId.getClusterId())     throw new OStorageException("Record identity can not be moved inside of the same non LH based cluster.");
-    if (newId.getClusterPosition().longValue() <= destinationCluster.getLastEntryPosition())     throw new OStorageException("New position " + newId.getClusterPosition() + " of "+ originalId+ " record inside of "+ destinationCluster.getName()+ " cluster and can not be used as destination");
+    if (newId.getClusterPosition() <= destinationCluster.getLastEntryPosition())     throw new OStorageException("New position " + newId.getClusterPosition() + " of "+ originalId+ " record inside of "+ destinationCluster.getName()+ " cluster and can not be used as destination");
     if (destinationCluster.getFirstEntryPosition() != 0 || destinationCluster.getEntries() != destinationCluster.getLastEntryPosition() + 1)     throw new OStorageException("Cluster " + destinationCluster.getName() + " contains holes and can not be used as destination for "+ originalId+ " record.");
   }
   final OPhysicalPosition ppos=originalCluster.getPhysicalPosition(new OPhysicalPosition(originalId.getClusterPosition()));
@@ -14,20 +14,20 @@
     if (!destinationCluster.addPhysicalPosition(ppos))     throw new OStorageException("Record with id " + newId + " has already exists in cluster "+ destinationCluster.getName());
   }
  else {
-    final int diff=(int)(newId.getClusterPosition().longValue() - destinationCluster.getLastEntryPosition() - 1);
-    final OClusterPosition startPos=OClusterPositionFactory.INSTANCE.valueOf(destinationCluster.getLastEntryPosition() + 1);
-    OClusterPosition pos=startPos;
+    final int diff=(int)(newId.getClusterPosition() - destinationCluster.getLastEntryPosition() - 1);
+    final long startPos=destinationCluster.getLastEntryPosition() + 1;
+    long pos=startPos;
     final OPhysicalPosition physicalPosition=new OPhysicalPosition(pos);
     for (int i=0; i < diff; i++) {
       physicalPosition.clusterPosition=pos;
       destinationCluster.addPhysicalPosition(physicalPosition);
-      pos=pos.inc();
+      pos++;
     }
     destinationCluster.addPhysicalPosition(ppos);
     pos=startPos;
     for (int i=0; i < diff; i++) {
       destinationCluster.removePhysicalPosition(pos);
-      pos=pos.inc();
+      pos++;
     }
   }
   originalCluster.removePhysicalPosition(originalId.getClusterPosition());

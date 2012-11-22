@@ -1,34 +1,39 @@
 {
-  final Collection<OIdentifiable> linked;
-  if (fieldValue instanceof ODocument) {
-    linked=new OMVRBTreeRIDSet().fromDocument((ODocument)fieldValue);
-  }
- else {
-    linked=(Collection<OIdentifiable>)fieldValue;
-  }
+  final Collection<?> linked;
+  if (fieldValue instanceof ODocument)   linked=new OMVRBTreeRIDSet().fromDocument((ODocument)fieldValue);
+ else   linked=(Collection<OIdentifiable>)fieldValue;
   iContext.onBeforeCollection(iRootRecord,fieldName,iUserObject,linked);
-  final Iterator<OIdentifiable> iter;
+  final Iterator<?> iter;
   if (linked instanceof ORecordLazyMultiValue)   iter=((ORecordLazyMultiValue)linked).rawIterator();
  else   iter=linked.iterator();
   while (iter.hasNext()) {
-    OIdentifiable d=iter.next();
-    if (d == null)     continue;
-    final Integer fieldDepthLevel=parsedRecords.get(d.getIdentity());
-    if (!d.getIdentity().isValid() || (fieldDepthLevel != null && fieldDepthLevel.intValue() == iLevelFromRoot)) {
-      removeParsedFromMap(parsedRecords,d);
-      d=d.getRecord();
-      if (!(d instanceof ODocument)) {
-        iListener.processStandardField(null,d,fieldName,iContext,iUserObject);
+    final Object o=iter.next();
+    if (o == null)     continue;
+    if (o instanceof OIdentifiable) {
+      OIdentifiable d=(OIdentifiable)o;
+      final Integer fieldDepthLevel=parsedRecords.get(d.getIdentity());
+      if (!d.getIdentity().isValid() || (fieldDepthLevel != null && fieldDepthLevel.intValue() == iLevelFromRoot)) {
+        removeParsedFromMap(parsedRecords,d);
+        d=d.getRecord();
+        if (!(d instanceof ODocument)) {
+          iListener.processStandardField(null,d,fieldName,iContext,iUserObject);
+        }
+ else {
+          iContext.onBeforeDocument(iRootRecord,(ODocument)d,fieldName,iUserObject);
+          final Object userObject=iListener.fetchLinkedCollectionValue(iRootRecord,iUserObject,fieldName,(ODocument)d,iContext);
+          processRecord((ODocument)d,userObject,iFetchPlan,iCurrentLevel,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
+          iContext.onAfterDocument(iRootRecord,(ODocument)d,fieldName,iUserObject);
+        }
       }
  else {
-        iContext.onBeforeDocument(iRootRecord,(ODocument)d,fieldName,iUserObject);
-        final Object userObject=iListener.fetchLinkedCollectionValue(iRootRecord,iUserObject,fieldName,(ODocument)d,iContext);
-        processRecord((ODocument)d,userObject,iFetchPlan,iCurrentLevel,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
-        iContext.onAfterDocument(iRootRecord,(ODocument)d,fieldName,iUserObject);
+        iListener.parseLinkedCollectionValue(iRootRecord,d,iUserObject,fieldName,iContext);
       }
     }
- else {
-      iListener.parseLinkedCollectionValue(iRootRecord,d,iUserObject,fieldName,iContext);
+ else     if (o instanceof Map<?,?>) {
+      fetchMap(iRootRecord,iUserObject,iFetchPlan,o,null,iCurrentLevel + 1,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
+    }
+ else     if (OMultiValue.isMultiValue(o)) {
+      fetchCollection(iRootRecord,iUserObject,iFetchPlan,o,null,iCurrentLevel + 1,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
     }
   }
   iContext.onAfterCollection(iRootRecord,fieldName,iUserObject);

@@ -76,7 +76,8 @@
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(indexAsString,'=',' ');
         if (indexParts.size() == 1 && indexRanges.size() == 1 && indexCondition.size() == 1) {
           if (value instanceof Map<?,?>)           value=getMapEntry((Map<String,?>)value,index);
- else           value=OMultiValue.getValue(value,Integer.parseInt(indexAsString));
+ else           if (Character.isDigit(indexAsString.charAt(0)))           value=OMultiValue.getValue(value,Integer.parseInt(indexAsString));
+ else           value=getFieldValue(value,indexAsString,iContext);
         }
  else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
@@ -126,10 +127,15 @@
  else         if (value instanceof Map<?,?>)         value=getMapEntry((Map<String,?>)value,fieldName);
  else         if (value instanceof Collection<?>) {
           final List<Object> values=new ArrayList<Object>();
-          for (          Object v : OMultiValue.getMultiValueIterable(value))           if (v instanceof OIdentifiable)           values.add(getIdentifiableValue((OIdentifiable)v,fieldName));
- else           if (v instanceof Map)           values.add(((Map<?,?>)v).get(fieldName));
- else           return null;
-          value=values;
+          for (          Object v : OMultiValue.getMultiValueIterable(value)) {
+            final Object item;
+            if (v instanceof OIdentifiable)             item=getIdentifiableValue((OIdentifiable)v,fieldName);
+ else             if (v instanceof Map)             item=((Map<?,?>)v).get(fieldName);
+ else             item=null;
+            if (item != null)             values.add(item);
+          }
+          if (values.isEmpty())           value=null;
+ else           value=values;
         }
  else         return null;
       }

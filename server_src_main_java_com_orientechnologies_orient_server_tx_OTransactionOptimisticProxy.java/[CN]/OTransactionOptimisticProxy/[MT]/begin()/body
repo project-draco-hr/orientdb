@@ -12,12 +12,12 @@ switch (recordStatus) {
 case ORecordOperation.CREATED:
         entry=new OTransactionEntryProxy(recordType);
       entry.type=recordStatus;
-    entry.getRecord().fill(rid,0,channel.readBytes(),true);
+    entry.getRecord().fill(rid,OVersionFactory.instance().createVersion(),channel.readBytes(),true);
   createdRecords.put(rid.copy(),entry.getRecord());
 break;
 case ORecordOperation.UPDATED:
 final ORecordInternal<?> newRecord=Orient.instance().getRecordFactoryManager().newInstance(recordType);
-newRecord.fill(rid,channel.readInt(),channel.readBytes(),true);
+newRecord.fill(rid,channel.readVersion(),channel.readBytes(),true);
 final ORecordInternal<?> currentRecord;
 if (newRecord.getRecordType() == ODocument.RECORD_TYPE) {
 currentRecord=getDatabase().load(rid);
@@ -25,14 +25,14 @@ if (currentRecord == null) throw new ORecordNotFoundException(rid.toString());
 if (currentRecord.getRecordType() == ODocument.RECORD_TYPE) ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
 }
  else currentRecord=newRecord;
-currentRecord.setVersion(newRecord.getVersion());
+currentRecord.getRecordVersion().copyFrom(newRecord.getRecordVersion());
 entry=new ORecordOperation(currentRecord,recordStatus);
 updatedRecords.put(rid,currentRecord);
 break;
 case ORecordOperation.DELETED:
 entry=new OTransactionEntryProxy(recordType);
 entry.type=recordStatus;
-entry.getRecord().fill(rid,channel.readInt(),null,false);
+entry.getRecord().fill(rid,channel.readVersion(),null,false);
 break;
 default :
 throw new OTransactionException("Unrecognized tx command: " + recordStatus);

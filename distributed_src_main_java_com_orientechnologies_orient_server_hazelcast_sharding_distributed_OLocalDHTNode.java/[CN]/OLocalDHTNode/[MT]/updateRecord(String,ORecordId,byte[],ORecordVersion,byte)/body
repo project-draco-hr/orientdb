@@ -1,0 +1,34 @@
+{
+  final ORecordInternal<?> newRecord=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
+  lockManager.acquireLock(Thread.currentThread(),iRecordId,OLockManager.LOCK.EXCLUSIVE);
+  try {
+    final ODatabaseDocumentTx database=openDatabase(storageName);
+    try {
+      newRecord.fill(iRecordId,iVersion,iContent,true);
+      final ORecordInternal<?> currentRecord;
+      if (newRecord instanceof ODocument) {
+        currentRecord=database.load(iRecordId);
+        if (currentRecord == null) {
+          throw new ORecordNotFoundException(iRecordId.toString());
+        }
+        ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
+      }
+ else {
+        currentRecord=newRecord;
+      }
+      currentRecord.getRecordVersion().copyFrom(iVersion);
+      if (iRecordId.getClusterId() == -1)       currentRecord.save();
+ else       currentRecord.save(database.getClusterNameById(iRecordId.getClusterId()));
+      if (currentRecord.getIdentity().toString().equals(database.getStorage().getConfiguration().indexMgrRecordId) && !database.getStatus().equals(ODatabase.STATUS.IMPORTING)) {
+        database.getMetadata().getIndexManager().reload();
+      }
+      return currentRecord.getRecordVersion();
+    }
+  finally {
+      closeDatabase(database);
+    }
+  }
+  finally {
+    lockManager.releaseLock(Thread.currentThread(),iRecordId,OLockManager.LOCK.EXCLUSIVE);
+  }
+}

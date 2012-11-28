@@ -1,0 +1,32 @@
+{
+  final int contentSize=iRecordContent != null ? iRecordContent.length : 0;
+  final int size=OFFSET_RECORD_CONTENT + contentSize;
+  lock.acquireExclusiveLock();
+  try {
+    int offset=file.allocateSpace(size);
+    file.writeByte(offset,STATUS_COMMITTING);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    file.writeByte(offset,iOperation);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    file.writeInt(offset,iTxId);
+    offset+=OBinaryProtocol.SIZE_INT;
+    file.writeShort(offset,(short)iClusterId);
+    offset+=OBinaryProtocol.SIZE_SHORT;
+    final byte[] clusterContent=iClusterOffset.toStream();
+    file.write(offset,clusterContent);
+    offset+=CLUSTER_OFFSET_SIZE;
+    file.writeByte(offset,iRecordType);
+    offset+=OBinaryProtocol.SIZE_BYTE;
+    offset+=iRecordVersion.getSerializer().writeTo(file,offset);
+    file.writeInt(offset,dataSegmentId);
+    offset+=OBinaryProtocol.SIZE_INT;
+    file.writeInt(offset,contentSize);
+    offset+=OBinaryProtocol.SIZE_INT;
+    file.write(offset,iRecordContent);
+    offset+=contentSize;
+    if (synchEnabled)     file.synch();
+  }
+  finally {
+    lock.releaseExclusiveLock();
+  }
+}

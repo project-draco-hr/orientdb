@@ -1,0 +1,52 @@
+{
+  if (iClusterSegment == null)   throw new OStorageException("Cluster not defined for record: " + iRid);
+  final long timer=Orient.instance().getProfiler().startChrono();
+  lock.acquireExclusiveLock();
+  try {
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    try {
+      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
+      if (!checkForRecordValidity(ppos))       return null;
+switch (iVersion.getCounter()) {
+case -1:
+        ppos.recordVersion.increment();
+      iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+    break;
+case -2:
+  break;
+default :
+if (iVersion.getCounter() > -1) {
+  if (!iVersion.equals(ppos.recordVersion))   if (OFastConcurrentModificationException.enabled())   throw OFastConcurrentModificationException.instance();
+ else   throw new OConcurrentModificationException(iRid,ppos.recordVersion,iVersion,ORecordOperation.UPDATED);
+  ppos.recordVersion.increment();
+  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+}
+ else {
+  iVersion.clearRollbackMode();
+  ppos.recordVersion.copyFrom(iVersion);
+  iClusterSegment.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+}
+}
+if (ppos.recordType != iRecordType) iClusterSegment.updateRecordType(iRid.clusterPosition,iRecordType);
+final long newDataSegmentOffset;
+if (ppos.dataSegmentPos == -1) newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).addRecord(iRid,iContent);
+ else newDataSegmentOffset=getDataSegmentById(ppos.dataSegmentId).setRecord(ppos.dataSegmentPos,iRid,iContent);
+if (newDataSegmentOffset != ppos.dataSegmentPos) {
+iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,newDataSegmentOffset);
+ppos.dataSegmentPos=newDataSegmentOffset;
+}
+return ppos;
+}
+  finally {
+lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+}
+}
+ catch (IOException e) {
+OLogManager.instance().error(this,"Error on updating record " + iRid + " (cluster: "+ iClusterSegment+ ")",e);
+}
+ finally {
+lock.releaseExclusiveLock();
+Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to local database",timer);
+}
+return null;
+}

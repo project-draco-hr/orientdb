@@ -1,0 +1,25 @@
+{
+  if (!(iRecord instanceof ODocument))   return (RET)super.save(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  ODocument doc=(ODocument)iRecord;
+  if (iForceCreate || !doc.getIdentity().isValid()) {
+    if (doc.getClassName() != null)     checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_CREATE,doc.getClassName());
+    if (iClusterName == null && doc.getSchemaClass() != null)     iClusterName=getClusterNameById(doc.getSchemaClass().getDefaultClusterId());
+    int id=getClusterIdByName(iClusterName);
+    if (id == -1)     throw new IllegalArgumentException("Cluster name " + iClusterName + " is not configured");
+    final int[] clusterIds;
+    if (doc.getSchemaClass() != null) {
+      clusterIds=doc.getSchemaClass().getClusterIds();
+      int i=0;
+      for (; i < clusterIds.length; ++i)       if (clusterIds[i] == id)       break;
+      if (i == clusterIds.length)       throw new IllegalArgumentException("Cluster name " + iClusterName + " is not configured to store the class "+ doc.getClassName());
+    }
+ else     clusterIds=new int[]{id};
+  }
+ else {
+    if (doc.getClassName() != null)     checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_UPDATE,doc.getClassName());
+  }
+  doc.validate();
+  doc.convertAllMultiValuesToTrackedVersions();
+  doc=super.save(doc,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  return (RET)doc;
+}

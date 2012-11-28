@@ -35,12 +35,22 @@
       }
     }
     try {
+      int recordVersion=0;
+      long timestamp=0L;
+      long macAddress=0L;
       for (int i=0; i < fields.size(); i+=2) {
         final String fieldName=OStringSerializerHelper.getStringContent(fields.get(i));
         final String fieldValue=fields.get(i + 1);
         final String fieldValueAsString=OStringSerializerHelper.getStringContent(fieldValue);
         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_RID))         iRecord.setIdentity(new ORecordId(fieldValueAsString));
- else         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_VERSION))         iRecord.setVersion(Integer.parseInt(fieldValue));
+ else         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_VERSION))         if (OGlobalConfiguration.DB_USE_DISTRIBUTED_VERSION.getValueAsBoolean())         recordVersion=Integer.parseInt(fieldValue);
+ else         iRecord.getRecordVersion().setCounter(Integer.parseInt(fieldValue));
+ else         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_VERSION_TIMESTAMP)) {
+          if (OGlobalConfiguration.DB_USE_DISTRIBUTED_VERSION.getValueAsBoolean())           timestamp=Long.parseLong(fieldValue);
+        }
+ else         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_VERSION_MACADDRESS)) {
+          if (OGlobalConfiguration.DB_USE_DISTRIBUTED_VERSION.getValueAsBoolean())           macAddress=Long.parseLong(fieldValue);
+        }
  else         if (fieldName.equals(ODocumentHelper.ATTRIBUTE_TYPE)) {
           continue;
         }
@@ -89,6 +99,9 @@
  else             doc.field(fieldName,v);
           }
         }
+      }
+      if (timestamp != 0 && OGlobalConfiguration.DB_USE_DISTRIBUTED_VERSION.getValueAsBoolean()) {
+        ((ODistributedVersion)iRecord.getRecordVersion()).update(recordVersion,timestamp,macAddress);
       }
     }
  catch (    Exception e) {

@@ -1,0 +1,17 @@
+{
+  final ORecordInternal<?> newRecord=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  newRecord.fill(rid,version,buffer,true);
+  final ORecordInternal<?> currentRecord;
+  if (newRecord instanceof ODocument) {
+    currentRecord=iDatabase.load(rid);
+    if (currentRecord == null)     throw new ORecordNotFoundException(rid.toString());
+    ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
+  }
+ else   currentRecord=newRecord;
+  currentRecord.getRecordVersion().copyFrom(version);
+  iDatabase.save(currentRecord);
+  if (currentRecord.getIdentity().toString().equals(iDatabase.getStorage().getConfiguration().indexMgrRecordId) && !iDatabase.getStatus().equals(STATUS.IMPORTING)) {
+    iDatabase.getMetadata().getIndexManager().reload();
+  }
+  return currentRecord.getRecordVersion();
+}

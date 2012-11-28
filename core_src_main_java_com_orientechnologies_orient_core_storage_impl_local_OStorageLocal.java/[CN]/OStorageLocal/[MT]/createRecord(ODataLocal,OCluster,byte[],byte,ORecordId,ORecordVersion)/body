@@ -1,0 +1,49 @@
+{
+  checkOpeness();
+  if (iContent == null)   throw new IllegalArgumentException("Record is null");
+  final long timer=Orient.instance().getProfiler().startChrono();
+  lock.acquireExclusiveLock();
+  try {
+    final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,iRecordType);
+    boolean sequentialPositionGeneration=false;
+    if (iClusterSegment.generatePositionBeforeCreation()) {
+      if (iRid.isNew()) {
+        iRid.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(positionGenerator++);
+        sequentialPositionGeneration=true;
+      }
+    }
+ else {
+      iClusterSegment.addPhysicalPosition(ppos);
+      iRid.clusterPosition=ppos.clusterPosition;
+    }
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    try {
+      ppos.dataSegmentId=iDataSegment.getId();
+      ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
+      if (iClusterSegment.generatePositionBeforeCreation()) {
+        if (iRecordVersion.getCounter() > -1 && iRecordVersion.compareTo(ppos.recordVersion) > 0)         ppos.recordVersion=iRecordVersion;
+        ppos.clusterPosition=iRid.clusterPosition;
+        addPhysicalPosition(iDataSegment,iClusterSegment,iRid,ppos,sequentialPositionGeneration);
+      }
+ else {
+        iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
+        if (iRecordVersion.getCounter() > -1 && iRecordVersion.compareTo(ppos.recordVersion) > 0) {
+          iClusterSegment.updateVersion(iRid.clusterPosition,iRecordVersion);
+          ppos.recordVersion=iRecordVersion;
+        }
+      }
+      return ppos;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on creating record in cluster: " + iClusterSegment,e);
+    return null;
+  }
+ finally {
+    lock.releaseExclusiveLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in local database",timer);
+  }
+}

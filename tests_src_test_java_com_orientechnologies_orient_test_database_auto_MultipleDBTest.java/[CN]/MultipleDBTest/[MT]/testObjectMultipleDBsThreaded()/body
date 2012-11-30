@@ -2,22 +2,16 @@
   final int operations_write=1000;
   final int operations_read=1;
   final int dbs=10;
-  final Semaphore sem=new Semaphore(4,true);
-  final AtomicInteger activeDBs=new AtomicInteger(dbs);
   final Set<String> times=Collections.newSetFromMap(new ConcurrentHashMap<String,Boolean>());
+  Set<Future> threads=new HashSet<Future>();
+  ExecutorService executorService=Executors.newFixedThreadPool(4);
   for (int i=0; i < dbs; i++) {
-    sem.acquire();
     final String dbUrl=baseUrl + i;
-    Thread t=new Thread(new Runnable(){
-      public void run(){
+    Callable<Void> t=new Callable<Void>(){
+      public Void call() throws InterruptedException, IOException {
         OObjectDatabaseTx tx=new OObjectDatabaseTx(dbUrl);
-        try {
-          ODatabaseHelper.deleteDatabase(tx);
-          ODatabaseHelper.createDatabase(tx,dbUrl);
-        }
- catch (        IOException e) {
-          e.printStackTrace();
-        }
+        ODatabaseHelper.deleteDatabase(tx);
+        ODatabaseHelper.createDatabase(tx,dbUrl);
         try {
           System.out.println("(" + getDbId(tx) + ") "+ "Created");
           if (tx.isClosed()) {
@@ -51,28 +45,20 @@
           System.out.println(time);
           times.add(time);
           tx.close();
-          sem.release();
-          activeDBs.decrementAndGet();
         }
   finally {
-          try {
-            System.out.println("(" + getDbId(tx) + ") "+ "Dropping");
-            System.out.flush();
-            ODatabaseHelper.deleteDatabase(tx);
-            System.out.println("(" + getDbId(tx) + ") "+ "Dropped");
-            System.out.flush();
-          }
- catch (          IOException e) {
-            e.printStackTrace();
-          }
+          System.out.println("(" + getDbId(tx) + ") "+ "Dropping");
+          System.out.flush();
+          ODatabaseHelper.deleteDatabase(tx);
+          System.out.println("(" + getDbId(tx) + ") "+ "Dropped");
+          System.out.flush();
         }
+        return null;
       }
     }
-);
-    t.start();
+;
+    threads.add(executorService.submit(t));
   }
-  while (activeDBs.get() != 0) {
-    Thread.sleep(300);
-  }
+  for (  Future future : threads)   future.get();
   System.out.println("Test testObjectMultipleDBsThreaded ended");
 }

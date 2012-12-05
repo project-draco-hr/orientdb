@@ -4,14 +4,17 @@
   v.field("name","superNode");
   long insertBegin=System.currentTimeMillis();
   long begin=insertBegin;
+  Set<Integer> identities=new HashSet<Integer>(1000);
   for (int i=1; i <= 1000; ++i) {
     database.createEdge(v,database.createVertex().field("id",i)).save();
+    Assert.assertTrue(identities.add(i));
     if (i % 100 == 0) {
       final long now=System.currentTimeMillis();
       System.out.printf("\nInserted %d edges, elapsed %d ms. v.out=%d",i,now - begin,((Set<?>)v.field("out")).size());
       begin=System.currentTimeMillis();
     }
   }
+  Assert.assertEquals(identities.size(),1000);
   int originalEdges=((Set<?>)v.field("out")).size();
   System.out.println("Edge count (Original instance): " + originalEdges);
   ODocument x=database.load(v.getIdentity());
@@ -22,7 +25,9 @@
   System.out.printf("\nInsertion completed in %dms. DB edges %d, DB vertices %d",now - insertBegin,database.countEdges(),database.countVertexes());
   int i=1;
   for (  OIdentifiable e : database.getOutEdges(v)) {
-    Assert.assertEquals(database.getInVertex(e).field("id"),i);
+    Integer currentIdentity=database.getInVertex(e).field("id");
+    Assert.assertTrue(identities.contains(currentIdentity));
+    Assert.assertTrue(identities.remove(currentIdentity));
     if (i % 100 == 0) {
       now=System.currentTimeMillis();
       System.out.printf("\nRead %d edges and %d vertices, elapsed %d ms",i,i,now - begin);
@@ -30,5 +35,6 @@
     }
     i++;
   }
+  Assert.assertTrue(identities.isEmpty());
   database.declareIntent(null);
 }

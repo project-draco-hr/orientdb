@@ -1,0 +1,29 @@
+{
+  final int[] hash=calculateHash(clusterPosition);
+  byte keySignature=OLinearHashingHashCalculatorFactory.INSTANCE.calculateSignature(clusterPosition);
+  byte signature=primaryIndex.getChainSignature(hash[0]);
+  int pageNumberToUse=hash[0];
+  int chainDisplacement=primaryIndex.getChainDisplacement(hash[0]);
+  byte groupNumber=calculateGroupNumber(hash[0],hash[1]);
+  int pageNumber=groupOverflowTable.getPageForGroup(groupNumber);
+  while (true) {
+    if (keySignature > signature) {
+      if (chainDisplacement >= 253) {
+        return null;
+      }
+ else {
+        pageNumberToUse=pageNumber + chainDisplacement;
+        int realPosInSecondaryIndex=pageIndicator.getRealPosInSecondaryIndex(pageNumberToUse);
+        signature=secondaryIndex.getChainSignature(realPosInSecondaryIndex);
+        chainDisplacement=secondaryIndex.getChainDisplacement(realPosInSecondaryIndex);
+      }
+    }
+ else {
+      OLinearHashingBucket bucket=file.get(pageNumberToUse);
+      if (bucket != null) {
+        return (V)bucket.get(clusterPosition);
+      }
+      return null;
+    }
+  }
+}

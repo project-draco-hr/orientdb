@@ -1,0 +1,55 @@
+{
+  List<OLinearHashingBucket> chain=new ArrayList<OLinearHashingBucket>();
+  boolean nextLevel=false;
+  int naturalOrderedKey=OLinearHashingHashCalculatorFactory.INSTANCE.calculateNaturalOrderedHash(currentRecord,level);
+  if (naturalOrderedKey < next) {
+    naturalOrderedKey=OLinearHashingHashCalculatorFactory.INSTANCE.calculateNaturalOrderedHash(currentRecord,level + 1);
+    nextLevel=true;
+  }
+  if (nextNaturalOrderedKeyShouldBeUsed) {
+    naturalOrderedKey+=step;
+    if (nextLevel && naturalOrderedKey >= 2 * next && step > 0) {
+      naturalOrderedKey=naturalOrderedKey / 2;
+      nextLevel=false;
+    }
+    if (!nextLevel && naturalOrderedKey < next && step < 0) {
+      naturalOrderedKey=naturalOrderedKey * 2 + 1;
+      nextLevel=true;
+    }
+  }
+  int bucketNumber;
+  if (nextLevel) {
+    bucketNumber=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(naturalOrderedKey,level + 1);
+  }
+ else {
+    bucketNumber=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(naturalOrderedKey,level);
+  }
+  int displacement=primaryIndex.getChainDisplacement(bucketNumber);
+  while (displacement < 253) {
+    int pageToUse=findNextPageInChain(bucketNumber,nextLevel ? level + 1 : level,displacement);
+    int realPosInSecondaryIndex=pageIndicator.getRealPosInSecondaryIndex(pageToUse);
+    displacement=secondaryIndex.getChainDisplacement(realPosInSecondaryIndex);
+    OLinearHashingBucket bucket=file.get(pageToUse);
+    chain.add(bucket);
+  }
+  OLinearHashingBucket bucket=file.get(bucketNumber);
+  final K[] result;
+  if (chain.size() == 0) {
+    result=(K[])new OClusterPosition[bucket.size];
+    System.arraycopy(bucket.keys,0,result,0,bucket.size);
+  }
+ else {
+    chain.add(bucket);
+    int amountOfRecords=0;
+    for (    OLinearHashingBucket chainElement : chain) {
+      amountOfRecords+=chainElement.size;
+    }
+    result=(K[])new OClusterPosition[amountOfRecords];
+    int freePositionInArrayPointer=0;
+    for (    OLinearHashingBucket chainElement : chain) {
+      System.arraycopy(chainElement.keys,0,result,freePositionInArrayPointer,chainElement.size);
+      freePositionInArrayPointer+=chainElement.size;
+    }
+  }
+  return result;
+}

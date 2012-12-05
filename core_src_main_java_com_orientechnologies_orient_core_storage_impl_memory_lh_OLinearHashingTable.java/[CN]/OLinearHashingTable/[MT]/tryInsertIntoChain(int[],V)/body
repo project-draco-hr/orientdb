@@ -1,0 +1,68 @@
+{
+  int chainDisplacement=primaryIndex.getChainDisplacement(hash[0]);
+  int pageToStore;
+  final byte keySignature;
+  if (chainDisplacement > 253) {
+    return storeRecordInBucket(hash[0],value,true);
+  }
+ else {
+    byte chainSignature=primaryIndex.getChainSignature(hash[0]);
+    keySignature=OLinearHashingHashCalculatorFactory.INSTANCE.calculateSignature(value.clusterPosition);
+    if (keySignature < chainSignature) {
+      moveLargestRecordToRecordPool(hash[0],chainSignature);
+      final boolean result=storeRecordInBucket(hash[0],value,true);
+      storeRecordFromRecordPool();
+      return result;
+    }
+ else     if (keySignature == chainSignature) {
+      recordPool.add(value);
+      size--;
+      moveLargestRecordToRecordPool(hash[0],chainSignature);
+      OLinearHashingBucket bucket=file.get(hash[0]);
+      primaryIndex.updateSignature(hash[0],bucket.keys,bucket.size);
+      storeRecordFromRecordPool();
+      return true;
+    }
+ else {
+      if (chainDisplacement == 253) {
+        return allocateNewPageAndStore(hash[0],hash[0],value,hash[1],true);
+      }
+ else {
+        pageToStore=findNextPageInChain(hash[0],hash[1],chainDisplacement);
+      }
+    }
+  }
+  while (true) {
+    int realPosInSecondaryIndex=pageIndicator.getRealPosInSecondaryIndex(pageToStore);
+    chainDisplacement=secondaryIndex.getChainDisplacement(realPosInSecondaryIndex);
+    if (chainDisplacement > 253) {
+      return storeRecordInBucket(pageToStore,value,false);
+    }
+ else {
+      int chainSignature=secondaryIndex.getChainSignature(realPosInSecondaryIndex);
+      if (keySignature < chainSignature) {
+        moveLargestRecordToRecordPool(pageToStore,(byte)chainSignature);
+        final boolean result=storeRecordInBucket(pageToStore,value,false);
+        storeRecordFromRecordPool();
+        return result;
+      }
+ else       if (keySignature == chainSignature) {
+        recordPool.add(value);
+        size--;
+        moveLargestRecordToRecordPool(pageToStore,(byte)chainSignature);
+        OLinearHashingBucket bucket=file.get(pageToStore);
+        secondaryIndex.updateSignature(realPosInSecondaryIndex,bucket.keys,bucket.size);
+        storeRecordFromRecordPool();
+        return true;
+      }
+ else {
+        if (chainDisplacement == 253) {
+          return allocateNewPageAndStore(hash[0],pageToStore,value,hash[1],false);
+        }
+ else {
+          pageToStore=findNextPageInChain(hash[0],hash[1],chainDisplacement);
+        }
+      }
+    }
+  }
+}

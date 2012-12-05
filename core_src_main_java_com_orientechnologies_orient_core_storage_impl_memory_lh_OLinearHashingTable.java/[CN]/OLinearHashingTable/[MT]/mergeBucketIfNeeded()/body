@@ -1,0 +1,31 @@
+{
+  double capacity=((double)size) / (primaryIndex.bucketCount() * OLinearHashingBucket.BUCKET_MAX_SIZE);
+  if (capacity < minCapacity && level > 0) {
+    final int naturalOrderKey1;
+    final int bucketNumberToMerge1;
+    final int bucketNumberToMerge2;
+    final int currentLevel;
+    if (next == 0) {
+      currentLevel=level;
+      naturalOrderKey1=(int)(CHAIN_NUMBER * Math.pow(2,level)) - 2;
+      bucketNumberToMerge1=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(naturalOrderKey1,level);
+      bucketNumberToMerge2=(int)Math.pow(2,level) - 1;
+    }
+ else {
+      currentLevel=level + 1;
+      naturalOrderKey1=2 * (next - 1);
+      bucketNumberToMerge1=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(naturalOrderKey1,level + 1);
+      bucketNumberToMerge2=next - 1 + (int)Math.pow(2,level);
+    }
+    loadChainInPool(bucketNumberToMerge1,currentLevel);
+    loadChainInPool(bucketNumberToMerge2,currentLevel);
+    primaryIndex.remove(bucketNumberToMerge2);
+    file.set(bucketNumberToMerge2,null);
+    next--;
+    if (next < 0) {
+      level--;
+      next=(int)(CHAIN_NUMBER * Math.pow(2,level) - 1);
+    }
+    storeRecordFromRecordPool();
+  }
+}

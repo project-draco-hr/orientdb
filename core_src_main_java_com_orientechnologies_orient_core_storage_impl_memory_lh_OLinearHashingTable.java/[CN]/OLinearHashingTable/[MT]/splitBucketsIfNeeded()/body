@@ -1,0 +1,34 @@
+{
+  double capacity=((double)size) / (primaryIndex.bucketCount() * OLinearHashingBucket.BUCKET_MAX_SIZE);
+  if (capacity > maxCapacity) {
+    int bucketNumberToSplit=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(next,level);
+    loadChainInPool(bucketNumberToSplit,level);
+    int pageToStore=next + (int)Math.pow(2,level);
+    byte groupWithStartingPageLessThan=groupOverflowTable.getGroupWithStartingPageLessThenOrEqual(pageToStore);
+    if (groupWithStartingPageLessThan != -2) {
+      int groupSize=groupOverflowTable.getSizeForGroup(groupWithStartingPageLessThan);
+      boolean needMove=false;
+      for (int i=pageToStore; i < pageToStore + groupSize; ++i) {
+        if (pageIndicator.get(i)) {
+          needMove=true;
+          break;
+        }
+      }
+      if (needMove) {
+        moveOverflowGroupToNewPosition(pageToStore);
+      }
+    }
+    primaryIndex.addNewPosition(pageToStore);
+    while (file.size() < pageToStore + 1) {
+      file.add(null);
+    }
+    file.set(pageToStore,new OLinearHashingBucket());
+    groupOverflowTable.moveDummyGroupIfNeeded(pageToStore,calculateGroupSize(level + 1));
+    next++;
+    if (next == (CHAIN_NUMBER * Math.pow(2,level))) {
+      next=0;
+      level++;
+    }
+    storeRecordFromRecordPool();
+  }
+}

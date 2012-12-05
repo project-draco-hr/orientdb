@@ -6,7 +6,7 @@
   if (liveUpdated)   updateClusterRange();
   ORecordInternal<?> record=getRecord();
   while (currentClusterIdx > -1) {
-    while (currentEntry >= firstClusterEntry) {
+    while (currentEntry.compareTo(firstClusterEntry) >= 0) {
       if (!nextPosition(+1)) {
         currentRecord=null;
         break;
@@ -16,9 +16,15 @@
     }
     currentClusterIdx--;
     updateClusterRange();
-    currentEntry=lastClusterEntry;
-    currentPositionIndex=currentPositions.length;
-    currentPositions=dbStorage.getClusterPositionsForEntry(current.clusterId,currentEntry);
+    if (endRange != null && endRange.getClusterPosition() != null) {
+      OClusterPosition beginClusterPosition=endRange.getClusterPosition();
+      currentEntry=beginClusterPosition.compareTo(lastClusterEntry) < 0 ? beginClusterPosition : lastClusterEntry;
+    }
+ else {
+      currentEntry=lastClusterEntry;
+    }
+    record=getRecord();
+    currentRecord=readCurrentRecord(record,0);
   }
   if (txEntries != null && txEntries.size() - (currentTxEntryPosition + 1) > 0)   return true;
   currentRecord=null;

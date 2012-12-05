@@ -1,0 +1,25 @@
+{
+  long filePosition=position.longValue() * RECORD_SIZE;
+  ORecordVersion recordVersionContainer=OVersionFactory.instance().createVersion();
+  acquireSharedLock();
+  try {
+    if (position.compareTo(getLastIdentity()) > 0)     return OClusterPosition.INVALID_POSITION;
+    do {
+      filePosition-=RECORD_SIZE;
+      final long[] pos=fileSegment.getRelativePosition(filePosition);
+      final OFile f=fileSegment.files[(int)pos[0]];
+      long p=pos[1] + OBinaryProtocol.SIZE_SHORT + OBinaryProtocol.SIZE_LONG+ OBinaryProtocol.SIZE_BYTE;
+      recordVersionContainer.getSerializer().readFrom(f,p,recordVersionContainer);
+    }
+ while (recordVersionContainer.isTemporary() && position.compareTo(getFirstIdentity()) >= 0);
+    if (recordVersionContainer.isTemporary()) {
+      return OClusterPosition.INVALID_POSITION;
+    }
+ else {
+      return OClusterPositionFactory.INSTANCE.valueOf(filePosition / RECORD_SIZE);
+    }
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

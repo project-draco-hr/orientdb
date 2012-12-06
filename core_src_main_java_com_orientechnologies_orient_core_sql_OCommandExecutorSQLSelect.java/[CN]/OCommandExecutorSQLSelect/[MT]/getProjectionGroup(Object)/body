@@ -1,7 +1,28 @@
 {
   ORuntimeResult group=null;
   if (groupedResult == null)   groupedResult=new LinkedHashMap<Object,ORuntimeResult>();
- else   group=groupedResult.get(fieldValue);
+ else {
+    if (fieldValue != null && fieldValue.getClass().isArray()) {
+      final int arraySize=Array.getLength(fieldValue);
+      for (      Entry<Object,ORuntimeResult> entry : groupedResult.entrySet()) {
+        final Object k=entry.getKey();
+        boolean same=false;
+        if (k != null && k.getClass().isArray() && Array.getLength(k) == arraySize) {
+          same=true;
+          for (int i=0; i < arraySize; ++i) {
+            final Object o1=Array.get(k,i);
+            final Object o2=Array.get(fieldValue,i);
+            if (o1 == null && o2 != null || o1 != null && o2 == null || o1 != null && !o1.equals(o2)) {
+              same=false;
+              break;
+            }
+          }
+        }
+        if (same)         group=entry.getValue();
+      }
+    }
+ else     group=groupedResult.get(fieldValue);
+  }
   if (group == null) {
     group=new ORuntimeResult(createProjectionFromDefinition(),resultCount,context);
     groupedResult.put(fieldValue,group);

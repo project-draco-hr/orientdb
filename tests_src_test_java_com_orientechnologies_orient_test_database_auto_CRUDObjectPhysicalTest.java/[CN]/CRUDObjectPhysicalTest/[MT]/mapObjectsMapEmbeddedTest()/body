@@ -1,0 +1,37 @@
+{
+  database=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  List<Child> cresult=database.query(new OSQLSynchQuery<Child>("select * from Child"));
+  int childSize=cresult.size();
+  JavaComplexTestClass p=database.newInstance(JavaComplexTestClass.class);
+  p.setName("Silvester");
+  Child c=database.newInstance(Child.class);
+  c.setName("John");
+  Child c1=database.newInstance(Child.class);
+  c1.setName("Jack");
+  Child c2=database.newInstance(Child.class);
+  c2.setName("Bob");
+  Child c3=database.newInstance(Child.class);
+  c3.setName("Sam");
+  Child c4=database.newInstance(Child.class);
+  c4.setName("Dean");
+  p.getEmbeddedChildren().put(c.getName(),c);
+  p.getEmbeddedChildren().put(c1.getName(),c1);
+  p.getEmbeddedChildren().put(c2.getName(),c2);
+  p.getEmbeddedChildren().put(c3.getName(),c3);
+  p.getEmbeddedChildren().put(c4.getName(),c4);
+  database.save(p);
+  cresult=database.query(new OSQLSynchQuery<Child>("select * from Child"));
+  Assert.assertTrue(cresult.size() == childSize);
+  ORID rid=new ORecordId(p.getId());
+  database.close();
+  database=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  JavaComplexTestClass loaded=database.load(rid);
+  Assert.assertEquals(loaded.getEmbeddedChildren().size(),5);
+  for (  String key : loaded.getEmbeddedChildren().keySet()) {
+    Child loadedC=loaded.getEmbeddedChildren().get(key);
+    Assert.assertTrue(database.getRecordByUserObject(loadedC,false).isEmbedded());
+    Assert.assertTrue(loadedC instanceof Child);
+    Assert.assertTrue(loadedC.getName().equals("John") || loadedC.getName().equals("Jack") || loadedC.getName().equals("Bob")|| loadedC.getName().equals("Sam")|| loadedC.getName().equals("Dean"));
+  }
+  database.close();
+}

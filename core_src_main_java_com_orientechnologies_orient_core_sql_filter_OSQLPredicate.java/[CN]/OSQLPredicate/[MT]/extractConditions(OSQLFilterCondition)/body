@@ -9,20 +9,21 @@
     return new OSQLSynchQuery<Object>(embedded.toString());
   }
   parserSetCurrentPosition(oldPosition);
-  final OSQLFilterCondition currentCondition=extractCondition();
-  if (!parserSkipWhiteSpaces())   return currentCondition;
-  if (!parserIsEnded() && parserGetCurrentChar() == ')')   return currentCondition;
-  final OQueryOperator nextOperator=extractConditionOperator();
-  if (nextOperator == null)   return currentCondition;
-  if (nextOperator.precedence > currentCondition.getOperator().precedence) {
-    final OSQLFilterCondition subCondition=new OSQLFilterCondition(currentCondition.right,nextOperator);
-    currentCondition.right=subCondition;
-    subCondition.right=extractConditionItem(false,1);
-    return currentCondition;
-  }
+  OSQLFilterCondition currentCondition=extractCondition();
+  while (parserSkipWhiteSpaces()) {
+    if (!parserIsEnded() && parserGetCurrentChar() == ')')     return currentCondition;
+    final OQueryOperator nextOperator=extractConditionOperator();
+    if (nextOperator == null)     return currentCondition;
+    if (nextOperator.precedence > currentCondition.getOperator().precedence) {
+      final OSQLFilterCondition subCondition=new OSQLFilterCondition(currentCondition.right,nextOperator);
+      currentCondition.right=subCondition;
+      subCondition.right=extractConditionItem(false,1);
+    }
  else {
-    final OSQLFilterCondition parentCondition=new OSQLFilterCondition(currentCondition,nextOperator);
-    parentCondition.right=extractConditions(parentCondition);
-    return parentCondition;
+      final OSQLFilterCondition parentCondition=new OSQLFilterCondition(currentCondition,nextOperator);
+      parentCondition.right=extractConditions(parentCondition);
+      currentCondition=parentCondition;
+    }
   }
+  return currentCondition;
 }

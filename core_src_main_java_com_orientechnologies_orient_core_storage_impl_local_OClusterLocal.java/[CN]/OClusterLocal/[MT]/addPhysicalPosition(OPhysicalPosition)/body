@@ -1,30 +1,24 @@
 {
   final long[] pos;
-  final boolean recycled;
   long offset;
   acquireExclusiveLock();
   try {
     offset=holeSegment.popLastEntryPosition();
     if (offset > -1) {
       pos=fileSegment.getRelativePosition(offset);
-      recycled=true;
     }
  else {
       pos=allocateRecord();
       offset=fileSegment.getAbsolutePosition(pos);
-      recycled=false;
     }
     final OFile file=fileSegment.files[(int)pos[0]];
     long p=pos[1];
     file.writeShort(p,(short)iPPosition.dataSegmentId);
     file.writeLong(p+=OBinaryProtocol.SIZE_SHORT,iPPosition.dataSegmentPos);
     file.writeByte(p+=OBinaryProtocol.SIZE_LONG,iPPosition.recordType);
-    if (recycled) {
-      iPPosition.recordVersion.getSerializer().readFrom(file,p + OBinaryProtocol.SIZE_BYTE,iPPosition.recordVersion);
-      iPPosition.recordVersion.revive();
-    }
- else     iPPosition.recordVersion.reset();
+    iPPosition.recordVersion.reset();
     iPPosition.recordVersion.getSerializer().writeTo(file,p + OBinaryProtocol.SIZE_BYTE,iPPosition.recordVersion);
+    iPPosition.recordVersion.increment();
     iPPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(offset / RECORD_SIZE);
     updateBoundsAfterInsertion(iPPosition.clusterPosition.longValue());
   }

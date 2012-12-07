@@ -1,19 +1,19 @@
 {
   long filePosition=position.longValue() * RECORD_SIZE;
-  ORecordVersion recordVersionContainer=OVersionFactory.instance().createVersion();
   acquireSharedLock();
   try {
-    if (position.compareTo(getLastIdentity()) >= 0)     return OClusterPosition.INVALID_POSITION;
-    long lastFilePosition=getLastIdentity().longValue() * RECORD_SIZE;
+    if (position.compareTo(getLastPosition()) >= 0)     return OClusterPosition.INVALID_POSITION;
+    long lastFilePosition=getLastPosition().longValue() * RECORD_SIZE;
+    byte recordType;
     do {
       filePosition+=RECORD_SIZE;
       final long[] pos=fileSegment.getRelativePosition(filePosition);
       final OFile f=fileSegment.files[(int)pos[0]];
-      long p=pos[1] + OBinaryProtocol.SIZE_SHORT + OBinaryProtocol.SIZE_LONG+ OBinaryProtocol.SIZE_BYTE;
-      recordVersionContainer.getSerializer().readFrom(f,p,recordVersionContainer);
+      long p=pos[1] + RECORD_TYPE_OFFSET;
+      recordType=f.readByte(p);
     }
- while (recordVersionContainer.isTemporary() && filePosition < lastFilePosition);
-    if (recordVersionContainer.isTemporary()) {
+ while (recordType == RECORD_WAS_DELETED && filePosition < lastFilePosition);
+    if (recordType == RECORD_WAS_DELETED) {
       return OClusterPosition.INVALID_POSITION;
     }
  else {
@@ -21,7 +21,6 @@
     }
   }
   finally {
-    recordVersionContainer.clearRollbackMode();
     releaseSharedLock();
   }
 }

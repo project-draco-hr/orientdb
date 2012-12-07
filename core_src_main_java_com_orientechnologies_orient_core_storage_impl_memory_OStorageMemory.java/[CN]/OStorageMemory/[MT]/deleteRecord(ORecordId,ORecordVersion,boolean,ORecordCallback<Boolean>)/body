@@ -1,0 +1,33 @@
+{
+  final long timer=Orient.instance().getProfiler().startChrono();
+  final OCluster cluster=getClusterById(iRid.clusterId);
+  lock.acquireSharedLock();
+  try {
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    try {
+      final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
+      if (ppos == null || ppos.recordVersion.isTombstone()) {
+        if (iCallback != null)         iCallback.call(iRid,false);
+        return false;
+      }
+      if (iVersion.getCounter() > -1 && !ppos.recordVersion.equals(iVersion))       if (OFastConcurrentModificationException.enabled())       throw OFastConcurrentModificationException.instance();
+ else       throw new OConcurrentModificationException(iRid,ppos.recordVersion,iVersion,ORecordOperation.DELETED);
+      if (useTombstones)       cluster.updateVersion(iRid.clusterPosition,ORecordVersion.TOMBSTONE);
+ else       cluster.removePhysicalPosition(iRid.clusterPosition);
+      final ODataSegmentMemory dataSegment=getDataSegmentById(ppos.dataSegmentId);
+      dataSegment.deleteRecord(ppos.dataSegmentPos);
+      if (iCallback != null)       iCallback.call(null,true);
+      return true;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+    }
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on delete record " + iRid,e);
+  }
+ finally {
+    lock.releaseSharedLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from memory database",timer,"db.*.deleteRecord");
+  }
+}

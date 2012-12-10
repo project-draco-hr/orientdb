@@ -1,19 +1,14 @@
 {
   double capacity=((double)size) / (primaryIndex.bucketCount() * OLinearHashingBucket.BUCKET_MAX_SIZE);
   if (capacity > maxCapacity) {
-    int bucketNumberToSplit=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(next,level);
+    int bucketNumberToSplit=(int)OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(next,level);
     loadChainInPool(bucketNumberToSplit,level);
-    int pageToStore=next + (int)Math.pow(2,level);
+    groupOverflowTable.removeUnusedGroups(pageIndicator);
+    int pageToStore=next + 1 << level;
     byte groupWithStartingPageLessThan=groupOverflowTable.getGroupWithStartingPageLessThenOrEqual(pageToStore);
     if (groupWithStartingPageLessThan != -2) {
       int groupSize=groupOverflowTable.getSizeForGroup(groupWithStartingPageLessThan);
-      boolean needMove=false;
-      for (int i=pageToStore; i < pageToStore + groupSize; ++i) {
-        if (pageIndicator.get(i)) {
-          needMove=true;
-          break;
-        }
-      }
+      final boolean needMove=pageIndicator.isUsedPageExistInRange(pageToStore,pageToStore + groupSize);
       if (needMove) {
         moveOverflowGroupToNewPosition(pageToStore);
       }
@@ -25,7 +20,7 @@
     file.set(pageToStore,new OLinearHashingBucket());
     groupOverflowTable.moveDummyGroupIfNeeded(pageToStore,calculateGroupSize(level + 1));
     next++;
-    if (next == (CHAIN_NUMBER * Math.pow(2,level))) {
+    if (next == 1 << level) {
       next=0;
       level++;
     }

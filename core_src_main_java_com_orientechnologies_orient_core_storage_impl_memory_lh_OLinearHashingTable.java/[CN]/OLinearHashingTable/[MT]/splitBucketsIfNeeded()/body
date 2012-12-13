@@ -1,31 +1,30 @@
 {
   double capacity=((double)size) / (primaryIndex.bucketCount() * OLinearHashingBucket.BUCKET_MAX_SIZE);
   if (capacity > maxCapacity) {
-    int bucketNumberToSplit=OLinearHashingHashCalculatorFactory.INSTANCE.calculateBucketNumber(next,level);
+    int bucketNumberToSplit=OLinearHashingHashCalculator.INSTANCE.calculateBucketNumber(next,level);
     loadChainInPool(bucketNumberToSplit,level);
-    int pageToStore=next + (int)Math.pow(2,level);
+    groupOverflowTable.removeUnusedGroups(pageIndicator);
+    int pageToStore=next + (1 << level);
     byte groupWithStartingPageLessThan=groupOverflowTable.getGroupWithStartingPageLessThenOrEqual(pageToStore);
-    if (groupWithStartingPageLessThan != -2) {
+    if (groupWithStartingPageLessThan >= 0) {
       int groupSize=groupOverflowTable.getSizeForGroup(groupWithStartingPageLessThan);
-      boolean needMove=false;
-      for (int i=pageToStore; i < pageToStore + groupSize; ++i) {
-        if (pageIndicator.get(i)) {
-          needMove=true;
-          break;
-        }
-      }
+      final boolean needMove=pageIndicator.isUsedPageExistInRange(pageToStore,pageToStore + groupSize);
       if (needMove) {
         moveOverflowGroupToNewPosition(pageToStore);
       }
     }
+ else     if (groupWithStartingPageLessThan == -1) {
+      groupOverflowTable.moveDummyGroup(calculateGroupSize(level + 1));
+    }
+ else     if (groupWithStartingPageLessThan != -2)     throw new IllegalStateException("Invalid group  number : " + groupWithStartingPageLessThan);
     primaryIndex.addNewPosition(pageToStore);
     while (file.size() < pageToStore + 1) {
       file.add(null);
     }
-    file.set(pageToStore,new OLinearHashingBucket());
+    file.set(pageToStore,new OLinearHashingBucket<K,V>());
     groupOverflowTable.moveDummyGroupIfNeeded(pageToStore,calculateGroupSize(level + 1));
     next++;
-    if (next == (CHAIN_NUMBER * Math.pow(2,level))) {
+    if (next == 1 << level) {
       next=0;
       level++;
     }

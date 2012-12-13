@@ -1,6 +1,6 @@
 {
-  final int[] hash=calculateHash(key);
-  byte keySignature=OLinearHashingHashCalculatorFactory.INSTANCE.calculateSignature(key);
+  final int[] hash=calculateBucketNumberAndLevel(key);
+  byte keySignature=OLinearHashingHashCalculator.INSTANCE.calculateSignature(key);
   byte signature=primaryIndex.getChainSignature(hash[0]);
   int pageNumberToUse=hash[0];
   int chainDisplacement=primaryIndex.getChainDisplacement(hash[0]);
@@ -10,7 +10,7 @@
   while (true) {
     if (keySignature > signature) {
       if (chainDisplacement >= 253) {
-        return false;
+        return null;
       }
  else {
         prevPage=pageNumberToUse;
@@ -21,15 +21,18 @@
       }
     }
  else {
-      OLinearHashingBucket bucket=file.get(pageNumberToUse);
-      int position=bucket.deleteKey(key);
+      OLinearHashingBucket<K,V> bucket=file.get(pageNumberToUse);
+      int position=bucket.getPosition(key);
+      final V deletedValue;
       if (position >= 0) {
+        deletedValue=bucket.values[position];
+        bucket.deleteEntry(position);
         while (chainDisplacement < 253) {
           prevPage=pageNumberToUse;
           pageNumberToUse=pageNumber + chainDisplacement;
           int realPosInSecondaryIndex=pageIndicator.getRealPosInSecondaryIndex(pageNumberToUse);
           chainDisplacement=secondaryIndex.getChainDisplacement(realPosInSecondaryIndex);
-          OLinearHashingBucket secondBucket=file.get(pageNumberToUse);
+          OLinearHashingBucket<K,V> secondBucket=file.get(pageNumberToUse);
           List<V> smallestRecords=secondBucket.getSmallestRecords(OLinearHashingBucket.BUCKET_MAX_SIZE - bucket.size);
           if (smallestRecords.isEmpty()) {
           }
@@ -101,11 +104,11 @@
         }
       }
  else {
-        return false;
+        return null;
       }
       size--;
       mergeBucketIfNeeded();
-      return true;
+      return deletedValue;
     }
   }
 }

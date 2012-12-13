@@ -1,0 +1,26 @@
+{
+  setDataCommandInfo("Retrieve floor positions");
+  final int clusterId=channel.readInt();
+  final OClusterPosition clusterPosition=channel.readClusterPosition();
+  beginResponse();
+  try {
+    sendOk(clientTxId);
+    final OPhysicalPosition[] previousPositions=connection.database.getStorage().floorPhysicalPositions(clusterId,new OPhysicalPosition(clusterPosition));
+    if (previousPositions != null) {
+      channel.writeInt(previousPositions.length);
+      for (      final OPhysicalPosition physicalPosition : previousPositions) {
+        channel.writeClusterPosition(physicalPosition.clusterPosition);
+        channel.writeInt(physicalPosition.dataSegmentId);
+        channel.writeLong(physicalPosition.dataSegmentPos);
+        channel.writeInt(physicalPosition.recordSize);
+        channel.writeVersion(physicalPosition.recordVersion);
+      }
+    }
+ else {
+      channel.writeInt(0);
+    }
+  }
+  finally {
+    endResponse();
+  }
+}

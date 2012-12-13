@@ -3,15 +3,18 @@
   int pageToStore;
   final byte keySignature;
   if (chainDisplacement > 253) {
-    return storeRecordInBucket(hash[0],value,true);
+    final boolean result=storeRecordInBucket(hash[0],value,true);
+    if (result)     size++;
+    return result;
   }
  else {
     byte chainSignature=primaryIndex.getChainSignature(hash[0]);
-    keySignature=OLinearHashingHashCalculatorFactory.INSTANCE.calculateSignature(value.clusterPosition);
+    keySignature=OLinearHashingHashCalculator.INSTANCE.calculateSignature(value.clusterPosition);
     if (keySignature < chainSignature) {
       moveLargestRecordToRecordPool(hash[0],chainSignature);
       final boolean result=storeRecordInBucket(hash[0],value,true);
       storeRecordFromRecordPool();
+      if (result)       size++;
       return result;
     }
  else     if (keySignature == chainSignature) {
@@ -24,7 +27,9 @@
     }
  else {
       if (chainDisplacement == 253) {
-        return allocateNewPageAndStore(hash[0],hash[0],value,hash[1],true);
+        final boolean result=allocateNewPageAndStore(hash[0],hash[0],value,hash[1],true);
+        if (result)         size++;
+        return result;
       }
  else {
         pageToStore=findNextPageInChain(hash[0],hash[1],chainDisplacement);
@@ -35,7 +40,9 @@
     int realPosInSecondaryIndex=pageIndicator.getRealPosInSecondaryIndex(pageToStore);
     chainDisplacement=secondaryIndex.getChainDisplacement(realPosInSecondaryIndex);
     if (chainDisplacement > 253) {
-      return storeRecordInBucket(pageToStore,value,false);
+      final boolean result=storeRecordInBucket(pageToStore,value,false);
+      if (result)       size++;
+      return result;
     }
  else {
       int chainSignature=secondaryIndex.getChainSignature(realPosInSecondaryIndex);
@@ -43,6 +50,7 @@
         moveLargestRecordToRecordPool(pageToStore,(byte)chainSignature);
         final boolean result=storeRecordInBucket(pageToStore,value,false);
         storeRecordFromRecordPool();
+        if (result)         size++;
         return result;
       }
  else       if (keySignature == chainSignature) {
@@ -55,7 +63,9 @@
       }
  else {
         if (chainDisplacement == 253) {
-          return allocateNewPageAndStore(hash[0],pageToStore,value,hash[1],false);
+          final boolean result=allocateNewPageAndStore(hash[0],pageToStore,value,hash[1],false);
+          if (result)           size++;
+          return result;
         }
  else {
           pageToStore=findNextPageInChain(hash[0],hash[1],chainDisplacement);

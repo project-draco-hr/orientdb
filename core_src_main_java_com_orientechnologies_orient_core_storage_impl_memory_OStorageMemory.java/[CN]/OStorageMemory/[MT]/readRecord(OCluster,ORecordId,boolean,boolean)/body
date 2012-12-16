@@ -1,0 +1,28 @@
+{
+  final long timer=Orient.instance().getProfiler().startChrono();
+  lock.acquireSharedLock();
+  try {
+    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.SHARED);
+    try {
+      final OClusterPosition lastPos=iClusterSegment.getLastPosition();
+      if (!iClusterSegment.isRequiresValidPositionBeforeCreation()) {
+        if (iRid.clusterPosition.compareTo(lastPos) > 0)         throw new ORecordNotFoundException("Record " + iRid + " is outside cluster size. Valid range for cluster '"+ iClusterSegment.getName()+ "' is 0-"+ lastPos);
+      }
+      final OPhysicalPosition ppos=iClusterSegment.getPhysicalPosition(new OPhysicalPosition(iRid.clusterPosition));
+      if (ppos != null && loadTombstones && ppos.recordVersion.isTombstone())       return new ORawBuffer(null,ppos.recordVersion,ppos.recordType);
+      if (ppos == null || ppos.recordVersion.isTombstone())       return null;
+      final ODataSegmentMemory dataSegment=getDataSegmentById(ppos.dataSegmentId);
+      return new ORawBuffer(dataSegment.readRecord(ppos.dataSegmentPos),ppos.recordVersion,ppos.recordType);
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.SHARED);
+    }
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on read record in cluster: " + iClusterSegment.getId(),e);
+  }
+ finally {
+    lock.releaseSharedLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from memory database",timer,"db.*.readRecord");
+  }
+}

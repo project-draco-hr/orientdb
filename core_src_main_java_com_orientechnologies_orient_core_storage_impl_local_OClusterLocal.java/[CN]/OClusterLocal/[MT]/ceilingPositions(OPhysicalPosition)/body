@@ -1,0 +1,32 @@
+{
+  long filePosition=position.clusterPosition.longValue() * RECORD_SIZE;
+  if (filePosition < 0)   filePosition=0;
+  acquireSharedLock();
+  try {
+    if (getFirstPosition().longValue() < 0)     return new OPhysicalPosition[0];
+    final long lastFilePosition=getLastPosition().longValue() * RECORD_SIZE;
+    if (filePosition > lastFilePosition)     return new OPhysicalPosition[0];
+    byte recordType;
+    OFile f;
+    long[] pos;
+    do {
+      pos=fileSegment.getRelativePosition(filePosition);
+      f=fileSegment.files[(int)pos[0]];
+      long p=pos[1] + RECORD_TYPE_OFFSET;
+      recordType=f.readByte(p);
+      filePosition+=RECORD_SIZE;
+    }
+ while (recordType == RECORD_WAS_DELETED && filePosition <= lastFilePosition);
+    if (recordType == RECORD_WAS_DELETED) {
+      return new OPhysicalPosition[0];
+    }
+ else {
+      long p=pos[1];
+      final OPhysicalPosition physicalPosition=readPhysicalPosition(f,p);
+      return new OPhysicalPosition[]{physicalPosition};
+    }
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

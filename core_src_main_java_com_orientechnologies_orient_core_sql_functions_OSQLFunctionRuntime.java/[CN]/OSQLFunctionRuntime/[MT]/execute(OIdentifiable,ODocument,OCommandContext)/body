@@ -3,6 +3,18 @@
     if (configuredParameters[i] instanceof OSQLFilterItemField)     runtimeParameters[i]=((OSQLFilterItemField)configuredParameters[i]).getValue(iCurrentRecord,iContext);
  else     if (configuredParameters[i] instanceof OSQLFunctionRuntime)     runtimeParameters[i]=((OSQLFunctionRuntime)configuredParameters[i]).execute(iCurrentRecord,iCurrentResult,iContext);
  else     if (configuredParameters[i] instanceof OSQLFilterItemVariable)     runtimeParameters[i]=((OSQLFilterItemVariable)configuredParameters[i]).getValue(iCurrentRecord,iContext);
+ else     if (configuredParameters[i] instanceof OCommandSQL) {
+      try {
+        runtimeParameters[i]=((OCommandSQL)configuredParameters[i]).setContext(iContext).execute();
+      }
+ catch (      OCommandExecutorNotFoundException e) {
+        final String text=((OCommandSQL)configuredParameters[i]).getText();
+        final OSQLPredicate pred=new OSQLPredicate(text);
+        runtimeParameters[i]=pred.evaluate(iContext);
+        configuredParameters[i]=pred;
+      }
+    }
+ else     if (configuredParameters[i] instanceof OSQLPredicate)     runtimeParameters[i]=((OSQLPredicate)configuredParameters[i]).evaluate(iContext);
   }
   final Object functionResult=function.execute(iCurrentRecord,iCurrentResult,runtimeParameters,iContext);
   return transformValue(iCurrentRecord,functionResult);

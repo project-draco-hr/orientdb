@@ -1,0 +1,67 @@
+{
+  if (!OGlobalConfiguration.USE_LHPEPS_MEMORY_CLUSTER.getValueAsBoolean())   return;
+  int pos=url.lastIndexOf("/");
+  final String u;
+  if (pos > -1)   u=url.substring(0,pos) + "/zombieDB";
+ else {
+    pos=url.lastIndexOf(":");
+    u=url.substring(0,pos + 1) + "/zombieDB";
+  }
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(u);
+  try {
+    ODatabaseHelper.dropDatabase(db);
+  }
+ catch (  OStorageException e) {
+    Assert.assertTrue(e.getCause().getMessage().equals("Database with name 'sub/subTest' doesn't exits."));
+  }
+  ODatabaseHelper.createDatabase(db,u);
+  db.open("admin","admin");
+  final OSchema schema=db.getMetadata().getSchema();
+  final OClass zombieClass=schema.createClass("Zombie");
+  zombieClass.createProperty("name",OType.STRING);
+  zombieClass.createProperty("rank",OType.INTEGER);
+  schema.save();
+  final int docCount=10000;
+  final ODocument document=new ODocument();
+  final TreeSet<OClusterPosition> clusterPositions=new TreeSet<OClusterPosition>();
+  for (int i=0; i < docCount; i++) {
+    document.reset();
+    document.setClassName("Zombie");
+    document.field("name","Flasheater" + i);
+    document.field("rank",i);
+    document.save();
+    clusterPositions.add(document.getIdentity().getClusterPosition());
+  }
+  final HashSet<OClusterPosition> deletedItems=new HashSet<OClusterPosition>();
+  final Random random=new Random();
+  ORecordIteratorCluster<ODocument> clusterIterator=db.browseCluster("Zombie",true);
+  while (clusterIterator.hasNext()) {
+    final ODocument doc=clusterIterator.next();
+    if (random.nextBoolean()) {
+      deletedItems.add(doc.getIdentity().getClusterPosition());
+      doc.delete();
+    }
+  }
+  Assert.assertEquals(db.countClass("Zombie"),docCount - deletedItems.size());
+  clusterIterator=db.browseCluster("Zombie",true);
+  Iterator<OClusterPosition> positionIterator=clusterPositions.iterator();
+  while (clusterIterator.hasNext()) {
+    final ODocument doc=clusterIterator.next();
+    final OClusterPosition position=positionIterator.next();
+    Assert.assertEquals(position,doc.getIdentity().getClusterPosition());
+    if (deletedItems.contains(position))     Assert.assertTrue(doc.getRecordVersion().isTombstone());
+  }
+  Assert.assertFalse(clusterIterator.hasNext());
+  Assert.assertFalse(positionIterator.hasNext());
+  clusterIterator=db.browseCluster("Zombie");
+  positionIterator=clusterPositions.iterator();
+  while (positionIterator.hasNext()) {
+    final OClusterPosition position=positionIterator.next();
+    if (deletedItems.contains(position))     continue;
+    Assert.assertTrue(clusterIterator.hasNext());
+    Assert.assertEquals(position,clusterIterator.next().getIdentity().getClusterPosition());
+  }
+  Assert.assertFalse(clusterIterator.hasNext());
+  Assert.assertFalse(positionIterator.hasNext());
+  db.close();
+}

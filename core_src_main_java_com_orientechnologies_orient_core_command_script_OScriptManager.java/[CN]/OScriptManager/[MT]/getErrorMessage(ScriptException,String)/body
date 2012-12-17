@@ -1,0 +1,30 @@
+{
+  final int errorLineNumber=e.getLineNumber();
+  if (errorLineNumber <= 0) {
+    throw new OCommandScriptException("Error on evaluation of the script library. Error: " + e.getMessage() + "\nScript library was:\n"+ lib);
+  }
+ else {
+    final StringBuilder code=new StringBuilder();
+    final Scanner scanner=new Scanner(lib);
+    try {
+      scanner.useDelimiter("\n");
+      String currentLine=null;
+      String lastFunctionName="unknown";
+      for (int currentLineNumber=1; scanner.hasNext(); currentLineNumber++) {
+        currentLine=scanner.next();
+        int pos=currentLine.indexOf("function");
+        if (pos > -1) {
+          final String[] words=OStringParser.getWords(currentLine.substring(pos + "function".length() + 1)," \r\n\t");
+          if (words.length > 0 && words[0] != "(")           lastFunctionName=words[0];
+        }
+        if (currentLineNumber == errorLineNumber)         code.append(String.format("%4d: >>> %s\n",currentLineNumber,currentLine));
+ else         if (Math.abs(currentLineNumber - errorLineNumber) <= LINES_AROUND_ERROR)         code.append(String.format("%4d: %s\n",currentLineNumber,currentLine));
+      }
+      code.insert(0,String.format("ScriptManager: error %s.\nFunction %s:\n\n",e.getMessage(),lastFunctionName));
+    }
+  finally {
+      scanner.close();
+    }
+    throw new OCommandScriptException(code.toString());
+  }
+}

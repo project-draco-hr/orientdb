@@ -1,0 +1,23 @@
+{
+  super(iDatabase,iLowLevelDatabase,iterateThroughTombstones);
+  if (iClusterId == ORID.CLUSTER_ID_INVALID)   throw new IllegalArgumentException("The clusterId is invalid");
+  current.clusterId=iClusterId;
+  final OClusterPosition[] range=database.getStorage().getClusterDataRange(current.clusterId);
+  if (firstClusterEntry.equals(OClusterPosition.INVALID_POSITION))   this.firstClusterEntry=range[0];
+ else   this.firstClusterEntry=firstClusterEntry.compareTo(range[0]) > 0 ? firstClusterEntry : range[0];
+  if (lastClusterEntry.equals(OClusterPosition.INVALID_POSITION))   this.lastClusterEntry=range[1];
+ else   this.lastClusterEntry=lastClusterEntry.compareTo(range[1]) < 0 ? lastClusterEntry : range[1];
+  totalAvailableRecords=database.countClusterElements(current.clusterId,iterateThroughTombstones);
+  txEntries=iDatabase.getTransaction().getNewRecordEntriesByClusterIds(new int[]{iClusterId});
+  if (txEntries != null)   for (  ORecordOperation entry : txEntries) {
+switch (entry.type) {
+case ORecordOperation.CREATED:
+      totalAvailableRecords++;
+    break;
+case ORecordOperation.DELETED:
+  totalAvailableRecords--;
+break;
+}
+}
+begin();
+}

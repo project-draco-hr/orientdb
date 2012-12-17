@@ -14,6 +14,7 @@
   }
   final HashSet<OClusterPosition> deletedItems=new HashSet<OClusterPosition>();
   final Random random=new Random();
+  random.setSeed(119269911101956L);
   ORecordIteratorCluster<ODocument> clusterIterator=db.browseCluster("Zombie",OClusterPosition.INVALID_POSITION,OClusterPosition.INVALID_POSITION,true);
   while (clusterIterator.hasNext()) {
     final ODocument doc=clusterIterator.next();
@@ -23,8 +24,21 @@
     }
   }
   Assert.assertEquals(db.countClass("Zombie"),docCount - deletedItems.size());
-  clusterIterator=db.browseCluster("Zombie",OClusterPosition.INVALID_POSITION,OClusterPosition.INVALID_POSITION,true);
-  Iterator<OClusterPosition> positionIterator=clusterPositions.iterator();
+  OClusterPosition startPosition=null;
+  OClusterPosition endPosition=null;
+  int processedDocs=0;
+  for (  OClusterPosition position : clusterPositions) {
+    processedDocs++;
+    if (processedDocs == 1000) {
+      startPosition=position;
+    }
+ else     if (processedDocs == 2000) {
+      endPosition=position;
+      break;
+    }
+  }
+  clusterIterator=db.browseCluster("Zombie",startPosition,endPosition,true);
+  Iterator<OClusterPosition> positionIterator=clusterPositions.subSet(startPosition,true,endPosition,true).iterator();
   while (clusterIterator.hasNext()) {
     final ODocument doc=clusterIterator.next();
     final OClusterPosition position=positionIterator.next();
@@ -33,8 +47,8 @@
   }
   Assert.assertFalse(clusterIterator.hasNext());
   Assert.assertFalse(positionIterator.hasNext());
-  clusterIterator=db.browseCluster("Zombie");
-  positionIterator=clusterPositions.iterator();
+  clusterIterator=db.browseCluster("Zombie",startPosition,endPosition,false);
+  positionIterator=clusterPositions.subSet(startPosition,true,endPosition,true).iterator();
   while (positionIterator.hasNext()) {
     final OClusterPosition position=positionIterator.next();
     if (deletedItems.contains(position))     continue;

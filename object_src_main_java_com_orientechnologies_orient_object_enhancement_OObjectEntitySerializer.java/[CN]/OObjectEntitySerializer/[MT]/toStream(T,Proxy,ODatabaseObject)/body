@@ -30,11 +30,18 @@
     versionConfigured=true;
     Object ver=getFieldValue(vField,iPojo);
     if (ver != null) {
-      if (ver instanceof Number) {
-        iRecord.setVersion(((Number)ver).intValue());
+      final ORecordVersion version=iRecord.getRecordVersion();
+      if (ver instanceof ORecordVersion) {
+        version.copyFrom((ORecordVersion)ver);
       }
- else       if (ver instanceof String)       iRecord.setVersion(Integer.parseInt((String)ver));
- else       if (ver.getClass().equals(Object.class))       iRecord.setVersion((Integer)ver);
+ else       if (ver instanceof Number) {
+        if (version instanceof OSimpleVersion)         version.setCounter(((Number)ver).intValue());
+ else         OLogManager.instance().warn(OObjectEntitySerializer.class,"@Version field can't be declared as Number in distributed mode. Should be one of following: String, Object, ORecordVersion");
+      }
+ else       if (ver instanceof String) {
+        version.getSerializer().fromString((String)ver,version);
+      }
+ else       if (ver.getClass().equals(Object.class))       version.copyFrom((ORecordVersion)ver);
  else       OLogManager.instance().warn(OObjectSerializerHelper.class,"@Version field has been declared as %s while the supported are: Number, String, Object",ver.getClass());
     }
   }

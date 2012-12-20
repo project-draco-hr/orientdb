@@ -1,0 +1,28 @@
+{
+  ORecordInternal<?> replicaToAdd=record;
+  boolean result;
+  final ORecordVersion version=record.getRecordVersion();
+  try {
+    if (!version.isTombstone()) {
+      if (record instanceof ODocument) {
+        replicaToAdd=mergeWithDocument();
+      }
+ else       replicaToAdd=record;
+      callbackHooks(TYPE.BEFORE_REPLICA_ADD,replicaToAdd);
+    }
+ else     replicaToAdd=record;
+    byte[] stream=replicaToAdd.toStream();
+    final int dataSegmentId=dataSegmentStrategy.assignDataSegmentId(ODatabaseRecordAbstract.this,replicaToAdd);
+    result=underlying.updateReplica(dataSegmentId,rid,stream,version,recordType);
+    if (!version.isTombstone()) {
+      callbackHooks(TYPE.AFTER_REPLICA_ADD,replicaToAdd);
+      replicaToAdd.unsetDirty();
+      getLevel1Cache().updateRecord(replicaToAdd);
+    }
+  }
+ catch (  Exception e) {
+    if (!version.isTombstone())     callbackHooks(TYPE.AFTER_REPLICA_ADD,replicaToAdd);
+    throw e;
+  }
+  return result;
+}

@@ -6,7 +6,7 @@
     final long offset=data.createRecord(iContent);
     final OCluster cluster=getClusterById(iRid.clusterId);
     final OPhysicalPosition ppos=new OPhysicalPosition(iDataSegmentId,offset,iRecordType);
-    if (cluster.isRequiresValidPositionBeforeCreation()) {
+    if (cluster.isLHBased()) {
       if (iRid.isNew()) {
         if (OGlobalConfiguration.USE_NODE_ID_CLUSTER_POSITION.getValueAsBoolean()) {
           ppos.clusterPosition=OClusterPositionFactory.INSTANCE.generateUniqueClusterPosition();
@@ -19,7 +19,10 @@
         ppos.clusterPosition=iRid.clusterPosition;
       }
     }
-    cluster.addPhysicalPosition(ppos);
+    if (!cluster.addPhysicalPosition(ppos)) {
+      data.readRecord(ppos.dataSegmentPos);
+      throw new OStorageException("Record with given id " + iRid + " has already exists.");
+    }
     iRid.clusterPosition=ppos.clusterPosition;
     if (iCallback != null)     iCallback.call(iRid,iRid.clusterPosition);
     return new OStorageOperationResult<OPhysicalPosition>(ppos);

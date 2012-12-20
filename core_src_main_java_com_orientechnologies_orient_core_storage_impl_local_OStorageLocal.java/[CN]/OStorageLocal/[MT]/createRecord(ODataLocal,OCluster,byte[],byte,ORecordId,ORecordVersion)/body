@@ -1,49 +1,56 @@
 {
   checkOpeness();
-  if (iContent == null)   throw new IllegalArgumentException("Record is null");
+  if (content == null)   throw new IllegalArgumentException("Record is null");
   final long timer=Orient.instance().getProfiler().startChrono();
-  lock.acquireExclusiveLock();
-  try {
-    final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,iRecordType);
-    boolean sequentialPositionGeneration=false;
-    if (iClusterSegment.isRequiresValidPositionBeforeCreation()) {
-      if (iRid.isNew()) {
-        iRid.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(positionGenerator++);
-        sequentialPositionGeneration=true;
+  final OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,recordType);
+  if (cluster.isLHBased()) {
+    if (rid.isNew()) {
+      if (OGlobalConfiguration.USE_NODE_ID_CLUSTER_POSITION.getValueAsBoolean()) {
+        ppos.clusterPosition=OClusterPositionFactory.INSTANCE.generateUniqueClusterPosition();
+      }
+ else {
+        ppos.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(positionGenerator++);
       }
     }
  else {
-      iClusterSegment.addPhysicalPosition(ppos);
-      iRid.clusterPosition=ppos.clusterPosition;
-    }
-    lockManager.acquireLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
-    try {
-      ppos.dataSegmentId=iDataSegment.getId();
-      ppos.dataSegmentPos=iDataSegment.addRecord(iRid,iContent);
-      if (iClusterSegment.isRequiresValidPositionBeforeCreation()) {
-        if (iRecordVersion.getCounter() > -1 && iRecordVersion.compareTo(ppos.recordVersion) > 0)         ppos.recordVersion=iRecordVersion;
-        ppos.clusterPosition=iRid.clusterPosition;
-        addPhysicalPosition(iDataSegment,iClusterSegment,iRid,ppos,sequentialPositionGeneration);
-      }
- else {
-        iClusterSegment.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
-        if (iRecordVersion.getCounter() > -1 && iRecordVersion.compareTo(ppos.recordVersion) > 0) {
-          iClusterSegment.updateVersion(iRid.clusterPosition,iRecordVersion);
-          ppos.recordVersion=iRecordVersion;
-        }
-      }
-      return ppos;
-    }
-  finally {
-      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+      ppos.clusterPosition=rid.clusterPosition;
     }
   }
- catch (  IOException e) {
-    OLogManager.instance().error(this,"Error on creating record in cluster: " + iClusterSegment,e);
+  try {
+    if (!cluster.addPhysicalPosition(ppos))     throw new OStorageException("Record with given id " + rid + " has already exists.");
+    rid.clusterPosition=ppos.clusterPosition;
+    lock.acquireExclusiveLock();
+    try {
+      lockManager.acquireLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
+      try {
+        ppos.dataSegmentId=dataSegment.getId();
+        ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
+        cluster.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
+        if (recordVersion.getCounter() > -1 && recordVersion.compareTo(ppos.recordVersion) > 0) {
+          cluster.updateVersion(rid.clusterPosition,recordVersion);
+          ppos.recordVersion=recordVersion;
+        }
+        return ppos;
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
+      }
+    }
+  finally {
+      lock.releaseExclusiveLock();
+    }
+  }
+ catch (  IOException ioe) {
+    try {
+      if (ppos.clusterPosition != null && ppos.clusterPosition.compareTo(OClusterPosition.INVALID_POSITION) != 0)       cluster.removePhysicalPosition(ppos.clusterPosition);
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error on removing physical position in cluster: " + cluster,e);
+    }
+    OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,ioe);
     return null;
   }
  finally {
-    lock.releaseExclusiveLock();
     Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in local database",timer,"db.*.createRecord");
   }
 }

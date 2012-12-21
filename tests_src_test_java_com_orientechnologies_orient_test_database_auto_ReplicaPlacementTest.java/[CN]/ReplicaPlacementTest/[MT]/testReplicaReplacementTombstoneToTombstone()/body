@@ -1,7 +1,7 @@
 {
   if (!OGlobalConfiguration.USE_LHPEPS_MEMORY_CLUSTER.getValueAsBoolean())   return;
   ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
-  final ODocument docOne=new ODocument("ReplicaTest");
+  ODocument docOne=new ODocument("ReplicaTest");
   docOne.field("prop","value");
   docOne.save();
   ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
@@ -12,14 +12,13 @@
   ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
   docOne.field("prop","value3");
   docOne.save();
-  docOne.field("prop","value5");
-  docOne.save();
+  docOne.delete();
+  docOne=dbOne.load(docOne.getIdentity(),"*:0",false,true);
+  ORecordVersion docOneVersion=docOne.getRecordVersion();
   ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
   dbTwo.updatedReplica(docOne);
-  docTwo=dbTwo.load(docOne.getIdentity());
-  Assert.assertNotNull(docTwo);
-  Assert.assertTrue(ODocumentHelper.hasSameContentItem(docTwo,dbTwo,docOne,dbOne));
+  docTwo=dbTwo.load(docOne.getIdentity(),"*:0",false,true);
+  Assert.assertEquals(docOneVersion,docTwo.getRecordVersion());
   final OIndex propindex=dbTwo.getMetadata().getIndexManager().getIndex("propindex");
-  Assert.assertEquals(1,propindex.getSize());
-  Assert.assertTrue(propindex.contains("value5"));
+  Assert.assertEquals(0,propindex.getSize());
 }

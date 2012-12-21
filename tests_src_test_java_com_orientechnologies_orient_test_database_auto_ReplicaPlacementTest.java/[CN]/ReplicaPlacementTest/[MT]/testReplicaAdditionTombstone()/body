@@ -1,20 +1,21 @@
 {
   if (!OGlobalConfiguration.USE_LHPEPS_MEMORY_CLUSTER.getValueAsBoolean())   return;
-  InitScheme initScheme=new InitScheme("ReplicaAddition").invoke();
+  InitScheme initScheme=new InitScheme("ReplicaAdditionTombstone").invoke();
   ODatabaseDocumentTx dbOne=initScheme.getDbOne();
   ODatabaseDocumentTx dbTwo=initScheme.getDbTwo();
   ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
-  final ODocument docOne=new ODocument("ReplicaTest");
+  ODocument docOne=new ODocument("ReplicaTest");
   docOne.field("prop","value");
   docOne.save();
+  docOne.delete();
+  docOne=dbOne.load(docOne.getIdentity(),"*:0",false,true);
   ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
   dbTwo.updatedReplica(docOne);
-  final ODocument docTwo=dbTwo.load(docOne.getIdentity());
+  final ODocument docTwo=dbTwo.load(docOne.getIdentity(),"*:0",false,true);
   Assert.assertNotNull(docTwo);
-  Assert.assertTrue(ODocumentHelper.hasSameContentItem(docTwo,dbTwo,docOne,dbOne));
+  Assert.assertEquals(docOne.getRecordVersion(),docTwo.getRecordVersion());
   final OIndex propindex=dbTwo.getMetadata().getIndexManager().getIndex("propindex");
-  Assert.assertEquals(1,propindex.getSize());
-  Assert.assertTrue(propindex.contains("value"));
+  Assert.assertEquals(0,propindex.getSize());
   dbOne.close();
   dbTwo.close();
 }

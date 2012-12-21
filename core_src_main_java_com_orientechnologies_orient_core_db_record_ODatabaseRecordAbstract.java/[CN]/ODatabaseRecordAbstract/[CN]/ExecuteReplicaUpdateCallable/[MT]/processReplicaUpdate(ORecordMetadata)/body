@@ -4,15 +4,16 @@
   final ORecordVersion version=record.getRecordVersion();
   try {
     if (recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
-      replicaToUpdate=mergeWithDocument();
+      replicaToUpdate=mergeWithDocument(null);
       callbackHooks(TYPE.BEFORE_REPLICA_ADD,replicaToUpdate);
     }
  else     if (!recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
-      replicaToUpdate=mergeWithDocument();
+      replicaToUpdate=mergeWithDocument(rid);
       callbackHooks(TYPE.BEFORE_REPLICA_UPDATE,replicaToUpdate);
     }
- else     if (recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
-      replicaToUpdate=mergeWithDocument();
+ else     if (!recordMetadata.getRecordVersion().isTombstone() && version.isTombstone()) {
+      replicaToUpdate=load(rid,"*:0",false,true);
+      replicaToUpdate.getRecordVersion().copyFrom(version);
       callbackHooks(TYPE.BEFORE_REPLICA_DELETE,replicaToUpdate);
     }
     byte[] stream=replicaToUpdate.toStream();
@@ -28,7 +29,7 @@
       replicaToUpdate.unsetDirty();
       getLevel1Cache().updateRecord(replicaToUpdate);
     }
- else     if (recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
+ else     if (!recordMetadata.getRecordVersion().isTombstone() && version.isTombstone()) {
       callbackHooks(TYPE.AFTER_REPLICA_DELETE,replicaToUpdate);
       replicaToUpdate.unsetDirty();
       getLevel1Cache().deleteRecord(rid);
@@ -41,7 +42,7 @@
  else     if (!recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
       callbackHooks(TYPE.REPLICA_UPDATE_FAILED,replicaToUpdate);
     }
- else     if (recordMetadata.getRecordVersion().isTombstone() && !version.isTombstone()) {
+ else     if (!recordMetadata.getRecordVersion().isTombstone() && version.isTombstone()) {
       callbackHooks(TYPE.REPLICA_DELETE_FAILED,replicaToUpdate);
     }
     throw e;

@@ -15,7 +15,9 @@
           ppos=new OPhysicalPosition(rid.clusterPosition,recordVersion);
           ppos.recordType=recordType;
           ppos.dataSegmentId=dataSegment.getId();
-          ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
+          if (!recordVersion.isTombstone()) {
+            ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
+          }
           cluster.addPhysicalPosition(ppos);
           return true;
         }
@@ -23,7 +25,17 @@
           if (ppos.recordType != recordType)           throw new OStorageException("Record types of provided and stored replicas are different " + recordType + ":"+ ppos.recordType+ ".");
           if (ppos.recordVersion.compareTo(recordVersion) < 0) {
             cluster.updateVersion(ppos.clusterPosition,recordVersion);
-            dataSegment.setRecord(ppos.dataSegmentPos,rid,content);
+            if (!recordVersion.isTombstone() && !ppos.recordVersion.isTombstone()) {
+              ppos.dataSegmentPos=dataSegment.setRecord(ppos.dataSegmentPos,rid,content);
+              cluster.updateDataSegmentPosition(ppos.clusterPosition,dataSegmentId,ppos.dataSegmentPos);
+            }
+ else             if (!recordVersion.isTombstone() && ppos.recordVersion.isTombstone()) {
+              ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
+              cluster.updateDataSegmentPosition(ppos.clusterPosition,dataSegmentId,ppos.dataSegmentPos);
+            }
+ else             if (recordVersion.isTombstone() && !ppos.recordVersion.isTombstone()) {
+              dataSegment.deleteRecord(ppos.dataSegmentPos);
+            }
             return true;
           }
         }

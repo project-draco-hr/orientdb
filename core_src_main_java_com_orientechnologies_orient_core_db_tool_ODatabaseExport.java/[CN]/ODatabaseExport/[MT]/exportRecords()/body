@@ -1,5 +1,6 @@
 {
-  long totalRecords=0;
+  long totalFoundRecords=0;
+  long totalExportedRecords=0;
   int level=1;
   listener.onMessage("\nExporting records...");
   writer.beginCollection(level,true,"records");
@@ -8,20 +9,20 @@
   for (int i=0; exportedClusters <= maxClusterId; ++i) {
     String clusterName=database.getClusterNameById(i);
     exportedClusters++;
-    final long recordTot;
+    long clusterExportedRecordsTot=0;
     if (clusterName != null) {
       if (includeClusters != null) {
-        if (!includeClusters.contains(clusterName))         continue;
+        if (!includeClusters.contains(clusterName.toUpperCase()))         continue;
       }
  else       if (excludeClusters != null) {
-        if (excludeClusters.contains(clusterName))         continue;
+        if (excludeClusters.contains(clusterName.toUpperCase()))         continue;
       }
-      if (excludeClusters != null && excludeClusters.contains(clusterName))       continue;
-      recordTot=database.countClusterElements(clusterName);
+      if (excludeClusters != null && excludeClusters.contains(clusterName.toUpperCase()))       continue;
+      clusterExportedRecordsTot=database.countClusterElements(clusterName);
     }
- else     recordTot=0;
+ else     if (includeClusters != null && !includeClusters.isEmpty())     continue;
     listener.onMessage("\n- Cluster " + (clusterName != null ? "'" + clusterName + "'" : "NULL") + " (id="+ i+ ")...");
-    long recordNum=0;
+    long clusterExportedRecordsCurrent=0;
     if (clusterName != null) {
       ORecordInternal<?> rec=null;
       try {
@@ -29,14 +30,16 @@
           rec=it.next();
           if (rec instanceof ODocument) {
             ODocument doc=(ODocument)rec;
+            final String className=doc.getClassName() != null ? doc.getClassName().toUpperCase() : null;
             if (includeClasses != null) {
-              if (!includeClasses.contains(doc.getClassName()))               continue;
+              if (!includeClasses.contains(className))               continue;
             }
  else             if (excludeClasses != null) {
-              if (excludeClasses.contains(doc.getClassName()))               continue;
+              if (excludeClasses.contains(className))               continue;
             }
           }
-          exportRecord(recordTot,recordNum++,rec);
+ else           if (includeClasses != null && !includeClasses.isEmpty())           continue;
+          if (exportRecord(clusterExportedRecordsTot,clusterExportedRecordsCurrent,rec))           clusterExportedRecordsCurrent++;
         }
       }
  catch (      IOException e) {
@@ -54,10 +57,11 @@ catch (      Throwable t) {
         }
       }
     }
-    listener.onMessage("OK (records=" + recordTot + ")");
-    totalRecords+=recordTot;
+    listener.onMessage("OK (records=" + clusterExportedRecordsCurrent + "/"+ clusterExportedRecordsTot+ ")");
+    totalExportedRecords+=clusterExportedRecordsCurrent;
+    totalFoundRecords+=clusterExportedRecordsTot;
   }
   writer.endCollection(level,true);
-  listener.onMessage("\n\nDone. Exported " + totalRecords + " records\n");
-  return totalRecords;
+  listener.onMessage("\n\nDone. Exported " + totalExportedRecords + " of total "+ totalFoundRecords+ " records\n");
+  return totalFoundRecords;
 }

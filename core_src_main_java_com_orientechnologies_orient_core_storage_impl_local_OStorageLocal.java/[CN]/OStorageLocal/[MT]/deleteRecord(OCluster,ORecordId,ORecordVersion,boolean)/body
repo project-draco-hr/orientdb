@@ -8,7 +8,14 @@
       if (ppos == null || ppos.dataSegmentId < 0 || (useTombstones && ppos.recordVersion.isTombstone()))       return null;
       if (iVersion.getCounter() > -1 && !ppos.recordVersion.equals(iVersion))       if (OFastConcurrentModificationException.enabled())       throw OFastConcurrentModificationException.instance();
  else       throw new OConcurrentModificationException(iRid,ppos.recordVersion,iVersion,ORecordOperation.DELETED);
-      if (!ppos.recordVersion.isTombstone() && ppos.dataSegmentPos > -1)       getDataSegmentById(ppos.dataSegmentId).deleteRecord(ppos.dataSegmentPos);
+      if (!ppos.recordVersion.isTombstone() && ppos.dataSegmentPos > -1) {
+        try {
+          getDataSegmentById(ppos.dataSegmentId).deleteRecord(ppos.dataSegmentPos);
+        }
+ catch (        OIOException e) {
+          OLogManager.instance().error(this,"Cannot remove the record in data segment, however remove it from cluster",e);
+        }
+      }
       if (useTombstones && iClusterSegment.hasTombstonesSupport())       iClusterSegment.convertToTombstone(iRid.clusterPosition);
  else       iClusterSegment.removePhysicalPosition(iRid.clusterPosition);
       return ppos;

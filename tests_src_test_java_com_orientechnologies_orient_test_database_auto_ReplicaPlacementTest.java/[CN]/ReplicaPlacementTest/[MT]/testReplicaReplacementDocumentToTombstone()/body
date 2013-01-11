@@ -1,0 +1,22 @@
+{
+  if (!OGlobalConfiguration.USE_LHPEPS_MEMORY_CLUSTER.getValueAsBoolean())   return;
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
+  ODocument docOne=new ODocument("ReplicaTest");
+  docOne.field("prop","value");
+  docOne.save();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
+  dbTwo.updatedReplica(docOne);
+  ODocument docTwo=dbTwo.load(docOne.getIdentity());
+  Assert.assertNotNull(docTwo);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
+  docOne.field("prop","value3");
+  docOne.save();
+  docOne.delete();
+  docOne=dbOne.load(docOne.getIdentity(),"*:0",false,true);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
+  dbTwo.updatedReplica(docOne);
+  docTwo=dbTwo.load(docOne.getIdentity());
+  Assert.assertNull(docTwo);
+  final OIndex propindex=dbTwo.getMetadata().getIndexManager().getIndex("propindex");
+  Assert.assertEquals(0,propindex.getSize());
+}

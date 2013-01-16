@@ -1,5 +1,6 @@
 {
   final Boolean copy=getFieldOfClass(iContext,iConfig,"copy",Boolean.class);
+  final Boolean flatMultivalues=getFieldOfClass(iContext,iConfig,"flatMultivalues",Boolean.class);
   Object target=getField(iContext,iConfig,"target");
   if (target != null && target.equals("null"))   target=new ODocument();
   final Object value=getRawField(iConfig,"value");
@@ -7,7 +8,7 @@
     if (value instanceof ODocument) {
       final ODocument doc=((ODocument)value);
       for (      String fieldName : doc.fieldNames()) {
-        final Object v=resolveValue(iContext,doc.field(fieldName));
+        final Object v=resolveValue(iContext,doc.field(fieldName),true);
         if (target != null) {
           debug(iContext,"Set value %s in document field '%s'",v,fieldName);
           ((ODocument)target).field(fieldName,v);
@@ -17,7 +18,7 @@
     }
  else     if (value instanceof Map<?,?>) {
       for (      Entry<Object,Object> entry : ((Map<Object,Object>)value).entrySet()) {
-        final Object v=resolveValue(iContext,getValue(entry.getValue(),copy));
+        final Object v=resolveValue(iContext,getValue(entry.getValue(),copy),true);
         if (target != null) {
           debug(iContext,"Set value %s in document field '%s'",v,entry.getKey());
           ((ODocument)target).field(entry.getKey().toString(),v);
@@ -27,7 +28,9 @@
     }
  else {
       final String name=getRequiredFieldOfClass(iContext,iConfig,"name",String.class);
-      assignVariable(iContext,name,getValue(getRequiredField(iContext,iConfig,"value"),copy));
+      Object v=getValue(getRequiredField(iContext,iConfig,"value"),copy);
+      v=flatMultivalues(iContext,copy,flatMultivalues,v);
+      assignVariable(iContext,name,v);
     }
   }
   return null;

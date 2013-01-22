@@ -1,0 +1,28 @@
+{
+  if (!OGlobalConfiguration.USE_LHPEPS_MEMORY_CLUSTER.getValueAsBoolean())   return;
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
+  ORecordBytes recordOne=new ORecordBytes(new byte[]{10,11,22,33,44,55,66,77});
+  recordOne.save();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
+  dbTwo.updatedReplica(recordOne);
+  ORecordBytes recordTwo=dbTwo.load(recordOne.getIdentity());
+  Assert.assertNotNull(recordTwo);
+  Assert.assertEquals(recordTwo.toStream(),recordOne.toStream());
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbOne);
+  recordOne.setDirty();
+  recordOne.fromInputStream(new ByteArrayInputStream(new byte[]{10,11,22}));
+  recordOne.save();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbTwo);
+  recordTwo.setDirty();
+  recordTwo.fromInputStream(new ByteArrayInputStream(new byte[]{10,11,44}));
+  recordTwo.save();
+  recordTwo.setDirty();
+  recordTwo.fromInputStream(new ByteArrayInputStream(new byte[]{10,11,55}));
+  recordTwo.save();
+  final ORecordVersion oldVersion=recordTwo.getRecordVersion();
+  Assert.assertFalse(dbTwo.updatedReplica(recordOne));
+  recordTwo=dbTwo.load(recordOne.getIdentity());
+  Assert.assertEquals(0,recordTwo.getRecordVersion().compareTo(oldVersion));
+  Assert.assertEquals(recordTwo.toStream(),new byte[]{10,11,55});
+  Assert.assertFalse(Arrays.equals(recordOne.toStream(),recordTwo.toStream()));
+}

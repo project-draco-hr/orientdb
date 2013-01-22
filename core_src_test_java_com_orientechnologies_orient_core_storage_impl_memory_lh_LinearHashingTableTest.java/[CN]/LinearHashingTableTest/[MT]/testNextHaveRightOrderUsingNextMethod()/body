@@ -1,0 +1,30 @@
+{
+  OLinearHashingTable<OClusterPosition,OPhysicalPosition> linearHashingTable;
+  MersenneTwisterFast random;
+  List<Long> keys=new ArrayList<Long>();
+  long i=0;
+  while (i < MAX_SEED) {
+    linearHashingTable=new OLinearHashingTable<OClusterPosition,OPhysicalPosition>();
+    random=new MersenneTwisterFast(i);
+    keys.clear();
+    while (keys.size() < KEYS_COUNT) {
+      long key=random.nextLong(Long.MAX_VALUE);
+      OPhysicalPosition position=new OPhysicalPosition(new OClusterPositionLong(key));
+      if (linearHashingTable.put(position)) {
+        keys.add(key);
+        Assert.assertTrue(linearHashingTable.contains(position.clusterPosition),"key " + key);
+      }
+    }
+    Collections.sort(keys);
+    for (    Long key : keys) {
+      OClusterPosition lhKey=linearHashingTable.ceilingEntries(new OClusterPositionLong(key))[0].key;
+      Assert.assertEquals(new OClusterPositionLong(key),lhKey,"" + key);
+    }
+    for (int j=0, keysSize=keys.size() - 1; j < keysSize; j++) {
+      Long key=keys.get(j);
+      OClusterPosition lhKey=linearHashingTable.higherEntries(new OClusterPositionLong(key))[0].key;
+      Assert.assertEquals(new OClusterPositionLong(keys.get(j + 1)),lhKey,"" + j);
+    }
+    i++;
+  }
+}

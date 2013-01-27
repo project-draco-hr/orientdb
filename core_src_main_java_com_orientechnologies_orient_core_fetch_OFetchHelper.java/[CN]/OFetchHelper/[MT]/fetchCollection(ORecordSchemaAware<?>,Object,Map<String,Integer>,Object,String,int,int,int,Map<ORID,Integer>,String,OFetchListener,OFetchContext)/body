@@ -1,8 +1,15 @@
 {
   final Collection<?> linked;
   if (fieldValue instanceof ODocument)   linked=new OMVRBTreeRIDSet().fromDocument((ODocument)fieldValue);
- else   linked=(Collection<OIdentifiable>)fieldValue;
-  iContext.onBeforeCollection(iRootRecord,fieldName,iUserObject,linked);
+ else   if (fieldValue instanceof Collection<?>) {
+    linked=(Collection<OIdentifiable>)fieldValue;
+    iContext.onBeforeCollection(iRootRecord,fieldName,iUserObject,linked);
+  }
+ else   if (fieldValue instanceof Map<?,?>) {
+    linked=(Collection<?>)((Map<?,?>)fieldValue).values();
+    iContext.onBeforeMap(iRootRecord,fieldName,iUserObject);
+  }
+ else   throw new IllegalStateException("Unrecognized type: " + fieldValue.getClass());
   final Iterator<?> iter;
   if (linked instanceof ORecordLazyMultiValue)   iter=((ORecordLazyMultiValue)linked).rawIterator();
  else   if (linked instanceof OMVRBTreeRIDSet)   iter=((OMVRBTreeRIDSet)linked).iterator(false);
@@ -37,5 +44,6 @@
       fetchCollection(iRootRecord,iUserObject,iFetchPlan,o,null,iCurrentLevel + 1,iLevelFromRoot,iFieldDepthLevel,parsedRecords,iFieldPathFromRoot,iListener,iContext);
     }
   }
-  iContext.onAfterCollection(iRootRecord,fieldName,iUserObject);
+  if (fieldValue instanceof Collection<?>)   iContext.onAfterCollection(iRootRecord,fieldName,iUserObject);
+ else   if (fieldValue instanceof Map<?,?>)   iContext.onAfterMap(iRootRecord,fieldName,iUserObject);
 }

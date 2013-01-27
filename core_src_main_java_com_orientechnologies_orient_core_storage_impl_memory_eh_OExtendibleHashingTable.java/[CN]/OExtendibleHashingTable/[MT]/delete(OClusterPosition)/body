@@ -1,0 +1,17 @@
+{
+  final NodeInfo nodeInfo=getBucket(clusterPosition);
+  final long position=hashTree[nodeInfo.nodeIndex][nodeInfo.itemIndex + nodeInfo.hashMapOffset];
+  final OExtendibleHashingBucket bucket=file.get((int)position - 1);
+  final int positionIndex=bucket.getPosition(clusterPosition);
+  if (positionIndex == -1)   return null;
+  final OPhysicalPosition removedPosition=bucket.deleteEntry(positionIndex);
+  if (bucket.size() > 0)   return removedPosition;
+  final long[] node=hashTree[nodeInfo.nodeIndex];
+  mergeNodesAfterDeletion(nodeInfo,bucket);
+  if (nodeInfo.parent != null) {
+    final int hashMapSize=1 << nodeLocalDepths[nodeInfo.nodeIndex];
+    final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
+    if (allMapsContainSameBucket)     mergeNodeToParent(node,nodeInfo);
+  }
+  return removedPosition;
+}

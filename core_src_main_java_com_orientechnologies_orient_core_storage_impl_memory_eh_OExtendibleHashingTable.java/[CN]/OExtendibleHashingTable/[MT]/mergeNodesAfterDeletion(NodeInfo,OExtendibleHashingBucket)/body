@@ -1,0 +1,42 @@
+{
+  final long[] node=hashTree[nodeInfo.nodeIndex];
+  final int bucketDepth=bucket.getDepth();
+  int offset=nodeInfo.nodeGlobalDepth - (bucketDepth - 1);
+  NodeInfo currentNode=nodeInfo;
+  int nodeLocalDepth=nodeLocalDepths[nodeInfo.nodeIndex];
+  while (offset > 0) {
+    offset-=nodeLocalDepth;
+    if (offset > 0) {
+      currentNode=nodeInfo.parent;
+      nodeLocalDepth=nodeLocalDepths[currentNode.nodeIndex];
+    }
+  }
+  final int diff=bucketDepth - 1 - (currentNode.nodeGlobalDepth - nodeLocalDepth);
+  final int interval=(1 << (nodeLocalDepth - diff - 1));
+  int firstStartIndex=currentNode.itemIndex & ((LEVEL_MASK << (nodeLocalDepth - diff)) & LEVEL_MASK);
+  int firstEndIndex=firstStartIndex + interval;
+  final int secondStartIndex=firstEndIndex;
+  final int secondEndIndex=secondStartIndex + interval;
+  if ((currentNode.itemIndex >>> (nodeLocalDepth - diff - 1) & 1) == 1) {
+    long buddyPosition=node[firstStartIndex];
+    while (buddyPosition < 0) {
+      final int nodeIndex=(int)((buddyPosition & Long.MAX_VALUE) >> 8);
+      final int itemOffset=(int)buddyPosition & 0xFF;
+      buddyPosition=hashTree[nodeIndex][itemOffset];
+    }
+    for (int i=secondStartIndex; i < secondEndIndex; i++) {
+      updateBucket(currentNode.nodeIndex,i,currentNode.hashMapOffset,buddyPosition);
+    }
+  }
+ else {
+    long buddyPosition=node[secondStartIndex];
+    while (buddyPosition < 0) {
+      final int nodeIndex=(int)((buddyPosition & Long.MAX_VALUE) >> 8);
+      final int itemOffset=(int)buddyPosition & 0xFF;
+      buddyPosition=hashTree[nodeIndex][itemOffset];
+    }
+    for (int i=firstStartIndex; i < firstEndIndex; i++) {
+      updateBucket(currentNode.nodeIndex,i,currentNode.hashMapOffset,buddyPosition);
+    }
+  }
+}

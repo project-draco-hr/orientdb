@@ -1,0 +1,34 @@
+{
+  final long[] newNode=new long[MAX_LEVEL_SIZE];
+  final int newNodeDepth;
+  final int newNodeStartIndex;
+  final int mapInterval;
+  if (nodeInfo.itemIndex < node.length / 2) {
+    final int maxDepth=getMaxLevelDepth(node,0,node.length / 2);
+    if (maxDepth > 0)     newNodeDepth=maxDepth;
+ else     newNodeDepth=1;
+    mapInterval=1 << (MAX_LEVEL_DEPTH - newNodeDepth);
+    newNodeStartIndex=(nodeInfo.itemIndex / mapInterval) * mapInterval;
+  }
+ else {
+    final int maxDepth=getMaxLevelDepth(node,node.length / 2,node.length);
+    if (maxDepth > 0)     newNodeDepth=maxDepth;
+ else     newNodeDepth=1;
+    mapInterval=1 << (MAX_LEVEL_DEPTH - newNodeDepth);
+    newNodeStartIndex=((nodeInfo.itemIndex - node.length / 2) / mapInterval) * mapInterval + node.length / 2;
+  }
+  final int newNodeIndex=addNewNode(newNode,newNodeDepth);
+  final int mapSize=1 << newNodeDepth;
+  for (int i=0; i < mapInterval; i++) {
+    final int nodeOffset=i + newNodeStartIndex;
+    final long position=node[nodeOffset];
+    if (nodeOffset != nodeInfo.itemIndex) {
+      for (int n=i << newNodeDepth; n < (i + 1) << newNodeDepth; n++)       newNode[n]=position;
+    }
+ else {
+      for (int n=i << newNodeDepth; n < (2 * i + 1) << (newNodeDepth - 1); n++)       newNode[n]=position;
+      for (int n=(2 * i + 1) << (newNodeDepth - 1); n < (i + 1) << newNodeDepth; n++)       newNode[n]=newFilePosition;
+    }
+    node[nodeOffset]=(newNodeIndex << 8) | (i * mapSize) | Long.MIN_VALUE;
+  }
+}

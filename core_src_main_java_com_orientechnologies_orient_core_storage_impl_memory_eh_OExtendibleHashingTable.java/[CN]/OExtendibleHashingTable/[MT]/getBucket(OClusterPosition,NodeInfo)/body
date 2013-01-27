@@ -1,0 +1,37 @@
+{
+  final long hash=key.longValueHigh();
+  int nodeDepth;
+  int localNodeDepth;
+  NodeInfo parentNode;
+  int nodeIndex;
+  int offset;
+  if (startNode != null) {
+    nodeDepth=startNode.nodeGlobalDepth;
+    localNodeDepth=nodeLocalDepths[startNode.nodeIndex];
+    parentNode=startNode;
+    nodeIndex=startNode.nodeIndex;
+    offset=startNode.hashMapOffset;
+  }
+ else {
+    localNodeDepth=nodeLocalDepths[0];
+    nodeDepth=localNodeDepth;
+    parentNode=null;
+    nodeIndex=0;
+    offset=0;
+  }
+  int index=(int)((hash >>> (64 - nodeDepth)) & (LEVEL_MASK >>> (MAX_LEVEL_DEPTH - localNodeDepth)));
+  NodeInfo currentNode=new NodeInfo(parentNode,0,index,0,nodeDepth);
+  do {
+    final long position=hashTree[nodeIndex][index + offset];
+    if (position >= 0)     return currentNode;
+    nodeIndex=(int)((position & Long.MAX_VALUE) >>> 8);
+    offset=(int)(position & 0xFF);
+    localNodeDepth=nodeLocalDepths[nodeIndex];
+    nodeDepth+=localNodeDepth;
+    index=(int)((hash >>> (64 - nodeDepth)) & (LEVEL_MASK >>> (MAX_LEVEL_DEPTH - localNodeDepth)));
+    parentNode=currentNode;
+    currentNode=new NodeInfo(parentNode,offset,index,nodeIndex,nodeDepth);
+  }
+ while (nodeDepth <= 64);
+  throw new IllegalStateException("Extendible hashing tree in corrupted state.");
+}

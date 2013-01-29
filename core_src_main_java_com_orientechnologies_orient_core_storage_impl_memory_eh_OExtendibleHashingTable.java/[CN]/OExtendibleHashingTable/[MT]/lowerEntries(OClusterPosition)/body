@@ -1,3 +1,21 @@
 {
-  return null;
+  final NodeInfo nodeInfo=getBucket(key);
+  long position=hashTree[nodeInfo.nodeIndex][nodeInfo.itemIndex + nodeInfo.hashMapOffset];
+  if (position == 0)   position=prevBucket(nodeInfo);
+  if (position == 0)   return new Entry[0];
+  OExtendibleHashingBucket bucket=file.get((int)position - 1);
+  while (bucket != null && (bucket.size() == 0 || bucket.get(0).clusterPosition.compareTo(key) >= 0)) {
+    final long prevPosition=bucket.getPrevBucket();
+    if (prevPosition > 0)     bucket=file.get((int)prevPosition - 1);
+ else     bucket=null;
+  }
+  if (bucket != null) {
+    final int startIndex=0;
+    final int index=bucket.getPosition(key);
+    final int endIndex;
+    if (index >= 0)     endIndex=index;
+ else     endIndex=-index - 1;
+    return convertBucketToEntries(bucket,startIndex,endIndex);
+  }
+  return new Entry[0];
 }

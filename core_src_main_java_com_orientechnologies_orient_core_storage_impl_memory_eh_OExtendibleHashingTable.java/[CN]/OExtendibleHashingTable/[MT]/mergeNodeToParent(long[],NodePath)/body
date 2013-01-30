@@ -1,13 +1,19 @@
 {
+  final int startIndex=findParentNodeStartIndex(nodePath);
+  final int localNodeDepth=nodesMetadata[nodePath.nodeIndex].getNodeLocalDepth();
+  final int hashMapSize=1 << localNodeDepth;
   final long[] parentNode=hashTree[nodePath.parent.nodeIndex];
-  int startIndex=-1;
-  for (int i=0; i < parentNode.length; i++)   if (parentNode[i] < 0 && (parentNode[i] & Long.MAX_VALUE) >>> 8 == nodePath.nodeIndex) {
-    startIndex=i;
-    break;
-  }
-  final int hashMapSize=1 << nodeLocalDepths[nodePath.nodeIndex];
   for (int i=0, k=startIndex; i < node.length; i+=hashMapSize, k++) {
     parentNode[k]=node[i];
   }
   deleteNode(nodePath.nodeIndex);
+  final OExtendibleHashingNodeMetadata metadata=nodesMetadata[nodePath.parent.nodeIndex];
+  if (nodePath.parent.itemIndex < MAX_LEVEL_SIZE / 2) {
+    final int maxChildDepth=metadata.getMaxLeftChildDepth();
+    if (maxChildDepth == localNodeDepth)     metadata.setMaxLeftChildDepth(getMaxLevelDepth(parentNode,0,parentNode.length / 2));
+  }
+ else {
+    final int maxChildDepth=metadata.getMaxRightChildDepth();
+    if (maxChildDepth == localNodeDepth)     metadata.setMaxRightChildDepth(getMaxLevelDepth(parentNode,parentNode.length / 2,parentNode.length));
+  }
 }

@@ -1,0 +1,41 @@
+{
+  checkSyntax(iRequest.url,2,"Syntax error: batch/<database>");
+  iRequest.data.commandInfo="Execute multiple requests in one shot";
+  ODatabaseDocumentTx db=null;
+  ODocument batch=null;
+  int executed=0;
+  try {
+    db=getProfiledDatabaseInstance(iRequest);
+    batch=new ODocument().fromJSON(iRequest.content);
+    Boolean tx=batch.field("transaction");
+    if (tx == null)     tx=false;
+    final Collection<Map<Object,Object>> operations=batch.field("operations");
+    if (operations == null || operations.isEmpty())     throw new IllegalArgumentException("Input JSON has no operations to execute");
+    if (tx)     db.begin();
+    for (    Map<Object,Object> operation : operations) {
+      final String type=(String)operation.get("type");
+      Object record=operation.get("record");
+      ODocument doc;
+      if (record instanceof Map<?,?>)       doc=new ODocument((Map<String,Object>)record);
+ else       doc=(ODocument)record;
+      if (type.equals("c")) {
+        doc.save();
+        executed++;
+      }
+ else       if (type.equals("u")) {
+        doc.save();
+        executed++;
+      }
+ else       if (type.equals("d")) {
+        db.delete(doc.getIdentity());
+        executed++;
+      }
+    }
+    if (tx)     db.commit();
+  }
+  finally {
+    if (db != null)     db.close();
+  }
+  iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,executed,null,true);
+  return false;
+}

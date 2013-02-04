@@ -1,11 +1,16 @@
 {
-  final NodePath nodePath=getBucket(key);
+  NodePath nodePath=getBucket(key);
   long position=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-  if (position == 0)   position=nextBucket(nodePath);
-  if (position == 0)   return new Entry[0];
+  if (position == 0) {
+    nodePath=nextNonEmptyNode(nodePath);
+    if (nodePath == null)     return new Entry[0];
+    position=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+  }
   OExtendibleHashingBucket bucket=file.get((int)position - 1);
   while (bucket != null && bucket.size() == 0) {
-    final long nextPosition=bucket.getNextBucket();
+    nodePath=nextBucketToFind(nodePath,bucket.getDepth());
+    if (nodePath == null)     return new Entry[0];
+    final long nextPosition=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
     if (nextPosition > 0)     bucket=file.get((int)nextPosition - 1);
  else     bucket=null;
   }

@@ -1,18 +1,16 @@
 {
   NodePath nodePath=getBucket(key);
-  long position=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-  if (position == 0) {
-    nodePath=nextNonEmptyNode(nodePath);
-    if (nodePath == null)     return new Entry[0];
-    position=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-  }
-  OExtendibleHashingBucket bucket=file.get((int)position - 1);
+  long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+  int fileLevel=getFileLevel(bucketPointer);
+  long filePosition=getFilePosition(bucketPointer);
+  OExtendibleHashingBucket bucket=files.get(fileLevel).get((int)filePosition - 1);
   while (bucket != null && (bucket.size() == 0 || bucket.get(bucket.size() - 1).clusterPosition.compareTo(key) <= 0)) {
     nodePath=nextBucketToFind(nodePath,bucket.getDepth());
     if (nodePath == null)     return new Entry[0];
-    final long nextPosition=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-    if (nextPosition > 0)     bucket=file.get((int)nextPosition - 1);
- else     bucket=null;
+    final long nextPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+    fileLevel=getFileLevel(nextPointer);
+    filePosition=getFilePosition(nextPointer);
+    bucket=files.get(fileLevel).get((int)filePosition - 1);
   }
   if (bucket != null) {
     final int index=bucket.getPosition(key);

@@ -1,17 +1,24 @@
 {
   final NodePath nodePath=getBucket(clusterPosition);
-  final long position=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-  final OExtendibleHashingBucket bucket=file.get((int)position - 1);
+  final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+  final int fileLevel=getFileLevel(bucketPointer);
+  final long filePosition=getFilePosition(bucketPointer);
+  final OExtendibleHashingBucket bucket=files.get(fileLevel).get((int)filePosition - 1).copy();
   final int positionIndex=bucket.getPosition(clusterPosition);
   if (positionIndex < 0)   return null;
   final OPhysicalPosition removedPosition=bucket.deleteEntry(positionIndex);
-  if (bucket.size() > 0)   return removedPosition;
-  mergeNodesAfterDeletion(nodePath,bucket,position);
+  if (bucket.size() > 0) {
+    files.get(fileLevel).set((int)filePosition - 1,bucket);
+    size--;
+    return removedPosition;
+  }
+  if (!mergeBucketsAfterDeletion(nodePath,bucket))   files.get(fileLevel).set((int)filePosition - 1,bucket);
   if (nodePath.parent != null) {
     final int hashMapSize=1 << nodePath.nodeLocalDepth;
     final long[] node=hashTree[nodePath.nodeIndex];
     final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
     if (allMapsContainSameBucket)     mergeNodeToParent(node,nodePath);
   }
+  size--;
   return removedPosition;
 }

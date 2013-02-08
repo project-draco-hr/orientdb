@@ -1,0 +1,26 @@
+{
+  storage.checkForClusterPermissions(getName());
+  acquireExclusiveLock();
+  try {
+    BucketPath bucketPath=getBucket(zeroKey);
+    while (bucketPath != null) {
+      OEHBucket bucket=readBucket(bucketPath);
+      for (      OPhysicalPosition position : bucket) {
+        if (storage.checkForRecordValidity(position))         storage.getDataSegmentById(position.dataSegmentId).deleteRecord(position.dataSegmentPos);
+      }
+      bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+    }
+    for (    OEHFileMetadata metadata : files) {
+      if (metadata.getFile().isOpen())       metadata.getFile().shrink(0);
+ else {
+        metadata.getFile().open();
+        metadata.getFile().shrink(0);
+      }
+      metadata.getFile().close();
+    }
+    initHashTreeState();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

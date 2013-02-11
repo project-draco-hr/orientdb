@@ -1,3 +1,24 @@
 {
+  BucketPath bucketPath=getBucket(position.clusterPosition);
+  long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+  int fileLevel=getFileLevel(bucketPointer);
+  long filePosition=getFilePosition(bucketPointer);
+  OEHBucket bucket=readBucket(fileLevel,filePosition);
+  while (bucket != null && bucket.size() == 0) {
+    bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+    if (bucketPath == null)     return new OPhysicalPosition[0];
+    final long nextPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    fileLevel=getFileLevel(nextPointer);
+    filePosition=getFilePosition(nextPointer);
+    bucket=readBucket(fileLevel,filePosition);
+  }
+  if (bucket != null) {
+    final int index=bucket.getIndex(position.clusterPosition);
+    final int startIndex;
+    if (index >= 0)     startIndex=index;
+ else     startIndex=-index - 1;
+    final int endIndex=bucket.size();
+    return convertBucketToPositions(bucket,startIndex,endIndex);
+  }
   return new OPhysicalPosition[0];
 }

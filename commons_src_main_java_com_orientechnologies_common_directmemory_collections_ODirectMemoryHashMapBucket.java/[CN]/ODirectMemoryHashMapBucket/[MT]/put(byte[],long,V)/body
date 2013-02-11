@@ -1,0 +1,40 @@
+{
+  FindResult<K,V> findResult=doFind(serializedKey,hashCode);
+  if (findResult == null) {
+    final int keySize=OBinaryTypeSerializer.INSTANCE.getObjectSize(serializedKey);
+    final long keyPointer=directMemory.allocate(keySize);
+    if (keyPointer == ODirectMemory.NULL_POINTER)     throw new OutOfMemoryError("There is not enough memory to allocate");
+    OBinaryTypeSerializer.INSTANCE.serializeInDirectMemory(serializedKey,directMemory,keyPointer);
+    final int serializedValueSize=valueSerializer.getObjectSize(value);
+    final long valuePointer=directMemory.allocate(serializedValueSize);
+    if (valuePointer == ODirectMemory.NULL_POINTER) {
+      directMemory.free(keyPointer);
+      throw new OutOfMemoryError("There is not enough memory to allocate");
+    }
+    valueSerializer.serializeInDirectMemory(value,directMemory,valuePointer);
+    if (size < bucketSize) {
+      hashCodes[size]=hashCode;
+      int index=size * 2;
+      keyValuePairs[index++]=keyPointer;
+      keyValuePairs[index]=valuePointer;
+      size++;
+    }
+ else {
+      if (nextBucket == null)       nextBucket=new ODirectMemoryHashMapBucket<K,V>(directMemory,bucketSize,valueSerializer);
+      nextBucket.add(keyPointer,hashCode,valuePointer);
+    }
+    return true;
+  }
+ else {
+    final int serializedValueSize=valueSerializer.getObjectSize(value);
+    final long newValuePointer=directMemory.allocate(serializedValueSize);
+    if (newValuePointer == ODirectMemory.NULL_POINTER)     throw new OutOfMemoryError("There is not enough memory to allocate");
+    directMemory.set(newValuePointer,value,valueSerializer);
+    final long[] foundKeyValuePairs=findResult.foundBucket.keyValuePairs;
+    final int valueIndex=2 * findResult.foundIndex + 1;
+    final long oldValuePointer=foundKeyValuePairs[valueIndex];
+    directMemory.free(oldValuePointer);
+    foundKeyValuePairs[valueIndex]=newValuePointer;
+    return false;
+  }
+}

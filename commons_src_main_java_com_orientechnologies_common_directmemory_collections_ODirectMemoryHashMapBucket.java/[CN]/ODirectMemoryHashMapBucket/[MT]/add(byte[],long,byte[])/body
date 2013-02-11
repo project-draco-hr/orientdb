@@ -1,0 +1,22 @@
+{
+  final int keySize=OBinaryTypeSerializer.INSTANCE.getObjectSize(serializedKey);
+  final long keyPointer=directMemory.allocate(keySize);
+  if (keyPointer == ODirectMemory.NULL_POINTER)   throw new OutOfMemoryError("There is not enough memory to allocate");
+  OBinaryTypeSerializer.INSTANCE.serializeInDirectMemory(serializedKey,directMemory,keyPointer);
+  final long valuePointer=directMemory.allocate(serializedValue);
+  if (valuePointer == ODirectMemory.NULL_POINTER) {
+    directMemory.free(keyPointer);
+    throw new OutOfMemoryError("There is not enough memory to allocate");
+  }
+  if (size < bucketSize) {
+    hashCodes[size]=hashCode;
+    int index=size * 2;
+    keyValuePairs[index++]=keyPointer;
+    keyValuePairs[index]=valuePointer;
+    size++;
+  }
+ else {
+    if (nextBucket == null)     nextBucket=new ODirectMemoryHashMapBucket<K,V>(directMemory,bucketSize,valueSerializer);
+    nextBucket.add(serializedKey,hashCode,serializedValue);
+  }
+}

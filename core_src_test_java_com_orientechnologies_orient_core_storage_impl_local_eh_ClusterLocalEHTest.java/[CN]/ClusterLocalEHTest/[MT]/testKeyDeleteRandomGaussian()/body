@@ -1,0 +1,29 @@
+{
+  HashSet<ONodeId> nodeIds=new HashSet<ONodeId>();
+  MersenneTwisterFast random=new MersenneTwisterFast();
+  while (nodeIds.size() < KEYS_COUNT) {
+    long key=(long)(random.nextGaussian() * Long.MAX_VALUE / 2 + Long.MAX_VALUE);
+    if (key < 0)     continue;
+    final ONodeId nodeId=ONodeId.valueOf(key).shiftLeft(128);
+    final OPhysicalPosition position=new OPhysicalPosition(new OClusterPositionNodeId(nodeId));
+    if (extendibleHashingCluster.addPhysicalPosition(position)) {
+      nodeIds.add(nodeId);
+    }
+  }
+  for (  ONodeId nodeId : nodeIds) {
+    if (nodeId.longValueHigh() % 3 == 0) {
+      final OClusterPosition position=new OClusterPositionNodeId(nodeId);
+      extendibleHashingCluster.removePhysicalPosition(position);
+    }
+  }
+  for (  ONodeId nodeId : nodeIds) {
+    if (nodeId.longValueHigh() % 3 == 0) {
+      OPhysicalPosition position=new OPhysicalPosition(new OClusterPositionNodeId(nodeId));
+      Assert.assertNull(extendibleHashingCluster.getPhysicalPosition(position));
+    }
+ else {
+      OPhysicalPosition position=new OPhysicalPosition(new OClusterPositionNodeId(nodeId));
+      Assert.assertNotNull(extendibleHashingCluster.getPhysicalPosition(position));
+    }
+  }
+}

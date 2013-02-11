@@ -5,22 +5,22 @@
   final byte[] buffer=new byte[bufferSize];
   int offset=0;
   for (int i=0; i < len; i++) {
-    final String name=OStringSerializer.INSTANCE.deserializeNative(buffer,offset);
-    offset+=OStringSerializer.INSTANCE.getObjectSize(name);
+    final String incrementSize=OStringSerializer.INSTANCE.deserializeNative(buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(incrementSize);
+    final String path=OStringSerializer.INSTANCE.deserializeNative(buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(path);
+    final String type=OStringSerializer.INSTANCE.deserializeNative(buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(type);
     final long bucketsCount=OIntegerSerializer.INSTANCE.deserializeNative(buffer,offset);
     offset+=OIntegerSerializer.INT_SIZE;
     final long tombstone=OLongSerializer.INSTANCE.deserializeNative(buffer,offset);
-    final OFileMMap fileMMap;
-    if (name.length() > 0) {
-      fileMMap=new OFileMMap();
-      fileMMap.init(name,"rw");
-    }
- else     fileMMap=null;
-    final OEHFileMetadata extendibleHashingFile=new OEHFileMetadata();
-    extendibleHashingFile.setFile(fileMMap);
-    extendibleHashingFile.setBucketsCount(bucketsCount);
-    extendibleHashingFile.setTombstonePosition(tombstone);
-    metadata[i]=extendibleHashingFile;
+    final OStorageFileConfiguration fileConfiguration=new OStorageFileConfiguration(null,path,type,"0",incrementSize);
+    final OSingleFileSegment singleFileSegment=new OSingleFileSegment(storage,fileConfiguration);
+    final OEHFileMetadata bucketFile=new OEHFileMetadata();
+    bucketFile.setFile(singleFileSegment);
+    bucketFile.setBucketsCount(bucketsCount);
+    bucketFile.setTombstonePosition(tombstone);
+    metadata[i]=bucketFile;
   }
   return metadata;
 }

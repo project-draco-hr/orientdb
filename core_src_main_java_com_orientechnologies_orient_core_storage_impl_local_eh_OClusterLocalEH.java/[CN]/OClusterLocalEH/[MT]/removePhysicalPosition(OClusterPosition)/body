@@ -1,18 +1,24 @@
 {
-  final BucketPath nodePath=getBucket(iPosition);
-  final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-  final int fileLevel=getFileLevel(bucketPointer);
-  final long filePosition=getFilePosition(bucketPointer);
-  final OEHBucket bucket=readBucket(fileLevel,filePosition);
-  final int positionIndex=bucket.getIndex(iPosition);
-  if (positionIndex < 0)   return;
-  bucket.deleteEntry(positionIndex);
-  size--;
-  if (!mergeBucketsAfterDeletion(nodePath,bucket))   saveBucket(fileLevel,filePosition,bucket);
-  if (nodePath.parent != null) {
-    final int hashMapSize=1 << nodePath.nodeLocalDepth;
-    final long[] node=hashTree[nodePath.nodeIndex];
-    final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
-    if (allMapsContainSameBucket)     mergeNodeToParent(node,nodePath);
+  acquireExclusiveLock();
+  try {
+    final BucketPath nodePath=getBucket(iPosition);
+    final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+    final int fileLevel=getFileLevel(bucketPointer);
+    final long filePosition=getFilePosition(bucketPointer);
+    final OEHBucket bucket=readBucket(fileLevel,filePosition);
+    final int positionIndex=bucket.getIndex(iPosition);
+    if (positionIndex < 0)     return;
+    bucket.deleteEntry(positionIndex);
+    size--;
+    if (!mergeBucketsAfterDeletion(nodePath,bucket))     saveBucket(fileLevel,filePosition,bucket);
+    if (nodePath.parent != null) {
+      final int hashMapSize=1 << nodePath.nodeLocalDepth;
+      final long[] node=hashTree[nodePath.nodeIndex];
+      final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
+      if (allMapsContainSameBucket)       mergeNodeToParent(node,nodePath);
+    }
+  }
+  finally {
+    releaseExclusiveLock();
   }
 }

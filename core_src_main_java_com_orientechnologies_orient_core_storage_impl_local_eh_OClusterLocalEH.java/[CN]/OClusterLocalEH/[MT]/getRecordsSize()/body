@@ -1,3 +1,19 @@
 {
-  return 0;
+  acquireSharedLock();
+  try {
+    long size=0;
+    for (    OEHFileMetadata fileMetadata : filesMetadata)     if (fileMetadata != null)     size+=fileMetadata.getFile().getFilledUpTo();
+    BucketPath bucketPath=getBucket(zeroKey);
+    while (bucketPath != null) {
+      OEHBucket bucket=readBucket(bucketPath);
+      for (      OPhysicalPosition position : bucket) {
+        if (position.dataSegmentPos > -1 && !position.recordVersion.isTombstone())         size+=storage.getDataSegmentById(position.dataSegmentId).getRecordSize(position.dataSegmentPos);
+      }
+      bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+    }
+    return size;
+  }
+  finally {
+    releaseSharedLock();
+  }
 }

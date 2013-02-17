@@ -1,3 +1,28 @@
 {
-  return new OPhysicalPosition[0];
+  acquireSharedLock();
+  try {
+    BucketPath bucketPath=getBucket(position.clusterPosition);
+    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    int fileLevel=getFileLevel(bucketPointer);
+    long filePosition=getFilePosition(bucketPointer);
+    OEHBucket bucket=readBucket(fileLevel,filePosition);
+    while (bucket.size() == 0) {
+      final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
+      if (prevBucketPath == null)       return new OPhysicalPosition[0];
+      final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
+      fileLevel=getFileLevel(prevPointer);
+      filePosition=getFilePosition(prevPointer);
+      bucket=readBucket(fileLevel,filePosition);
+      bucketPath=prevBucketPath;
+    }
+    final int startIndex=0;
+    final int index=bucket.getIndex(position.clusterPosition);
+    final int endIndex;
+    if (index >= 0)     endIndex=index + 1;
+ else     endIndex=-index - 1;
+    return convertBucketToPositions(bucket,startIndex,endIndex);
+  }
+  finally {
+    releaseSharedLock();
+  }
 }

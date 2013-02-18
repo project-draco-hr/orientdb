@@ -1,2 +1,26 @@
 {
+  acquireExclusiveLock();
+  try {
+    metadataStore.open();
+    treeStateStore.open();
+    filesMetadata=metadataStore.loadMetadata(storage,bucketBufferSize);
+    for (    OEHFileMetadata fileMetadata : filesMetadata)     if (fileMetadata != null)     fileMetadata.getFile().open();
+    size=metadataStore.getRecordsCount();
+    hashTreeSize=(int)treeStateStore.getHashTreeSize();
+    final int arraySize;
+    int bitsCount=Integer.bitCount(hashTreeSize);
+    if (bitsCount == 1)     arraySize=hashTreeSize;
+ else     arraySize=1 << (Integer.highestOneBit(hashTreeSize) + 1);
+    hashTree=new long[arraySize][];
+    nodesMetadata=new OEHNodeMetadata[arraySize];
+    for (int i=0; i < hashTreeSize; i++) {
+      hashTree[i]=treeStateStore.loadTreeNode(i);
+      nodesMetadata[i]=treeStateStore.loadMetadata(i);
+    }
+    size=metadataStore.getRecordsCount();
+    tombstonesCount=metadataStore.getTombstonesCount();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
 }

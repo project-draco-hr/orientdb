@@ -1,3 +1,63 @@
 {
-  return false;
+  acquireExclusiveLock();
+  try {
+    final ORID rid=(ORID)configuration.field(CONFIG_MAP_RID,ORID.class);
+    if (rid == null)     throw new OIndexException("Error during deserialization of index definition: '" + CONFIG_MAP_RID + "' attribute is null");
+    identity=rid;
+    this.configuration=configuration;
+    name=configuration.field(OIndexInternal.CONFIG_NAME);
+    type=configuration.field(OIndexInternal.CONFIG_TYPE);
+    final ODocument indexDefinitionDoc=configuration.field(OIndexInternal.INDEX_DEFINITION);
+    if (indexDefinitionDoc != null) {
+      try {
+        final String indexDefClassName=configuration.field(OIndexInternal.INDEX_DEFINITION_CLASS);
+        final Class<?> indexDefClass=Class.forName(indexDefClassName);
+        indexDefinition=(OIndexDefinition)indexDefClass.getDeclaredConstructor().newInstance();
+        indexDefinition.fromStream(indexDefinitionDoc);
+      }
+ catch (      final ClassNotFoundException e) {
+        throw new OIndexException("Error during deserialization of index definition",e);
+      }
+catch (      final NoSuchMethodException e) {
+        throw new OIndexException("Error during deserialization of index definition",e);
+      }
+catch (      final InvocationTargetException e) {
+        throw new OIndexException("Error during deserialization of index definition",e);
+      }
+catch (      final InstantiationException e) {
+        throw new OIndexException("Error during deserialization of index definition",e);
+      }
+catch (      final IllegalAccessException e) {
+        throw new OIndexException("Error during deserialization of index definition",e);
+      }
+      clustersToIndex.clear();
+      final Collection<? extends String> clusters=configuration.field(CONFIG_CLUSTERS);
+      if (clusters != null)       clustersToIndex.addAll(clusters);
+      keySerializer=detectKeySerializer(indexDefinition);
+      metadataStore.open();
+      treeStateStore.open();
+      filesMetadata=metadataStore.loadMetadata(storage,bucketBufferSize);
+      for (      OEHFileMetadata fileMetadata : filesMetadata)       if (fileMetadata != null)       fileMetadata.getFile().open();
+      size=metadataStore.getRecordsCount();
+      hashTreeSize=(int)treeStateStore.getHashTreeSize();
+      final int arraySize;
+      int bitsCount=Integer.bitCount(hashTreeSize);
+      if (bitsCount == 1)       arraySize=hashTreeSize;
+ else       arraySize=1 << (Integer.highestOneBit(hashTreeSize) + 1);
+      hashTree=new long[arraySize][];
+      nodesMetadata=new OEHNodeMetadata[arraySize];
+      for (int i=0; i < hashTreeSize; i++) {
+        hashTree[i]=treeStateStore.loadTreeNode(i);
+        nodesMetadata[i]=treeStateStore.loadMetadata(i);
+      }
+      size=metadataStore.getRecordsCount();
+    }
+    return true;
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during index loading",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

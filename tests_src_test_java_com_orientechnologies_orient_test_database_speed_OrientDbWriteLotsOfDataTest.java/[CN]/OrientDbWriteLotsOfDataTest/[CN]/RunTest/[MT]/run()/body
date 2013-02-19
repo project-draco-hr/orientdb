@@ -1,0 +1,60 @@
+{
+  try {
+    int savecount=0;
+    int txncount=0;
+    long t0, t1;
+switch (this.txtype) {
+case NOTX:
+{
+        t0=System.currentTimeMillis();
+        final ODocument foo=new ODocument();
+        db.begin(TXTYPE.NOTX);
+        int ktxn;
+        for (ktxn=0; ktxn < 10; ktxn++) {
+          int ksave;
+          for (ksave=0; ksave < 1000; ++ksave) {
+            foo.reset();
+            foo.setClassName(CLASSNAME);
+            foo.field(PROPKEY,PROPVAL);
+            db.save(foo);
+          }
+          savecount+=ksave;
+        }
+        db.commit();
+        txncount+=ktxn;
+        t1=System.currentTimeMillis();
+        break;
+      }
+case OPTIMISTIC:
+{
+      t0=System.currentTimeMillis();
+      db.begin(TXTYPE.OPTIMISTIC);
+      int ktxn;
+      for (ktxn=0; ktxn < 10; ktxn++) {
+        int ksave;
+        for (ksave=0; ksave < 1000; ++ksave) {
+          ODocument foo=new ODocument(CLASSNAME);
+          foo.field(PROPKEY,PROPVAL);
+          db.save(foo);
+        }
+        savecount+=ksave;
+      }
+      db.commit();
+      txncount+=ktxn;
+      t1=System.currentTimeMillis();
+      break;
+    }
+default :
+  throw new Error("unknown txtype: " + txtype);
+}
+this.statTotalSaves=savecount;
+this.statTotalTxn=txncount;
+this.statTotalSecs=1.0E-3 * (t1 - t0);
+}
+ catch (Exception e) {
+db.rollback();
+}
+ finally {
+db.close();
+}
+}

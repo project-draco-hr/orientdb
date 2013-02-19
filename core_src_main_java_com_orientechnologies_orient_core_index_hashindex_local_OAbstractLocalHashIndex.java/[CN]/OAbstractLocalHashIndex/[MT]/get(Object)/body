@@ -2,6 +2,7 @@
   acquireSharedLock();
   try {
     final byte[] serializedKey=new byte[keySerializer.getObjectSize(key)];
+    keySerializer.serializeNative(key,serializedKey,0);
     final long hashCode=OMurmurHash3.murmurHash3_x64_64(serializedKey,SEED);
     BucketPath bucketPath=getBucket(hashCode);
     final long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
@@ -9,7 +10,9 @@
     final int fileLevel=getFileLevel(bucketPointer);
     final long filePosition=getFilePosition(bucketPointer);
     final OHashIndexBucket bucket=readBucket(fileLevel,filePosition);
-    return (T)bucket.find(serializedKey).rid;
+    OHashIndexBucket.Entry entry=bucket.find(serializedKey);
+    if (entry == null)     return null;
+    return (T)entry.rid;
   }
  catch (  IOException e) {
     throw new OIndexException("Exception during index value retrieval",e);

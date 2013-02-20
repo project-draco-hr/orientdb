@@ -1,16 +1,20 @@
 {
+  OLogManager.instance().debug(this,"[OMMapManagerNew] flushing pages in memory...");
+  int flushedBlocks=0;
+  int totalBlocks=0;
+  final long now=System.currentTimeMillis();
   for (Iterator<Map.Entry<OFileMMap,OMMapBufferEntry[]>> it=bufferPoolPerFile.entrySet().iterator(); it.hasNext(); ) {
     OFileMMap file;
     final Map.Entry<OFileMMap,OMMapBufferEntry[]> mapEntry=it.next();
     file=mapEntry.getKey();
     lockManager.acquireLock(Thread.currentThread(),file,OLockManager.LOCK.EXCLUSIVE);
     try {
-      if (file.isClosed()) {
+      if (autoFlushUnusedTime > 0 || file.isClosed()) {
         OMMapBufferEntry[] notFlushed=EMPTY_BUFFER_ENTRIES;
         for (        OMMapBufferEntry entry : mapEntry.getValue()) {
-          if (!removeEntry(entry)) {
-            notFlushed=addEntry(notFlushed,entry);
-          }
+          totalBlocks++;
+          if ((file.isClosed() || autoFlushUnusedTime == 0 || now - entry.getLastUsed() > autoFlushUnusedTime) && removeEntry(entry))           flushedBlocks++;
+ else           notFlushed=addEntry(notFlushed,entry);
         }
         if (notFlushed.length == 0) {
           it.remove();
@@ -24,4 +28,5 @@
       lockManager.releaseLock(Thread.currentThread(),file,OLockManager.LOCK.EXCLUSIVE);
     }
   }
+  OLogManager.instance().debug(this,"[OMMapManagerNew] flushed %d/%d blocks",flushedBlocks,totalBlocks);
 }

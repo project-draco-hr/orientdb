@@ -6,29 +6,39 @@
     if (flattenTarget instanceof OSQLFilterItemVariable) {
       Object r=((OSQLFilterItemVariable)flattenTarget).getValue(null,context);
       if (r != null) {
-        if (r instanceof OIdentifiable)         ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)r);
+        if (r instanceof OIdentifiable)         tempResult.add((OIdentifiable)r);
  else         if (OMultiValue.isMultiValue(r)) {
-          for (          Object o : OMultiValue.getMultiValueIterable(r))           ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)o);
+          for (          Object o : OMultiValue.getMultiValueIterable(r))           tempResult.add((OIdentifiable)o);
         }
       }
     }
   }
  else {
-    OFlattenIterator finalResult=new OFlattenIterator();
+    final List<OIdentifiable> finalResult=new ArrayList<OIdentifiable>();
     for (    OIdentifiable id : tempResult) {
       if (flattenTarget instanceof OSQLFilterItem)       fieldValue=((OSQLFilterItem)flattenTarget).getValue(id.getRecord(),context);
  else       if (flattenTarget instanceof OSQLFunctionRuntime)       fieldValue=((OSQLFunctionRuntime)flattenTarget).getResult();
  else       fieldValue=flattenTarget.toString();
       if (fieldValue != null)       if (fieldValue instanceof Collection<?>) {
-        finalResult.add((Collection<OIdentifiable>)fieldValue);
+        for (        Object o : ((Collection<?>)fieldValue)) {
+          if (o instanceof OIdentifiable)           finalResult.add(((OIdentifiable)o).getRecord());
+ else           if (o instanceof List) {
+            List<OIdentifiable> list=(List<OIdentifiable>)o;
+            for (int i=0; i < list.size(); i++)             finalResult.add(list.get(i).getRecord());
+          }
+        }
       }
  else       if (fieldValue instanceof Map<?,?>) {
-        finalResult.add(((Map<?,OIdentifiable>)fieldValue).values());
+        for (        Map.Entry<?,?> entry : ((Map<?,?>)fieldValue).entrySet()) {
+          final Object o=entry.getValue();
+          if (o instanceof OIdentifiable)           finalResult.add(((OIdentifiable)o).getRecord());
+ else           if (o instanceof List) {
+            List<OIdentifiable> list=(List<OIdentifiable>)o;
+            for (int i=0; i < list.size(); i++)             finalResult.add(list.get(i).getRecord());
+          }
+        }
       }
- else       if (fieldValue instanceof OFlattenIterator) {
-        finalResult=(OFlattenIterator)fieldValue;
-      }
- else       if (fieldValue instanceof OIdentifiable)       finalResult.add((OIdentifiable)fieldValue);
+ else       finalResult.add((OIdentifiable)fieldValue);
     }
     tempResult=finalResult;
   }

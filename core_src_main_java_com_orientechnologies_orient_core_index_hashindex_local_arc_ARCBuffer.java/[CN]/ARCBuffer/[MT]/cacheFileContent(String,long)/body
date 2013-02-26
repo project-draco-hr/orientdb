@@ -1,0 +1,23 @@
+{
+  final OMultiFileSegment multiFileSegment=openFiles.get(fileName);
+  final long endPosition=filePosition + pageSize;
+  byte[] content=new byte[pageSize];
+  if (multiFileSegment.getFilledUpTo() >= endPosition) {
+    final long[] pos=multiFileSegment.getRelativePosition(filePosition);
+    final OFile file=multiFileSegment.getFile((int)pos[0]);
+    file.read(pos[1],content,content.length);
+  }
+ else   if (multiFileSegment.getFilledUpTo() > filePosition) {
+    int dif=(int)(filePosition - multiFileSegment.getFilledUpTo());
+    final long[] pos=multiFileSegment.getRelativePosition(filePosition);
+    final OFile file=multiFileSegment.getFile((int)pos[0]);
+    file.read(pos[1],content,dif);
+    multiFileSegment.allocateSpace((int)(endPosition - dif));
+  }
+ else {
+    multiFileSegment.allocateSpace((int)(endPosition - multiFileSegment.getFilledUpTo()));
+  }
+  long dataPointer;
+  dataPointer=directMemory.allocate(content);
+  return dataPointer;
+}

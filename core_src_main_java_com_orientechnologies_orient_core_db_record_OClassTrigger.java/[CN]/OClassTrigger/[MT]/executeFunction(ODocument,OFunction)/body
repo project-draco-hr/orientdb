@@ -1,20 +1,17 @@
 {
-  if (funcDoc == null)   return RESULT.RECORD_NOT_CHANGED;
-  String funcName=funcDoc.field("name");
-  if (funcName == null || funcName.length() == 0)   return RESULT.RECORD_NOT_CHANGED;
+  if (func == null)   return RESULT.RECORD_NOT_CHANGED;
   ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   if (db != null && !(db instanceof ODatabaseRecordTx))   db=db.getUnderlying();
-  final OFunction f=db.getMetadata().getFunctionLibrary().getFunction(funcName);
   final OScriptManager scriptManager=Orient.instance().getScriptManager();
-  final ScriptEngine scriptEngine=scriptManager.getEngine(f.getLanguage());
+  final ScriptEngine scriptEngine=scriptManager.getEngine(func.getLanguage());
   final Bindings binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
   for (  OScriptInjection i : scriptManager.getInjections())   i.bind(binding);
   binding.put("doc",iDocument);
   if (db != null)   binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseRecordTx)db));
   boolean isSuccess=false;
   try {
-    if (f.getLanguage() == null)     throw new OConfigurationException("Database function '" + funcName + "' has no language");
-    final String funcStr=scriptManager.getFunctionDefinition(f);
+    if (func.getLanguage() == null)     throw new OConfigurationException("Database function '" + func.getName() + "' has no language");
+    final String funcStr=scriptManager.getFunctionDefinition(func);
     if (funcStr != null) {
       try {
         scriptEngine.eval(funcStr);
@@ -26,14 +23,14 @@
     if (scriptEngine instanceof Invocable) {
       final Invocable invocableEngine=(Invocable)scriptEngine;
       Object[] EMPTY=new Object[0];
-      isSuccess=(Boolean)invocableEngine.invokeFunction(funcName,EMPTY);
+      isSuccess=(Boolean)invocableEngine.invokeFunction(func.getName(),EMPTY);
     }
   }
  catch (  ScriptException e) {
-    throw new OCommandScriptException("Error on execution of the script",funcName,e.getColumnNumber(),e);
+    throw new OCommandScriptException("Error on execution of the script",func.getName(),e.getColumnNumber(),e);
   }
 catch (  NoSuchMethodException e) {
-    throw new OCommandScriptException("Error on execution of the script",funcName,0,e);
+    throw new OCommandScriptException("Error on execution of the script",func.getName(),0,e);
   }
 catch (  OCommandScriptException e) {
     throw e;

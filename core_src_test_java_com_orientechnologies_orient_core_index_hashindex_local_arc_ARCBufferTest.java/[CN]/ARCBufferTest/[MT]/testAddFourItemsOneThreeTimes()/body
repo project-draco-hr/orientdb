@@ -1,0 +1,23 @@
+{
+  for (int i=0; i < 4; i++) {
+    long pagePointer=buffer.loadAndLockForWrite("arcBufferTest",".tst",i);
+    directMemory.set(pagePointer,new byte[]{(byte)i,1,2,3,4,5,6,(byte)i},8);
+    buffer.releaseWriteLock("arcBufferTest",".tst",i);
+  }
+  long pagePointer=buffer.loadAndLockForWrite("arcBufferTest",".tst",1);
+  directMemory.set(pagePointer,new byte[]{(byte)10,1,2,3,4,5,6,(byte)10},8);
+  buffer.releaseWriteLock("arcBufferTest",".tst",1);
+  pagePointer=buffer.loadAndLockForWrite("arcBufferTest",".tst",1);
+  directMemory.set(pagePointer,new byte[]{(byte)40,1,2,3,4,5,6,(byte)40},8);
+  buffer.releaseWriteLock("arcBufferTest",".tst",1);
+  Assert.assertTrue(buffer.inFetchedOnceLRU("arcBufferTest.tst",0));
+  Assert.assertTrue(buffer.inFetchedOnceLRU("arcBufferTest.tst",2));
+  Assert.assertTrue(buffer.inFetchedOnceLRU("arcBufferTest.tst",3));
+  Assert.assertTrue(buffer.inFetchedSeveralTimesLRU("arcBufferTest.tst",1));
+  Assert.assertEquals(buffer.getFilledUpTo("arcBufferTest",".tst"),4);
+  buffer.flush();
+  assertFile(0,new byte[]{(byte)0,1,2,3,4,5,6,(byte)0});
+  assertFile(1,new byte[]{(byte)40,1,2,3,4,5,6,(byte)40});
+  assertFile(2,new byte[]{(byte)2,1,2,3,4,5,6,(byte)2});
+  assertFile(3,new byte[]{(byte)3,1,2,3,4,5,6,(byte)3});
+}

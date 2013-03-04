@@ -6,7 +6,7 @@
   record=null;
   try {
     record=ORecordSerializerJSON.INSTANCE.fromString(value,record,null);
-    if (schemaImported && record.getIdentity().toString().equals(database.getStorage().getConfiguration().schemaRecordId)) {
+    if (schemaImported && record.getIdentity().equals(schemaRecordId)) {
       return null;
     }
     if (includeClusters != null) {
@@ -24,13 +24,16 @@
       int indexId=database.getClusterIdByName(OMetadata.CLUSTER_INDEX_NAME);
       if (record.getIdentity().getClusterId() == indexId || record.getIdentity().getClusterId() == oridsId)       return null;
     }
+    final int manualIndexCluster=database.getClusterIdByName(OMetadata.CLUSTER_MANUAL_INDEX_NAME);
+    final int internalCluster=database.getClusterIdByName(OMetadata.CLUSTER_INTERNAL_NAME);
+    final int indexCluster=database.getClusterIdByName(OMetadata.CLUSTER_INDEX_NAME);
     if (exporterVersion >= 4) {
-      final int manualIndex=database.getClusterIdByName(OMetadata.CLUSTER_MANUAL_INDEX_NAME);
-      if (record.getIdentity().getClusterId() == manualIndex)       return null;
+      if (record.getIdentity().getClusterId() == manualIndexCluster)       return null;
     }
     final String rid=record.getIdentity().toString();
-    if (!lhClustersAreUsed)     storeLocalClusterRecord();
- else     storeLHClusterRecord(new ORecordId(rid));
+    final int clusterId=record.getIdentity().getClusterId();
+    if (hashClustersAreUsed && (clusterId != manualIndexCluster && clusterId != internalCluster && clusterId != indexCluster))     storeHashClusterRecord(new ORecordId(rid));
+ else     storeLocalClusterRecord();
     if (!record.getIdentity().toString().equals(rid))     throw new OSchemaException("Imported record '" + record.getIdentity() + "' has rid different from the original: "+ rid);
   }
  catch (  Exception t) {

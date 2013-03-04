@@ -1,0 +1,33 @@
+{
+  acquireExclusiveLock();
+  try {
+    final byte[] serializedKey=new byte[keySerializer.getObjectSize(key)];
+    keySerializer.serializeNative(key,serializedKey,0);
+    final long hashCode=OMurmurHash3.murmurHash3_x64_64(serializedKey,SEED);
+    final BucketPath nodePath=getBucket(hashCode);
+    final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
+    final int fileLevel=getBucketSize(bucketPointer);
+    final OHashIndexBucket bucket=readBucket(fileLevel,getFilePosition(bucketPointer));
+    final int positionIndex=bucket.getIndex(serializedKey);
+    if (positionIndex < 0)     return false;
+    bucket.deleteEntry(positionIndex);
+    size--;
+    if (!mergeBucketsAfterDeletion(nodePath,bucket)) {
+      saveBucket(getFilePosition(bucketPointer),bucket);
+      updateBucketSizes(bucketPointer,bucket);
+    }
+    if (nodePath.parent != null) {
+      final int hashMapSize=1 << nodePath.nodeLocalDepth;
+      final long[] node=hashTree[nodePath.nodeIndex];
+      final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
+      if (allMapsContainSameBucket)       mergeNodeToParent(node,nodePath);
+    }
+    return true;
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during index removal",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

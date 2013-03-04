@@ -1,0 +1,16 @@
+{
+  final int positionOffset=POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE;
+  final int entryPosition=OIntegerSerializer.INSTANCE.deserializeNative(dataBuffer,positionOffset);
+  final int keySize=keySerializer.getObjectSizeNative(dataBuffer,entryPosition);
+  System.arraycopy(dataBuffer,positionOffset + OIntegerSerializer.INT_SIZE,dataBuffer,positionOffset,size() * OIntegerSerializer.INT_SIZE - (index + 1) * OIntegerSerializer.INT_SIZE);
+  int nextEntryPosition=entryPosition + keySize;
+  System.arraycopy(dataBuffer,nextEntryPosition,dataBuffer,entryPosition,dataBufferLength - nextEntryPosition);
+  int currentPositionOffset=POSITIONS_ARRAY_OFFSET;
+  for (int i=0; i < size; i++) {
+    int currentEntryPosition=OIntegerSerializer.INSTANCE.deserializeNative(dataBuffer,currentPositionOffset);
+    if (currentEntryPosition > entryPosition)     OIntegerSerializer.INSTANCE.serializeNative(currentEntryPosition - keySize,dataBuffer,currentPositionOffset);
+    currentPositionOffset+=OIntegerSerializer.INT_SIZE;
+  }
+  dataBufferLength-=keySize;
+  size--;
+}

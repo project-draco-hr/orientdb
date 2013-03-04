@@ -1,0 +1,37 @@
+{
+  storage.checkForClusterPermissions(getName());
+  acquireExclusiveLock();
+  try {
+    if (removeDataInTruncate) {
+      BucketPath bucketPath=getBucket(zeroKey);
+      while (bucketPath != null) {
+        final long[] node=hashTree[bucketPath.nodeIndex];
+        final long bucketPointer=node[bucketPath.itemIndex + bucketPath.hashMapOffset];
+        final long filePosition=getFilePosition(bucketPointer);
+        final int fileLevel=getFileLevel(bucketPointer);
+        final OEHBucket bucket=readBucket(fileLevel,filePosition);
+        bucketToTrack.set(new OPair<Long,OEHBucket>(bucketPointer,bucket));
+        for (int i=0; i < bucket.size(); i++) {
+          final OPhysicalPosition position=bucket.getEntry(i);
+          if (storage.checkForRecordValidity(position)) {
+            storage.getDataSegmentById(position.dataSegmentId).deleteRecord(position.dataSegmentPos);
+          }
+        }
+        bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+      }
+    }
+    bucketToTrack.set(null);
+    for (    OEHFileMetadata metadata : filesMetadata) {
+      if (metadata == null)       continue;
+      metadata.getFile().truncate();
+      metadata.setBucketsCount(0);
+      metadata.setTombstonePosition(-1);
+    }
+    metadataStore.truncate();
+    treeStateStore.truncate();
+    initHashTreeState();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

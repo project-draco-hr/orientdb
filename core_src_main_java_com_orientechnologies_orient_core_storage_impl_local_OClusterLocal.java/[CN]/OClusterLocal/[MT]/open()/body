@@ -5,10 +5,24 @@
     holeSegment.open();
     beginOffsetData=fileSegment.files[0].readHeaderLong(0);
     endOffsetData=fileSegment.files[0].readHeaderLong(OBinaryProtocol.SIZE_LONG);
-    final long version=fileSegment.files[0].readHeaderLong(2 * OBinaryProtocol.SIZE_LONG);
+    version=fileSegment.files[0].readHeaderLong(2 * OBinaryProtocol.SIZE_LONG);
     if (version < 1) {
       convertDeletedRecords();
-      fileSegment.files[0].writeHeaderLong(2 * OBinaryProtocol.SIZE_LONG,1);
+    }
+    if (version < 2) {
+      if (endOffsetData < 0) {
+        endOffsetData=fileSegment.getFilledUpTo() / RECORD_SIZE - 1;
+        if (endOffsetData >= 0) {
+          long[] fetchPos;
+          for (long currentPos=endOffsetData * RECORD_SIZE; currentPos >= beginOffsetData; currentPos-=RECORD_SIZE) {
+            fetchPos=fileSegment.getRelativePosition(currentPos);
+            if (fileSegment.files[(int)fetchPos[0]].readByte(fetchPos[1] + RECORD_TYPE_OFFSET) != RECORD_WAS_DELETED)             break;
+            endOffsetData--;
+          }
+        }
+        fileSegment.files[0].writeHeaderLong(OBinaryProtocol.SIZE_LONG,endOffsetData);
+      }
+      fileSegment.files[0].writeHeaderLong(2 * OBinaryProtocol.SIZE_LONG,2);
     }
   }
   finally {

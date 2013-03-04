@@ -1,0 +1,37 @@
+{
+  final OHashIndexBucket updatedBucket=new OHashIndexBucket(bucket.getDepth());
+  final OHashIndexBucket newBucket=new OHashIndexBucket(bucket.getDepth());
+  int bucketDepth=bucket.getDepth();
+  bucketDepth=splitBucketContent(bucket,updatedBucket,newBucket,bucketDepth);
+  updatedBucket.toStream();
+  newBucket.toStream();
+  final long newFilePosition;
+  if (bucketTombstonePointer >= 0) {
+    final int tombstoneSize=getBucketSize(bucketTombstonePointer);
+    final long tombstoneFilePosition=getFilePosition(bucketTombstonePointer);
+    final OHashIndexBucket tombstone=readBucket(tombstoneSize,tombstoneFilePosition);
+    bucketTombstonePointer=tombstone.getNextRemovedBucketPair();
+    final long[] pos=bucketFile.getRelativePosition(filePosition);
+    final OFile file=bucketFile.getFile((int)pos[0]);
+    file.write(tombstoneFilePosition,newBucket.getDataBuffer(),newBucket.getDataBufferLength(),0);
+    newFilePosition=tombstoneFilePosition;
+  }
+ else {
+    final long[] pos=bucketFile.allocateSpace(OHashIndexBucket.MAX_BUCKET_SIZE_BYTES);
+    final OFile file=bucketFile.getFile((int)pos[0]);
+    file.write(pos[1],newBucket.getDataBuffer(),newBucket.getDataBufferLength(),0);
+    newFilePosition=bucketFile.getAbsolutePosition(pos);
+  }
+  final long[] pos=bucketFile.getRelativePosition(filePosition);
+  final OFile file=bucketFile.getFile((int)pos[0]);
+  file.write(pos[1],updatedBucket.getDataBuffer(),updatedBucket.getDataBufferLength(),0);
+  final int newBucketIndex=(int)(newFilePosition / OHashIndexBucket.MAX_BUCKET_SIZE_BYTES);
+  if (newBucketIndex >= bucketsSizes.length) {
+    int[] oldBucketsSizes=bucketsSizes;
+    bucketsSizes=new int[2 * bucketsSizes.length];
+    System.arraycopy(oldBucketsSizes,0,bucketsSizes,0,oldBucketsSizes.length);
+  }
+  bucketsSizes[bucketsCount]=newBucket.getDataBufferLength();
+  bucketsCount++;
+  return new BucketSplitResult(createBucketPointer(filePosition),createBucketPointer(newFilePosition),bucketDepth);
+}

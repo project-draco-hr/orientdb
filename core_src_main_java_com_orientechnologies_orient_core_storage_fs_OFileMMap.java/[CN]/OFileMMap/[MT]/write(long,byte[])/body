@@ -1,36 +1,42 @@
 {
-  if (iSourceBuffer == null || iSourceBuffer.length == 0)   return;
-  iOffset=checkRegions(iOffset,iSourceBuffer.length);
+  acquireWriteLock();
   try {
-    final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,iSourceBuffer.length,OMMapManager.OPERATION_TYPE.WRITE,strategy);
-    if (entries != null) {
-      try {
-        int position=(int)(iOffset - entries[0].beginOffset);
-        int remaining;
-        final int iLenght=iSourceBuffer.length;
-        int remainingLength=iLenght;
-        for (        OMMapBufferEntry entry : entries) {
-          entry.buffer.position(position);
-          remaining=entry.buffer.remaining();
-          int toWrite=Math.min(remaining,remainingLength);
-          entry.buffer.put(iSourceBuffer,iLenght - remainingLength,toWrite);
-          position=0;
-          remainingLength-=toWrite;
+    if (iSourceBuffer == null || iSourceBuffer.length == 0)     return;
+    iOffset=checkRegions(iOffset,iSourceBuffer.length);
+    try {
+      final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,iSourceBuffer.length,OMMapManager.OPERATION_TYPE.WRITE,strategy);
+      if (entries != null) {
+        try {
+          int position=(int)(iOffset - entries[0].beginOffset);
+          int remaining;
+          final int iLenght=iSourceBuffer.length;
+          int remainingLength=iLenght;
+          for (          OMMapBufferEntry entry : entries) {
+            entry.buffer.position(position);
+            remaining=entry.buffer.remaining();
+            int toWrite=Math.min(remaining,remainingLength);
+            entry.buffer.put(iSourceBuffer,iLenght - remainingLength,toWrite);
+            position=0;
+            remainingLength-=toWrite;
+          }
+        }
+  finally {
+          OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.WRITE);
         }
       }
-  finally {
-        OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.WRITE);
+ else {
+        final ByteBuffer buffer=acquireByteBuffer(iSourceBuffer.length);
+        buffer.put(iSourceBuffer);
+        buffer.rewind();
+        channel.write(buffer,iOffset + HEADER_SIZE);
+        releaseByteBuffer(buffer);
       }
     }
- else {
-      final ByteBuffer buffer=acquireByteBuffer(iSourceBuffer.length);
-      buffer.put(iSourceBuffer);
-      buffer.rewind();
-      channel.write(buffer,iOffset + HEADER_SIZE);
-      releaseByteBuffer(buffer);
+ catch (    BufferOverflowException e) {
+      OLogManager.instance().error(this,"Error on write in the range " + iOffset + "-"+ (iOffset + iSourceBuffer.length)+ "."+ toString(),e,OIOException.class);
     }
   }
- catch (  BufferOverflowException e) {
-    OLogManager.instance().error(this,"Error on write in the range " + iOffset + "-"+ (iOffset + iSourceBuffer.length)+ "."+ toString(),e,OIOException.class);
+  finally {
+    releaseWriteLock();
   }
 }

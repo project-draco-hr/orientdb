@@ -1,20 +1,26 @@
 {
-  iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_BYTE);
-  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_BYTE,OMMapManager.OPERATION_TYPE.READ,strategy);
-  if (entries != null) {
-    try {
-      return entries[0].buffer.get((int)(iOffset - entries[0].beginOffset));
-    }
+  acquireReadLock();
+  try {
+    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_BYTE);
+    final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_BYTE,OMMapManager.OPERATION_TYPE.READ,strategy);
+    if (entries != null) {
+      try {
+        return entries[0].buffer.get((int)(iOffset - entries[0].beginOffset));
+      }
   finally {
-      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
+        OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
+      }
+    }
+ else {
+      final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_BYTE);
+      channel.read(buffer,iOffset + HEADER_SIZE);
+      buffer.rewind();
+      final byte value=buffer.get();
+      releaseByteBuffer(buffer);
+      return value;
     }
   }
- else {
-    final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_BYTE);
-    channel.read(buffer,iOffset + HEADER_SIZE);
-    buffer.rewind();
-    final byte value=buffer.get();
-    releaseByteBuffer(buffer);
-    return value;
+  finally {
+    releaseReadLock();
   }
 }

@@ -1,25 +1,31 @@
 {
-  iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_LONG);
-  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_LONG,OMMapManager.OPERATION_TYPE.READ,strategy);
-  if (entries != null) {
-    try {
-      if (entries.length == 1)       return entries[0].buffer.getLong((int)(iOffset - entries[0].beginOffset));
+  acquireReadLock();
+  try {
+    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_LONG);
+    final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_LONG,OMMapManager.OPERATION_TYPE.READ,strategy);
+    if (entries != null) {
+      try {
+        if (entries.length == 1)         return entries[0].buffer.getLong((int)(iOffset - entries[0].beginOffset));
  else {
-        entries[0].buffer.position((int)(iOffset - entries[0].beginOffset));
-        entries[1].buffer.position(0);
-        return OByteBufferUtils.mergeLongFromBuffers(entries[0].buffer,entries[1].buffer);
+          entries[0].buffer.position((int)(iOffset - entries[0].beginOffset));
+          entries[1].buffer.position(0);
+          return OByteBufferUtils.mergeLongFromBuffers(entries[0].buffer,entries[1].buffer);
+        }
+      }
+  finally {
+        OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
       }
     }
-  finally {
-      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
+ else {
+      final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_LONG);
+      channel.read(buffer,iOffset + HEADER_SIZE);
+      buffer.rewind();
+      final long value=buffer.getLong();
+      releaseByteBuffer(buffer);
+      return value;
     }
   }
- else {
-    final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_LONG);
-    channel.read(buffer,iOffset + HEADER_SIZE);
-    buffer.rewind();
-    final long value=buffer.getLong();
-    releaseByteBuffer(buffer);
-    return value;
+  finally {
+    releaseReadLock();
   }
 }

@@ -44,6 +44,7 @@
  else         if (OStringSerializerHelper.startsWithIgnoreCase(line,OHttpUtils.HEADER_X_FORWARDED_FOR))         connection.data.caller=line.substring(OHttpUtils.HEADER_X_FORWARDED_FOR.length());
  else         if (OStringSerializerHelper.startsWithIgnoreCase(line,OHttpUtils.HEADER_AUTHENTICATION))         iRequest.authentication=line.substring(OHttpUtils.HEADER_AUTHENTICATION.length());
  else         if (OStringSerializerHelper.startsWithIgnoreCase(line,"Expect: 100-continue"))         sendTextContent(100,null,null,null,null);
+ else         if (OStringSerializerHelper.startsWithIgnoreCase(line,OHttpUtils.HEADER_CONTENT_ENCODING))         iRequest.contentEncoding=line.substring(OHttpUtils.HEADER_CONTENT_ENCODING.length());
       }
       in=channel.read();
       if (in == -1)       break;
@@ -64,7 +65,12 @@
         byte[] buffer=new byte[contentLength];
         buffer[0]=(byte)currChar;
         channel.read(buffer,1,contentLength - 1);
-        iRequest.content=new String(buffer);
+        if (iRequest.contentEncoding != null && iRequest.contentEncoding.equals(OHttpUtils.CONTENT_ACCEPT_GZIP_ENCODED)) {
+          iRequest.content=this.deCompress(buffer);
+        }
+ else {
+          iRequest.content=new String(buffer);
+        }
         return;
       }
     }

@@ -1,18 +1,20 @@
 {
-  final OHashIndexBucket emptyBucket=new OHashIndexBucket(MAX_LEVEL_DEPTH);
-  bucketFile.allocateSpace(OHashIndexBucket.MAX_BUCKET_SIZE_BYTES * MAX_LEVEL_SIZE);
-  for (long filePosition=0; filePosition < OHashIndexBucket.MAX_BUCKET_SIZE_BYTES * MAX_LEVEL_SIZE; filePosition+=OHashIndexBucket.MAX_BUCKET_SIZE_BYTES)   saveBucket(filePosition,emptyBucket);
-  final long[] rootTree=new long[MAX_LEVEL_SIZE];
-  bucketsSizes=new int[MAX_LEVEL_SIZE];
-  bucketsCount=MAX_LEVEL_SIZE;
-  for (int i=0; i < MAX_LEVEL_SIZE; i++) {
-    rootTree[i]=createBucketPointer(i * OHashIndexBucket.MAX_BUCKET_SIZE_BYTES);
-    bucketsSizes[i]=emptyBucket.getDataBufferLength();
+  for (long pageIndex=0; pageIndex < MAX_LEVEL_SIZE; pageIndex++) {
+    final PageLockResult pageLockResult=lockPageForWrite(pageIndex,0);
+    try {
+      final OHashIndexBucket emptyBucket=new OHashIndexBucket(MAX_LEVEL_DEPTH,pageLockResult.dataPointer,directMemory);
+    }
+  finally {
+      releasePageWriteLock(pageIndex,0,pageLockResult.cacheLock);
+    }
   }
+  final long[] rootTree=new long[MAX_LEVEL_SIZE];
+  for (int i=0; i < MAX_LEVEL_SIZE; i++)   rootTree[i]=createBucketPointer(i,0);
   hashTree=new long[1][];
   hashTree[0]=rootTree;
   nodesMetadata=new OEHNodeMetadata[1];
   nodesMetadata[0]=new OEHNodeMetadata((byte)0,(byte)0,(byte)MAX_LEVEL_DEPTH);
+  filesMetadata[0].setBucketsCount(MAX_LEVEL_SIZE);
   size=0;
   hashTreeSize=1;
 }

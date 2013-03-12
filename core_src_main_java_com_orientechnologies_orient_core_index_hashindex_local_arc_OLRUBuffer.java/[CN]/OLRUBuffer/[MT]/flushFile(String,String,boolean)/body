@@ -1,0 +1,21 @@
+{
+  final String fullName=fileName + fileExtension;
+  OLockManager.LOCK lock=writeLock ? OLockManager.LOCK.EXCLUSIVE : OLockManager.LOCK.SHARED;
+synchronized (syncObject) {
+    final Set<Long> pageIndexes=filesPages.get(fullName);
+    for (    Long pageIndex : pageIndexes) {
+      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(fullName,pageIndex),lock);
+      try {
+        LRUEntry lruEntry=lruList.get(fileName,pageIndex);
+        if (lruEntry.isDirty) {
+          flushData(fullName,lruEntry.pageIndex,lruEntry.dataPointer);
+          lruEntry.isDirty=false;
+        }
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(fullName,pageIndex),lock);
+      }
+    }
+    files.get(fullName).synch();
+  }
+}

@@ -6,15 +6,21 @@
     final long hashCode=OMurmurHash3.murmurHash3_x64_64(serializedKey,SEED);
     final BucketPath nodePath=getBucket(hashCode);
     final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
-    final int fileLevel=getBucketSize(bucketPointer);
-    final OHashIndexBucket bucket=readBucket(fileLevel,getFilePosition(bucketPointer));
-    final int positionIndex=bucket.getIndex(serializedKey);
-    if (positionIndex < 0)     return false;
-    bucket.deleteEntry(positionIndex);
-    size--;
-    if (!mergeBucketsAfterDeletion(nodePath,bucket)) {
-      saveBucket(getFilePosition(bucketPointer),bucket);
-      updateBucketSizes(bucketPointer,bucket);
+    final long pageIndex=getPageIndex(bucketPointer);
+    final int fileLevel=getFileLevel(bucketPointer);
+    PageLockResult pageLockResult=lockPageForWrite(pageIndex,fileLevel);
+    try {
+      final OHashIndexBucket bucket=new OHashIndexBucket(pageLockResult.dataPointer,directMemory);
+      final int positionIndex=bucket.getIndex(serializedKey);
+      if (positionIndex < 0)       return false;
+      bucket.deleteEntry(positionIndex);
+      size--;
+      if (mergeBucketsAfterDeletion(nodePath,bucket)) {
+        clearDirtyFlag(pageIndex,fileLevel,pageLockResult.cacheLock);
+      }
+    }
+  finally {
+      releasePageWriteLock(pageIndex,fileLevel,pageLockResult.cacheLock);
     }
     if (nodePath.parent != null) {
       final int hashMapSize=1 << nodePath.nodeLocalDepth;

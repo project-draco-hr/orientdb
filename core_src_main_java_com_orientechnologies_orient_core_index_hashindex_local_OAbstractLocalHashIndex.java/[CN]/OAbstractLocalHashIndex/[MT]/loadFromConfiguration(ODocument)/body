@@ -36,13 +36,13 @@ catch (      final IllegalAccessException e) {
       keySerializer=detectKeySerializer(indexDefinition);
       metadataStore.open();
       treeStateStore.open();
-      final OStorageSegmentConfiguration fileConfiguration=new OStorageSegmentConfiguration(storage.getConfiguration(),name,0);
-      bucketFile=new OMultiFileSegment(storage,fileConfiguration,OEHFileMetadata.DEF_EXTENSION,OHashIndexBucket.MAX_BUCKET_SIZE_BYTES);
-      bucketFile.open();
-      size=bucketFile.getFile(0).readHeaderLong(0);
-      hashTreeSize=(int)bucketFile.getFile(0).readHeaderLong(OLongSerializer.LONG_SIZE);
-      hashTreeTombstone=(int)bucketFile.getFile(0).readHeaderLong(2 * OLongSerializer.LONG_SIZE);
-      bucketTombstonePointer=bucketFile.getFile(0).readHeaderLong(3 * OLongSerializer.LONG_SIZE);
+      bucketFileConfiguration=new OStorageSegmentConfiguration(storage.getConfiguration(),name,0);
+      bucketFileConfiguration.fileType=OFileFactory.CLASSIC;
+      buffer.openFile(bucketFileConfiguration,BUCKET_FILE_EXTENSION);
+      size=metadataStore.getRecordsCount();
+      hashTreeSize=(int)treeStateStore.getHashTreeSize();
+      hashTreeTombstone=(int)treeStateStore.getHashTreeTombstone();
+      bucketTombstonePointer=treeStateStore.getBucketTombstonePointer();
       final int arraySize;
       int bitsCount=Integer.bitCount(hashTreeSize);
       if (bitsCount == 1)       arraySize=hashTreeSize;
@@ -50,7 +50,6 @@ catch (      final IllegalAccessException e) {
       hashTree=new long[arraySize][];
       nodesMetadata=new OEHNodeMetadata[arraySize];
       final long bucketsOffset=treeStateStore.getBucketsOffset();
-      bucketsSizes=treeStateStore.loadBucketsSizes();
       for (int i=0; i < hashTreeSize; i++) {
         hashTree[i]=treeStateStore.loadTreeNode(i,bucketsOffset);
         nodesMetadata[i]=treeStateStore.loadMetadata(i,bucketsOffset);

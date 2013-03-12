@@ -1,16 +1,19 @@
 {
+  final int freePointer=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,bufferPointer + FREE_POINTER_OFFSET);
   final int positionOffset=POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE;
-  final int entryPosition=OIntegerSerializer.INSTANCE.deserializeNative(dataBuffer,positionOffset);
-  final int keySize=keySerializer.getObjectSizeNative(dataBuffer,entryPosition);
-  System.arraycopy(dataBuffer,positionOffset + OIntegerSerializer.INT_SIZE,dataBuffer,positionOffset,size() * OIntegerSerializer.INT_SIZE - (index + 1) * OIntegerSerializer.INT_SIZE);
-  int nextEntryPosition=entryPosition + keySize;
-  System.arraycopy(dataBuffer,nextEntryPosition,dataBuffer,entryPosition,dataBufferLength - nextEntryPosition);
+  final int entryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,bufferPointer + positionOffset);
+  final int keySize=keySerializer.getObjectSizeInDirectMemory(directMemory,bufferPointer + entryPosition);
+  final int ridSize=ridSerializer.getObjectSizeInDirectMemory(directMemory,bufferPointer + entryPosition + keySize);
+  final int entrySize=keySize + ridSize;
+  directMemory.copyData(bufferPointer + positionOffset + OIntegerSerializer.INT_SIZE,bufferPointer + positionOffset,size() * OIntegerSerializer.INT_SIZE - (index + 1) * OIntegerSerializer.INT_SIZE);
+  if (entryPosition > freePointer)   directMemory.copyData(bufferPointer + freePointer,bufferPointer + freePointer + entrySize,entryPosition - freePointer);
   int currentPositionOffset=POSITIONS_ARRAY_OFFSET;
-  for (int i=0; i < size; i++) {
-    int currentEntryPosition=OIntegerSerializer.INSTANCE.deserializeNative(dataBuffer,currentPositionOffset);
-    if (currentEntryPosition > entryPosition)     OIntegerSerializer.INSTANCE.serializeNative(currentEntryPosition - keySize,dataBuffer,currentPositionOffset);
+  int size=size();
+  for (int i=0; i < size - 1; i++) {
+    int currentEntryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,bufferPointer + currentPositionOffset);
+    if (currentEntryPosition < entryPosition)     OIntegerSerializer.INSTANCE.serializeInDirectMemory(currentEntryPosition + entrySize,directMemory,bufferPointer + currentPositionOffset);
     currentPositionOffset+=OIntegerSerializer.INT_SIZE;
   }
-  dataBufferLength-=keySize;
-  size--;
+  OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePointer + entrySize,directMemory,bufferPointer + FREE_POINTER_OFFSET);
+  OIntegerSerializer.INSTANCE.serializeInDirectMemory(size - 1,directMemory,bufferPointer + SIZE_OFFSET);
 }

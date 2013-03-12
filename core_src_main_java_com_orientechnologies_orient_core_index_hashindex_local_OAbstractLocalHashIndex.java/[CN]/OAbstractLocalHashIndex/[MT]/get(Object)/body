@@ -7,11 +7,18 @@
     BucketPath bucketPath=getBucket(hashCode);
     final long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
     if (bucketPointer == 0)     return null;
-    final int bucketSize=getBucketSize(bucketPointer);
-    final OHashIndexBucket bucket=readBucket(bucketSize,getFilePosition(bucketPointer));
-    OHashIndexBucket.Entry entry=bucket.find(serializedKey);
-    if (entry == null)     return null;
-    return (T)entry.rid;
+    long pageIndex=getPageIndex(bucketPointer);
+    int fileLevel=getFileLevel(bucketPointer);
+    PageLockResult pageLockResult=lockPageForRead(pageIndex,fileLevel);
+    try {
+      final OHashIndexBucket bucket=new OHashIndexBucket(pageLockResult.dataPointer,directMemory);
+      OHashIndexBucket.Entry entry=bucket.find(serializedKey);
+      if (entry == null)       return null;
+      return (T)entry.rid;
+    }
+  finally {
+      releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+    }
   }
  catch (  IOException e) {
     throw new OIndexException("Exception during index value retrieval",e);

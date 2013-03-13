@@ -1,0 +1,100 @@
+{
+  char stringBeginChar=' ';
+  boolean encodeMode=false;
+  int insideParenthesis=0;
+  int insideCollection=0;
+  int insideMap=0;
+  int insideLinkPart=0;
+  final int max=endIndex > -1 ? endIndex + 1 : iSource.length();
+  final char[] buffer=new char[max - beginIndex];
+  iSource.getChars(beginIndex,max,buffer,0);
+  iBuffer.ensureCapacity(max);
+  int i=0;
+  for (; i < buffer.length; ++i) {
+    final char c=buffer[i];
+    if (!isCharPresent(c,iJumpChars))     break;
+  }
+  for (; i < buffer.length; ++i) {
+    final char c=buffer[i];
+    if (stringBeginChar == ' ') {
+      if (iConsiderBraces)       if (c == COLLECTION_BEGIN)       insideCollection++;
+ else       if (c == COLLECTION_END) {
+        if (!isCharPresent(c,iSeparator)) {
+          if (insideCollection == 0)           throw new OSerializationException("Found invalid " + COLLECTION_END + " character. Ensure it is opened and closed correctly.");
+          insideCollection--;
+        }
+      }
+ else       if (c == EMBEDDED_BEGIN) {
+        insideParenthesis++;
+      }
+ else       if (c == EMBEDDED_END) {
+        if (insideParenthesis == 0)         throw new OSerializationException("Found invalid " + EMBEDDED_END + " character. Ensure it is opened and closed correctly.");
+        insideParenthesis--;
+      }
+ else       if (c == MAP_BEGIN) {
+        insideMap++;
+      }
+ else       if (c == MAP_END) {
+        if (!isCharPresent(c,iSeparator)) {
+          if (insideMap == 0)           throw new OSerializationException("Found invalid " + MAP_END + " character. Ensure it is opened and closed correctly.");
+          insideMap--;
+        }
+      }
+ else       if (c == LINK)       insideLinkPart=1;
+ else       if (insideLinkPart == 1 && c == ORID.SEPARATOR)       insideLinkPart=2;
+      if (insideLinkPart > 0 && c != '-' && !Character.isDigit(c) && c != ORID.SEPARATOR && c != LINK)       insideLinkPart=0;
+      if ((c == '"' || iStringSeparatorExtended && c == '\'') && !encodeMode) {
+        stringBeginChar=c;
+      }
+      if (insideParenthesis == 0 && insideCollection == 0 && insideMap == 0 && insideLinkPart == 0) {
+        if (isCharPresent(c,iSeparator)) {
+          return beginIndex + i + 1;
+        }
+      }
+      if (iJumpChars.length > 0) {
+        if (isCharPresent(c,iJumpChars))         continue;
+      }
+    }
+ else {
+      if ((c == '"' || iStringSeparatorExtended && c == '\'') && !encodeMode) {
+        if (stringBeginChar == c) {
+          stringBeginChar=' ';
+        }
+      }
+    }
+    if (c == '\\' && !encodeMode) {
+      final char nextChar=buffer[i + 1];
+      if (nextChar == 'u') {
+        i=OStringParser.readUnicode(buffer,i + 2,iBuffer);
+        continue;
+      }
+ else       if (nextChar == 'n') {
+        iBuffer.append("\n");
+        i++;
+        continue;
+      }
+ else       if (nextChar == 'r') {
+        iBuffer.append("\r");
+        i++;
+        continue;
+      }
+ else       if (nextChar == 't') {
+        iBuffer.append("\t");
+        i++;
+        continue;
+      }
+ else       if (nextChar == 'f') {
+        iBuffer.append("\f");
+        i++;
+        continue;
+      }
+ else       encodeMode=true;
+    }
+ else     encodeMode=false;
+    if (c != '\\' && encodeMode) {
+      encodeMode=false;
+    }
+    iBuffer.append(c);
+  }
+  return -1;
+}

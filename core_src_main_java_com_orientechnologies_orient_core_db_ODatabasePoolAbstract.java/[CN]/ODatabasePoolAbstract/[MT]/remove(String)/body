@@ -1,17 +1,19 @@
 {
-  final OResourcePool<String,DB> pool=pools.get(iPoolName);
-  if (pool != null) {
-    for (    DB db : pool.getResources()) {
-      if (db.getStorage().getStatus() == OStorage.STATUS.OPEN)       try {
-        OLogManager.instance().debug(this,"Closing pooled database '%s'...",db.getName());
-        ((ODatabasePooled)db).forceClose();
-        OLogManager.instance().debug(this,"OK",db.getName());
+synchronized (pools) {
+    final OResourcePool<String,DB> pool=pools.get(iPoolName);
+    if (pool != null) {
+      for (      DB db : pool.getResources()) {
+        if (db.getStorage().getStatus() == OStorage.STATUS.OPEN)         try {
+          OLogManager.instance().debug(this,"Closing pooled database '%s'...",db.getName());
+          ((ODatabasePooled)db).forceClose();
+          OLogManager.instance().debug(this,"OK",db.getName());
+        }
+ catch (        Exception e) {
+          OLogManager.instance().debug(this,"Error: %d",e.toString());
+        }
       }
- catch (      Exception e) {
-        OLogManager.instance().debug(this,"Error: %d",e.toString());
-      }
+      pool.close();
+      pools.remove(iPoolName);
     }
-    pool.close();
-    pools.remove(iPoolName);
   }
 }

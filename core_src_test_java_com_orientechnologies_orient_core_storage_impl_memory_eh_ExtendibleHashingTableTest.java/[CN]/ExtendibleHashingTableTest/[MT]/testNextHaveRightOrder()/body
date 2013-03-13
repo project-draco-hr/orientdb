@@ -1,0 +1,32 @@
+{
+  OExtendibleHashingTable extendibleHashingTable;
+  MersenneTwisterFast random;
+  List<Long> keys=new ArrayList<Long>();
+  long i=0;
+  while (i < MAX_SEED) {
+    extendibleHashingTable=new OExtendibleHashingTable(3,4);
+    random=new MersenneTwisterFast(i);
+    keys.clear();
+    while (keys.size() < KEYS_COUNT) {
+      long key=random.nextLong(Long.MAX_VALUE);
+      OPhysicalPosition position=new OPhysicalPosition(new OClusterPositionLong(key));
+      if (extendibleHashingTable.put(position)) {
+        keys.add(key);
+        Assert.assertTrue(extendibleHashingTable.contains(position.clusterPosition),"key " + key);
+      }
+    }
+    Collections.sort(keys);
+    OExtendibleHashingTable.Entry[] hashTableEntries=extendibleHashingTable.ceilingEntries(new OClusterPositionLong(0));
+    int curPos=0;
+    for (    Long key : keys) {
+      OClusterPosition lhKey=hashTableEntries[curPos].key;
+      Assert.assertEquals(new OClusterPositionLong(key),lhKey,"" + key);
+      curPos++;
+      if (curPos >= hashTableEntries.length) {
+        hashTableEntries=extendibleHashingTable.higherEntries(hashTableEntries[hashTableEntries.length - 1].key);
+        curPos=0;
+      }
+    }
+    i++;
+  }
+}

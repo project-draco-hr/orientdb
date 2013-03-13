@@ -1,0 +1,39 @@
+{
+  OObjectDatabaseTx database=new OObjectDatabaseTx(url);
+  database.open("admin","admin");
+  try {
+    Account account=new Account();
+    account.setName("John Grisham");
+    account=database.save(account);
+    Address address1=new Address();
+    address1.setStreet("Mulholland drive");
+    Address address2=new Address();
+    address2.setStreet("Via Veneto");
+    List<Address> addresses=new ArrayList<Address>();
+    addresses.add(address1);
+    addresses.add(address2);
+    account.setAddresses(addresses);
+    account=database.save(account);
+    database.commit();
+    String originalName=account.getName();
+    database.begin(TXTYPE.OPTIMISTIC);
+    Assert.assertEquals(account.getAddresses().size(),2);
+    account.getAddresses().remove(1);
+    Assert.assertEquals(account.getAddresses().size(),1);
+    account.setName("New Name");
+    account=database.save(account);
+    Assert.assertEquals(account.getAddresses().size(),1);
+    database.rollback();
+    account=database.reload(account,true);
+    Assert.assertEquals(account.getAddresses().size(),2);
+    Assert.assertEquals(account.getName(),originalName);
+    int bookCount=0;
+    for (    Address b : database.browseClass(Address.class)) {
+      if (b.getStreet().equals("Mulholland drive") || b.getStreet().equals("Via Veneto"))       bookCount++;
+    }
+    Assert.assertEquals(bookCount,2);
+  }
+  finally {
+    database.close();
+  }
+}

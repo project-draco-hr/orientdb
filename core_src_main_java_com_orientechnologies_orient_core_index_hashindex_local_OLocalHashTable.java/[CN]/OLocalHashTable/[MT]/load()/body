@@ -1,0 +1,29 @@
+{
+  acquireExclusiveLock();
+  try {
+    metadataStore.open();
+    treeStateStore.open();
+    size=metadataStore.getRecordsCount();
+    hashTreeSize=(int)treeStateStore.getHashTreeSize();
+    hashTreeTombstone=(int)treeStateStore.getHashTreeTombstone();
+    bucketTombstonePointer=treeStateStore.getBucketTombstonePointer();
+    final int arraySize;
+    int bitsCount=Integer.bitCount(hashTreeSize);
+    if (bitsCount == 1)     arraySize=hashTreeSize;
+ else     arraySize=1 << (Integer.highestOneBit(hashTreeSize) + 1);
+    hashTree=new long[arraySize][];
+    nodesMetadata=new OEHNodeMetadata[arraySize];
+    final long bucketsOffset=treeStateStore.getBucketsOffset();
+    for (int i=0; i < hashTreeSize; i++) {
+      hashTree[i]=treeStateStore.loadTreeNode(i,bucketsOffset);
+      nodesMetadata[i]=treeStateStore.loadMetadata(i,bucketsOffset);
+    }
+    size=metadataStore.getRecordsCount();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during hash table loading",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

@@ -1,15 +1,18 @@
 {
   final Object value=getRequiredField(iContext,iConfig,"value");
+  Boolean nullAsEmpty=getFieldOfClass(iContext,iConfig,"nullAsEmpty",Boolean.class);
+  if (nullAsEmpty == null)   nullAsEmpty=true;
+  final Boolean flatMultivalues=getFieldOfClass(iContext,iConfig,"flatMultivalues",Boolean.class);
   Object result;
   if (isBlock(value))   result=delegate("value",iManager,value,iContext,iOutput,iReadOnly);
  else   result=value;
-  final Object source=getField(iContext,iConfig,"source");
+  Object source=getField(iContext,iConfig,"source");
+  if (source instanceof Map<?,?>)   source=new ODocument((Map<String,Object>)source);
   if (source instanceof ODocument && result instanceof List<?>) {
-    final List<Object> list=new ArrayList<Object>();
-    for (    Object o : (List<Object>)result) {
-      if (o != null)       list.add(((ODocument)source).field(o.toString()));
-    }
-    result=list;
+    result=addDocumentFields((ODocument)source,(List<Object>)result,nullAsEmpty);
+  }
+ else   if (OMultiValue.isMultiValue(result) && flatMultivalues != null && flatMultivalues) {
+    result=flatMultivalues(iContext,false,flatMultivalues,result);
   }
   final String field=getFieldOfClass(iContext,iConfig,"field",String.class);
   if (field != null) {

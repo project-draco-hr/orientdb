@@ -3,29 +3,7 @@
   keySerializer.serialize(key,serializedKey,0);
   final long hashCode=OMurmurHash3.murmurHash3_x64_64(serializedKey,SEED);
   final long index=index(hashCode);
-  int hashLineSize=getHashLineSize(entries,index);
-  mainHashLoop:   for (int i=0; i < hashLineSize; i++) {
-    final long currentHash=getHashCode(entries,index,i);
-    if (currentHash == hashCode) {
-      final byte[] currentKey=getKey(entries,index,i);
-      if (currentKey.length != serializedKey.length)       continue;
-      for (int j=0; j < currentKey.length; j++)       if (serializedKey[j] != currentKey[j])       continue mainHashLoop;
-      return getValue(entries,index,i);
-    }
-  }
-  int hashLinePtr=getNextHashLinePtr(entries,index);
-  while (hashLinePtr != ODirectMemory.NULL_POINTER) {
-    hashLineSize=getHashLineSizeFromHashLine(hashLinePtr);
-    hashLineLoop:     for (int i=0; i < hashLineSize; i++) {
-      final long currentHash=getHashCodeFromHashLine(hashLinePtr,i);
-      if (currentHash == hashCode) {
-        final byte[] currentKey=getKeyFromHashLine(hashLinePtr,i);
-        if (currentKey.length != serializedKey.length)         continue;
-        for (int j=0; j < currentKey.length; j++)         if (serializedKey[j] != currentKey[j])         continue hashLineLoop;
-        return getValueFromHashLine(hashLinePtr,i);
-      }
-    }
-    hashLinePtr=getNextHashLinePtrFromHashLine(hashLinePtr);
-  }
-  return null;
+  final ODirectMemoryHashMapBucket<K,V> bucket=entries[(int)index];
+  if (bucket == null)   return null;
+  return bucket.find(serializedKey,hashCode);
 }

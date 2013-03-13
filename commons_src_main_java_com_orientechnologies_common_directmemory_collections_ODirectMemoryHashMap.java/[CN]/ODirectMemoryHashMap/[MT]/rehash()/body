@@ -1,42 +1,31 @@
 {
-  final long oldCapacity=capacity;
-  final int oldEntries=entries;
-  capacity=capacity << 1;
-  if (!allocateInitialMemory(capacity)) {
-    capacity=oldCapacity;
-    entries=oldEntries;
-  }
-  for (long oldIndex=0; oldIndex < oldCapacity; oldIndex++) {
-    int oldHashLineSize=getHashLineSize(oldEntries,oldIndex);
-    for (int oldOffset=0; oldOffset < oldHashLineSize; oldOffset++) {
-      final int oldKeyPtr=getKeyPtr(oldEntries,oldIndex,oldOffset);
-      final int oldValuePtr=getValuePtr(oldEntries,oldIndex,oldOffset);
-      final long oldHashCode=getHashCode(oldEntries,oldIndex,oldOffset);
-      if (!rehashEntry(oldHashCode,oldKeyPtr,oldValuePtr)) {
-        clearLines(entries,capacity);
-        memory.free(entries);
-        entries=oldEntries;
-        capacity=oldCapacity;
-      }
-    }
-    int oldHashLinePtr=getNextHashLinePtr(oldEntries,oldIndex);
-    while (oldHashLinePtr != ODirectMemory.NULL_POINTER) {
-      oldHashLineSize=getHashLineSizeFromHashLine(oldHashLinePtr);
-      for (int oldOffset=0; oldOffset < oldHashLineSize; oldOffset++) {
-        final int oldKeyPtr=getKeyPtrFromHashLine(oldHashLinePtr,oldOffset);
-        final long oldHashCode=getHashCodeFromHashLine(oldHashLinePtr,oldOffset);
-        final int oldValuePtr=getValuePtrFromHashLine(oldHashLinePtr,oldOffset);
-        if (!rehashEntry(oldHashCode,oldKeyPtr,oldValuePtr)) {
-          clearLines(entries,capacity);
-          memory.free(entries);
-          entries=oldEntries;
-          capacity=oldCapacity;
+  final ODirectMemoryHashMapBucket<K,V>[] oldEntries=entries;
+  final int oldCapacity=capacity;
+  try {
+    capacity=capacity << 1;
+    entries=new ODirectMemoryHashMapBucket[capacity];
+    for (    ODirectMemoryHashMapBucket<K,V> oldBucket : oldEntries) {
+      if (oldBucket == null)       continue;
+      for (      ODirectMemoryHashMapBucket.Entry oldEntry : oldBucket) {
+        final long index=index(oldEntry.hashCode);
+        ODirectMemoryHashMapBucket<K,V> bucket=entries[(int)index];
+        if (bucket == null) {
+          bucket=new ODirectMemoryHashMapBucket<K,V>(memory,bucketSize,valueSerializer);
+          entries[(int)index]=bucket;
         }
+        entries[(int)index].add(oldEntry.key,oldEntry.hashCode,oldEntry.value);
       }
-      oldHashLinePtr=getNextHashLinePtrFromHashLine(oldHashLinePtr);
     }
+    for (    ODirectMemoryHashMapBucket<K,V> oldBucket : oldEntries) {
+      if (oldBucket == null)       continue;
+      oldBucket.clear();
+    }
+    nextThreshold=(int)(capacity * 0.75);
   }
-  nextThreshold=(long)(capacity * 0.75);
-  clearLines(oldEntries,oldCapacity);
-  memory.free(oldEntries);
+ catch (  OutOfMemoryError e) {
+    for (    ODirectMemoryHashMapBucket<K,V> bucket : entries)     if (bucket != null)     bucket.clear();
+    entries=oldEntries;
+    capacity=oldCapacity;
+    throw e;
+  }
 }

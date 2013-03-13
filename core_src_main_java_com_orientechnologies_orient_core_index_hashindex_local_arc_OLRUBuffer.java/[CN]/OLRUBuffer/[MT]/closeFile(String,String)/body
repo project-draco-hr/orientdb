@@ -1,0 +1,22 @@
+{
+  final String fullName=fileName + fileExtension;
+synchronized (syncObject) {
+    if (!files.containsKey(fullName))     return;
+    final Set<Long> pageIndexes=filesPages.get(fullName);
+    for (    Long pageIndex : pageIndexes) {
+      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(fullName,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      try {
+        LRUEntry lruEntry=lruList.remove(fullName,pageIndex);
+        if (lruEntry != null && !lruEntry.managedExternally) {
+          flushData(fullName,pageIndex,lruEntry.dataPointer);
+          directMemory.free(lruEntry.dataPointer);
+        }
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(fullName,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+    pageIndexes.clear();
+    files.get(fullName).close();
+  }
+}

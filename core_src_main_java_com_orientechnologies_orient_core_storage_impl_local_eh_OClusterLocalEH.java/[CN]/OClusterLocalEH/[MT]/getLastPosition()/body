@@ -1,0 +1,23 @@
+{
+  acquireSharedLock();
+  try {
+    BucketPath bucketPath=getBucket(clusterPositionFactory.getMaxValue());
+    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    int fileLevel=getFileLevel(bucketPointer);
+    long filePosition=getFilePosition(bucketPointer);
+    OEHBucket bucket=readBucket(fileLevel,filePosition);
+    while (bucket.size() == 0) {
+      final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
+      if (prevBucketPath == null)       return clusterPositionFactory.valueOf(-1);
+      final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
+      fileLevel=getFileLevel(prevPointer);
+      filePosition=getFilePosition(prevPointer);
+      bucket=readBucket(fileLevel,filePosition);
+      bucketPath=prevBucketPath;
+    }
+    return bucket.getKey(bucket.size() - 1);
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

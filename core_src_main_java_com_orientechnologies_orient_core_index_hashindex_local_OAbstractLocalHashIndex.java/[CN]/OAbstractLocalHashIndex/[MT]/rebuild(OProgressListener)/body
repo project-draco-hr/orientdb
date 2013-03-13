@@ -1,0 +1,54 @@
+{
+  long documentIndexed=0;
+  final boolean intentInstalled=getDatabase().declareIntent(new OIntentMassiveInsert());
+  acquireExclusiveLock();
+  try {
+    try {
+      clear();
+    }
+ catch (    Exception e) {
+    }
+    int documentNum=0;
+    long documentTotal=0;
+    for (    final String cluster : clustersToIndex)     documentTotal+=getDatabase().countClusterElements(cluster);
+    if (iProgressListener != null)     iProgressListener.onBegin(this,documentTotal);
+    for (    final String clusterName : clustersToIndex)     try {
+      for (      final ORecord<?> record : getDatabase().browseCluster(clusterName)) {
+        if (record instanceof ODocument) {
+          final ODocument doc=(ODocument)record;
+          if (indexDefinition == null)           throw new OConfigurationException("Index '" + name + "' cannot be rebuilt because has no a valid definition ("+ indexDefinition+ ")");
+          final Object fieldValue=indexDefinition.getDocumentValueToIndex(doc);
+          if (fieldValue != null) {
+            if (fieldValue instanceof Collection) {
+              for (              final Object fieldValueItem : (Collection<?>)fieldValue) {
+                put(fieldValueItem,doc);
+              }
+            }
+ else             put(fieldValue,doc);
+            ++documentIndexed;
+          }
+        }
+        documentNum++;
+        if (iProgressListener != null)         iProgressListener.onProgress(this,documentNum,documentNum * 100f / documentTotal);
+      }
+    }
+ catch (    NoSuchElementException e) {
+    }
+    lazySave();
+    if (iProgressListener != null)     iProgressListener.onCompletition(this,true);
+  }
+ catch (  final Exception e) {
+    if (iProgressListener != null)     iProgressListener.onCompletition(this,false);
+    try {
+      clear();
+    }
+ catch (    Exception e2) {
+    }
+    throw new OIndexException("Error on rebuilding the index for clusters: " + clustersToIndex,e);
+  }
+ finally {
+    if (intentInstalled)     getDatabase().declareIntent(null);
+    releaseExclusiveLock();
+  }
+  return documentIndexed;
+}

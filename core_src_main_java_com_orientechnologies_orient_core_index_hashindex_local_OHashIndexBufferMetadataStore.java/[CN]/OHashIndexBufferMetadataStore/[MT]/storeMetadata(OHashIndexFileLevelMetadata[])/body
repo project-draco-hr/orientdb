@@ -1,9 +1,21 @@
 {
   int bufferSize=0;
+  int counter=0;
   for (  OHashIndexFileLevelMetadata metadata : filesMetadata) {
     if (metadata == null)     break;
+    counter++;
     final OStorageSegmentConfiguration fileConfiguration=metadata.getFileConfiguration();
     bufferSize+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.name);
+    bufferSize+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileType);
+    bufferSize+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileMaxSize);
+    bufferSize+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileIncrementSize);
+    bufferSize+=OIntegerSerializer.INT_SIZE;
+    for (    OStorageFileConfiguration storageFileConfiguration : fileConfiguration.infoFiles) {
+      bufferSize+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.incrementSize);
+      bufferSize+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.path == null ? "" : storageFileConfiguration.path);
+      bufferSize+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.type);
+      bufferSize+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.maxSize == null ? "" : storageFileConfiguration.maxSize);
+    }
     bufferSize+=OIntegerSerializer.INT_SIZE;
     bufferSize+=2 * OLongSerializer.LONG_SIZE;
   }
@@ -15,15 +27,31 @@
     if (fileMetadata == null)     break;
     final OStorageSegmentConfiguration fileConfiguration=fileMetadata.getFileConfiguration();
     OStringSerializer.INSTANCE.serializeNative(fileConfiguration.name,buffer,offset);
-    offset+=OStringSerializer.INSTANCE.getObjectSizeNative(buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.name);
+    OStringSerializer.INSTANCE.serializeNative(fileConfiguration.fileType,buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileType);
+    OStringSerializer.INSTANCE.serializeNative(fileConfiguration.fileMaxSize,buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileMaxSize);
+    OStringSerializer.INSTANCE.serializeNative(fileConfiguration.fileIncrementSize,buffer,offset);
+    offset+=OStringSerializer.INSTANCE.getObjectSize(fileConfiguration.fileIncrementSize);
     OIntegerSerializer.INSTANCE.serializeNative(fileConfiguration.id,buffer,offset);
-    offset+=OStringSerializer.INSTANCE.getObjectSizeNative(buffer,offset);
+    offset+=OIntegerSerializer.INT_SIZE;
+    OIntegerSerializer.INSTANCE.serializeNative(fileConfiguration.infoFiles.length,buffer,offset);
+    offset+=OIntegerSerializer.INT_SIZE;
+    for (    OStorageFileConfiguration storageFileConfiguration : fileConfiguration.infoFiles) {
+      OStringSerializer.INSTANCE.serializeNative(storageFileConfiguration.incrementSize,buffer,offset);
+      offset+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.incrementSize);
+      OStringSerializer.INSTANCE.serializeNative(storageFileConfiguration.path == null ? "" : storageFileConfiguration.path,buffer,offset);
+      offset+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.path == null ? "" : storageFileConfiguration.path);
+      OStringSerializer.INSTANCE.serializeNative(storageFileConfiguration.maxSize == null ? "" : storageFileConfiguration.maxSize,buffer,offset);
+      offset+=OStringSerializer.INSTANCE.getObjectSize(storageFileConfiguration.maxSize == null ? "" : storageFileConfiguration.maxSize);
+    }
     OLongSerializer.INSTANCE.serializeNative(fileMetadata.getBucketsCount(),buffer,offset);
     offset+=OLongSerializer.LONG_SIZE;
     OLongSerializer.INSTANCE.serializeNative(fileMetadata.getTombstoneIndex(),buffer,offset);
     offset+=OLongSerializer.LONG_SIZE;
   }
-  file.writeInt(0,filesMetadata.length);
+  file.writeInt(0,counter);
   file.writeInt(OIntegerSerializer.INT_SIZE,buffer.length);
   file.write(2 * OIntegerSerializer.INT_SIZE,buffer);
 }

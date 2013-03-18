@@ -1,0 +1,29 @@
+{
+  OHashTreeNodeMetadata[] hashTreeNodeMetadata=new OHashTreeNodeMetadata[hashTreeSize];
+  long[][] hashTree=new long[hashTreeSize][];
+  long filePosition=0;
+  for (int i=0; i < hashTreeSize; i++) {
+    byte[] contentBuffer=new byte[RECORD_SIZE];
+    file.read(filePosition,contentBuffer,contentBuffer.length);
+    int offset=0;
+    boolean notNullNode=OBooleanSerializer.INSTANCE.deserializeNative(contentBuffer,offset);
+    offset++;
+    if (notNullNode) {
+      long[] node=new long[OLocalHashTable.MAX_LEVEL_SIZE];
+      for (int n=0; n < node.length; n++) {
+        node[n]=OLongSerializer.INSTANCE.deserializeNative(contentBuffer,offset);
+        offset+=OLongSerializer.LONG_SIZE;
+      }
+      hashTree[i]=node;
+      OHashTreeNodeMetadata nodeMetadata=new OHashTreeNodeMetadata(contentBuffer[offset++],contentBuffer[offset++],contentBuffer[offset]);
+      hashTreeNodeMetadata[i]=nodeMetadata;
+    }
+ else {
+      hashTree[i]=null;
+      hashTreeNodeMetadata[i]=null;
+      hashTreeNodeMetadata[i]=null;
+    }
+    filePosition+=RECORD_SIZE;
+  }
+  return new TreeState(hashTree,hashTreeNodeMetadata);
+}

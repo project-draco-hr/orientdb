@@ -2,34 +2,17 @@
   storage.checkForClusterPermissions(getName());
   acquireExclusiveLock();
   try {
-    if (removeDataInTruncate) {
-      BucketPath bucketPath=getBucket(zeroKey);
-      while (bucketPath != null) {
-        final long[] node=hashTree[bucketPath.nodeIndex];
-        final long bucketPointer=node[bucketPath.itemIndex + bucketPath.hashMapOffset];
-        final long filePosition=getFilePosition(bucketPointer);
-        final int fileLevel=getFileLevel(bucketPointer);
-        final OEHBucket bucket=readBucket(fileLevel,filePosition);
-        bucketToTrack.set(new OPair<Long,OEHBucket>(bucketPointer,bucket));
-        for (int i=0; i < bucket.size(); i++) {
-          final OPhysicalPosition position=bucket.getEntry(i);
-          if (storage.checkForRecordValidity(position)) {
-            storage.getDataSegmentById(position.dataSegmentId).deleteRecord(position.dataSegmentPos);
-          }
-        }
-        bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+    OHashIndexBucket.Entry<OClusterPosition,OPhysicalPosition> entry=localHashTable.firstEntry();
+    while (entry != null) {
+      if (storage.checkForRecordValidity(entry.value)) {
+        storage.getDataSegmentById(entry.value.dataSegmentId).deleteRecord(entry.value.dataSegmentPos);
       }
+      final OHashIndexBucket.Entry<OClusterPosition,OPhysicalPosition>[] entries=localHashTable.higherEntries(entry.key,1);
+      if (entries.length > 0)       entry=entries[0];
+ else       entry=null;
     }
-    bucketToTrack.set(null);
-    for (    OEHFileMetadata metadata : filesMetadata) {
-      if (metadata == null)       continue;
-      metadata.getFile().truncate();
-      metadata.setBucketsCount(0);
-      metadata.setTombstonePosition(-1);
-    }
-    metadataStore.truncate();
-    treeStateStore.truncate();
-    initHashTreeState();
+    localHashTable.clear();
+    tombstonesCount=0;
   }
   finally {
     releaseExclusiveLock();

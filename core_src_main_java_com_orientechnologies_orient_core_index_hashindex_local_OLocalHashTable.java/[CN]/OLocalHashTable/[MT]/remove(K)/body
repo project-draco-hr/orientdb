@@ -6,15 +6,16 @@
     final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
     final long pageIndex=getPageIndex(bucketPointer);
     final int fileLevel=getFileLevel(bucketPointer);
+    final V removed;
     PageLockResult pageLockResult=lockPageForWrite(pageIndex,fileLevel);
     try {
       final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
       final int positionIndex=bucket.getIndex(key);
-      if (positionIndex < 0)       return false;
-      bucket.deleteEntry(positionIndex);
+      if (positionIndex < 0)       return null;
+      removed=bucket.deleteEntry(positionIndex).value;
       size--;
       if (mergeBucketsAfterDeletion(nodePath,bucket)) {
-        clearDirtyFlag(pageIndex,fileLevel,pageLockResult.cacheLock);
+        resetPageChanges(pageIndex,fileLevel,pageLockResult.cacheLock);
       }
     }
   finally {
@@ -26,7 +27,7 @@
       final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
       if (allMapsContainSameBucket)       mergeNodeToParent(node,nodePath);
     }
-    return true;
+    return removed;
   }
  catch (  IOException e) {
     throw new OIndexException("Error during index removal",e);

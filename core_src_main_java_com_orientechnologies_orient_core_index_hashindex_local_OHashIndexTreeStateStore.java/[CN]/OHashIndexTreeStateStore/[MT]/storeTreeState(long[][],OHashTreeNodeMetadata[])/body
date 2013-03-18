@@ -1,0 +1,27 @@
+{
+  truncate();
+  file.allocateSpace(hashTree.length * RECORD_SIZE);
+  long filePosition=0;
+  for (int i=0; i < hashTree.length; i++) {
+    long[] node=hashTree[i];
+    byte[] nodeContentBuffer=new byte[RECORD_SIZE];
+    int offset=0;
+    if (node != null) {
+      OBooleanSerializer.INSTANCE.serializeNative(true,nodeContentBuffer,offset);
+      offset++;
+      for (      long position : node) {
+        OLongSerializer.INSTANCE.serializeNative(position,nodeContentBuffer,offset);
+        offset+=OLongSerializer.LONG_SIZE;
+      }
+      OHashTreeNodeMetadata nodeMetadata=nodesMetadata[i];
+      nodeContentBuffer[offset++]=(byte)nodeMetadata.getMaxLeftChildDepth();
+      nodeContentBuffer[offset++]=(byte)nodeMetadata.getMaxRightChildDepth();
+      nodeContentBuffer[offset]=(byte)nodeMetadata.getNodeLocalDepth();
+    }
+ else {
+      OBooleanSerializer.INSTANCE.serializeNative(false,nodeContentBuffer,offset);
+    }
+    file.write(filePosition,nodeContentBuffer);
+    filePosition+=nodeContentBuffer.length;
+  }
+}

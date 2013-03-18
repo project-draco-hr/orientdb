@@ -1,0 +1,33 @@
+{
+  acquireSharedLock();
+  try {
+    BucketPath bucketPath=getBucket(HASH_CODE_MIN_VALUE);
+    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex];
+    int fileLevel=getFileLevel(bucketPointer);
+    long pageIndex=getPageIndex(bucketPointer);
+    PageLockResult pageLockResult=lockPageForRead(pageIndex,fileLevel);
+    try {
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+      while (bucket.size() == 0) {
+        bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+        if (bucketPath == null)         return null;
+        releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+        final long nextPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+        fileLevel=getFileLevel(nextPointer);
+        pageIndex=getPageIndex(nextPointer);
+        pageLockResult=lockPageForRead(pageIndex,fileLevel);
+        bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+      }
+      return bucket.getEntry(0);
+    }
+  finally {
+      releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Exception during data read",ioe);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

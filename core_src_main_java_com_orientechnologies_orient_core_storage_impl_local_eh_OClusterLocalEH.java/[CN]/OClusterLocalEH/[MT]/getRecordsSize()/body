@@ -2,14 +2,12 @@
   acquireSharedLock();
   try {
     long size=0;
-    for (    OEHFileMetadata fileMetadata : filesMetadata)     if (fileMetadata != null)     size+=fileMetadata.getFile().getFilledUpTo();
-    BucketPath bucketPath=getBucket(zeroKey);
-    while (bucketPath != null) {
-      OEHBucket bucket=readBucket(bucketPath);
-      for (      OPhysicalPosition position : bucket) {
-        if (position.dataSegmentPos > -1 && !position.recordVersion.isTombstone())         size+=storage.getDataSegmentById(position.dataSegmentId).getRecordSize(position.dataSegmentPos);
+    OHashIndexBucket.Entry<OClusterPosition,OPhysicalPosition>[] entries=localHashTable.ceilingEntries(OClusterPositionFactory.INSTANCE.valueOf(0));
+    while (entries.length > 0) {
+      for (      OHashIndexBucket.Entry<OClusterPosition,OPhysicalPosition> entry : entries) {
+        if (entry.value.dataSegmentPos > -1 && !entry.value.recordVersion.isTombstone())         size+=storage.getDataSegmentById(entry.value.dataSegmentId).getRecordSize(entry.value.dataSegmentPos);
       }
-      bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+      entries=localHashTable.higherEntries(entries[entries.length - 1].key);
     }
     return size;
   }

@@ -1,0 +1,29 @@
+{
+  long pagePointer=directMemory.allocate(new byte[OLocalPage.PAGE_SIZE]);
+  try {
+    OLocalPage localPage=new OLocalPage(pagePointer,true);
+    localPage.appendRecord(new byte[]{1,2,3,4,5,6,5,4,3,2,1});
+    localPage.appendRecord(new byte[]{2,2,3,4,5,6,5,4,3,2,2});
+    localPage.appendRecord(new byte[]{3,2,3,4,5,6,5,4,3,2,3});
+    localPage.appendRecord(new byte[]{4,2,3,4,5,6,5,4,3,2,4});
+    int freeSpace=localPage.getFreeSpace();
+    localPage.cleanOutRecord(0);
+    localPage.cleanOutRecord(2);
+    Assert.assertEquals(localPage.getFreeSpace(),freeSpace + 15 * 2);
+    freeSpace=localPage.getFreeSpace();
+    Assert.assertFalse(localPage.markRecordAsDeleted(0));
+    Assert.assertFalse(localPage.markRecordAsDeleted(2));
+    Assert.assertTrue(localPage.isCleanedOut(0));
+    Assert.assertTrue(localPage.isCleanedOut(2));
+    Assert.assertEquals(localPage.getRecordsCount(),2);
+    int positionFive=localPage.appendRecord(new byte[]{1,2,3});
+    Assert.assertEquals(positionFive,2);
+    int positionSix=localPage.appendRecord(new byte[]{4,5,6});
+    Assert.assertEquals(positionSix,0);
+    Assert.assertEquals(localPage.getFreeSpace(),freeSpace - 2 * 7);
+    Assert.assertEquals(localPage.getRecordsCount(),4);
+  }
+  finally {
+    directMemory.free(pagePointer);
+  }
+}

@@ -1,0 +1,36 @@
+{
+  acquireExclusiveLock();
+  try {
+    this.storage=storageLocal;
+    buffer=storage.getDiskCache();
+    this.name=name;
+    initStores(metadataConfigurationFileExtension,treeStateFileExtension);
+    metadataStore.open();
+    treeStateStore.open();
+    size=metadataStore.getRecordsCount();
+    hashTreeSize=(int)treeStateStore.getHashTreeSize();
+    hashTreeTombstone=(int)treeStateStore.getHashTreeTombstone();
+    bucketTombstonePointer=treeStateStore.getBucketTombstonePointer();
+    final int arraySize;
+    int bitsCount=Integer.bitCount(hashTreeSize);
+    if (bitsCount == 1)     arraySize=hashTreeSize;
+ else     arraySize=Integer.highestOneBit(hashTreeSize) << 1;
+    OHashIndexTreeStateStore.TreeState treeState=treeStateStore.loadTreeState(arraySize);
+    hashTree=treeState.getHashTree();
+    nodesMetadata=treeState.getHashTreeNodeMetadata();
+    size=metadataStore.getRecordsCount();
+    keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.INSTANCE.getObjectSerializer(metadataStore.getKeySerializerId());
+    valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.INSTANCE.getObjectSerializer(metadataStore.getValuerSerializerId());
+    filesMetadata=metadataStore.loadMetadata();
+    for (int i=0; i < filesMetadata.length; i++) {
+      OHashIndexFileLevelMetadata fileLevelMetadata=filesMetadata[i];
+      if (fileLevelMetadata != null)       fileLevelIds[i]=buffer.openFile(fileLevelMetadata.getFileConfiguration(),bucketFileExtension);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during hash table loading",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

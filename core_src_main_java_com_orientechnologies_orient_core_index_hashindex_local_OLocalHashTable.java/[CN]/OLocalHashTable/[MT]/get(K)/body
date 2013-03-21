@@ -1,0 +1,27 @@
+{
+  acquireSharedLock();
+  try {
+    final long hashCode=keyHashFunction.hashCode(key);
+    BucketPath bucketPath=getBucket(hashCode);
+    final long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    if (bucketPointer == 0)     return null;
+    long pageIndex=getPageIndex(bucketPointer);
+    int fileLevel=getFileLevel(bucketPointer);
+    PageLockResult pageLockResult=lockPageForRead(pageIndex,fileLevel);
+    try {
+      final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+      OHashIndexBucket.Entry<K,V> entry=bucket.find(key);
+      if (entry == null)       return null;
+      return entry.value;
+    }
+  finally {
+      releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during index value retrieval",e);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

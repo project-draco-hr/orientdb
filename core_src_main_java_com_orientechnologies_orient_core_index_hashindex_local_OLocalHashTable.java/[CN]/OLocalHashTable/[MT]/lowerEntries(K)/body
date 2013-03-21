@@ -1,0 +1,37 @@
+{
+  acquireSharedLock();
+  try {
+    final long hashCode=keyHashFunction.hashCode(key);
+    BucketPath bucketPath=getBucket(hashCode);
+    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    int fileLevel=getFileLevel(bucketPointer);
+    long pageIndex=getPageIndex(bucketPointer);
+    PageLockResult pageLockResult=lockPageForRead(pageIndex,fileLevel);
+    try {
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+      while (bucket.size() == 0 || comparator.compare(bucket.getKey(0),key) >= 0) {
+        final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
+        if (prevBucketPath == null)         return new OHashIndexBucket.Entry[0];
+        releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+        final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
+        fileLevel=getFileLevel(prevPointer);
+        pageIndex=getPageIndex(prevPointer);
+        pageLockResult=lockPageForRead(pageIndex,fileLevel);
+        bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+        bucketPath=prevBucketPath;
+      }
+      final int startIndex=0;
+      final int index=bucket.getIndex(key);
+      final int endIndex;
+      if (index >= 0)       endIndex=index;
+ else       endIndex=-index - 1;
+      return convertBucketToEntries(bucket,startIndex,endIndex);
+    }
+  finally {
+      releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+    }
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

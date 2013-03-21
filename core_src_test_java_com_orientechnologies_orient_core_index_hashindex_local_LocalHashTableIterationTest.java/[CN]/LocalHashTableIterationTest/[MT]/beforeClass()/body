@@ -1,0 +1,19 @@
+{
+  String buildDirectory=System.getProperty("buildDirectory");
+  if (buildDirectory == null)   buildDirectory=".";
+  databaseDocumentTx=new ODatabaseDocumentTx("local:" + buildDirectory + "/localHashTableIterationTest");
+  if (databaseDocumentTx.exists()) {
+    databaseDocumentTx.open("admin","admin");
+    databaseDocumentTx.drop();
+  }
+  databaseDocumentTx.create();
+  buffer=new OLRUCache(400 * 1024 * 1024,ODirectMemoryFactory.INSTANCE.directMemory(),OHashIndexBucket.MAX_BUCKET_SIZE_BYTES,(OStorageLocal)databaseDocumentTx.getStorage(),false);
+  OHashFunction<Integer> hashFunction=new OHashFunction<Integer>(){
+    @Override public long hashCode(    Integer value){
+      return Long.MAX_VALUE / 2 + value;
+    }
+  }
+;
+  localHashTable=new OLocalHashTable<Integer,String>(OAbstractLocalHashIndex.METADATA_CONFIGURATION_FILE_EXTENSION,OAbstractLocalHashIndex.TREE_STATE_FILE_EXTENSION,OAbstractLocalHashIndex.BUCKET_FILE_EXTENSION,hashFunction);
+  localHashTable.create("localHashTableIterationTest",OIntegerSerializer.INSTANCE,OStringSerializer.INSTANCE,(OStorageLocal)databaseDocumentTx.getStorage());
+}

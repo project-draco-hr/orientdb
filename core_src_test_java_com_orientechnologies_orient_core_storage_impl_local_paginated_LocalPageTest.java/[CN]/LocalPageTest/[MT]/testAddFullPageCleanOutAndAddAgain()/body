@@ -1,0 +1,46 @@
+{
+  long pagePointer=directMemory.allocate(new byte[OLocalPage.PAGE_SIZE]);
+  try {
+    OLocalPage localPage=new OLocalPage(pagePointer,true);
+    Map<Integer,Byte> positionCounter=new HashMap<Integer,Byte>();
+    int lastPosition;
+    byte counter=0;
+    int freeSpace=localPage.getFreeSpace();
+    Assert.assertEquals(freeSpace,OLocalPage.PAGE_SIZE - 5 * OIntegerSerializer.INT_SIZE);
+    do {
+      lastPosition=localPage.appendRecord(new byte[]{counter,counter,counter});
+      if (lastPosition >= 0) {
+        Assert.assertEquals(lastPosition,positionCounter.size());
+        positionCounter.put(lastPosition,counter);
+        counter++;
+        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - 11);
+        freeSpace=localPage.getFreeSpace();
+      }
+    }
+ while (lastPosition >= 0);
+    Assert.assertEquals(localPage.getRecordsCount(),5956);
+    for (int i=0; i < 5956; i+=2) {
+      localPage.cleanOutRecord(i);
+      positionCounter.remove(i);
+    }
+    freeSpace=localPage.getFreeSpace();
+    do {
+      lastPosition=localPage.appendRecord(new byte[]{counter,counter,counter});
+      if (lastPosition >= 0) {
+        positionCounter.put(lastPosition,counter);
+        counter++;
+        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - 7);
+        freeSpace=localPage.getFreeSpace();
+      }
+    }
+ while (lastPosition >= 0);
+    Assert.assertEquals(localPage.getRecordsCount(),5956);
+    for (    Map.Entry<Integer,Byte> entry : positionCounter.entrySet()) {
+      final long pointer=localPage.getRecordPointer(entry.getKey());
+      Assert.assertEquals(directMemory.get(pointer,3),new byte[]{entry.getValue(),entry.getValue(),entry.getValue()});
+    }
+  }
+  finally {
+    directMemory.free(pagePointer);
+  }
+}

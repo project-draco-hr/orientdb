@@ -2,7 +2,7 @@
   acquireExclusiveLock();
   try {
     long nextPagePointer=-1;
-    int entryContentLength=content.length + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE;
+    int entryContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE;
     if (entryContentLength < OLocalPage.MAX_RECORD_SIZE) {
       byte[] entryContent=new byte[entryContentLength];
       int entryPosition=0;
@@ -10,12 +10,14 @@
       entryPosition++;
       System.arraycopy(content,0,entryContent,entryPosition,content.length);
       entryPosition+=content.length;
+      entryContent[entryPosition]=1;
+      entryPosition++;
       OLongSerializer.INSTANCE.serializeNative(nextPagePointer,entryContent,entryPosition);
       size++;
-      return addEntry(recordVersion,entryContent);
+      return OClusterPositionFactory.INSTANCE.valueOf(addEntry(recordVersion,entryContent));
     }
  else {
-      int entrySize=content.length + OVersionFactory.instance().getVersionSize() + OByteSerializer.BYTE_SIZE;
+      int entrySize=content.length + OByteSerializer.BYTE_SIZE;
       int fullEntryPosition=0;
       byte[] fullEntry=new byte[entrySize];
       fullEntry[fullEntryPosition]=recordType;
@@ -23,10 +25,11 @@
       System.arraycopy(content,0,fullEntry,fullEntryPosition,content.length);
       nextPagePointer=-1;
       int to=fullEntry.length;
-      int from=to - (OLocalPage.MAX_RECORD_SIZE - OLongSerializer.LONG_SIZE);
+      int from=to - (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
       do {
-        byte[] entryContent=new byte[from - to + OLongSerializer.LONG_SIZE];
+        byte[] entryContent=new byte[from - to + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE];
         System.arraycopy(fullEntry,from,entryContent,0,from - to);
+        entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
         OLongSerializer.INSTANCE.serializeNative(nextPagePointer,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
         nextPagePointer=addEntry(recordVersion,entryContent);
         to=from;
@@ -35,7 +38,7 @@
       }
  while (from > to);
       size++;
-      return nextPagePointer;
+      return OClusterPositionFactory.INSTANCE.valueOf(nextPagePointer);
     }
   }
   finally {

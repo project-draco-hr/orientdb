@@ -1,0 +1,54 @@
+{
+  acquireSharedLock();
+  try {
+    long pagePointer=clusterPosition.longValue();
+    int recordPosition=(int)(pagePointer & 0xFFFF);
+    long pageIndex=pagePointer >>> 16;
+    if (diskCache.getFilledUpTo(fileId) < pageIndex)     return null;
+    final List<byte[]> recordChunks=new ArrayList<byte[]>();
+    int contentSize=0;
+    long nextPagePointer=-1;
+    ORecordVersion recordVersion=null;
+    do {
+      long pointer=diskCache.loadAndLockForRead(fileId,pageIndex);
+      try {
+        final OLocalPage localPage=new OLocalPage(pointer,false);
+        long recordPointer=localPage.getRecordPointer(recordPosition);
+        if (recordPointer == ODirectMemory.NULL_POINTER) {
+          if (recordChunks.isEmpty())           return null;
+ else           throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+        }
+        byte[] content=directMemory.get(recordPointer,localPage.getRecordSize(recordPosition));
+        if (recordVersion == null)         recordVersion=localPage.getRecordVersion(recordPosition);
+        recordChunks.add(content);
+        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+        contentSize+=content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
+      }
+  finally {
+        diskCache.releaseReadLock(fileId,pageIndex);
+      }
+      pageIndex=nextPagePointer >>> 16;
+      recordPosition=(int)(nextPagePointer & 0xFFFF);
+    }
+ while (nextPagePointer >= 0);
+    byte[] fullContent;
+    if (recordChunks.size() == 1)     fullContent=recordChunks.get(0);
+ else {
+      fullContent=new byte[contentSize + OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE];
+      int fullContentPosition=0;
+      for (      byte[] recordChuck : recordChunks) {
+        System.arraycopy(recordChuck,0,fullContent,fullContentPosition,recordChuck.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE);
+        fullContentPosition+=recordChuck.length - OLongSerializer.LONG_SIZE;
+      }
+    }
+    int fullContentPosition=0;
+    byte recordType=fullContent[fullContentPosition];
+    fullContentPosition++;
+    byte[] recordContent=new byte[fullContent.length - 2 * OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE];
+    System.arraycopy(fullContent,fullContentPosition,recordContent,0,recordContent.length);
+    return new ORawBuffer(recordContent,recordVersion,recordType);
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

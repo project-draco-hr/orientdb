@@ -1,0 +1,59 @@
+{
+  long pointer=diskCache.loadAndLockForWrite(fileId,pageIndex);
+  try {
+    final OLocalPage localPage=new OLocalPage(pointer,false);
+    int newFreePageIndex=calculateFreePageIndex(localPage);
+    long nextPageIndex=localPage.getNextPage();
+    long prevPageIndex=localPage.getPrevPage();
+    if (prevFreePageIndex == newFreePageIndex)     return;
+    if (prevPageIndex >= 0) {
+      long prevPagePointer=diskCache.loadAndLockForWrite(fileId,prevPageIndex);
+      try {
+        final OLocalPage prevPage=new OLocalPage(prevPagePointer,false);
+        prevPage.setNextPage(nextPageIndex);
+      }
+  finally {
+        diskCache.releaseWriteLock(fileId,prevPageIndex);
+      }
+    }
+    if (nextPageIndex >= 0) {
+      long nextPagePointer=diskCache.loadAndLockForWrite(fileId,nextPageIndex);
+      try {
+        final OLocalPage nextPage=new OLocalPage(nextPagePointer,false);
+        nextPage.setPrevPage(prevPageIndex);
+      }
+  finally {
+        diskCache.releaseWriteLock(fileId,nextPageIndex);
+      }
+    }
+    if (prevFreePageIndex < 0 && newFreePageIndex < 0)     return;
+    if (prevFreePageIndex >= 0) {
+      freePageIndexes[prevFreePageIndex]=nextPageIndex;
+      localPage.setNextPage(-1);
+      localPage.setPrevPage(-1);
+    }
+    if (newFreePageIndex >= 0) {
+      long oldFreePage=freePageIndexes[newFreePageIndex];
+      if (oldFreePage >= 0) {
+        long oldFreePagePointer=diskCache.loadAndLockForWrite(fileId,oldFreePage);
+        try {
+          final OLocalPage oldFreeLocalPage=new OLocalPage(oldFreePagePointer,false);
+          oldFreeLocalPage.setPrevPage(pageIndex);
+        }
+  finally {
+          diskCache.releaseWriteLock(fileId,oldFreePage);
+        }
+        localPage.setNextPage(oldFreePage);
+        localPage.setPrevPage(-1);
+      }
+      freePageIndexes[newFreePageIndex]=pageIndex;
+    }
+ else {
+      localPage.setNextPage(-1);
+      localPage.setPrevPage(-1);
+    }
+  }
+  finally {
+    diskCache.releaseWriteLock(fileId,pageIndex);
+  }
+}

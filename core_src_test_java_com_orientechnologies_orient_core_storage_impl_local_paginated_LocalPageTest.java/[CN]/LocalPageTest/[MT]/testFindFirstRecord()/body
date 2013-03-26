@@ -1,0 +1,50 @@
+{
+  long pagePointer=directMemory.allocate(new byte[OLocalPage.PAGE_SIZE]);
+  final MersenneTwisterFast mersenneTwister=new MersenneTwisterFast();
+  try {
+    OLocalPage localPage=new OLocalPage(pagePointer,true);
+    Set<Integer> positions=new HashSet<Integer>();
+    int lastPosition;
+    byte counter=0;
+    int freeSpace=localPage.getFreeSpace();
+    Assert.assertEquals(freeSpace,OLocalPage.MAX_RECORD_SIZE);
+    ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+    recordVersion.increment();
+    do {
+      lastPosition=localPage.appendRecord(recordVersion,new byte[]{counter,counter,counter});
+      if (lastPosition >= 0) {
+        Assert.assertEquals(lastPosition,positions.size());
+        positions.add(lastPosition);
+        counter++;
+        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - (15 + OVersionFactory.instance().getVersionSize()));
+        freeSpace=localPage.getFreeSpace();
+      }
+    }
+ while (lastPosition >= 0);
+    int filledRecordsCount=positions.size();
+    Assert.assertEquals(localPage.getRecordsCount(),filledRecordsCount);
+    for (int i=0; i < filledRecordsCount; i++) {
+      if (mersenneTwister.nextBoolean()) {
+        localPage.deleteRecord(i);
+        positions.remove(i);
+      }
+    }
+    int recordsIterated=0;
+    int recordPosition=0;
+    int lastRecordPosition=-1;
+    do {
+      recordPosition=localPage.findFirstRecord(recordPosition);
+      if (recordPosition < 0)       break;
+      Assert.assertTrue(positions.contains(recordPosition));
+      Assert.assertTrue(recordPosition > lastRecordPosition);
+      lastRecordPosition=recordPosition;
+      recordPosition++;
+      recordsIterated++;
+    }
+ while (recordPosition >= 0);
+    Assert.assertEquals(recordsIterated,positions.size());
+  }
+  finally {
+    directMemory.free(pagePointer);
+  }
+}

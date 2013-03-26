@@ -1,0 +1,26 @@
+{
+  nextBucketLoop:   while (bucketPath != null) {
+    final long[] node=hashTree[bucketPath.nodeIndex];
+    final int startIndex=bucketPath.itemIndex + bucketPath.hashMapOffset;
+    final int endIndex=MAX_LEVEL_SIZE;
+    for (int i=startIndex; i < endIndex; i++) {
+      final long position=node[i];
+      if (position > 0) {
+        final int hashMapSize=1 << bucketPath.nodeLocalDepth;
+        final int hashMapOffset=(i / hashMapSize) * hashMapSize;
+        final int itemIndex=i - hashMapOffset;
+        return new BucketPath(bucketPath.parent,hashMapOffset,itemIndex,bucketPath.nodeIndex,bucketPath.nodeLocalDepth,bucketPath.nodeGlobalDepth);
+      }
+      if (position < 0) {
+        final int childNodeIndex=(int)((position & Long.MAX_VALUE) >> 8);
+        final int childItemOffset=(int)position & 0xFF;
+        final BucketPath parent=new BucketPath(bucketPath.parent,0,i,bucketPath.nodeIndex,bucketPath.nodeLocalDepth,bucketPath.nodeGlobalDepth);
+        final int childLocalDepth=nodesMetadata[childNodeIndex].getNodeLocalDepth();
+        bucketPath=new BucketPath(parent,childItemOffset,0,childNodeIndex,childLocalDepth,bucketPath.nodeGlobalDepth + childLocalDepth);
+        continue nextBucketLoop;
+      }
+    }
+    bucketPath=nextLevelUp(bucketPath);
+  }
+  return null;
+}

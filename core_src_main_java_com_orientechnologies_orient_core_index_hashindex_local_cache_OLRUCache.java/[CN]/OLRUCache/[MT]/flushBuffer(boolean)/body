@@ -1,0 +1,18 @@
+{
+  OLockManager.LOCK lock=writeLock ? OLockManager.LOCK.EXCLUSIVE : OLockManager.LOCK.SHARED;
+synchronized (syncObject) {
+    for (    LRUEntry entry : lruList) {
+      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(entry.fileId,entry.pageIndex),lock);
+      try {
+        if (entry.isDirty) {
+          flushData(entry.fileId,entry.pageIndex,entry.dataPointer);
+          entry.isDirty=false;
+        }
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(entry.fileId,entry.pageIndex),lock);
+      }
+    }
+    for (    OMultiFileSegment multiFileSegment : files.values())     multiFileSegment.synch();
+  }
+}

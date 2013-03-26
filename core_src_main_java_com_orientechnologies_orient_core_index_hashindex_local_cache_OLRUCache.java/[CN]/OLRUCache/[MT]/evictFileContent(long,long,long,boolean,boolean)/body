@@ -1,0 +1,30 @@
+{
+  if (mangedExternally)   return;
+  if (isDirty) {
+    if (evictedPages.size() >= OGlobalConfiguration.DISK_CACHE_WRITE_QUEUE_LENGTH.getValueAsInteger()) {
+      Map.Entry[] sortedPages=evictedPages.entrySet().toArray(new Map.Entry[evictedPages.size()]);
+      Arrays.sort(sortedPages,new Comparator<Map.Entry>(){
+        @Override public int compare(        Map.Entry entryOne,        Map.Entry entryTwo){
+          FileLockKey fileLockKeyOne=(FileLockKey)entryOne.getKey();
+          FileLockKey fileLockKeyTwo=(FileLockKey)entryTwo.getKey();
+          return fileLockKeyOne.compareTo(fileLockKeyTwo);
+        }
+      }
+);
+      for (      Map.Entry<FileLockKey,Long> entry : sortedPages) {
+        long evictedDataPointer=entry.getValue();
+        FileLockKey fileLockKey=entry.getKey();
+        flushData(fileLockKey.fileId,fileLockKey.pageIndex,evictedDataPointer);
+        directMemory.free(evictedDataPointer);
+      }
+      flushData(fileId,pageIndex,dataPointer);
+      directMemory.free(dataPointer);
+      evictedPages.clear();
+    }
+ else     evictedPages.put(new FileLockKey(fileId,pageIndex),dataPointer);
+  }
+ else {
+    directMemory.free(dataPointer);
+  }
+  filesPages.get(fileId).remove(pageIndex);
+}

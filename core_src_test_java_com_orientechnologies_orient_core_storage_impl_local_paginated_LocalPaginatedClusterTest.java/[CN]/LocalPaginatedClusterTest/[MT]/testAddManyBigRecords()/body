@@ -1,0 +1,22 @@
+{
+  final int records=1000;
+  MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast();
+  Map<OClusterPosition,byte[]> positionRecordMap=new HashMap<OClusterPosition,byte[]>();
+  ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+  recordVersion.increment();
+  recordVersion.increment();
+  for (int i=0; i < records; i++) {
+    int recordSize=mersenneTwisterFast.nextInt(2 * OLocalPage.MAX_RECORD_SIZE) + OLocalPage.MAX_RECORD_SIZE + 1;
+    byte[] bigRecord=new byte[recordSize];
+    mersenneTwisterFast.nextBytes(bigRecord);
+    final OClusterPosition clusterPosition=paginatedCluster.createRecord(bigRecord,recordVersion,(byte)2);
+    positionRecordMap.put(clusterPosition,bigRecord);
+  }
+  for (  Map.Entry<OClusterPosition,byte[]> entry : positionRecordMap.entrySet()) {
+    ORawBuffer rawBuffer=paginatedCluster.readRecord(entry.getKey());
+    Assert.assertNotNull(rawBuffer);
+    Assert.assertEquals(rawBuffer.version,recordVersion);
+    Assert.assertEquals(rawBuffer.buffer,entry.getValue());
+    Assert.assertEquals(rawBuffer.recordType,2);
+  }
+}

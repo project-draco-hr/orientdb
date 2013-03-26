@@ -1,0 +1,24 @@
+{
+synchronized (syncObject) {
+    if (!files.containsKey(fileId))     return;
+    final Set<Long> pageIndexes=filesPages.get(fileId);
+    Long[] sortedPageIndexes=new Long[pageIndexes.size()];
+    sortedPageIndexes=pageIndexes.toArray(sortedPageIndexes);
+    Arrays.sort(sortedPageIndexes);
+    for (    Long pageIndex : sortedPageIndexes) {
+      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      try {
+        OCacheEntry lruEntry=remove(fileId,pageIndex);
+        if (lruEntry != null && !lruEntry.managedExternally) {
+          flushData(fileId,pageIndex,lruEntry.dataPointer);
+          directMemory.free(lruEntry.dataPointer);
+        }
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+    pageIndexes.clear();
+    files.get(fileId).close();
+  }
+}

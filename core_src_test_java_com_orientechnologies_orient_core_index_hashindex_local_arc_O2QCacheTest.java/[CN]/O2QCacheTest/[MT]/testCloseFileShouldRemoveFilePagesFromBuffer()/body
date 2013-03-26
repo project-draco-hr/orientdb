@@ -1,0 +1,24 @@
+{
+  long fileId=buffer.openFile(fileConfiguration,".tst");
+  long[] pointers;
+  pointers=new long[4];
+  for (int i=0; i < 4; i++) {
+    pointers[i]=buffer.loadAndLockForWrite(fileId,i);
+    directMemory.set(pointers[i],new byte[]{(byte)i,1,2,seed,4,5,6,(byte)i},8);
+    buffer.releaseWriteLock(fileId,i);
+  }
+  Deque<OCacheEntry> am=buffer.getAm();
+  Deque<OCacheEntry> a1in=buffer.getA1in();
+  Deque<OCacheEntry> a1out=buffer.getA1out();
+  Assert.assertTrue(am.isEmpty());
+  Assert.assertTrue(a1out.isEmpty());
+  for (int i=0; i < 4; i++) {
+    OCacheEntry entry=generateEntry(fileId,i,pointers[i]);
+    Assert.assertTrue(a1in.contains(entry));
+  }
+  Assert.assertEquals(buffer.getFilledUpTo(fileId),4);
+  buffer.closeFile(fileId);
+  Assert.assertTrue(buffer.getA1out().isEmpty());
+  Assert.assertTrue(buffer.getA1in().isEmpty());
+  Assert.assertTrue(buffer.getAm().isEmpty());
+}

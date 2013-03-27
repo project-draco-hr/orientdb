@@ -1,0 +1,42 @@
+{
+  acquireExclusiveLock();
+  try {
+    long pagePointer=clusterPosition.longValue();
+    int recordPosition=(int)(pagePointer & 0xFFFF);
+    long pageIndex=pagePointer >>> 16;
+    if (diskCache.getFilledUpTo(fileId) < pageIndex)     return false;
+    long nextPagePointer=-1;
+    int removedContentSize=0;
+    do {
+      long pointer=diskCache.loadAndLockForWrite(fileId,pageIndex);
+      int initialFreePageIndex;
+      try {
+        final OLocalPage localPage=new OLocalPage(pointer,false);
+        initialFreePageIndex=calculateFreePageIndex(localPage);
+        long recordPointer=localPage.getRecordPointer(recordPosition);
+        if (recordPointer == ODirectMemory.NULL_POINTER) {
+          if (removedContentSize == 0)           return false;
+ else           throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+        }
+        byte[] content=directMemory.get(recordPointer,localPage.getRecordSize(recordPosition));
+        int initialFreeSpace=localPage.getFreeSpace();
+        localPage.deleteRecord(recordPosition);
+        removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
+        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+      }
+  finally {
+        diskCache.releaseWriteLock(fileId,pageIndex);
+      }
+      updateFreePagesIndex(initialFreePageIndex,pageIndex);
+      pageIndex=nextPagePointer >>> 16;
+      recordPosition=(int)(nextPagePointer & 0xFFFF);
+    }
+ while (nextPagePointer >= 0);
+    size--;
+    recordsSize-=removedContentSize;
+    return true;
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

@@ -1,0 +1,38 @@
+{
+  long pagesCount=diskCache.getFilledUpTo(fileId);
+  pageLoop:   for (long i=pageIndex; i < pagesCount; i++) {
+    long pointer=diskCache.loadAndLockForRead(fileId,i);
+    try {
+      final OLocalPage localPage=new OLocalPage(pointer,false);
+      int recordsCount=localPage.getRecordsCount();
+      if (recordsCount > 0) {
+        while (true) {
+          recordPosition=localPage.findFirstRecord(recordPosition);
+          if (recordPosition < 0) {
+            recordPosition=0;
+            continue pageLoop;
+          }
+ else {
+            long recordPointer=localPage.getRecordPointer(recordPosition);
+            int recordSize=localPage.getRecordSize(recordPosition);
+            if (directMemory.getByte(recordPointer + recordSize - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 1) {
+              OPhysicalPosition physicalPosition=new OPhysicalPosition();
+              physicalPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf((i << 16) | recordPosition);
+              physicalPosition.recordVersion=localPage.getRecordVersion(recordPosition);
+              physicalPosition.recordType=directMemory.getByte(recordPointer);
+              physicalPosition.recordSize=-1;
+              physicalPosition.dataSegmentId=-1;
+              physicalPosition.dataSegmentPos=-1;
+              return new OPhysicalPosition[]{physicalPosition};
+            }
+            recordPosition++;
+          }
+        }
+      }
+    }
+  finally {
+      diskCache.releaseReadLock(fileId,i);
+    }
+  }
+  return new OPhysicalPosition[0];
+}

@@ -2,27 +2,30 @@
   long pagePointer=directMemory.allocate(new byte[OLocalPage.PAGE_SIZE]);
   try {
     OLocalPage localPage=new OLocalPage(pagePointer,true);
+    ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+    recordVersion.increment();
     List<Integer> positions=new ArrayList<Integer>();
     int lastPosition;
     byte counter=0;
     int freeSpace=localPage.getFreeSpace();
-    Assert.assertEquals(freeSpace,OLocalPage.PAGE_SIZE - 5 * OIntegerSerializer.INT_SIZE);
     do {
-      lastPosition=localPage.appendRecord(new byte[]{counter,counter,counter});
+      lastPosition=localPage.appendRecord(recordVersion,new byte[]{counter,counter,counter});
       if (lastPosition >= 0) {
         Assert.assertEquals(lastPosition,positions.size());
         positions.add(lastPosition);
         counter++;
-        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - 11);
+        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - (15 + OVersionFactory.instance().getVersionSize()));
         freeSpace=localPage.getFreeSpace();
       }
     }
  while (lastPosition >= 0);
-    Assert.assertEquals(localPage.getRecordsCount(),5956);
+    Assert.assertEquals(localPage.getRecordsCount(),positions.size());
     counter=0;
     for (    int position : positions) {
       long pointer=localPage.getRecordPointer(position);
       Assert.assertEquals(directMemory.get(pointer,3),new byte[]{counter,counter,counter});
+      Assert.assertEquals(localPage.getRecordSize(position),3);
+      Assert.assertEquals(localPage.getRecordVersion(position),recordVersion);
       counter++;
     }
   }

@@ -1,0 +1,35 @@
+{
+  final int records=10000;
+  long seed=System.currentTimeMillis();
+  MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(seed);
+  System.out.println("testGetPhysicalPosition seed : " + seed);
+  Set<OPhysicalPosition> positions=new HashSet<OPhysicalPosition>();
+  ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+  recordVersion.increment();
+  recordVersion.increment();
+  for (int i=0; i < records; i++) {
+    int recordSize=mersenneTwisterFast.nextInt(2 * OLocalPage.MAX_RECORD_SIZE) + 1;
+    byte[] record=new byte[recordSize];
+    mersenneTwisterFast.nextBytes(record);
+    recordVersion.increment();
+    final OClusterPosition clusterPosition=paginatedCluster.createRecord(record,recordVersion,(byte)i);
+    final OPhysicalPosition physicalPosition=new OPhysicalPosition();
+    physicalPosition.recordVersion=recordVersion;
+    physicalPosition.clusterPosition=clusterPosition;
+    physicalPosition.dataSegmentId=-1;
+    physicalPosition.dataSegmentPos=-1;
+    physicalPosition.recordSize=-1;
+    physicalPosition.recordType=(byte)i;
+    positions.add(physicalPosition);
+  }
+  for (  OPhysicalPosition position : positions) {
+    OPhysicalPosition physicalPosition=new OPhysicalPosition();
+    physicalPosition.clusterPosition=position.clusterPosition;
+    physicalPosition=paginatedCluster.getPhysicalPosition(physicalPosition);
+    Assert.assertEquals(physicalPosition.clusterPosition,position.clusterPosition);
+    Assert.assertEquals(physicalPosition.recordType,position.recordType);
+    Assert.assertEquals(physicalPosition.recordSize,position.recordSize);
+    Assert.assertEquals(physicalPosition.dataSegmentPos,position.dataSegmentPos);
+    Assert.assertEquals(physicalPosition.dataSegmentId,position.dataSegmentId);
+  }
+}

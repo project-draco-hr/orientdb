@@ -1,7 +1,8 @@
 {
-  if (newRecords == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  if (newRecords == null && content == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   final OCommandParameters commandParameters=new OCommandParameters(iArgs);
   if (indexName != null) {
+    if (newRecords == null)     throw new OCommandExecutionException("No key/value found");
     final OIndex<?> index=getDatabase().getMetadata().getIndexManager().getIndex(indexName);
     if (index == null)     throw new OCommandExecutionException("Target index '" + indexName + "' not found");
     Map<String,Object> result=null;
@@ -13,22 +14,27 @@
   }
  else {
     final List<ODocument> docs=new ArrayList<ODocument>();
-    for (    Map<String,Object> candidate : newRecords) {
+    if (newRecords != null) {
+      for (      Map<String,Object> candidate : newRecords) {
+        final ODocument doc=className != null ? new ODocument(className) : new ODocument();
+        OSQLHelper.bindParameters(doc,candidate,commandParameters);
+        if (clusterName != null) {
+          doc.save(clusterName);
+        }
+ else {
+          doc.save();
+        }
+        docs.add(doc);
+      }
+      if (docs.size() == 1)       return docs.get(0);
+ else       return docs;
+    }
+ else     if (content != null) {
       final ODocument doc=className != null ? new ODocument(className) : new ODocument();
-      OSQLHelper.bindParameters(doc,candidate,commandParameters);
-      if (clusterName != null) {
-        doc.save(clusterName);
-      }
- else {
-        doc.save();
-      }
-      docs.add(doc);
-    }
-    if (docs.size() == 1) {
-      return docs.get(0);
-    }
- else {
-      return docs;
+      doc.merge(content,false,false);
+      doc.save();
+      return doc;
     }
   }
+  return null;
 }

@@ -1,0 +1,40 @@
+{
+  final int records=10000;
+  long seed=System.currentTimeMillis();
+  MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(seed);
+  System.out.println("testForwardIteration seed : " + seed);
+  NavigableMap<OClusterPosition,byte[]> positionRecordMap=new TreeMap<OClusterPosition,byte[]>();
+  ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+  recordVersion.increment();
+  recordVersion.increment();
+  for (int i=0; i < records; i++) {
+    int recordSize=mersenneTwisterFast.nextInt(2 * OLocalPage.MAX_RECORD_SIZE) + 1;
+    byte[] record=new byte[recordSize];
+    mersenneTwisterFast.nextBytes(record);
+    final OClusterPosition clusterPosition=paginatedCluster.createRecord(record,recordVersion,(byte)2);
+    positionRecordMap.put(clusterPosition,record);
+  }
+  Iterator<OClusterPosition> positionIterator=positionRecordMap.keySet().iterator();
+  while (positionIterator.hasNext()) {
+    OClusterPosition clusterPosition=positionIterator.next();
+    if (mersenneTwisterFast.nextBoolean()) {
+      Assert.assertTrue(paginatedCluster.deleteRecord(clusterPosition));
+      positionIterator.remove();
+    }
+  }
+  OPhysicalPosition physicalPosition=new OPhysicalPosition();
+  physicalPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(0);
+  OPhysicalPosition[] positions=paginatedCluster.ceilingPositions(physicalPosition);
+  Assert.assertTrue(positions.length > 0);
+  int counter=0;
+  for (  OClusterPosition testedPosition : positionRecordMap.keySet()) {
+    Assert.assertTrue(positions.length > 0);
+    Assert.assertEquals(positions[0].clusterPosition,testedPosition);
+    OPhysicalPosition positionToFind=positions[0];
+    positions=paginatedCluster.higherPositions(positionToFind);
+    counter++;
+  }
+  Assert.assertEquals(paginatedCluster.getEntries(),counter);
+  Assert.assertEquals(paginatedCluster.getFirstPosition(),positionRecordMap.firstKey());
+  Assert.assertEquals(paginatedCluster.getLastPosition(),positionRecordMap.lastKey());
+}

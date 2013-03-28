@@ -1,0 +1,21 @@
+{
+synchronized (syncObject) {
+    if (!files.containsKey(fileId))     return;
+    final Set<Long> pageIndexes=filesPages.get(fileId);
+    for (    Long pageIndex : pageIndexes) {
+      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      try {
+        LRUEntry lruEntry=lruList.remove(fileId,pageIndex);
+        if (lruEntry != null && !lruEntry.managedExternally)         directMemory.free(lruEntry.dataPointer);
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+    NavigableMap<FileLockKey,Long> fileEvictedPages=evictedPages.subMap(new FileLockKey(fileId,0),true,new FileLockKey(fileId,Integer.MAX_VALUE),true);
+    for (    long pointer : fileEvictedPages.values())     directMemory.free(pointer);
+    fileEvictedPages.clear();
+    pageIndexes.clear();
+    files.get(fileId).truncate();
+  }
+}

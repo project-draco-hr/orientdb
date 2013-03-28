@@ -1,0 +1,33 @@
+{
+  acquireSharedLock();
+  try {
+    OClusterPosition clusterPosition=position.clusterPosition;
+    long pagePointer=clusterPosition.longValue();
+    long pageIndex=pagePointer >>> 16;
+    int recordPosition=(int)(pagePointer & 0xFFFF);
+    long pagesCount=diskCache.getFilledUpTo(fileId);
+    if (pageIndex >= pagesCount)     return null;
+    long pointer=diskCache.loadAndLockForRead(fileId,pageIndex);
+    try {
+      final OLocalPage localPage=new OLocalPage(pointer,false);
+      long recordPointer=localPage.getRecordPointer(recordPosition);
+      if (recordPointer == ODirectMemory.NULL_POINTER)       return null;
+      int recordSize=localPage.getRecordSize(recordPosition);
+      if (directMemory.getByte(recordPointer + recordSize - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 0)       return null;
+      final OPhysicalPosition physicalPosition=new OPhysicalPosition();
+      physicalPosition.dataSegmentId=-1;
+      physicalPosition.dataSegmentPos=-1;
+      physicalPosition.recordSize=-1;
+      physicalPosition.recordType=directMemory.getByte(recordPointer);
+      physicalPosition.recordVersion=localPage.getRecordVersion(recordPosition);
+      physicalPosition.clusterPosition=position.clusterPosition;
+      return physicalPosition;
+    }
+  finally {
+      diskCache.releaseReadLock(fileId,pageIndex);
+    }
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

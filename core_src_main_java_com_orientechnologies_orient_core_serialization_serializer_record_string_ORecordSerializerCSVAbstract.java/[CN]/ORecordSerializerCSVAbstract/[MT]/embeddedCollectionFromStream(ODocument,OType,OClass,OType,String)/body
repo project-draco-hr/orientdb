@@ -1,13 +1,16 @@
 {
   if (iValue.length() == 0)   return null;
-  final String value=iValue.charAt(0) == '[' ? iValue.substring(1,iValue.length() - 1) : iValue;
+  final String value=iValue.charAt(0) == OStringSerializerHelper.LIST_BEGIN || iValue.charAt(0) == OStringSerializerHelper.SET_BEGIN ? iValue.substring(1,iValue.length() - 1) : iValue;
   Collection<?> coll;
   if (iLinkedType == OType.LINK) {
     if (iDocument != null)     coll=(Collection<?>)(iType == OType.EMBEDDEDLIST ? new ORecordLazyList(iDocument).setStreamedContent(new StringBuilder(value)) : new OMVRBTreeRIDSet(iDocument).fromStream(new StringBuilder(value)));
  else {
       if (iType == OType.EMBEDDEDLIST)       coll=(Collection<?>)new ORecordLazyList().setStreamedContent(new StringBuilder(value));
  else {
-        return new OMVRBTreeRIDSet().setAutoConvert(false).fromStream(new StringBuilder(value));
+        final OMVRBTreeRIDSet set=new OMVRBTreeRIDSet();
+        set.setAutoConvertToRecord(false);
+        set.fromStream(new StringBuilder(value));
+        return set;
       }
     }
   }
@@ -15,7 +18,7 @@
   if (value.length() == 0)   return coll;
   OType linkedType;
   if (coll instanceof ORecordElement)   ((ORecordElement)coll).setInternalStatus(STATUS.UNMARSHALLING);
-  final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR);
+  final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR,true);
   for (  String item : items) {
     Object objectToAdd=null;
     linkedType=null;

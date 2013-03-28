@@ -2,7 +2,8 @@
   char stringBeginChar=' ';
   boolean encodeMode=false;
   int insideParenthesis=0;
-  int insideCollection=0;
+  int insideList=0;
+  int insideSet=0;
   int insideMap=0;
   int insideLinkPart=0;
   final int max=endIndex > -1 ? endIndex + 1 : iSource.length();
@@ -17,11 +18,11 @@
   for (; i < buffer.length; ++i) {
     final char c=buffer[i];
     if (stringBeginChar == ' ') {
-      if (iConsiderBraces)       if (c == COLLECTION_BEGIN)       insideCollection++;
- else       if (c == COLLECTION_END) {
+      if (iConsiderBraces)       if (c == LIST_BEGIN)       insideList++;
+ else       if (c == LIST_END) {
         if (!isCharPresent(c,iSeparator)) {
-          if (insideCollection == 0)           throw new OSerializationException("Found invalid " + COLLECTION_END + " character. Ensure it is opened and closed correctly.");
-          insideCollection--;
+          if (insideList == 0)           throw new OSerializationException("Found invalid " + LIST_END + " character. Ensure it is opened and closed correctly.");
+          insideList--;
         }
       }
  else       if (c == EMBEDDED_BEGIN) {
@@ -42,11 +43,18 @@
       }
  else       if (c == LINK)       insideLinkPart=1;
  else       if (insideLinkPart == 1 && c == ORID.SEPARATOR)       insideLinkPart=2;
+ else       if (iConsiderSets)       if (c == SET_BEGIN)       insideSet++;
+ else       if (c == SET_END) {
+        if (!isCharPresent(c,iSeparator)) {
+          if (insideSet == 0)           throw new OSerializationException("Found invalid " + SET_END + " character. Ensure it is opened and closed correctly.");
+          insideSet--;
+        }
+      }
       if (insideLinkPart > 0 && c != '-' && !Character.isDigit(c) && c != ORID.SEPARATOR && c != LINK)       insideLinkPart=0;
       if ((c == '"' || iStringSeparatorExtended && c == '\'') && !encodeMode) {
         stringBeginChar=c;
       }
-      if (insideParenthesis == 0 && insideCollection == 0 && insideMap == 0 && insideLinkPart == 0) {
+      if (insideParenthesis == 0 && insideList == 0 && insideSet == 0 && insideMap == 0 && insideLinkPart == 0) {
         if (isCharPresent(c,iSeparator)) {
           return beginIndex + i + 1;
         }

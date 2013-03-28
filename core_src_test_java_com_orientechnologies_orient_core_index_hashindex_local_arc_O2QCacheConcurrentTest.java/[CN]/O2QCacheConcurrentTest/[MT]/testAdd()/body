@@ -1,33 +1,11 @@
 {
-  for (int i=0; i < fileIds.length(); i++) {
-    fileIds.set(i,buffer.openFile(fileConfigurations[i],".tst"));
-  }
-  for (int i=0; i < THREAD_COUNT; i++) {
-    futures.add(executorService.submit(new Writer()));
-  }
-  for (  Future<Void> future : futures)   future.get();
-  futures.clear();
-  buffer.flushBuffer();
-  validate(version.byteValue());
+  getIdentitiesOfFiles();
+  fillFilesWithContent();
+  validateFilesContent(version.byteValue());
   version.compareAndSet(1,2);
   continuousWrite.compareAndSet(true,false);
-  List<Integer>[] array=new ArrayList[FILE_COUNT];
-  for (int k=0; k < FILE_COUNT; ++k) {
-    array[k]=new ArrayList<Integer>(PAGE_COUNT);
-    for (Integer i=0; i < PAGE_COUNT; ++i) {
-      array[k].add(i);
-    }
-  }
-  for (int i=0; i < FILE_COUNT; ++i) {
-    pagesQueue.set(i,Collections.synchronizedList(array[i]));
-  }
-  for (int i=0; i < THREAD_COUNT; i++) {
-    futures.add(executorService.submit(new Writer()));
-  }
-  for (int i=0; i < THREAD_COUNT; i++) {
-    futures.add(executorService.submit(new Reader()));
-  }
-  for (  Future<Void> future : futures)   future.get();
+  generateRemainingPagesQueueForAllFiles();
+  executeConcurrentRandomReadAndWriteOperations();
   buffer.flushBuffer();
-  validate(version.byteValue());
+  validateFilesContent(version.byteValue());
 }

@@ -1,0 +1,34 @@
+{
+  if (am.size() + a1in.size() >= maxSize) {
+    if (a1in.size() > K_IN) {
+      LRUEntry removedFromAInEntry=a1in.removeLRU();
+      FileLockKey fileLockKey=new FileLockKey(removedFromAInEntry.fileId,removedFromAInEntry.pageIndex);
+      lockManager.acquireLock(Thread.currentThread(),fileLockKey,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        evictFileContent(removedFromAInEntry.fileId,removedFromAInEntry.pageIndex,removedFromAInEntry.dataPointer,removedFromAInEntry.isDirty,removedFromAInEntry.managedExternally);
+        a1out.putToMRU(removedFromAInEntry.fileId,removedFromAInEntry.pageIndex,ODirectMemory.NULL_POINTER,false,removedFromAInEntry.managedExternally);
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),fileLockKey,OLockManager.LOCK.EXCLUSIVE);
+      }
+      if (a1out.size() > K_OUT) {
+        LRUEntry removedEntry=a1out.removeLRU();
+        Set<Long> pageEntries=filesPages.get(removedEntry.fileId);
+        pageEntries.remove(removedEntry.pageIndex);
+      }
+    }
+ else {
+      LRUEntry removedEntry=am.removeLRU();
+      FileLockKey fileLockKey=new FileLockKey(removedEntry.fileId,removedEntry.pageIndex);
+      lockManager.acquireLock(Thread.currentThread(),fileLockKey,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        evictFileContent(removedEntry.fileId,removedEntry.pageIndex,removedEntry.dataPointer,removedEntry.isDirty,removedEntry.managedExternally);
+        Set<Long> pageEntries=filesPages.get(removedEntry.fileId);
+        pageEntries.remove(removedEntry.pageIndex);
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),fileLockKey,OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  }
+}

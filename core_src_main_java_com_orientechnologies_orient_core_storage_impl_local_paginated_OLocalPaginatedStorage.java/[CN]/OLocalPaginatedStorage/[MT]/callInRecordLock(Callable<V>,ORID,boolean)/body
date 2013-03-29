@@ -1,0 +1,29 @@
+{
+  if (exclusiveLock) {
+    modificationLock.requestModificationLock();
+    lock.acquireExclusiveLock();
+  }
+ else   lock.acquireSharedLock();
+  try {
+    lockManager.acquireLock(Thread.currentThread(),rid,exclusiveLock ? OLockManager.LOCK.EXCLUSIVE : OLockManager.LOCK.SHARED);
+    try {
+      return callable.call();
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),rid,exclusiveLock ? OLockManager.LOCK.EXCLUSIVE : OLockManager.LOCK.SHARED);
+    }
+  }
+ catch (  RuntimeException e) {
+    throw e;
+  }
+catch (  Exception e) {
+    throw new OException("Error on nested call in lock",e);
+  }
+ finally {
+    if (exclusiveLock) {
+      modificationLock.releaseModificationLock();
+      lock.releaseExclusiveLock();
+    }
+ else     lock.releaseSharedLock();
+  }
+}

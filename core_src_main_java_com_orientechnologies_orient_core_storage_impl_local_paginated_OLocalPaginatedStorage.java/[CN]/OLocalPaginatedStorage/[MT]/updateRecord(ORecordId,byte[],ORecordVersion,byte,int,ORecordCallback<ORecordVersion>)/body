@@ -1,0 +1,50 @@
+{
+  checkOpeness();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  modificationLock.requestModificationLock();
+  try {
+    if (cluster == null)     throw new OStorageException("Cluster not defined for record: " + rid);
+    lock.acquireSharedLock();
+    try {
+      lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+        if (!checkForRecordValidity(ppos)) {
+          final ORecordVersion recordVersion=OVersionFactory.instance().createUntrackedVersion();
+          if (callback != null)           callback.call(rid,recordVersion);
+          return new OStorageOperationResult<ORecordVersion>(recordVersion);
+        }
+switch (version.getCounter()) {
+case -1:
+          ppos.recordVersion.increment();
+        break;
+case -2:
+      break;
+default :
+    if (!version.equals(ppos.recordVersion))     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
+ else     throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.UPDATED);
+  ppos.recordVersion.increment();
+}
+final OLocalPaginatedCluster localPaginatedCluster=(OLocalPaginatedCluster)cluster;
+localPaginatedCluster.updateRecord(rid.clusterPosition,content,ppos.recordVersion,recordType);
+if (callback != null) callback.call(rid,ppos.recordVersion);
+return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
+}
+  finally {
+lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+}
+}
+ catch (IOException e) {
+OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",e);
+final ORecordVersion recordVersion=OVersionFactory.instance().createUntrackedVersion();
+if (callback != null) callback.call(rid,recordVersion);
+return new OStorageOperationResult<ORecordVersion>(recordVersion);
+}
+ finally {
+lock.releaseSharedLock();
+}
+}
+  finally {
+modificationLock.releaseModificationLock();
+}
+}

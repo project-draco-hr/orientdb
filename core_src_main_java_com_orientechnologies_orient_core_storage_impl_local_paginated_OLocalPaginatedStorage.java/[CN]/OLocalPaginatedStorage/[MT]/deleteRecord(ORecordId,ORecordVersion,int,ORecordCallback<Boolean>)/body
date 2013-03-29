@@ -1,0 +1,33 @@
+{
+  checkOpeness();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  modificationLock.requestModificationLock();
+  try {
+    lock.acquireSharedLock();
+    try {
+      lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+        if (ppos == null)         return new OStorageOperationResult<Boolean>(false);
+        if (version.getCounter() > -1 && !ppos.recordVersion.equals(version))         if (OFastConcurrentModificationException.enabled())         throw OFastConcurrentModificationException.instance();
+ else         throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
+        final OLocalPaginatedCluster paginatedCluster=(OLocalPaginatedCluster)cluster;
+        paginatedCluster.deleteRecord(ppos.clusterPosition);
+        return new OStorageOperationResult<Boolean>(true);
+      }
+  finally {
+        lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  finally {
+      lock.releaseSharedLock();
+    }
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
+  }
+ finally {
+    modificationLock.releaseModificationLock();
+  }
+  return new OStorageOperationResult<Boolean>(false);
+}

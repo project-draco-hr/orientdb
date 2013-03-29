@@ -12,8 +12,9 @@
       entryContent[entryPosition]=1;
       entryPosition++;
       OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
+      AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
       size++;
-      return OClusterPositionFactory.INSTANCE.valueOf(addEntry(recordVersion,entryContent));
+      return createPhysicalPosition(recordType,addEntryResult.pagePointer,addEntryResult.recordVersion);
     }
  else {
       int entrySize=content.length + OByteSerializer.BYTE_SIZE;
@@ -24,6 +25,7 @@
       System.arraycopy(content,0,fullEntry,fullEntryPosition,content.length);
       long prevPageRecordPointer=-1;
       long firstPagePointer=-1;
+      ORecordVersion version=null;
       int from=0;
       int to=from + (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
       do {
@@ -32,8 +34,12 @@
         if (from > 0)         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
  else         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
-        final long addedPagePointer=addEntry(recordVersion,entryContent);
-        if (firstPagePointer == -1)         firstPagePointer=addedPagePointer;
+        final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+        if (firstPagePointer == -1) {
+          firstPagePointer=addEntryResult.pagePointer;
+          version=addEntryResult.recordVersion;
+        }
+        long addedPagePointer=addEntryResult.pagePointer;
         if (prevPageRecordPointer >= 0) {
           long prevPageIndex=prevPageRecordPointer >>> 16;
           int prevPageRecordPosition=(int)(prevPageRecordPointer & 0xFFFF);
@@ -55,7 +61,7 @@
       }
  while (from < to);
       size++;
-      return OClusterPositionFactory.INSTANCE.valueOf(firstPagePointer);
+      return createPhysicalPosition(recordType,firstPagePointer,version);
     }
   }
   finally {

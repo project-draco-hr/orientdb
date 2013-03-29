@@ -1,0 +1,21 @@
+{
+  int freePosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + FREE_POSITION_OFFSET);
+  int currentPosition=freePosition;
+  List<Integer> processedPositions=new ArrayList<Integer>();
+  while (currentPosition < PAGE_SIZE) {
+    int entrySize=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + currentPosition);
+    if (entrySize > 0) {
+      int positionIndex=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + currentPosition + OIntegerSerializer.INT_SIZE);
+      processedPositions.add(positionIndex);
+      currentPosition+=entrySize;
+    }
+ else {
+      entrySize=-entrySize;
+      directMemory.copyData(pagePointer + freePosition,pagePointer + freePosition + entrySize,currentPosition - freePosition);
+      currentPosition+=entrySize;
+      freePosition+=entrySize;
+      shiftPositions(processedPositions,entrySize);
+    }
+  }
+  OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePosition,directMemory,pagePointer + FREE_POSITION_OFFSET);
+}

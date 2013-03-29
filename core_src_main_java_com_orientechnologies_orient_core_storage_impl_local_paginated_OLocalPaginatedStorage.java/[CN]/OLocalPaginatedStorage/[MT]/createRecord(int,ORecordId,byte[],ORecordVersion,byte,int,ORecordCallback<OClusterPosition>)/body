@@ -1,0 +1,41 @@
+{
+  checkOpeness();
+  final OLocalPaginatedCluster cluster=(OLocalPaginatedCluster)getClusterById(rid.clusterId);
+  modificationLock.requestModificationLock();
+  try {
+    checkOpeness();
+    if (content == null)     throw new IllegalArgumentException("Record is null");
+    OPhysicalPosition ppos=new OPhysicalPosition(-1,-1,recordType);
+    try {
+      lock.acquireSharedLock();
+      try {
+        lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        try {
+          ppos=cluster.createRecord(content,recordVersion,recordType);
+          rid.clusterPosition=ppos.clusterPosition;
+          if (callback != null)           callback.call(rid,ppos.clusterPosition);
+          return new OStorageOperationResult<OPhysicalPosition>(ppos);
+        }
+  finally {
+          lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        }
+      }
+  finally {
+        lock.releaseSharedLock();
+      }
+    }
+ catch (    IOException ioe) {
+      try {
+        if (ppos.clusterPosition != null && ppos.clusterPosition.compareTo(OClusterPosition.INVALID_POSITION) != 0)         cluster.deleteRecord(ppos.clusterPosition);
+      }
+ catch (      IOException e) {
+        OLogManager.instance().error(this,"Error on removing record in cluster: " + cluster,e);
+      }
+      OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,ioe);
+      return null;
+    }
+  }
+  finally {
+    modificationLock.releaseModificationLock();
+  }
+}

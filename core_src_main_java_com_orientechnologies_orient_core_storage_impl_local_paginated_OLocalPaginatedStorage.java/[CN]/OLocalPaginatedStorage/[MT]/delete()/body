@@ -1,0 +1,45 @@
+{
+  if (status != STATUS.CLOSED) {
+    if (getUsers() > 0) {
+      while (removeUser() > 0)       ;
+    }
+  }
+  close(true);
+  try {
+    Orient.instance().unregisterStorage(this);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Cannot unregister storage",e);
+  }
+  final long timer=Orient.instance().getProfiler().startChrono();
+  File dbDir=new File(OIOUtils.getPathFromDatabaseName(OSystemVariableResolver.resolveSystemVariables(url)));
+  if (!dbDir.exists() || !dbDir.isDirectory())   dbDir=dbDir.getParentFile();
+  lock.acquireExclusiveLock();
+  try {
+    for (int i=0; i < DELETE_MAX_RETRIES; ++i) {
+      if (dbDir.exists() && dbDir.isDirectory()) {
+        int notDeletedFiles=0;
+        for (        File f : dbDir.listFiles()) {
+          for (          String ext : ALL_FILE_EXTENSIONS)           if (f.getPath().endsWith(ext)) {
+            if (!f.delete()) {
+              notDeletedFiles++;
+            }
+            break;
+          }
+        }
+        if (notDeletedFiles == 0) {
+          dbDir.delete();
+          return;
+        }
+      }
+ else       return;
+      OLogManager.instance().debug(this,"Cannot delete database files because they are still locked by the OrientDB process: waiting %d ms and retrying %d/%d...",DELETE_WAIT_TIME,i,DELETE_MAX_RETRIES);
+      OMemoryWatchDog.freeMemoryForResourceCleanup(DELETE_WAIT_TIME);
+    }
+    throw new OStorageException("Cannot delete database '" + name + "' located in: "+ dbDir+ ". Database files seem locked");
+  }
+  finally {
+    lock.releaseExclusiveLock();
+    Orient.instance().getProfiler().stopChrono("db." + name + ".drop","Drop a local database",timer,"db.*.drop");
+  }
+}

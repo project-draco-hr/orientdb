@@ -13,8 +13,9 @@
       entryContent[entryPosition]=1;
       entryPosition++;
       OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
-      AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+      final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
       size++;
+      recordsSize+=addEntryResult.recordsSizeDiff;
       return createPhysicalPosition(recordType,addEntryResult.pagePointer,addEntryResult.recordVersion);
     }
  else {
@@ -29,6 +30,7 @@
       ORecordVersion version=null;
       int from=0;
       int to=from + (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
+      int recordsSizeDiff=0;
       do {
         byte[] entryContent=new byte[to - from + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE];
         System.arraycopy(fullEntry,from,entryContent,0,to - from);
@@ -36,6 +38,7 @@
  else         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+        recordsSizeDiff+=addEntryResult.recordsSizeDiff;
         if (firstPagePointer == -1) {
           firstPagePointer=addEntryResult.pagePointer;
           version=addEntryResult.recordVersion;
@@ -62,6 +65,7 @@
       }
  while (from < to);
       size++;
+      recordsSize+=recordsSizeDiff;
       return createPhysicalPosition(recordType,firstPagePointer,version);
     }
   }

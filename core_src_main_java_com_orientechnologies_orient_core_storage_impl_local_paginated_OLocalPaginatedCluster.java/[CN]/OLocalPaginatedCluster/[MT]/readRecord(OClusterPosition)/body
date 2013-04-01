@@ -2,8 +2,8 @@
   acquireSharedLock();
   try {
     long pagePointer=clusterPosition.longValue();
-    int recordPosition=(int)(pagePointer & 0xFFFF);
-    long pageIndex=pagePointer >>> 16;
+    int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+    long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
     if (diskCache.getFilledUpTo(fileId) < pageIndex)     return null;
     final List<byte[]> recordChunks=new ArrayList<byte[]>();
     int contentSize=0;
@@ -27,8 +27,8 @@
   finally {
         diskCache.releaseReadLock(fileId,pageIndex);
       }
-      pageIndex=nextPagePointer >>> 16;
-      recordPosition=(int)(nextPagePointer & 0xFFFF);
+      pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
+      recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
     }
  while (nextPagePointer >= 0);
     byte[] fullContent;
@@ -44,7 +44,7 @@
     int fullContentPosition=0;
     byte recordType=fullContent[fullContentPosition];
     fullContentPosition++;
-    byte[] recordContent=new byte[fullContent.length - 2 * OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE];
+    byte[] recordContent=new byte[fullContent.length - (2 * OByteSerializer.BYTE_SIZE) - OLongSerializer.LONG_SIZE];
     System.arraycopy(fullContent,fullContentPosition,recordContent,0,recordContent.length);
     recordContent=Snappy.uncompress(recordContent,0,recordContent.length);
     return new ORawBuffer(recordContent,recordVersion,recordType);

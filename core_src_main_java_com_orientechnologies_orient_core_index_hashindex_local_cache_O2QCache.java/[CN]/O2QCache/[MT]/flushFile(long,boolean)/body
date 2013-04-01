@@ -6,16 +6,10 @@ synchronized (syncObject) {
     sortedPageIndexes=pageIndexes.toArray(sortedPageIndexes);
     Arrays.sort(sortedPageIndexes);
     for (    Long pageIndex : sortedPageIndexes) {
-      lockManager.acquireLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),lock);
-      try {
-        LRUEntry lruEntry=get(fileId,pageIndex);
-        if (lruEntry.isDirty) {
-          flushData(fileId,lruEntry.pageIndex,lruEntry.dataPointer);
-          lruEntry.isDirty=false;
-        }
-      }
-  finally {
-        lockManager.releaseLock(Thread.currentThread(),new FileLockKey(fileId,pageIndex),lock);
+      LRUEntry lruEntry=get(fileId,pageIndex);
+      if (lruEntry.isDirty && lruEntry.usageCounter.get() == 0) {
+        flushData(fileId,lruEntry.pageIndex,lruEntry.dataPointer);
+        lruEntry.isDirty=false;
       }
     }
     files.get(fileId).synch();

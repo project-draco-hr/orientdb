@@ -1,24 +1,30 @@
 {
-  iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_INT);
-  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_INT,OMMapManager.OPERATION_TYPE.WRITE,strategy);
-  if (entries != null) {
-    try {
-      if (entries.length == 1)       entries[0].buffer.putInt((int)(iOffset - entries[0].beginOffset),iValue);
+  acquireWriteLock();
+  try {
+    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_INT);
+    final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,OBinaryProtocol.SIZE_INT,OMMapManager.OPERATION_TYPE.WRITE,strategy);
+    if (entries != null) {
+      try {
+        if (entries.length == 1)         entries[0].buffer.putInt((int)(iOffset - entries[0].beginOffset),iValue);
  else {
-        entries[0].buffer.position((int)(iOffset - entries[0].beginOffset));
-        entries[1].buffer.position(0);
-        OByteBufferUtils.splitIntToBuffers(entries[0].buffer,entries[1].buffer,iValue);
+          entries[0].buffer.position((int)(iOffset - entries[0].beginOffset));
+          entries[1].buffer.position(0);
+          OByteBufferUtils.splitIntToBuffers(entries[0].buffer,entries[1].buffer,iValue);
+        }
+      }
+  finally {
+        OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.WRITE);
       }
     }
-  finally {
-      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.WRITE);
+ else {
+      final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_INT);
+      buffer.putInt(iValue);
+      buffer.rewind();
+      channel.write(buffer,iOffset + HEADER_SIZE);
+      releaseByteBuffer(buffer);
     }
   }
- else {
-    final ByteBuffer buffer=acquireByteBuffer(OBinaryProtocol.SIZE_INT);
-    buffer.putInt(iValue);
-    buffer.rewind();
-    channel.write(buffer,iOffset + HEADER_SIZE);
-    releaseByteBuffer(buffer);
+  finally {
+    releaseWriteLock();
   }
 }

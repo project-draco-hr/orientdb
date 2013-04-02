@@ -1,22 +1,28 @@
 {
-  OLogManager.instance().debug(this,"[OFile.openChannel] opening channel for file '%s' of size: ",osFile,osFile.length());
-  for (int i=0; i < OPEN_RETRY_MAX; ++i)   try {
-    accessFile=new RandomAccessFile(osFile,mode);
-    break;
-  }
- catch (  FileNotFoundException e) {
-    if (i == OPEN_DELAY_RETRY)     throw e;
-    osFile.getParentFile().mkdirs();
-    try {
-      Thread.sleep(OPEN_DELAY_RETRY);
+  acquireWriteLock();
+  try {
+    OLogManager.instance().debug(this,"[OFile.openChannel] opening channel for file '%s' of size: ",osFile,osFile.length());
+    for (int i=0; i < OPEN_RETRY_MAX; ++i)     try {
+      accessFile=new RandomAccessFile(osFile,mode);
+      break;
     }
- catch (    InterruptedException e1) {
-      Thread.currentThread().interrupt();
+ catch (    FileNotFoundException e) {
+      if (i == OPEN_DELAY_RETRY)       throw e;
+      osFile.getParentFile().mkdirs();
+      try {
+        Thread.sleep(OPEN_DELAY_RETRY);
+      }
+ catch (      InterruptedException e1) {
+        Thread.currentThread().interrupt();
+      }
     }
+    if (accessFile == null)     throw new FileNotFoundException(osFile.getAbsolutePath());
+    if (accessFile.length() != iNewSize)     accessFile.setLength(iNewSize);
+    accessFile.seek(0);
+    channel=accessFile.getChannel();
+    if (OGlobalConfiguration.FILE_LOCK.getValueAsBoolean())     lock();
   }
-  if (accessFile == null)   throw new FileNotFoundException(osFile.getAbsolutePath());
-  if (accessFile.length() != iNewSize)   accessFile.setLength(iNewSize);
-  accessFile.seek(0);
-  channel=accessFile.getChannel();
-  if (OGlobalConfiguration.FILE_LOCK.getValueAsBoolean())   lock();
+  finally {
+    releaseWriteLock();
+  }
 }

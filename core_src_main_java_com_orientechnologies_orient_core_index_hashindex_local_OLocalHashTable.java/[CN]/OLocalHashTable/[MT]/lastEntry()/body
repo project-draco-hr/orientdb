@@ -5,24 +5,24 @@
     long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
     int fileLevel=getFileLevel(bucketPointer);
     long pageIndex=getPageIndex(bucketPointer);
-    PageLockResult pageLockResult=lockPageForRead(pageIndex,fileLevel);
+    long pagePointer=loadPage(pageIndex,fileLevel);
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer,directMemory,keySerializer,valueSerializer);
       while (bucket.size() == 0) {
         final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
         if (prevBucketPath == null)         return null;
-        releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+        releasePage(pageIndex,fileLevel);
         final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
         fileLevel=getFileLevel(prevPointer);
         pageIndex=getPageIndex(prevPointer);
-        pageLockResult=lockPageForRead(pageIndex,fileLevel);
-        bucket=new OHashIndexBucket<K,V>(pageLockResult.dataPointer,directMemory,keySerializer,valueSerializer);
+        pagePointer=loadPage(pageIndex,fileLevel);
+        bucket=new OHashIndexBucket<K,V>(pagePointer,directMemory,keySerializer,valueSerializer);
         bucketPath=prevBucketPath;
       }
       return bucket.getEntry(bucket.size() - 1);
     }
   finally {
-      releasePageReadLock(pageIndex,fileLevel,pageLockResult.cacheLock);
+      releasePage(pageIndex,fileLevel);
     }
   }
  catch (  IOException ioe) {

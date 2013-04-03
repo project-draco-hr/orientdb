@@ -2,13 +2,13 @@
   acquireExclusiveLock();
   try {
     long pagePointer=clusterPosition.longValue();
-    int recordPosition=(int)(pagePointer & 0xFFFF);
-    long pageIndex=pagePointer >>> 16;
+    int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+    long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
     if (diskCache.getFilledUpTo(fileId) < pageIndex)     return false;
     long nextPagePointer=-1;
     int removedContentSize=0;
     do {
-      long pointer=diskCache.loadAndLockForWrite(fileId,pageIndex);
+      long pointer=diskCache.load(fileId,pageIndex);
       int initialFreePageIndex;
       try {
         final OLocalPage localPage=new OLocalPage(pointer,false);
@@ -25,11 +25,12 @@
         nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
       }
   finally {
-        diskCache.releaseWriteLock(fileId,pageIndex);
+        diskCache.markDirty(fileId,pageIndex);
+        diskCache.release(fileId,pageIndex);
       }
       updateFreePagesIndex(initialFreePageIndex,pageIndex);
-      pageIndex=nextPagePointer >>> 16;
-      recordPosition=(int)(nextPagePointer & 0xFFFF);
+      pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
+      recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
     }
  while (nextPagePointer >= 0);
     size--;

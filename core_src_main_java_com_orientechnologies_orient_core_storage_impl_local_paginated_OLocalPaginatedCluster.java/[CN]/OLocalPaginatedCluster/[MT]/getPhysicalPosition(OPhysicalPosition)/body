@@ -3,11 +3,11 @@
   try {
     OClusterPosition clusterPosition=position.clusterPosition;
     long pagePointer=clusterPosition.longValue();
-    long pageIndex=pagePointer >>> 16;
-    int recordPosition=(int)(pagePointer & 0xFFFF);
+    long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+    int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
     long pagesCount=diskCache.getFilledUpTo(fileId);
     if (pageIndex >= pagesCount)     return null;
-    long pointer=diskCache.loadAndLockForRead(fileId,pageIndex);
+    long pointer=diskCache.load(fileId,pageIndex);
     try {
       final OLocalPage localPage=new OLocalPage(pointer,false);
       long recordPointer=localPage.getRecordPointer(recordPosition);
@@ -24,7 +24,7 @@
       return physicalPosition;
     }
   finally {
-      diskCache.releaseReadLock(fileId,pageIndex);
+      diskCache.release(fileId,pageIndex);
     }
   }
   finally {

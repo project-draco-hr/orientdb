@@ -45,9 +45,9 @@
         }
         long addedPagePointer=addEntryResult.pagePointer;
         if (prevPageRecordPointer >= 0) {
-          long prevPageIndex=prevPageRecordPointer >>> 16;
-          int prevPageRecordPosition=(int)(prevPageRecordPointer & 0xFFFF);
-          long prevPageMemoryPointer=diskCache.loadAndLockForWrite(fileId,prevPageIndex);
+          long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
+          int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
+          long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
           try {
             final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false);
             long recordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
@@ -55,7 +55,8 @@
             OLongSerializer.INSTANCE.serializeInDirectMemory(addedPagePointer,directMemory,recordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);
           }
   finally {
-            diskCache.releaseWriteLock(fileId,prevPageIndex);
+            diskCache.markDirty(fileId,prevPageIndex);
+            diskCache.release(fileId,prevPageIndex);
           }
         }
         prevPageRecordPointer=addedPagePointer;

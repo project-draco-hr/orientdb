@@ -1,29 +1,9 @@
 {
-  iOffset=checkRegions(iOffset,iLenght);
-  final OMMapBufferEntry[] entries=OMMapManagerLocator.getInstance().acquire(this,iOffset,iLenght,OMMapManager.OPERATION_TYPE.READ,strategy);
-  if (entries != null) {
-    try {
-      int position=(int)(iOffset - entries[0].beginOffset);
-      int remaining;
-      int remainingLength=iLenght;
-      for (      OMMapBufferEntry entry : entries) {
-        entry.buffer.position(position);
-        remaining=entry.buffer.remaining();
-        int toRead=Math.min(remaining,remainingLength);
-        entry.buffer.get(iDestBuffer,iLenght - remainingLength,toRead);
-        position=0;
-        remainingLength-=toRead;
-      }
-    }
-  finally {
-      OMMapManagerLocator.getInstance().release(entries,OMMapManager.OPERATION_TYPE.READ);
-    }
+  acquireReadLock();
+  try {
+    readInternal(iOffset,iDestBuffer,iLenght);
   }
- else {
-    final ByteBuffer buffer=acquireByteBuffer(iLenght);
-    channel.read(buffer,iOffset + HEADER_SIZE);
-    buffer.rewind();
-    buffer.get(iDestBuffer);
-    releaseByteBuffer(buffer);
+  finally {
+    releaseReadLock();
   }
 }

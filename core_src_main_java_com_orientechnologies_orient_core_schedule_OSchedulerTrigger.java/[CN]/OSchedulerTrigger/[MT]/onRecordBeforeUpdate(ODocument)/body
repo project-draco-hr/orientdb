@@ -1,0 +1,28 @@
+{
+  try {
+    boolean isStart=iDocument.field(OScheduler.PROP_STARTED) == null ? false : ((Boolean)iDocument.field(OScheduler.PROP_STARTED));
+    String schedulerName=iDocument.field(OScheduler.PROP_NAME);
+    OScheduler scheduler=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchedulerListener().getScheduler(schedulerName);
+    if (isStart) {
+      if (scheduler == null) {
+        scheduler=new OScheduler(iDocument);
+        ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchedulerListener().addScheduler(scheduler);
+      }
+      String currentStatus=iDocument.field(OScheduler.PROP_STATUS);
+      if (currentStatus.equals(SCHEDULER_STATUS.STOPPED.name())) {
+        iDocument.field(OScheduler.PROP_STATUS,SCHEDULER_STATUS.WAITTING.name());
+      }
+    }
+ else {
+      if (scheduler != null) {
+        iDocument.field(OScheduler.PROP_STATUS,SCHEDULER_STATUS.STOPPED.name());
+      }
+    }
+    scheduler.resetDocument(iDocument);
+  }
+ catch (  Exception ex) {
+    OLogManager.instance().error(this,"Error when updating scheduler - " + ex.getMessage());
+    return RESULT.RECORD_NOT_CHANGED;
+  }
+  return RESULT.RECORD_CHANGED;
+}

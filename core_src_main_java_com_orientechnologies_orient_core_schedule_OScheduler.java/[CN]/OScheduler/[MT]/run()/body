@@ -1,0 +1,70 @@
+{
+  isRunning=true;
+  SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
+  Date date=new Date(System.currentTimeMillis());
+  OLogManager.instance().warn(this,"execute : " + this.toString() + " at "+ sdf.format(date));
+  ODatabaseRecordThreadLocal.INSTANCE.set(db);
+  this.document.field(PROP_STATUS,SCHEDULER_STATUS.RUNNING);
+  this.document.field(PROP_STARTTIME,System.currentTimeMillis());
+  this.document.save();
+  OScriptManager scriptManager=null;
+  Bindings binding=null;
+  try {
+    if (this.function == null)     return;
+    if (db != null && !(db instanceof ODatabaseRecordTx))     db=db.getUnderlying();
+    scriptManager=Orient.instance().getScriptManager();
+    final ScriptEngine scriptEngine=scriptManager.getEngine(this.function.getLanguage());
+    binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
+    for (    OScriptInjection i : scriptManager.getInjections())     i.bind(binding);
+    binding.put("doc",this.document);
+    if (db != null)     binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseRecordTx)db));
+    if (iArgs != null) {
+      for (      Entry<Object,Object> a : iArgs.entrySet()) {
+        binding.put(a.getKey().toString(),a.getValue());
+      }
+      binding.put("params",iArgs.values().toArray());
+    }
+ else {
+      binding.put("params",new Object[0]);
+    }
+    if (this.function.getLanguage() == null)     throw new OConfigurationException("Database function '" + this.function.getName() + "' has no language");
+    final String funcStr=scriptManager.getFunctionDefinition(this.function);
+    if (funcStr != null) {
+      try {
+        scriptEngine.eval(funcStr);
+      }
+ catch (      ScriptException e) {
+        scriptManager.getErrorMessage(e,funcStr);
+      }
+    }
+    if (scriptEngine instanceof Invocable) {
+      final Invocable invocableEngine=(Invocable)scriptEngine;
+      Object[] args=null;
+      if (iArgs != null) {
+        args=new Object[iArgs.size()];
+        int i=0;
+        for (        Entry<Object,Object> arg : iArgs.entrySet())         args[i++]=arg.getValue();
+      }
+      invocableEngine.invokeFunction(this.function.getName(),args);
+    }
+  }
+ catch (  ScriptException e) {
+    throw new OCommandScriptException("Error on execution of the script",this.function.getName(),e.getColumnNumber(),e);
+  }
+catch (  NoSuchMethodException e) {
+    throw new OCommandScriptException("Error on execution of the script",this.function.getName(),0,e);
+  }
+catch (  OCommandScriptException e) {
+    throw e;
+  }
+catch (  Exception ex) {
+    throw new OCommandScriptException("Unknown Exception",this.function.getName(),0,ex);
+  }
+ finally {
+    if (scriptManager != null && binding != null)     scriptManager.unbind(binding);
+    OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
+    isRunning=false;
+    this.document.field(PROP_STATUS,SCHEDULER_STATUS.WAITTING);
+    this.document.save();
+  }
+}

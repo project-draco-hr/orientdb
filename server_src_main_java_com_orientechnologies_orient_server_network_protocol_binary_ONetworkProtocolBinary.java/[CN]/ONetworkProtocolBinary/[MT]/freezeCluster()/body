@@ -1,0 +1,24 @@
+{
+  setDataCommandInfo("Freeze cluster");
+  final String dbName=channel.readString();
+  final int clusterId=channel.readShort();
+  checkServerAccess("database.freeze");
+  connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"local");
+  if (connection.database.exists()) {
+    OLogManager.instance().info(this,"Freezing database '%s' cluster %d",connection.database.getURL(),clusterId);
+    if (connection.database.isClosed()) {
+      openDatabase(connection.database,connection.serverUser.name,connection.serverUser.password);
+    }
+    connection.database.freezeCluster(clusterId);
+  }
+ else {
+    throw new OStorageException("Database with name '" + dbName + "' doesn't exits.");
+  }
+  beginResponse();
+  try {
+    sendOk(clientTxId);
+  }
+  finally {
+    endResponse();
+  }
+}

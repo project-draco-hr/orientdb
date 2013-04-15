@@ -1,43 +1,49 @@
 {
-  acquireExclusiveLock();
+  externalModificationLock.requestModificationLock();
   try {
-    long pagePointer=clusterPosition.longValue();
-    int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
-    long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
-    if (diskCache.getFilledUpTo(fileId) < pageIndex)     return false;
-    long nextPagePointer=-1;
-    int removedContentSize=0;
-    do {
-      long pointer=diskCache.load(fileId,pageIndex);
-      int initialFreePageIndex;
-      try {
-        final OLocalPage localPage=new OLocalPage(pointer,false);
-        initialFreePageIndex=calculateFreePageIndex(localPage);
-        long recordPointer=localPage.getRecordPointer(recordPosition);
-        if (recordPointer == ODirectMemory.NULL_POINTER) {
-          if (removedContentSize == 0)           return false;
- else           throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+    acquireExclusiveLock();
+    try {
+      long pagePointer=clusterPosition.longValue();
+      int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+      long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+      if (diskCache.getFilledUpTo(fileId) < pageIndex)       return false;
+      long nextPagePointer=-1;
+      int removedContentSize=0;
+      do {
+        long pointer=diskCache.load(fileId,pageIndex);
+        int initialFreePageIndex;
+        try {
+          final OLocalPage localPage=new OLocalPage(pointer,false);
+          initialFreePageIndex=calculateFreePageIndex(localPage);
+          long recordPointer=localPage.getRecordPointer(recordPosition);
+          if (recordPointer == ODirectMemory.NULL_POINTER) {
+            if (removedContentSize == 0)             return false;
+ else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+          }
+          byte[] content=directMemory.get(recordPointer,localPage.getRecordSize(recordPosition));
+          int initialFreeSpace=localPage.getFreeSpace();
+          localPage.deleteRecord(recordPosition);
+          removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
+          nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
         }
-        byte[] content=directMemory.get(recordPointer,localPage.getRecordSize(recordPosition));
-        int initialFreeSpace=localPage.getFreeSpace();
-        localPage.deleteRecord(recordPosition);
-        removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
-        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
-      }
   finally {
-        diskCache.markDirty(fileId,pageIndex);
-        diskCache.release(fileId,pageIndex);
+          diskCache.markDirty(fileId,pageIndex);
+          diskCache.release(fileId,pageIndex);
+        }
+        updateFreePagesIndex(initialFreePageIndex,pageIndex);
+        pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
+        recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
       }
-      updateFreePagesIndex(initialFreePageIndex,pageIndex);
-      pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
-      recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
-    }
  while (nextPagePointer >= 0);
-    size--;
-    recordsSize-=removedContentSize;
-    return true;
+      size--;
+      recordsSize-=removedContentSize;
+      return true;
+    }
+  finally {
+      releaseExclusiveLock();
+    }
   }
   finally {
-    releaseExclusiveLock();
+    externalModificationLock.releaseModificationLock();
   }
 }

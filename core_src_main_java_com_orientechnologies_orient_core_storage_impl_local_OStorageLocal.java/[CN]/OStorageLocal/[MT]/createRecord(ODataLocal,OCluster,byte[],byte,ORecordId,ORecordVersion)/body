@@ -1,4 +1,5 @@
 {
+  assert(lock.assertExclusiveLockHold());
   checkOpeness();
   if (content == null)   throw new IllegalArgumentException("Record is null");
   final long timer=Orient.instance().getProfiler().startChrono();
@@ -19,25 +20,19 @@
   try {
     if (!cluster.addPhysicalPosition(ppos))     throw new OStorageException("Record with given id " + new ORecordId(rid.clusterId,ppos.clusterPosition) + " has already exists.");
     rid.clusterPosition=ppos.clusterPosition;
-    lock.acquireExclusiveLock();
+    lockManager.acquireLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
     try {
-      lockManager.acquireLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
-      try {
-        ppos.dataSegmentId=dataSegment.getId();
-        ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
-        cluster.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
-        if (recordVersion.getCounter() > -1 && recordVersion.compareTo(ppos.recordVersion) > 0) {
-          cluster.updateVersion(rid.clusterPosition,recordVersion);
-          ppos.recordVersion=recordVersion;
-        }
-        return ppos;
+      ppos.dataSegmentId=dataSegment.getId();
+      ppos.dataSegmentPos=dataSegment.addRecord(rid,content);
+      cluster.updateDataSegmentPosition(ppos.clusterPosition,ppos.dataSegmentId,ppos.dataSegmentPos);
+      if (recordVersion.getCounter() > -1 && recordVersion.compareTo(ppos.recordVersion) > 0) {
+        cluster.updateVersion(rid.clusterPosition,recordVersion);
+        ppos.recordVersion=recordVersion;
       }
-  finally {
-        lockManager.releaseLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
-      }
+      return ppos;
     }
   finally {
-      lock.releaseExclusiveLock();
+      lockManager.releaseLock(Thread.currentThread(),rid,LOCK.EXCLUSIVE);
     }
   }
  catch (  IOException ioe) {

@@ -3,18 +3,19 @@
   OClass cls;
   cls=getDatabase().getStorage().callInLock(new Callable<OClass>(){
     @Override public OClass call() throws Exception {
-      return classes.get(iClassName.toLowerCase());
+      OClass cls=classes.get(iClassName.toLowerCase());
+      if (cls == null) {
+        final ODatabase ownerDb=getDatabase().getDatabaseOwner();
+        if (ownerDb instanceof ODatabaseObject) {
+          final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
+          if (javaClass != null) {
+            cls=cascadeCreate(javaClass);
+          }
+        }
+      }
+      return cls;
     }
   }
 ,false);
-  if (cls == null) {
-    final ODatabase ownerDb=getDatabase().getDatabaseOwner();
-    if (ownerDb instanceof ODatabaseObject) {
-      final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
-      if (javaClass != null) {
-        cls=cascadeCreate(javaClass);
-      }
-    }
-  }
   return cls;
 }

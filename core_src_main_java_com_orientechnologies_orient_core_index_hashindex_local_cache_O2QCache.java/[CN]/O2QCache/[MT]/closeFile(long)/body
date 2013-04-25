@@ -7,12 +7,16 @@ synchronized (syncObject) {
     Arrays.sort(sortedPageIndexes);
     for (    Long pageIndex : sortedPageIndexes) {
       LRUEntry lruEntry=get(fileId,pageIndex);
-      if (lruEntry == null || lruEntry.usageCounter == 0) {
-        lruEntry=remove(fileId,pageIndex);
-        if (lruEntry != null) {
+      if (lruEntry != null) {
+        if (lruEntry.usageCounter == 0) {
+          lruEntry=remove(fileId,pageIndex);
           flushData(fileId,pageIndex,lruEntry.dataPointer);
           directMemory.free(lruEntry.dataPointer);
         }
+      }
+ else {
+        Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+        if (dataPointer != null)         flushData(fileId,pageIndex,dataPointer);
       }
     }
     pageIndexes.clear();

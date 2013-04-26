@@ -1,0 +1,36 @@
+{
+  try {
+    this.storage=storage;
+    String walPath=OGlobalConfiguration.WAL_LOCATION.getValueAsString();
+    if (walPath == null)     walPath=storage.getStoragePath();
+    walLocation=new File(walPath);
+    File[] walFiles=walLocation.listFiles(new FilenameFilter(){
+      @Override public boolean accept(      File dir,      String name){
+        return LogSegment.validateName(name);
+      }
+    }
+);
+    if (walFiles.length == 0) {
+      logSegments.add(new LogSegment(new File(walLocation,getSegmentName(0)),0));
+      lastLsn=-1;
+      masterRecord=-1;
+      logSize=0;
+    }
+ else {
+      for (      File walFile : walFiles) {
+        LogSegment logSegment=new LogSegment(walFile);
+        logSegments.add(logSegment);
+        logSize+=logSegment.size();
+      }
+      readLastLSNAndMasterRecord();
+    }
+    maxRecordsCacheSize=OGlobalConfiguration.WAL_CACHE_SIZE.getValueAsInteger();
+    commitDelay=OGlobalConfiguration.WAL_COMMIT_TIMEOUT.getValueAsInteger();
+    maxSegmentSize=OGlobalConfiguration.WAL_MAX_SEGMENT_SIZE.getValueAsInteger() * 1024L * 1024L;
+    maxLogSize=OGlobalConfiguration.WAL_MAX_SIZE.getValueAsInteger() * 1024L * 1024L;
+  }
+ catch (  FileNotFoundException e) {
+    OLogManager.instance().error(this,"Error during file initialization for storage %s",e,storage.getName());
+    throw new IllegalStateException("Error during file initialization for storage" + storage.getName(),e);
+  }
+}

@@ -1,0 +1,18 @@
+{
+synchronized (syncObject) {
+    byte[] serializedForm=OWALRecordsFactory.INSTANCE.toStream(operation);
+    final int serializedSize=calculateSerializedSize(serializedForm);
+    if (lastLsn < 0) {
+      lastLsn=0;
+      nextLsn=serializedSize;
+    }
+ else {
+      lastLsn=nextLsn;
+      nextLsn=lastLsn + serializedSize;
+    }
+    if (operation.isUpdateMasterRecord())     masterRecord=lastLsn;
+    records.add(new RecordCacheEntry(serializedForm,lastLsn,masterRecord));
+    recordsCacheSize+=serializedSize;
+    if (recordsCacheSize >= maxRecordsCacheSize)     flushWALCache();
+  }
+}

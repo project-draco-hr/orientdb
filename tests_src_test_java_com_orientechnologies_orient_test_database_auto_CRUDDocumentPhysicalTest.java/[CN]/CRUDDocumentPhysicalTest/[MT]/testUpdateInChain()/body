@@ -1,0 +1,46 @@
+{
+  database=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
+  ODocument bank=database.newInstance("Account");
+  try {
+    bank.field("name","MyBankChained");
+    ODocument embedded=database.newInstance("Account").field("name","embedded1");
+    bank.field("embedded",embedded,OType.EMBEDDED);
+    ODocument[] embeddeds=new ODocument[]{database.newInstance("Account").field("name","embedded2"),database.newInstance("Account").field("name","embedded3")};
+    bank.field("embeddeds",embeddeds,OType.EMBEDDEDLIST);
+    ODocument linked=database.newInstance("Account").field("name","linked1");
+    bank.field("linked",linked);
+    ODocument[] linkeds=new ODocument[]{database.newInstance("Account").field("name","linked2"),database.newInstance("Account").field("name","linked3")};
+    bank.field("linkeds",linkeds,OType.LINKLIST);
+    bank.save();
+  }
+  finally {
+    database.close();
+  }
+  database=ODatabaseDocumentPool.global().acquire(url,"admin","admin");
+  try {
+    bank.reload();
+    ODocument changedDoc1=bank.field("embedded.total",100);
+    Assert.assertEquals(changedDoc1.field("name"),"MyBankChained");
+    Assert.assertEquals(changedDoc1.field("embedded.total"),100);
+    ODocument changedDoc2=bank.field("embeddeds.total",200);
+    Assert.assertEquals(changedDoc2.field("name"),"MyBankChained");
+    Collection<Integer> embeddeds=changedDoc2.field("embeddeds.total");
+    for (    Integer e : embeddeds)     Assert.assertEquals(e.intValue(),200);
+    ODocument changedDoc3=bank.field("linked.total",300);
+    Assert.assertEquals(changedDoc3.field("name"),"linked1");
+    Assert.assertEquals(changedDoc3.field("total"),300);
+    try {
+      bank.field("linkeds.total",400);
+      Assert.assertTrue(false);
+    }
+ catch (    IllegalArgumentException e) {
+      Assert.assertTrue(true);
+    }
+    ((ODocument)bank.field("linked")).delete();
+    for (    ODocument l : (Collection<ODocument>)bank.field("linkeds"))     l.delete();
+    bank.delete();
+  }
+  finally {
+    database.close();
+  }
+}

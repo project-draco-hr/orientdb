@@ -1,0 +1,18 @@
+{
+synchronized (syncObject) {
+    LogSegment logSegment=logSegments.last();
+    for (    RecordCacheEntry logEntry : records) {
+      final int serializedSize=calculateSerializedSize(logEntry.record);
+      if (logSegment.size() + serializedSize > maxSegmentSize)       logSegment=new LogSegment(new File(walLocation,getSegmentName(logSegment.getOrder() + 1)),nextLsn);
+      if (logSize + serializedSize > maxLogSize) {
+        LogSegment firstSegment=logSegments.first();
+        long segmentSize=firstSegment.size();
+        if (!firstSegment.delete())         OLogManager.instance().error(this,"File %s can to be deleted. Please check access rights.",firstSegment.getPath());
+        logSize-=segmentSize;
+        logSegments.remove(logSegment);
+      }
+      logSegment.logRecord(logEntry);
+      logSize+=serializedSize;
+    }
+  }
+}

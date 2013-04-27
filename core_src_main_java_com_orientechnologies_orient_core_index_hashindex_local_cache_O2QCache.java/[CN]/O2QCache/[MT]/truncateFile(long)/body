@@ -4,9 +4,15 @@ synchronized (syncObject) {
     final Set<Long> pageEntries=filesPages.get(fileId);
     for (    Long pageIndex : pageEntries) {
       LRUEntry lruEntry=get(fileId,pageIndex);
-      if (lruEntry == null || lruEntry.usageCounter == 0) {
-        lruEntry=remove(fileId,pageIndex);
-        if (lruEntry != null && lruEntry.dataPointer != ODirectMemory.NULL_POINTER)         directMemory.free(lruEntry.dataPointer);
+      if (lruEntry != null) {
+        if (lruEntry.usageCounter == 0) {
+          lruEntry=remove(fileId,pageIndex);
+          if (lruEntry.dataPointer != ODirectMemory.NULL_POINTER)           directMemory.free(lruEntry.dataPointer);
+        }
+      }
+ else {
+        Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+        if (dataPointer != null)         directMemory.free(dataPointer);
       }
     }
     pageEntries.clear();

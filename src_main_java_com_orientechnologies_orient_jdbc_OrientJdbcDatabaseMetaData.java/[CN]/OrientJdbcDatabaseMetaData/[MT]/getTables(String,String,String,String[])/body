@@ -1,9 +1,20 @@
 {
-  OrientJdbcStatement stmt=new OrientJdbcStatement(connection);
-  Collection<OClass> classes=database.getMetadata().getSchema().getClasses();
-  List<ODocument> records=new ArrayList<ODocument>();
-  for (  OClass oClass : classes) {
-    records.add(new ODocument().field("TABLE_TYPE","TABLE").field("TABLE_CAT",database.getName()).field("TABLE_SCHEM",database.getName()).field("TABLE_NAME",oClass.getName()).field("REMARKS","null").field("TYPE_CAT","null").field("TYPE_SCHEM","null").field("TYPE_NAME","null").field("REF_GENERATION","null"));
+  final Collection<OClass> classes=database.getMetadata().getSchema().getClasses();
+  final List<ODocument> records=new ArrayList<ODocument>();
+  for (  OClass cls : classes) {
+    final ODocument doc=new ODocument();
+    doc.field("TABLE_CAT",(Object)null);
+    doc.field("TABLE_SCHEM",(Object)null);
+    String type;
+    if (SYSTEM_TABLES.contains(cls.getName()))     type="SYSTEM TABLE";
+ else     if ("memory".equals(database.getClusterType(database.getClusterNameById(cls.getDefaultClusterId()))))     type="VIEW";
+ else     type="TABLE";
+    doc.field("TABLE_TYPE",type);
+    doc.field("TABLE_NAME",cls.getName());
+    doc.field("REMARKS",(Object)null);
+    doc.field("TYPE_NAME",(Object)null);
+    doc.field("REF_GENERATION",(Object)null);
+    records.add(doc);
   }
-  return new OrientJdbcResultSet(stmt,records,ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY,ResultSet.HOLD_CURSORS_OVER_COMMIT);
+  return new OrientJdbcResultSet(new OrientJdbcStatement(connection),records,ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY,ResultSet.HOLD_CURSORS_OVER_COMMIT);
 }

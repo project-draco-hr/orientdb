@@ -1,3 +1,22 @@
 {
-  return null;
+  if (!approximate)   metadata.getIndexManager().reload();
+  final Set<OIndex<?>> classIndexes=metadata.getIndexManager().getClassIndexes(table);
+  final Set<OIndex<?>> indexes=new HashSet<OIndex<?>>();
+  for (  OIndex<?> oIndex : classIndexes) {
+    if (!unique || oIndex.getType().equals(INDEX_TYPE.UNIQUE.name()))     indexes.add(oIndex);
+  }
+  final List<ODocument> records=new ArrayList<ODocument>();
+  for (  OIndex<?> idx : indexes) {
+    ODocument doc=new ODocument();
+    doc.field("TABLE_NAME",table);
+    final String fieldNames=idx.getDefinition().getFields().toString();
+    doc.field("COLUMN_NAME",fieldNames.substring(1,fieldNames.length() - 2));
+    doc.field("NON_UNIQUE",idx instanceof OIndexUnique);
+    doc.field("INDEX_NAME",idx.getName());
+    doc.field("ASC_OR_DESC","ASC");
+    records.add(doc);
+  }
+  final OrientJdbcStatement iOrientJdbcStatement=new OrientJdbcStatement(connection);
+  final ResultSet result=new OrientJdbcResultSet(iOrientJdbcStatement,records,ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY,ResultSet.HOLD_CURSORS_OVER_COMMIT);
+  return result;
 }

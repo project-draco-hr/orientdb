@@ -1,0 +1,33 @@
+{
+  this.maxRecordsCacheSize=maxRecordsCacheSize;
+  this.commitDelay=commitDelay;
+  this.maxSegmentSize=maxSegmentSize;
+  this.maxLogSize=maxLogSize;
+  this.storageName=storageName;
+  try {
+    this.walLocation=new File(walPath);
+    File[] walFiles=this.walLocation.listFiles(new FilenameFilter(){
+      @Override public boolean accept(      File dir,      String name){
+        return LogSegment.validateName(name);
+      }
+    }
+);
+    if (walFiles.length == 0) {
+      logSegments.add(new LogSegment(new File(this.walLocation,getSegmentName(0)),maxRecordsCacheSize));
+      masterRecord=null;
+      logSize=0;
+    }
+ else {
+      for (      File walFile : walFiles) {
+        LogSegment logSegment=new LogSegment(walFile,maxRecordsCacheSize);
+        logSegments.add(logSegment);
+        logSize+=logSegment.size();
+      }
+      Collections.sort(logSegments);
+    }
+  }
+ catch (  FileNotFoundException e) {
+    OLogManager.instance().error(this,"Error during file initialization for storage %s",e,storageName);
+    throw new IllegalStateException("Error during file initialization for storage " + storageName,e);
+  }
+}

@@ -1,0 +1,25 @@
+{
+  writeAheadLog.close();
+  writeAheadLog=new OWriteAheadLog(1024,1000,2048,10105,"WriteAheadLogTest",testDir.getAbsolutePath());
+  List<OWALRecord> writtenRecords=new ArrayList<OWALRecord>();
+  Random rnd=new Random();
+  final int recordsToWrite=218;
+  OWALRecord walRecord=new OCheckpointStartRecord();
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  walRecord=new OCheckpointStartRecord();
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  for (int i=0; i < recordsToWrite; i++) {
+    byte[] data=new byte[10];
+    rnd.nextBytes(data);
+    int pageOffset=rnd.nextInt(65536);
+    long pageIndex=rnd.nextLong();
+    OSetPageDataRecord setPageDataRecord=new OSetPageDataRecord(data,pageOffset,pageIndex,"test");
+    writtenRecords.add(setPageDataRecord);
+    writeAheadLog.logRecord(setPageDataRecord);
+  }
+  assertLogContent(writeAheadLog,writtenRecords.subList(45,writtenRecords.size()));
+  Assert.assertNull(writeAheadLog.getLastCheckpoint());
+  Assert.assertNull(writeAheadLog.read(writtenRecords.get(44).getLsn()));
+}

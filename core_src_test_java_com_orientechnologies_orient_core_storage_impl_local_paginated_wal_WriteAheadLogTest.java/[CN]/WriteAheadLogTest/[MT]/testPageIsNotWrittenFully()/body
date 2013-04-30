@@ -1,0 +1,28 @@
+{
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{1,2,3},10,20,"test"));
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{2,2,3},10,20,"test"));
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{3,2,3},10,20,"test"));
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{4,2,3},10,20,"test"));
+  long logSize=writeAheadLog.size();
+  writeAheadLog.close();
+  RandomAccessFile walFile=new RandomAccessFile(new File(writeAheadLog.getWalLocation(),"WriteAheadLogTest.0.wal"),"rw");
+  Assert.assertEquals(logSize,walFile.length());
+  walFile.setLength(walFile.length() - 2);
+  walFile.close();
+  writeAheadLog=createWAL();
+  OWALRecord walRecord=writeAheadLog.read(OLogSequenceNumber.BEGIN);
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  try {
+    writeAheadLog.readNext(walRecord.getLsn());
+    Assert.fail();
+  }
+ catch (  OWriteAheadLogRecordIsBrokenException e) {
+  }
+  writeAheadLog.restore();
+  walRecord=writeAheadLog.read(OLogSequenceNumber.BEGIN);
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  Assert.assertNull(writeAheadLog.readNext(walRecord.getLsn()));
+  Assert.assertEquals(writeAheadLog.size(),new File(writeAheadLog.getWalLocation(),"WriteAheadLogTest.0.wal").length());
+}

@@ -1,0 +1,36 @@
+{
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{1,2,3},10,20,"test"));
+  writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{1,2,3},10,20,"test"));
+  OLogSequenceNumber numberToDelete=writeAheadLog.logRecord(new OSetPageDataRecord(new byte[]{1,2,3},10,20,"test"));
+  writeAheadLog.logCheckPointStart();
+  writeAheadLog.logCheckPointStart();
+  Assert.assertNotNull(writeAheadLog.getLastCheckpoint());
+  long logSize=writeAheadLog.size();
+  writeAheadLog.close();
+  RandomAccessFile walFile=new RandomAccessFile(new File(writeAheadLog.getWalLocation(),"WriteAheadLogTest.0.wal"),"rw");
+  Assert.assertEquals(logSize,walFile.length());
+  walFile.seek(numberToDelete.getPosition() + 2 * OIntegerSerializer.INT_SIZE + 1);
+  int bt=walFile.read();
+  bt++;
+  walFile.seek(numberToDelete.getPosition() + 2 * OIntegerSerializer.INT_SIZE + 1);
+  walFile.write(bt);
+  walFile.close();
+  writeAheadLog=createWAL();
+  OWALRecord walRecord=writeAheadLog.read(OLogSequenceNumber.BEGIN);
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  try {
+    writeAheadLog.readNext(walRecord.getLsn());
+    Assert.fail();
+  }
+ catch (  OWriteAheadLogRecordIsBrokenException e) {
+  }
+  writeAheadLog.restore();
+  walRecord=writeAheadLog.read(OLogSequenceNumber.BEGIN);
+  walRecord=writeAheadLog.readNext(walRecord.getLsn());
+  Assert.assertNull(writeAheadLog.readNext(walRecord.getLsn()));
+  Assert.assertNull(writeAheadLog.getLastCheckpoint());
+  Assert.assertEquals(writeAheadLog.size(),new File(writeAheadLog.getWalLocation(),"WriteAheadLogTest.0.wal").length());
+  writeAheadLog.close();
+  writeAheadLog=createWAL();
+  Assert.assertNull(writeAheadLog.getLastCheckpoint());
+}

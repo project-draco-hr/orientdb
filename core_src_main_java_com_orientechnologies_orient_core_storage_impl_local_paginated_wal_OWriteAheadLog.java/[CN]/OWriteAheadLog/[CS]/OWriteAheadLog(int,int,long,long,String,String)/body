@@ -8,7 +8,7 @@
     this.walLocation=new File(walPath);
     File[] walFiles=this.walLocation.listFiles(new FilenameFilter(){
       @Override public boolean accept(      File dir,      String name){
-        return LogSegment.validateName(name);
+        return validateName(name);
       }
     }
 );
@@ -24,27 +24,27 @@
       }
       Collections.sort(logSegments);
     }
-    File masterRecordFile=new File(walLocation,storageName + ".wmr");
+    masterRecordFile=new File(walLocation,storageName + ".wmr");
     masterRecordLSNHolder=new RandomAccessFile(masterRecordFile,"rwd");
     if (masterRecordLSNHolder.length() > 0) {
-      OLogSequenceNumber firstMasterRecord=readMasterRecord(storageName,0);
-      OLogSequenceNumber secondMasterRecord=readMasterRecord(storageName,1);
+      firstMasterRecord=readMasterRecord(storageName,0);
+      secondMasterRecord=readMasterRecord(storageName,1);
       if (firstMasterRecord == null) {
         useFirstMasterRecord=true;
-        masterRecord=secondMasterRecord;
+        lastCheckpoint=secondMasterRecord;
       }
  else       if (secondMasterRecord == null) {
         useFirstMasterRecord=false;
-        masterRecord=firstMasterRecord;
+        lastCheckpoint=firstMasterRecord;
       }
  else {
         if (firstMasterRecord.compareTo(secondMasterRecord) >= 0) {
-          masterRecord=firstMasterRecord;
+          lastCheckpoint=firstMasterRecord;
           useFirstMasterRecord=false;
         }
  else {
-          masterRecord=firstMasterRecord;
-          useFirstMasterRecord=false;
+          lastCheckpoint=secondMasterRecord;
+          useFirstMasterRecord=true;
         }
       }
     }

@@ -14,8 +14,18 @@ synchronized (syncObject) {
       last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxRecordsCacheSize);
       logSegments.add(last);
     }
-    final OLogSequenceNumber lsn=last.logRecord(serializedForm);
+    final OLogSequenceNumber lsn=last.logRecord(serializedForm,record.isUpdateMasterRecord());
     record.setLsn(lsn);
-    if (record.isUpdateMasterRecord())     masterRecord=lsn;
+    if (record.isUpdateMasterRecord()) {
+      if (useFirstMasterRecord) {
+        writeMasterRecord(0,lsn);
+        useFirstMasterRecord=false;
+      }
+ else {
+        writeMasterRecord(1,lsn);
+        useFirstMasterRecord=true;
+      }
+      masterRecord=lsn;
+    }
   }
 }

@@ -1,20 +1,25 @@
 {
 synchronized (syncObject) {
-    final Set<Long> pageIndexes=filesPages.get(fileId);
-    Long[] sortedPageIndexes=new Long[pageIndexes.size()];
-    sortedPageIndexes=pageIndexes.toArray(sortedPageIndexes);
-    Arrays.sort(sortedPageIndexes);
-    for (    Long pageIndex : sortedPageIndexes) {
+    final SortedSet<Long> dirtyPages=this.dirtyPages.get(fileId);
+    for (Iterator<Long> iterator=dirtyPages.iterator(); iterator.hasNext(); ) {
+      Long pageIndex=iterator.next();
       LRUEntry lruEntry=get(fileId,pageIndex);
-      if (lruEntry != null) {
-        if (lruEntry.isDirty && lruEntry.usageCounter == 0) {
-          flushData(fileId,lruEntry.pageIndex,lruEntry.dataPointer);
-          lruEntry.isDirty=false;
+      if (lruEntry == null) {
+        final Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+        if (dataPointer != null) {
+          flushData(fileId,pageIndex,dataPointer);
+          iterator.remove();
         }
       }
  else {
-        final Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
-        if (dataPointer != null)         flushData(fileId,pageIndex,dataPointer);
+        if (lruEntry.usageCounter == 0) {
+          flushData(fileId,lruEntry.pageIndex,lruEntry.dataPointer);
+          iterator.remove();
+          lruEntry.isDirty=false;
+        }
+ else {
+          throw new OBlockedPageException("Unable to perform flush file because some pages is in use.");
+        }
       }
     }
     files.get(fileId).synch();

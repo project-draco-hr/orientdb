@@ -14,6 +14,20 @@
   DELETE_WAIT_TIME=OGlobalConfiguration.FILE_MMAP_FORCE_DELAY.getValueAsInteger();
   final ODirectMemory directMemory=ODirectMemoryFactory.INSTANCE.directMemory();
   diskCache=new O2QCache(OGlobalConfiguration.DISK_CACHE_SIZE.getValueAsLong() * ONE_KB * ONE_KB,directMemory,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * ONE_KB,this,false);
-  if (OGlobalConfiguration.USE_WAL.getValueAsBoolean())   writeAheadLog=new OWriteAheadLog(this);
+  if (OGlobalConfiguration.USE_WAL.getValueAsBoolean()) {
+    writeAheadLog=new OWriteAheadLog(this);
+    final int fuzzyCheckpointDelay=OGlobalConfiguration.WAL_FUZZY_CHECKPOINT_INTERVAL.getValueAsInteger();
+    fuzzyCheckpointExecutor.scheduleWithFixedDelay(new Runnable(){
+      @Override public void run(){
+        try {
+          makeFuzzyCheckpoint();
+        }
+ catch (        Throwable e) {
+          OLogManager.instance().error(this,"Error during background fuzzy checkpoint creation for storage " + name,e);
+        }
+      }
+    }
+,fuzzyCheckpointDelay,fuzzyCheckpointDelay,TimeUnit.SECONDS);
+  }
  else   writeAheadLog=null;
 }

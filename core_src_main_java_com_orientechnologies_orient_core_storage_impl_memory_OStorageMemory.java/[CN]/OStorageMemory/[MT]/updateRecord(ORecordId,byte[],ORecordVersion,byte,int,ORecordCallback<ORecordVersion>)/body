@@ -14,27 +14,42 @@
         return new OStorageOperationResult<ORecordVersion>(v);
       }
       if (!iVersion.isUntracked()) {
-        if (iVersion.getCounter() > -1) {
-          if (!iVersion.equals(ppos.recordVersion))           if (OFastConcurrentModificationException.enabled())           throw OFastConcurrentModificationException.instance();
- else           throw new OConcurrentModificationException(iRid,ppos.recordVersion,iVersion,ORecordOperation.UPDATED);
+switch (iVersion.getCounter()) {
+case -1:
           ppos.recordVersion.increment();
-        }
- else         ppos.recordVersion.decrement();
-      }
-      final ODataSegmentMemory dataSegment=getDataSegmentById(ppos.dataSegmentId);
-      dataSegment.updateRecord(ppos.dataSegmentPos,iContent);
-      if (iCallback != null)       iCallback.call(null,ppos.recordVersion);
-      return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
-    }
+        cluster.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+      break;
+case -2:
+    break;
+default :
+  if (iVersion.getCounter() > -1) {
+    if (!iVersion.equals(ppos.recordVersion))     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
+ else     throw new OConcurrentModificationException(iRid,ppos.recordVersion,iVersion,ORecordOperation.UPDATED);
+    ppos.recordVersion.increment();
+    cluster.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+  }
+ else {
+    iVersion.clearRollbackMode();
+    ppos.recordVersion.copyFrom(iVersion);
+    cluster.updateVersion(iRid.clusterPosition,ppos.recordVersion);
+  }
+}
+}
+if (ppos.recordType != iRecordType) cluster.updateRecordType(iRid.clusterPosition,iRecordType);
+final ODataSegmentMemory dataSegment=getDataSegmentById(ppos.dataSegmentId);
+dataSegment.updateRecord(ppos.dataSegmentPos,iContent);
+if (iCallback != null) iCallback.call(null,ppos.recordVersion);
+return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
+}
   finally {
-      lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
-    }
-  }
- catch (  IOException e) {
-    throw new OStorageException("Error on update record " + iRid,e);
-  }
+lockManager.releaseLock(Thread.currentThread(),iRid,LOCK.EXCLUSIVE);
+}
+}
+ catch (IOException e) {
+throw new OStorageException("Error on update record " + iRid,e);
+}
  finally {
-    lock.releaseSharedLock();
-    Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to memory database",timer,"db.*.updateRecord");
-  }
+lock.releaseSharedLock();
+Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to memory database",timer,"db.*.updateRecord");
+}
 }

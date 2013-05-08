@@ -3,31 +3,32 @@
   OLocalPaginatedStorage paginatedStorage=mock(OLocalPaginatedStorage.class);
   when(paginatedStorage.getName()).thenReturn("WriteAheadLogTest");
   when(paginatedStorage.getStoragePath()).thenReturn(testDir.getAbsolutePath());
-  writeAheadLog=new OWriteAheadLog(1024,-1,2048,10105,paginatedStorage);
+  writeAheadLog=new OWriteAheadLog(1024,-1,2048,2 * 2048,paginatedStorage);
   List<OWALRecord> writtenRecords=new ArrayList<OWALRecord>();
   Random rnd=new Random();
-  final int recordsToWrite=219;
   OWALRecord walRecord=new OFuzzyCheckpointStartRecord();
   writeAheadLog.logRecord(walRecord);
   writtenRecords.add(walRecord);
-  for (int i=0; i < recordsToWrite; i++) {
-    if (i == 50) {
-      walRecord=new OFuzzyCheckpointStartRecord();
-      writeAheadLog.logRecord(walRecord);
-      writtenRecords.add(walRecord);
-    }
- else {
-      byte[] data=new byte[10];
-      rnd.nextBytes(data);
-      int pageOffset=rnd.nextInt(65536);
-      long pageIndex=rnd.nextLong();
-      OSetPageDataRecord setPageDataRecord=new OSetPageDataRecord(data,pageOffset,pageIndex,"test");
-      writtenRecords.add(setPageDataRecord);
-      writeAheadLog.logRecord(setPageDataRecord);
-    }
+  OSetPageDataRecord setPageDataRecord=new OSetPageDataRecord(1,"test");
+  final int firstRecordsToWrite=(2048 - serializeSize(walRecord)) / serializeSize(setPageDataRecord);
+  for (int i=0; i < firstRecordsToWrite; i++) {
+    long pageIndex=rnd.nextLong();
+    setPageDataRecord=new OSetPageDataRecord(pageIndex,"test");
+    writtenRecords.add(setPageDataRecord);
+    writeAheadLog.logRecord(setPageDataRecord);
   }
-  assertLogContent(writeAheadLog,writtenRecords.subList(44,writtenRecords.size()));
-  Assert.assertNull(writeAheadLog.read(writtenRecords.get(43).getLsn()));
+  int recordsToWrite=2 * (2048 / serializeSize(setPageDataRecord));
+  for (int i=0; i < recordsToWrite - 1; i++) {
+    long pageIndex=rnd.nextLong();
+    setPageDataRecord=new OSetPageDataRecord(pageIndex,"test");
+    writtenRecords.add(setPageDataRecord);
+    writeAheadLog.logRecord(setPageDataRecord);
+  }
+  walRecord=new OFuzzyCheckpointStartRecord();
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  assertLogContent(writeAheadLog,writtenRecords.subList(firstRecordsToWrite + 1,writtenRecords.size()));
+  Assert.assertNull(writeAheadLog.read(writtenRecords.get(firstRecordsToWrite).getLsn()));
   Assert.assertEquals(writeAheadLog.getLastCheckpoint(),walRecord.getLsn());
   verify(paginatedStorage).scheduleCheckpoint();
   Assert.assertEquals(writeAheadLog.begin(),new OLogSequenceNumber(1,0));

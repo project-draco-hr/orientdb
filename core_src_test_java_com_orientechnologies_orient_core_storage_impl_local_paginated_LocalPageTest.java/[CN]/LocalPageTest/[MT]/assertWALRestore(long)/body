@@ -1,0 +1,17 @@
+{
+  writeAheadLog.flush();
+  long restoredPagePointer=directMemory.allocate(new byte[OLocalPage.PAGE_SIZE]);
+  try {
+    OLocalPage restoredPage=new OLocalPage(restoredPagePointer,false,writeAheadLog,-1,"test");
+    OLogSequenceNumber lsn=writeAheadLog.begin();
+    while (lsn != null) {
+      OWALRecord walRecord=writeAheadLog.read(lsn);
+      if (walRecord instanceof OAbstractPageWALRecord)       restoredPage.restore((OAbstractPageWALRecord)walRecord);
+      lsn=writeAheadLog.next(lsn);
+    }
+    Assert.assertEquals(directMemory.get(restoredPagePointer + SYSTEM_OFFSET,OLocalPage.PAGE_SIZE - SYSTEM_OFFSET),directMemory.get(pagePointer + SYSTEM_OFFSET,OLocalPage.PAGE_SIZE - SYSTEM_OFFSET));
+  }
+  finally {
+    directMemory.free(restoredPagePointer);
+  }
+}

@@ -12,7 +12,7 @@
     int endPos;
     for (    String projection : items) {
       projection=projection.trim();
-      if (projectionDefinition == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() operator");
+      if (projectionDefinition == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() and EXPAND() operators");
       fieldName=null;
       endPos=projection.toUpperCase(Locale.ENGLISH).indexOf(KEYWORD_AS);
       if (endPos > -1) {
@@ -27,13 +27,17 @@
         fieldName=OStringSerializerHelper.getStringContent(fieldName);
         for (int fieldIndex=2; projectionDefinition.containsKey(fieldName); ++fieldIndex)         fieldName+=fieldIndex;
       }
-      if (projection.toUpperCase(Locale.ENGLISH).startsWith("FLATTEN(")) {
+      String p=projection.toUpperCase(Locale.ENGLISH);
+      if (p.startsWith("FLATTEN(") || p.startsWith("EXPAND(")) {
+        if (p.startsWith("FLATTEN("))         OLogManager.instance().debug(this,"FLATTEN() operator has been replaced by EXPAND()");
         List<String> pars=OStringSerializerHelper.getParameters(projection);
-        if (pars.size() != 1)         throw new OCommandSQLParsingException("FLATTEN operator expects the field name as parameter. Example FLATTEN( out )");
-        flattenTarget=OSQLHelper.parseValue(this,pars.get(0).trim(),context);
+        if (pars.size() != 1) {
+          throw new OCommandSQLParsingException("EXPAND/FLATTEN operators expects the field name as parameter. Example EXPAND( out )");
+        }
+        expandTarget=OSQLHelper.parseValue(this,pars.get(0).trim(),context);
         projectionDefinition=null;
         projections=null;
-        if (groupedResult == null && flattenTarget instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)flattenTarget).aggregateResults())         getProjectionGroup(null);
+        if (groupedResult == null && expandTarget instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)expandTarget).aggregateResults())         getProjectionGroup(null);
         continue;
       }
       projectionDefinition.put(fieldName,projection);

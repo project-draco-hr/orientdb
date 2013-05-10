@@ -7,7 +7,8 @@ synchronized (syncObject) {
     record.setLsn(lsn);
     if (record.isUpdateMasterRecord())     lastCheckpoint=lsn;
     final long sizeDiff=last.filledUpTo() - lastSize;
-    if (logSize + sizeDiff >= maxLogSize) {
+    logSize+=sizeDiff;
+    if (logSize >= maxLogSize) {
       LogSegment first=logSegments.get(0);
       logSize-=first.filledUpTo();
       if (!first.delete(false))       OLogManager.instance().error(this,"Log segment %s can not be removed from WAL",first.getPath());
@@ -15,13 +16,12 @@ synchronized (syncObject) {
       fixMasterRecords();
       paginatedStorage.scheduleCheckpoint();
     }
-    if (last.filledUpTo() + sizeDiff >= maxSegmentSize) {
+    if (last.filledUpTo() >= maxSegmentSize) {
       last.flush();
       last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxRecordsCacheSize);
       last.open();
       logSegments.add(last);
     }
-    logSize+=sizeDiff;
     return lsn;
   }
 }

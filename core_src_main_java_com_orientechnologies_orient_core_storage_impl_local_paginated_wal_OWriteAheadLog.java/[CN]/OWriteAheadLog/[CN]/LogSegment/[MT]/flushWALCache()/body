@@ -1,6 +1,15 @@
 {
   if (pages.isEmpty())   return;
   rndFile.seek(lastFlushedPosition);
+  OLogSequenceNumber newFlushedLSN=null;
+  int lastPageOffset=-1;
+  int pageIndex=pages.size() - 1;
+  for (; pageIndex >= 0; pageIndex--) {
+    OWALPage page=pages.get(pageIndex);
+    lastPageOffset=findLastRecord(page);
+    if (lastPageOffset > 0)     break;
+  }
+  if (lastPageOffset > 0)   newFlushedLSN=new OLogSequenceNumber(order,lastFlushedPosition / OWALPage.PAGE_SIZE + pageIndex + lastPageOffset);
   for (int i=0; i < pages.size() - 1; i++) {
     final OWALPage page=pages.get(i);
     flushPage(page);
@@ -18,5 +27,6 @@
     directMemory.free(lastPage.getPagePointer());
     lastFlushedPosition=rndFile.getFilePointer();
   }
+  if (newFlushedLSN != null)   flushedLsn=newFlushedLSN;
   rndFile.getFD().sync();
 }

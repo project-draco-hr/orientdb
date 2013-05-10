@@ -9,19 +9,13 @@
     long pointer=directMemory.allocate(pageContent);
     try {
       OWALPage page=new OWALPage(pointer,false);
-      int prevOffset=OWALPage.RECORDS_OFFSET;
-      int pageOffset=OWALPage.RECORDS_OFFSET;
-      int maxOffset=OWALPage.PAGE_SIZE - page.getFreeSpace();
-      while (pageOffset < maxOffset) {
-        prevOffset=pageOffset;
-        pageOffset+=page.getSerializedRecordSize(pageOffset);
-      }
-      if (page.recordTail(prevOffset)) {
+      int pageOffset=findLastRecord(page);
+      if (pageOffset < 0) {
         pageIndex--;
         if (pageIndex < 0)         return null;
         continue;
       }
-      return new OLogSequenceNumber(order,(pages - 1) * OWALPage.PAGE_SIZE + prevOffset);
+      return new OLogSequenceNumber(order,pageIndex * OWALPage.PAGE_SIZE + pageOffset);
     }
   finally {
       directMemory.free(pointer);

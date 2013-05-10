@@ -1,16 +1,27 @@
 {
-  if (records.isEmpty() || records.get(0).lsn.compareTo(lsn) > 0)   return;
-  rndFile.seek(rndFile.length());
-  final CRC32 crc32=new CRC32();
+  if (pages.isEmpty() || pages.get(0).getFirstLsn().compareTo(lsn) > 0)   return;
+  rndFile.seek(lastFlushedPosition);
   int lastIndex=-1;
-  for (int i=0; i < records.size(); i++) {
-    CacheEntry cacheEntry=records.get(i);
-    if (cacheEntry.lsn.compareTo(lsn) <= 0) {
-      flushEntry(crc32,cacheEntry);
+  for (int i=0; i < pages.size() - 1; i++) {
+    OWALPage walPage=pages.get(i);
+    if (walPage.getFirstLsn().compareTo(lsn) <= 0) {
+      flushPage(walPage);
+      directMemory.free(walPage.getPagePointer());
       lastIndex=i;
     }
  else     break;
   }
+  lastFlushedPosition=rndFile.getFilePointer();
+  OWALPage lastPage=pages.get(pages.size() - 1);
+  if (lastPage.getFirstLsn().compareTo(lsn) <= 0) {
+    flushPage(lastPage);
+    if (lastPage.getFreeSpace() < OWALPage.MIN_RECORD_SIZE) {
+      filledUpTo+=lastPage.getFreeSpace();
+      directMemory.free(lastPage.getPagePointer());
+      lastFlushedPosition=rndFile.getFilePointer();
+      lastIndex=pages.size() - 1;
+    }
+  }
   rndFile.getFD().sync();
-  if (lastIndex > -1)   records.subList(0,lastIndex + 1).clear();
+  if (lastIndex > -1)   pages.subList(0,lastIndex + 1).clear();
 }

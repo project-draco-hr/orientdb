@@ -3,19 +3,26 @@
   OLocalPaginatedStorage paginatedStorage=mock(OLocalPaginatedStorage.class);
   when(paginatedStorage.getName()).thenReturn("WriteAheadLogTest");
   when(paginatedStorage.getStoragePath()).thenReturn(testDir.getAbsolutePath());
-  writeAheadLog=new OWriteAheadLog(1024,-1,2048,2 * 2048,paginatedStorage);
-  List<OUpdatePageRecord> writtenRecords=new ArrayList<OUpdatePageRecord>();
-  Random rnd=new Random();
-  OUpdatePageRecord setPageDataRecord=new OUpdatePageRecord(1,"test");
-  int oneSegment=2048 / serializeSize(setPageDataRecord);
-  int recordsToWrite=3 * oneSegment;
-  for (int i=0; i < recordsToWrite; i++) {
-    long pageIndex=rnd.nextLong();
-    setPageDataRecord=new OUpdatePageRecord(pageIndex,"test");
-    writtenRecords.add(setPageDataRecord);
-    writeAheadLog.logRecord(setPageDataRecord);
+  writeAheadLog=new OWriteAheadLog(2,-1,2 * OWALPage.PAGE_SIZE,4 * OWALPage.PAGE_SIZE,paginatedStorage);
+  List<OWALRecord> writtenRecords=new ArrayList<OWALRecord>();
+  long seed=System.currentTimeMillis();
+  System.out.println("testLogTruncation seed " + seed);
+  Random rnd=new Random(seed);
+  long logSize=writeAheadLog.size() + 1;
+  long prevLogSize=0;
+  int firstSegmentIndex=-1;
+  int counter=0;
+  while (logSize > prevLogSize) {
+    int contentSize=rnd.nextInt(OWALPage.PAGE_SIZE - 128) + 128;
+    OWALRecord walRecord=new TestRecord(contentSize);
+    writeAheadLog.logRecord(walRecord);
+    writtenRecords.add(walRecord);
+    prevLogSize=logSize;
+    logSize=writeAheadLog.size();
+    if (firstSegmentIndex < 0 && logSize > 2 * OWALPage.PAGE_SIZE)     firstSegmentIndex=counter;
+    counter++;
   }
-  assertLogContent(writeAheadLog,writtenRecords.subList(oneSegment,writtenRecords.size()));
-  Assert.assertNull(writeAheadLog.read(writtenRecords.get(oneSegment - 1).getLsn()));
+  assertLogContent(writeAheadLog,writtenRecords.subList(firstSegmentIndex + 1,writtenRecords.size()));
+  Assert.assertNull(writeAheadLog.read(writtenRecords.get(firstSegmentIndex).getLsn()));
   verify(paginatedStorage).scheduleCheckpoint();
 }

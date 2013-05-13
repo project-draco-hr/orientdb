@@ -2,7 +2,27 @@
   final byte[] record=readRecord(lsn);
   if (record == null)   return null;
   long pos=lsn.getPosition();
-  pos+=calculateEntrySize(record);
-  if (pos >= size)   return null;
+  long pageIndex=pos / OWALPage.PAGE_SIZE;
+  int pageOffset=(int)(pos - pageIndex * OWALPage.PAGE_SIZE);
+  int restOfRecord=record.length;
+  while (restOfRecord > 0) {
+    int entrySize=OWALPage.calculateSerializedSize(restOfRecord);
+    if (entrySize + pageOffset < OWALPage.PAGE_SIZE) {
+      if (entrySize + pageOffset <= OWALPage.PAGE_SIZE - OWALPage.MIN_RECORD_SIZE)       pos+=entrySize;
+ else       pos+=OWALPage.PAGE_SIZE - pageOffset + OWALPage.RECORDS_OFFSET;
+      break;
+    }
+ else     if (entrySize + pageOffset == OWALPage.PAGE_SIZE) {
+      pos+=entrySize + OWALPage.RECORDS_OFFSET;
+      break;
+    }
+ else {
+      int chunkSize=OWALPage.calculateRecordSize(OWALPage.PAGE_SIZE - pageOffset);
+      restOfRecord-=chunkSize;
+      pos+=OWALPage.PAGE_SIZE - pageOffset + OWALPage.RECORDS_OFFSET;
+      pageOffset=OWALPage.RECORDS_OFFSET;
+    }
+  }
+  if (pos >= filledUpTo)   return null;
   return new OLogSequenceNumber(order,pos);
 }

@@ -12,17 +12,24 @@
       }
     }
 );
+    boolean errorsWereFound=false;
     if (walFiles.length == 0) {
-      logSegments.add(new LogSegment(new File(this.walLocation,getSegmentName(0)),maxRecordsCacheSize));
+      LogSegment logSegment=new LogSegment(new File(this.walLocation,getSegmentName(0)),maxRecordsCacheSize);
+      logSegment.open();
+      logSegments.add(logSegment);
       logSize=0;
+      flushedLsn=null;
     }
  else {
       for (      File walFile : walFiles) {
         LogSegment logSegment=new LogSegment(walFile,maxRecordsCacheSize);
+        boolean checkError=logSegment.open();
+        errorsWereFound=errorsWereFound || checkError;
         logSegments.add(logSegment);
-        logSize+=logSegment.size();
+        logSize+=logSegment.filledUpTo();
       }
       Collections.sort(logSegments);
+      flushedLsn=readFlushedLSN();
     }
     masterRecordFile=new File(walLocation,paginatedStorage.getName() + ".wmr");
     masterRecordLSNHolder=new RandomAccessFile(masterRecordFile,"rwd");
@@ -48,6 +55,7 @@
         }
       }
     }
+    if (errorsWereFound)     fixMasterRecords();
     if (commitDelay > 0)     commitExecutor.scheduleWithFixedDelay(new Runnable(){
       @Override public void run(){
         try {

@@ -1,0 +1,33 @@
+{
+  if (from == null && to == null && rid == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
+  if (rid != null) {
+    final OrientEdge e=graph.getEdge(rid);
+    if (e != null) {
+      e.remove();
+      removed=1;
+    }
+  }
+ else {
+    final Set<OrientEdge> edges=new HashSet<OrientEdge>();
+    if (query == null) {
+      if (from != null && to != null) {
+        for (        Edge e : graph.getVertex(from).getEdges(Direction.OUT))         if (to.equals(((OrientEdge)e).getInVertex()))         edges.add((OrientEdge)e);
+      }
+ else       if (from != null)       edges.add((OrientEdge)graph.getVertex(from).getEdges(Direction.OUT));
+ else       if (to != null)       edges.add((OrientEdge)graph.getVertex(to).getEdges(Direction.IN));
+ else       throw new OCommandExecutionException("Invalid target");
+      if (compiledFilter != null) {
+        for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
+          final OrientEdge edge=it.next();
+          if (!(Boolean)compiledFilter.evaluate((ODocument)edge.getRecord(),null,context))           it.remove();
+        }
+      }
+      removed=edges.size();
+      for (      OrientEdge edge : edges)       edge.remove();
+    }
+ else     if (query != null)     query.execute(iArgs);
+ else     throw new OCommandExecutionException("Invalid target");
+  }
+  return removed;
+}

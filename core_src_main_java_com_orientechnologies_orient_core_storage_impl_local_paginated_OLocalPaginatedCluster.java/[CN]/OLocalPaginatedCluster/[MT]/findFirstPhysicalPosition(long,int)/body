@@ -1,9 +1,9 @@
 {
   long pagesCount=diskCache.getFilledUpTo(fileId);
   pageLoop:   for (long i=pageIndex; i < pagesCount; i++) {
-    long pointer=diskCache.loadAndLockForRead(fileId,i);
+    long pointer=diskCache.load(fileId,i);
     try {
-      final OLocalPage localPage=new OLocalPage(pointer,false);
+      final OLocalPage localPage=new OLocalPage(pointer,false,writeAheadLog,i,name);
       int recordsCount=localPage.getRecordsCount();
       if (recordsCount > 0) {
         while (true) {
@@ -17,7 +17,7 @@
             int recordSize=localPage.getRecordSize(recordPosition);
             if (directMemory.getByte(recordPointer + recordSize - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 1) {
               OPhysicalPosition physicalPosition=new OPhysicalPosition();
-              physicalPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf((i << 16) | recordPosition);
+              physicalPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf((i << PAGE_INDEX_OFFSET) | recordPosition);
               physicalPosition.recordVersion=localPage.getRecordVersion(recordPosition);
               physicalPosition.recordType=directMemory.getByte(recordPointer);
               physicalPosition.recordSize=-1;
@@ -31,7 +31,7 @@
       }
     }
   finally {
-      diskCache.releaseReadLock(fileId,i);
+      diskCache.release(fileId,i);
     }
   }
   return new OPhysicalPosition[0];

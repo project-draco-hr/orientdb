@@ -1,0 +1,29 @@
+{
+  List<OWALRecord> writtenRecords=new ArrayList<OWALRecord>();
+  OWALRecord walRecord=new TestRecord(ONE_KB);
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  walRecord=new TestRecord(ONE_KB);
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  walRecord=new TestRecord(OWALPage.PAGE_SIZE - OWALPage.RECORDS_OFFSET - 2048- OWALPage.MIN_RECORD_SIZE + 1);
+  writeAheadLog.logRecord(walRecord);
+  writtenRecords.add(walRecord);
+  assertLogContent(writeAheadLog,writtenRecords);
+  writeAheadLog.close();
+  long seed=System.currentTimeMillis();
+  System.out.println("seed of testWriteMultipleRecordsWithDifferentSizeAfterCloseTwo " + seed);
+  Random random=new Random(seed);
+  writeAheadLog=createWAL();
+  for (int writtenSize=0; writtenSize < 4 * OWALPage.PAGE_SIZE; ) {
+    int contentSize=random.nextInt(2 * OWALPage.PAGE_SIZE - 1) + 1;
+    walRecord=new TestRecord(contentSize);
+    writeAheadLog.logRecord(walRecord);
+    writtenRecords.add(walRecord);
+    writtenSize+=contentSize;
+  }
+  assertLogContent(writeAheadLog,writtenRecords);
+  writeAheadLog.close();
+  writeAheadLog=createWAL();
+  assertLogContent(writeAheadLog,writtenRecords);
+}

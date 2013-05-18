@@ -1,0 +1,20 @@
+{
+  String path=storageLocal.getConfiguration().getDirectory() + "/o2QCacheTest.0.tst";
+  OFileClassic fileClassic=new OFileClassic();
+  fileClassic.init(path,"r");
+  fileClassic.open();
+  byte[] content=new byte[8 + systemOffset];
+  fileClassic.read(pageIndex * (8 + systemOffset),content,8 + systemOffset);
+  Assert.assertEquals(Arrays.copyOfRange(content,systemOffset,8 + systemOffset),value);
+  long magicNumber=OLongSerializer.INSTANCE.deserializeNative(content,0);
+  Assert.assertEquals(magicNumber,O2QCache.MAGIC_NUMBER);
+  CRC32 crc32=new CRC32();
+  crc32.update(content,OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE,content.length - OIntegerSerializer.INT_SIZE - OLongSerializer.LONG_SIZE);
+  int crc=OIntegerSerializer.INSTANCE.deserializeNative(content,OLongSerializer.LONG_SIZE);
+  Assert.assertEquals(crc,(int)crc32.getValue());
+  int segment=OIntegerSerializer.INSTANCE.deserializeNative(content,OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE);
+  long position=OLongSerializer.INSTANCE.deserializeNative(content,OLongSerializer.LONG_SIZE + 2 * OIntegerSerializer.INT_SIZE);
+  OLogSequenceNumber readLsn=new OLogSequenceNumber(segment,position);
+  Assert.assertEquals(readLsn,lsn);
+  fileClassic.close();
+}

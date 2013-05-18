@@ -33,11 +33,21 @@
         if (involvedIndexes != null && !involvedIndexes.isEmpty()) {
           for (          OIndex<?> idx : involvedIndexes) {
             if (idx.getKeyTypes().length == 1 && idx.supportsOrderedIterations()) {
-              if (orderByFirstField.getValue().equalsIgnoreCase("asc"))               target=(Iterator<? extends OIdentifiable>)idx.valuesIterator();
- else               target=(Iterator<? extends OIdentifiable>)idx.valuesInverseIterator();
-              orderedFields=null;
-              fetchLimit=getQueryFetchLimit();
-              break;
+              if (idx.getSize() < MIN_THRESHOLD_USE_INDEX_AS_TARGET || compiledFilter == null) {
+                if (orderByFirstField.getValue().equalsIgnoreCase("asc"))                 target=(Iterator<? extends OIdentifiable>)idx.valuesIterator();
+ else                 target=(Iterator<? extends OIdentifiable>)idx.valuesInverseIterator();
+                if (context.isRecordingMetrics()) {
+                  Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
+                  if (idxNames == null) {
+                    idxNames=new HashSet<String>();
+                    context.setVariable("involvedIndexes",idxNames);
+                  }
+                  idxNames.add(idx.getName());
+                }
+                orderedFields=null;
+                fetchLimit=getQueryFetchLimit();
+                break;
+              }
             }
           }
         }

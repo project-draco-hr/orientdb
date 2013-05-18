@@ -1,22 +1,28 @@
 {
   checkOpeness();
   if (!rid.isPersistent())   throw new IllegalArgumentException("Cannot read record " + rid + " since the position is invalid in database '"+ name+ '\'');
-  if (atomicLock)   lock.acquireSharedLock();
   final OLocalPaginatedCluster localPaginatedCluster=(OLocalPaginatedCluster)clusterSegment;
+  localPaginatedCluster.getExternalModificationLock().requestModificationLock();
   try {
-    lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
+    if (atomicLock)     lock.acquireSharedLock();
     try {
-      return localPaginatedCluster.readRecord(rid.clusterPosition);
-    }
+      lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
+      try {
+        return localPaginatedCluster.readRecord(rid.clusterPosition);
+      }
   finally {
-      lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
+        lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error on reading record " + rid + " (cluster: "+ clusterSegment+ ')',e);
+      return null;
+    }
+ finally {
+      if (atomicLock)       lock.releaseSharedLock();
     }
   }
- catch (  IOException e) {
-    OLogManager.instance().error(this,"Error on reading record " + rid + " (cluster: "+ clusterSegment+ ')',e);
-    return null;
-  }
- finally {
-    if (atomicLock)     lock.releaseSharedLock();
+  finally {
+    localPaginatedCluster.getExternalModificationLock().releaseModificationLock();
   }
 }

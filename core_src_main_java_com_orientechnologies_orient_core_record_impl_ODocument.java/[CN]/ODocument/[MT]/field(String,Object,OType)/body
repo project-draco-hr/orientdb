@@ -3,6 +3,31 @@
     setClassName(iPropertyValue.toString());
     return this;
   }
+  final int lastSep=_allowChainedAccess ? iFieldName.lastIndexOf('.') : -1;
+  if (lastSep > -1) {
+    final Object subObject=field(iFieldName.substring(0,lastSep));
+    if (subObject != null) {
+      final String subFieldName=iFieldName.substring(lastSep + 1);
+      if (subObject instanceof ODocument) {
+        ((ODocument)subObject).field(subFieldName,iPropertyValue);
+        return (ODocument)(((ODocument)subObject).isEmbedded() ? this : subObject);
+      }
+ else       if (subObject instanceof Map<?,?>)       ((Map<String,Object>)subObject).put(subFieldName,iPropertyValue);
+ else       if (OMultiValue.isMultiValue(subObject)) {
+        for (        Object subObjectItem : OMultiValue.getMultiValueIterable(subObject)) {
+          if (subObjectItem instanceof ODocument) {
+            if (!((ODocument)subObjectItem).isEmbedded())             throw new IllegalArgumentException("Property '" + iFieldName + "' points to linked collection of items. You can only change embedded documents in this way");
+            ((ODocument)subObjectItem).field(subFieldName,iPropertyValue);
+          }
+ else           if (subObjectItem instanceof Map<?,?>) {
+            ((Map<String,Object>)subObjectItem).put(subFieldName,iPropertyValue);
+          }
+        }
+        return this;
+      }
+    }
+    return null;
+  }
   iFieldName=checkFieldName(iFieldName);
   checkForLoading();
   checkForFields();

@@ -1,0 +1,29 @@
+{
+synchronized (syncObject) {
+    if (!files.containsKey(fileId))     return;
+    final Set<Long> pageIndexes=filePages.get(fileId);
+    Long[] sortedPageIndexes=new Long[pageIndexes.size()];
+    sortedPageIndexes=pageIndexes.toArray(sortedPageIndexes);
+    Arrays.sort(sortedPageIndexes);
+    for (    Long pageIndex : sortedPageIndexes) {
+      LRUEntry lruEntry=get(fileId,pageIndex);
+      if (lruEntry != null) {
+        if (lruEntry.usageCounter == 0) {
+          lruEntry=remove(fileId,pageIndex);
+          flushData(fileId,pageIndex,lruEntry.dataPointer);
+          dirtyPages.get(fileId).remove(pageIndex);
+          directMemory.free(lruEntry.dataPointer);
+        }
+      }
+ else {
+        Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+        if (dataPointer != null) {
+          flushData(fileId,pageIndex,dataPointer);
+          dirtyPages.get(fileId).remove(pageIndex);
+        }
+      }
+    }
+    pageIndexes.clear();
+    files.get(fileId).close();
+  }
+}

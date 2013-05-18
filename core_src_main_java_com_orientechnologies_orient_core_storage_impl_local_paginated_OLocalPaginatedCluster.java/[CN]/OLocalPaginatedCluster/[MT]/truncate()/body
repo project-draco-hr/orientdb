@@ -1,13 +1,22 @@
 {
-  acquireExclusiveLock();
+  storageLocal.checkForClusterPermissions(getName());
+  externalModificationLock.requestModificationLock();
   try {
-    diskCache.truncateFile(fileId);
-    clusterStateHolder.truncate();
-    size=0;
-    recordsSize=0;
-    for (int i=0; i < freePageLists.length; i++)     freePageLists[i]=-1;
+    acquireExclusiveLock();
+    try {
+      diskCache.truncateFile(fileId);
+      clusterStateHolder.truncate();
+      size=0;
+      recordsSize=0;
+      logClusterState();
+      for (int i=0; i < freePageLists.length; i++)       freePageLists[i]=-1;
+    }
+  finally {
+      releaseExclusiveLock();
+    }
   }
   finally {
-    releaseExclusiveLock();
+    externalModificationLock.releaseModificationLock();
   }
+  storageLocal.scheduleCheckpoint();
 }

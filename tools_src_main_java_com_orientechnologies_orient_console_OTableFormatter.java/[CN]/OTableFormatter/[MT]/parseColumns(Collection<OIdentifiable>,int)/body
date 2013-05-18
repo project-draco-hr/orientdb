@@ -1,0 +1,48 @@
+{
+  final Map<String,Integer> columns=new LinkedHashMap<String,Integer>();
+  for (  String c : prefixedColumns)   columns.put(c,minColumnSize);
+  int fetched=0;
+  for (  OIdentifiable id : resultSet) {
+    ORecord<?> rec=id.getRecord();
+    for (    String c : prefixedColumns)     columns.put(c,getColumnSize(fetched,rec,c,columns.get(c)));
+    if (rec instanceof ODocument) {
+      ODocument doc=(ODocument)rec;
+      for (      String fieldName : doc.fieldNames()) {
+        columns.put(fieldName,getColumnSize(fetched,doc,fieldName,columns.get(fieldName)));
+      }
+    }
+ else     if (rec instanceof ORecordBytes) {
+      columns.put("value",maxWidthSize - 15);
+    }
+    if (limit > -1 && fetched++ >= limit)     break;
+  }
+  int width=0;
+  for (  Entry<String,Integer> col : columns.entrySet())   width+=col.getValue();
+  if (width > maxWidthSize) {
+    final List<Map.Entry<String,Integer>> orderedColumns=new ArrayList<Map.Entry<String,Integer>>();
+    orderedColumns.addAll(columns.entrySet());
+    Collections.sort(orderedColumns,new Comparator<Map.Entry<String,Integer>>(){
+      public int compare(      Map.Entry<String,Integer> o1,      Map.Entry<String,Integer> o2){
+        return o1.getValue().compareTo(o2.getValue());
+      }
+    }
+);
+    Collections.reverse(orderedColumns);
+    while (width > maxWidthSize) {
+      int oldWidth=width;
+      for (      Map.Entry<String,Integer> entry : orderedColumns) {
+        final int redux=entry.getValue() * 10 / 100;
+        if (entry.getValue() - redux < minColumnSize)         break;
+        entry.setValue(entry.getValue() - redux);
+        width-=redux;
+        if (width <= maxWidthSize)         break;
+      }
+      if (width == oldWidth)       break;
+    }
+    columns.clear();
+    for (    String c : prefixedColumns)     columns.put(c,minColumnSize);
+    Collections.reverse(orderedColumns);
+    for (    Entry<String,Integer> col : orderedColumns)     columns.put(col.getKey(),col.getValue());
+  }
+  return columns;
+}

@@ -1,0 +1,19 @@
+{
+  if (writeAheadLog == null)   return;
+  try {
+    lock.acquireExclusiveLock();
+    try {
+      diskCache.forceSyncStoredChanges();
+      writeAheadLog.logFuzzyCheckPointStart();
+      for (      OLocalPaginatedCluster cluster : clusters)       cluster.logClusterState();
+      diskCache.logDirtyPagesTable();
+      writeAheadLog.logFuzzyCheckPointEnd();
+    }
+  finally {
+      lock.releaseExclusiveLock();
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OStorageException("Error during fuzzy checkpoint creation for storage " + name,ioe);
+  }
+}

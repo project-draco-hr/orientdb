@@ -1,0 +1,21 @@
+{
+synchronized (syncObject) {
+    if (!files.containsKey(fileId))     return;
+    final Set<Long> pageEntries=filePages.get(fileId);
+    for (    Long pageIndex : pageEntries) {
+      LRUEntry lruEntry=get(fileId,pageIndex);
+      if (lruEntry != null) {
+        if (lruEntry.usageCounter == 0) {
+          lruEntry=remove(fileId,pageIndex);
+          if (lruEntry.dataPointer != ODirectMemory.NULL_POINTER)           directMemory.free(lruEntry.dataPointer);
+        }
+      }
+ else {
+        Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+        if (dataPointer != null)         directMemory.free(dataPointer);
+      }
+    }
+    pageEntries.clear();
+    files.get(fileId).truncate();
+  }
+}

@@ -1,0 +1,19 @@
+{
+  long pagesCount=rndFile.length() / OWALPage.PAGE_SIZE;
+  if (pagesCount == 0)   return;
+  rndFile.seek((pagesCount - 1) * OWALPage.PAGE_SIZE);
+  byte[] content=new byte[OWALPage.PAGE_SIZE];
+  rndFile.readFully(content);
+  long pointer=directMemory.allocate(content);
+  OWALPage walPage=new OWALPage(pointer,false);
+  if (walPage.getFreeSpace() >= OWALPage.MIN_RECORD_SIZE) {
+    pages.add(walPage);
+    filledUpTo=(pagesCount - 1) * OWALPage.PAGE_SIZE + (OWALPage.PAGE_SIZE - walPage.getFreeSpace());
+    nextPositionToFlush=(pagesCount - 1) * OWALPage.PAGE_SIZE;
+  }
+ else {
+    directMemory.free(pointer);
+    filledUpTo=rndFile.length();
+    nextPositionToFlush=filledUpTo;
+  }
+}

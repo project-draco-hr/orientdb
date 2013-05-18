@@ -4,17 +4,28 @@
   try {
     if (!checkForClose(iForce))     return;
     status=STATUS.CLOSING;
+    makeCheckpoint();
+    fuzzyCheckpointExecutor.shutdown();
+    final int fuzzyCheckpointDelay=OGlobalConfiguration.WAL_FUZZY_CHECKPOINT_INTERVAL.getValueAsInteger();
+    fuzzyCheckpointExecutor.awaitTermination(fuzzyCheckpointDelay * 10,TimeUnit.SECONDS);
+    checkpointExecutor.shutdown();
+    checkpointExecutor.awaitTermination(OGlobalConfiguration.WAL_CHECKPOINT_INTERVAL_TIMEOUT.getValueAsInteger(),TimeUnit.SECONDS);
     for (    OCluster cluster : clusters)     if (cluster != null)     cluster.close();
-    clusters=new OCluster[0];
+    clusters=new OLocalPaginatedCluster[0];
     clusterMap.clear();
     if (configuration != null)     configuration.close();
     level2Cache.shutdown();
     super.close(iForce);
-    if (diskCache != null)     diskCache.close();
+    if (writeAheadLog != null)     writeAheadLog.close();
+    diskCache.close();
     Orient.instance().unregisterStorage(this);
     status=STATUS.CLOSED;
   }
- catch (  IOException e) {
+ catch (  InterruptedException ie) {
+    OLogManager.instance().error(this,"Error on closing of storage '" + name,ie,OStorageException.class);
+    Thread.interrupted();
+  }
+catch (  IOException e) {
     OLogManager.instance().error(this,"Error on closing of storage '" + name,e,OStorageException.class);
   }
  finally {

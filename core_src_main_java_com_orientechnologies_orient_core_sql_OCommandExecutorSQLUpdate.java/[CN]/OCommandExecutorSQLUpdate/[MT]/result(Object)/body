@@ -3,26 +3,26 @@
   if (compiledFilter != null) {
     if (!(Boolean)compiledFilter.evaluate(record,null,context))     return false;
   }
-  boolean recordUpdated=false;
+  final Set<ODocument> updatedRecords=new HashSet<ODocument>();
   parameters.reset();
   if (content != null) {
     record.clear();
     record.merge(content,false,false);
-    recordUpdated=true;
+    updatedRecords.add(record);
   }
   if (merge != null) {
-    record.merge(merge,false,false);
-    recordUpdated=true;
+    record.merge(merge,true,false);
+    updatedRecords.add(record);
   }
   if (!setEntries.isEmpty()) {
-    OSQLHelper.bindParameters(record,setEntries,parameters,context);
-    recordUpdated=true;
+    Set<ODocument> changedDocuments=OSQLHelper.bindParameters(record,setEntries,parameters,context);
+    if (changedDocuments != null)     updatedRecords.addAll(changedDocuments);
   }
   for (  Map.Entry<String,Number> entry : incrementEntries.entrySet()) {
     final Number prevValue=record.field(entry.getKey());
     if (prevValue == null)     record.field(entry.getKey(),entry.getValue());
  else     record.field(entry.getKey(),OType.increment(prevValue,entry.getValue()));
-    recordUpdated=true;
+    updatedRecords.add(record);
   }
   Object v;
   Collection<Object> coll;
@@ -46,7 +46,7 @@
     if (v instanceof OSQLFilterItem)     v=((OSQLFilterItem)v).getValue(record,context);
  else     if (v instanceof OSQLFunctionRuntime)     v=((OSQLFunctionRuntime)v).execute(record,null,context);
     coll.add(v);
-    recordUpdated=true;
+    updatedRecords.add(record);
   }
   Map<String,Object> map;
   OPair<String,Object> pair;
@@ -69,30 +69,30 @@
       if (v instanceof OSQLFilterItem)       v=((OSQLFilterItem)v).getValue(record,context);
  else       if (pair.getValue() instanceof OSQLFunctionRuntime)       v=((OSQLFunctionRuntime)v).execute(record,null,context);
       map.put(pair.getKey(),v);
-      recordUpdated=true;
+      updatedRecords.add(record);
     }
   }
   for (  OPair<String,Object> entry : removeEntries) {
     v=entry.getValue();
     if (v == EMPTY_VALUE) {
       record.removeField(entry.getKey());
-      recordUpdated=true;
+      updatedRecords.add(record);
     }
  else {
       fieldValue=record.field(entry.getKey());
       if (fieldValue instanceof Collection<?>) {
         coll=(Collection<Object>)fieldValue;
-        if (coll.remove(v))         recordUpdated=true;
+        if (coll.remove(v))         updatedRecords.add(record);
       }
  else       if (fieldValue instanceof Map<?,?>) {
         map=(Map<String,Object>)fieldValue;
-        if (map.remove(v) != null)         recordUpdated=true;
+        if (map.remove(v) != null)         updatedRecords.add(record);
       }
     }
   }
-  if (recordUpdated) {
-    record.setDirty();
-    record.save();
+  for (  ODocument d : updatedRecords) {
+    d.setDirty();
+    d.save();
     recordCount++;
   }
   return true;

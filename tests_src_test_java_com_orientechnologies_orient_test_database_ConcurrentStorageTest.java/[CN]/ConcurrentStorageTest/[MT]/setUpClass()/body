@@ -1,0 +1,25 @@
+{
+  final ODatabaseDocumentTx setup=new ODatabaseDocumentTx(url);
+  if (setup.exists()) {
+    setup.open("admin","admin");
+    setup.drop();
+    setup.create();
+  }
+ else {
+    setup.create();
+  }
+  try {
+    if (setup.getMetadata().getSchema().getClass("test_class") != null) {
+      setup.getMetadata().getSchema().dropClass("test_class");
+    }
+    final OClass testClass=setup.getMetadata().getSchema().createClass("test_class");
+    testClass.createProperty("thread",OType.STRING);
+    testClass.createProperty("time",OType.LONG).createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    setup.getMetadata().getSchema().save();
+    assertTrue(setup.getClusterIdByName("test_class") != -1);
+    assertTrue(countInsertedRecords(setup) == 0);
+  }
+  finally {
+    setup.close();
+  }
+}

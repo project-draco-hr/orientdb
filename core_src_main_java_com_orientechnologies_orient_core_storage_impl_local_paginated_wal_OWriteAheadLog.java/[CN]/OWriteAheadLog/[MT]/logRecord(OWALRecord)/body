@@ -1,0 +1,27 @@
+{
+synchronized (syncObject) {
+    final byte[] serializedForm=OWALRecordsFactory.INSTANCE.toStream(record);
+    LogSegment last=logSegments.get(logSegments.size() - 1);
+    long lastSize=last.filledUpTo();
+    final OLogSequenceNumber lsn=last.logRecord(serializedForm,record.isUpdateMasterRecord());
+    record.setLsn(lsn);
+    if (record.isUpdateMasterRecord())     lastCheckpoint=lsn;
+    final long sizeDiff=last.filledUpTo() - lastSize;
+    logSize+=sizeDiff;
+    if (logSize >= maxLogSize) {
+      LogSegment first=logSegments.get(0);
+      logSize-=first.filledUpTo();
+      if (!first.delete(false))       OLogManager.instance().error(this,"Log segment %s can not be removed from WAL",first.getPath());
+      logSegments.remove(0);
+      fixMasterRecords();
+      paginatedStorage.scheduleCheckpoint();
+    }
+    if (last.filledUpTo() >= maxSegmentSize) {
+      last.flush();
+      last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxRecordsCacheSize);
+      last.open();
+      logSegments.add(last);
+    }
+    return lsn;
+  }
+}

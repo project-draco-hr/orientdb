@@ -1,0 +1,48 @@
+{
+  long pageIndex=filledUpTo / OWALPage.PAGE_SIZE;
+  OWALPage walPage;
+  int pos=0;
+  boolean firstRecord=true;
+  OLogSequenceNumber lsn=null;
+  while (pos < record.length) {
+    if (pages.isEmpty()) {
+      long pointer=directMemory.allocate(OWALPage.PAGE_SIZE);
+      walPage=new OWALPage(pointer,true);
+      pages.add(walPage);
+      filledUpTo+=OWALPage.RECORDS_OFFSET;
+    }
+ else {
+      walPage=pages.get(pages.size() - 1);
+    }
+    int freeSpace=walPage.getFreeSpace();
+    if (freeSpace < OWALPage.MIN_RECORD_SIZE) {
+      filledUpTo+=freeSpace + OWALPage.RECORDS_OFFSET;
+      long pointer=directMemory.allocate(OWALPage.PAGE_SIZE);
+      walPage=new OWALPage(pointer,true);
+      pages.add(walPage);
+      pageIndex++;
+      freeSpace=walPage.getFreeSpace();
+    }
+    final int entrySize=OWALPage.calculateSerializedSize(record.length - pos);
+    int pageOffset;
+    if (entrySize <= freeSpace) {
+      if (pos == 0)       pageOffset=walPage.appendRecord(record,false,!firstRecord);
+ else       pageOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,record.length),false,!firstRecord);
+      pos=record.length;
+    }
+ else {
+      int chunkSize=OWALPage.calculateRecordSize(freeSpace);
+      pageOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,pos + chunkSize),true,!firstRecord);
+      pos+=chunkSize;
+    }
+    if (firstRecord) {
+      lsn=new OLogSequenceNumber(order,pageIndex * OWALPage.PAGE_SIZE + pageOffset);
+      if (updateMasterRecord)       walPage.setLastMasterRecord(lsn);
+    }
+    int spaceDiff=freeSpace - walPage.getFreeSpace();
+    filledUpTo+=spaceDiff;
+    firstRecord=false;
+  }
+  if (pages.size() > maxRecordsCacheSize)   flushWALCache();
+  return lsn;
+}

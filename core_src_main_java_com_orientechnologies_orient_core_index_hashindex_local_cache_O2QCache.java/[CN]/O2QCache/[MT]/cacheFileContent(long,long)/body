@@ -1,0 +1,19 @@
+{
+  FileLockKey key=new FileLockKey(fileId,pageIndex);
+  if (evictedPages.containsKey(key))   return new CacheResult(true,evictedPages.remove(key));
+  final OMultiFileSegment multiFileSegment=files.get(fileId);
+  final long startPosition=pageIndex * pageSize;
+  final long endPosition=startPosition + pageSize;
+  byte[] content=new byte[pageSize];
+  long dataPointer;
+  if (multiFileSegment.getFilledUpTo() >= endPosition) {
+    multiFileSegment.readContinuously(startPosition,content,content.length);
+    dataPointer=directMemory.allocate(content);
+  }
+ else {
+    multiFileSegment.allocateSpaceContinuously((int)(endPosition - multiFileSegment.getFilledUpTo()));
+    dataPointer=directMemory.allocate(content);
+    initLsn(dataPointer);
+  }
+  return new CacheResult(false,dataPointer);
+}

@@ -1,0 +1,28 @@
+{
+  database=getDatabase();
+  database.checkSecurity(ODatabaseSecurityResources.COMMAND,ORole.PERMISSION_READ);
+  init((OCommandRequestText)iRequest);
+  parserRequiredKeyword("DELETE");
+  parserRequiredKeyword("VERTEX");
+  OClass clazz=null;
+  String temp=parseOptionalWord(true);
+  while (temp != null) {
+    if (temp.startsWith("#")) {
+      rid=new ORecordId(temp);
+    }
+ else     if (temp.equals(KEYWORD_WHERE)) {
+      if (clazz == null)       clazz=database.getMetadata().getSchema().getClass(OrientVertex.CLASS_NAME);
+      final String condition=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetPreviousPosition()) : "";
+      query=database.command(new OSQLAsynchQuery<ODocument>("select from " + clazz.getName() + condition,this));
+      break;
+    }
+ else     if (temp.length() > 0) {
+      clazz=database.getMetadata().getSchema().getClass(temp);
+      if (clazz == null)       throw new OCommandSQLParsingException("Class '" + temp + " was not found");
+    }
+    if (rid == null && clazz == null)     query=database.command(new OSQLAsynchQuery<ODocument>("select from V",this));
+    temp=parseOptionalWord(true);
+    if (parserIsEnded())     break;
+  }
+  return this;
+}

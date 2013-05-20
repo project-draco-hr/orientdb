@@ -1,0 +1,82 @@
+{
+  final List<ORID> existingChunks=fileDoc.field("DataChunks");
+  if (existingChunks != null) {
+    final String fileName=fileDoc.field("FileName");
+    throw new RuntimeException("File record already has data; overwrite not allowed! fileName: " + fileName);
+  }
+  final ODatabase database=ODatabaseRecordThreadLocal.INSTANCE.get();
+  database.declareIntent(new OIntentMassiveInsert());
+  final long fileSize=file.length();
+  final FileInputStream in=new FileInputStream(file);
+  try {
+    final int CHUNK_SIZE=81920;
+    int bufferedBytes;
+    final byte[] buffer=new byte[CHUNK_SIZE];
+    byte currentPercent=0;
+    final int fullChunks=(int)(fileSize / CHUNK_SIZE);
+    final long fullChunksSize=fullChunks * CHUNK_SIZE;
+    final int totalChunks;
+    if (fileSize > fullChunksSize) {
+      totalChunks=fullChunks + 1;
+    }
+ else {
+      totalChunks=fullChunks;
+    }
+    final List<ORID> chunkRids=new ArrayList<ORID>(totalChunks);
+    final ORecordBytes chunk=new ORecordBytes();
+    for (int page=0; page < fullChunks; page++) {
+      bufferedBytes=0;
+      while (bufferedBytes < buffer.length) {
+        final int bytesRead=in.read(buffer,bufferedBytes,buffer.length - bufferedBytes);
+        if (bytesRead == -1) {
+          throw new Exception("Reached end of file prematurely. (File changed while reading?) fileName=" + file.getAbsolutePath());
+        }
+        bufferedBytes+=bytesRead;
+      }
+      final long saveStartTime=System.currentTimeMillis();
+      chunk.reset(buffer);
+      chunk.save();
+      final long saveMs=System.currentTimeMillis() - saveStartTime;
+      System.out.printf("Saved chunk %d in %d ms.\n",page,saveMs);
+      chunkRids.add(chunk.getIdentity().copy());
+      final byte percent=(byte)((page + 1) * 100 / totalChunks);
+      if (percent > currentPercent) {
+        System.out.printf("Progress: %d%%\n",percent);
+        currentPercent=percent;
+      }
+    }
+    if (fullChunks < totalChunks) {
+      final int remainder=(int)(fileSize - fullChunksSize);
+      bufferedBytes=0;
+      while (bufferedBytes < remainder) {
+        final int bytesRead=in.read(buffer,bufferedBytes,remainder - bufferedBytes);
+        if (bytesRead == -1) {
+          throw new Exception("Reached end of file prematurely. (File changed while reading?) fileName=" + file.getAbsolutePath());
+        }
+        bufferedBytes+=bytesRead;
+      }
+      final long saveStartTime=System.currentTimeMillis();
+      chunk.reset(Arrays.copyOf(buffer,remainder));
+      chunk.save();
+      final long saveMs=System.currentTimeMillis() - saveStartTime;
+      System.out.printf("Saved partial chunk %d in %d ms.\n",fullChunks,saveMs);
+      chunkRids.add(chunk.getIdentity());
+    }
+    final int b=in.read();
+    if (b != -1) {
+      throw new Exception("File changed while saving to database! fileName=" + file.getAbsolutePath());
+    }
+    if (currentPercent < 100) {
+      System.out.println("Progress: 100%");
+    }
+    final long saveChunkListStartTime=System.currentTimeMillis();
+    fileDoc.field("DataChunks",chunkRids);
+    fileDoc.save();
+    final long saveChunkListMs=System.currentTimeMillis() - saveChunkListStartTime;
+    System.out.printf("Saved list of %d chunk RIDs in %d ms.\n",chunkRids.size(),saveChunkListMs);
+  }
+  finally {
+    database.declareIntent(null);
+    in.close();
+  }
+}

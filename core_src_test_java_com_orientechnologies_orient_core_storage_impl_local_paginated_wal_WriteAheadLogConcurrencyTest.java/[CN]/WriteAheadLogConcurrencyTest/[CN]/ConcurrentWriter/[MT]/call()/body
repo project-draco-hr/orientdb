@@ -1,0 +1,23 @@
+{
+  startLatch.await();
+  try {
+    while (writeAheadLog.size() < 3072L * 1024 * 1024) {
+      int recordSize=random.nextInt(OWALPage.PAGE_SIZE / 2 - 128) + 128;
+      WriteAheadLogTest.TestRecord testRecord=new WriteAheadLogTest.TestRecord(recordSize,random.nextBoolean());
+      OLogSequenceNumber lsn=writeAheadLog.log(testRecord);
+      if (testRecord.isUpdateMasterRecord()) {
+        OLogSequenceNumber checkpoint=lastCheckpoint.get();
+        while (checkpoint == null || checkpoint.compareTo(testRecord.getLsn()) < 0) {
+          if (lastCheckpoint.compareAndSet(checkpoint,testRecord.getLsn()))           break;
+          checkpoint=lastCheckpoint.get();
+        }
+      }
+      Assert.assertNull(recordConcurrentMap.put(lsn,testRecord));
+    }
+    return null;
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw e;
+  }
+}

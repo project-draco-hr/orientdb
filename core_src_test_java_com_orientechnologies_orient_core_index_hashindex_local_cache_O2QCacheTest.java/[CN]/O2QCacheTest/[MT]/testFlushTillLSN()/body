@@ -1,0 +1,20 @@
+{
+  closeBufferAndDeleteFile();
+  File file=new File(storageLocal.getConfiguration().getDirectory());
+  if (!file.exists())   file.mkdir();
+  writeAheadLog=new OWriteAheadLog(1024,-1,10 * 1024,100L * 1024 * 1024* 1024,storageLocal);
+  final OStorageSegmentConfiguration segmentConfiguration=new OStorageSegmentConfiguration(storageLocal.getConfiguration(),"o2QCacheTest",0);
+  segmentConfiguration.fileType=OFileFactory.CLASSIC;
+  buffer=new O2QCache(4 * (8 + systemOffset),2,directMemory,writeAheadLog,8 + systemOffset,storageLocal,true);
+  long fileId=buffer.openFile(fileConfiguration,".tst");
+  OLogSequenceNumber lsnToFlush=null;
+  for (int i=0; i < 8; i++) {
+    long dataPointer=buffer.load(fileId,i);
+    OLogSequenceNumber pageLSN=writeAheadLog.log(new OUpdatePageRecord(1,"test"));
+    setLsn(dataPointer,pageLSN);
+    if (i == 5)     lsnToFlush=pageLSN;
+    buffer.markDirty(fileId,i);
+    buffer.release(fileId,i);
+  }
+  Assert.assertEquals(writeAheadLog.getFlushedLSN(),lsnToFlush);
+}

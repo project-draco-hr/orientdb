@@ -12,10 +12,10 @@
       }
     }
 );
-    boolean errorsWereFound=false;
     if (walFiles.length == 0) {
       LogSegment logSegment=new LogSegment(new File(this.walLocation,getSegmentName(0)),maxRecordsCacheSize);
-      logSegment.open();
+      logSegment.init();
+      logSegment.startFlush();
       logSegments.add(logSegment);
       logSize=0;
       flushedLsn=null;
@@ -23,12 +23,12 @@
  else {
       for (      File walFile : walFiles) {
         LogSegment logSegment=new LogSegment(walFile,maxRecordsCacheSize);
-        boolean checkError=logSegment.open();
-        errorsWereFound=errorsWereFound || checkError;
+        logSegment.init();
         logSegments.add(logSegment);
         logSize+=logSegment.filledUpTo();
       }
       Collections.sort(logSegments);
+      logSegments.get(logSegments.size() - 1).startFlush();
       flushedLsn=readFlushedLSN();
     }
     masterRecordFile=new File(walLocation,paginatedStorage.getName() + ".wmr");
@@ -55,18 +55,7 @@
         }
       }
     }
-    if (errorsWereFound)     fixMasterRecords();
-    if (commitDelay > 0)     commitExecutor.scheduleWithFixedDelay(new Runnable(){
-      @Override public void run(){
-        try {
-          flush();
-        }
- catch (        Throwable e) {
-          OLogManager.instance().error(this,"Error during WAL background flush",e);
-        }
-      }
-    }
-,commitDelay,commitDelay,TimeUnit.MILLISECONDS);
+    fixMasterRecords();
   }
  catch (  FileNotFoundException e) {
     OLogManager.instance().error(this,"Error during file initialization for storage %s",e,paginatedStorage.getName());

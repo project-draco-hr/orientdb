@@ -3,13 +3,13 @@
   long pageIndex=filledUpTo / OWALPage.PAGE_SIZE;
   if (pageOffset == 0 && pageIndex > 0)   pageIndex--;
   int pos=0;
-  boolean firstRecord=true;
+  boolean firstChunk=true;
   OLogSequenceNumber lsn=null;
   while (pos < record.length) {
     if (currentPage == null) {
       long pointer=directMemory.allocate(OWALPage.PAGE_SIZE);
       currentPage=new OWALPage(pointer,true);
-      pages.add(currentPage);
+      pagesCache.add(currentPage);
       filledUpTo+=OWALPage.RECORDS_OFFSET;
     }
     int freeSpace=currentPage.getFreeSpace();
@@ -17,7 +17,7 @@
       filledUpTo+=freeSpace + OWALPage.RECORDS_OFFSET;
       long pointer=directMemory.allocate(OWALPage.PAGE_SIZE);
       currentPage=new OWALPage(pointer,true);
-      pages.add(currentPage);
+      pagesCache.add(currentPage);
       pageIndex++;
       freeSpace=currentPage.getFreeSpace();
     }
@@ -26,26 +26,26 @@ synchronized (walPage) {
       final int entrySize=OWALPage.calculateSerializedSize(record.length - pos);
       int addedChunkOffset;
       if (entrySize <= freeSpace) {
-        if (pos == 0)         addedChunkOffset=walPage.appendRecord(record,false,!firstRecord);
- else         addedChunkOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,record.length),false,!firstRecord);
+        if (pos == 0)         addedChunkOffset=walPage.appendRecord(record,false,!firstChunk);
+ else         addedChunkOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,record.length),false,!firstChunk);
         pos=record.length;
       }
  else {
         int chunkSize=OWALPage.calculateRecordSize(freeSpace);
         if (chunkSize > record.length - pos)         chunkSize=record.length - pos;
-        addedChunkOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,pos + chunkSize),true,!firstRecord);
+        addedChunkOffset=walPage.appendRecord(Arrays.copyOfRange(record,pos,pos + chunkSize),true,!firstChunk);
         pos+=chunkSize;
       }
-      if (firstRecord) {
+      if (firstChunk) {
         lsn=new OLogSequenceNumber(order,pageIndex * OWALPage.PAGE_SIZE + addedChunkOffset);
       }
       int spaceDiff=freeSpace - walPage.getFreeSpace();
       filledUpTo+=spaceDiff;
-      firstRecord=false;
+      firstChunk=false;
     }
   }
-  if (pages.size() > maxRecordsCacheSize) {
-    OLogManager.instance().info(this,"Max cache limit is reached (%d vs. %d), sync flush is performed.",maxRecordsCacheSize,pages.size());
+  if (pagesCache.size() > maxPagesCacheSize) {
+    OLogManager.instance().info(this,"Max cache limit is reached (%d vs. %d), sync flush is performed.",maxPagesCacheSize,pagesCache.size());
     flush();
   }
   return lsn;

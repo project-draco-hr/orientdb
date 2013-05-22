@@ -1,0 +1,22 @@
+{
+  OLogManager.instance().info(this,"Data restore procedure from fuzzy checkpoint is started.");
+  OLogSequenceNumber dirtyPagesLSN=writeAheadLog.next(checkPointRecord.getLsn());
+  ODirtyPagesRecord dirtyPagesRecord=(ODirtyPagesRecord)writeAheadLog.read(dirtyPagesLSN);
+  OLogSequenceNumber startLSN;
+  Set<ODirtyPage> dirtyPages=dirtyPagesRecord.getDirtyPages();
+  if (dirtyPages.isEmpty()) {
+    startLSN=dirtyPagesLSN;
+  }
+ else {
+    ODirtyPage[] pages=dirtyPages.toArray(new ODirtyPage[dirtyPages.size()]);
+    Arrays.sort(pages,new Comparator<ODirtyPage>(){
+      @Override public int compare(      ODirtyPage pageOne,      ODirtyPage pageTwo){
+        return pageOne.getLsn().compareTo(pageTwo.getLsn());
+      }
+    }
+);
+    startLSN=pages[0].getLsn();
+  }
+  if (startLSN.compareTo(writeAheadLog.begin()) < 0)   startLSN=writeAheadLog.begin();
+  restoreFrom(startLSN);
+}

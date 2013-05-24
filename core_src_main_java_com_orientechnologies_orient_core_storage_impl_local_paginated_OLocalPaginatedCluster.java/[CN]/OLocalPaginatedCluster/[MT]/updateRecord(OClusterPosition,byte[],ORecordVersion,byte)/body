@@ -1,2 +1,113 @@
 {
+  externalModificationLock.requestModificationLock();
+  try {
+    acquireExclusiveLock();
+    try {
+      content=Snappy.compress(content);
+      byte[] fullEntryContent=readFullEntry(clusterPosition);
+      int updatedContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
+      byte[] recordEntry;
+      if (updatedContentLength <= fullEntryContent.length)       recordEntry=new byte[fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE];
+ else {
+        int grownContent=(int)(content.length * RECORD_OVERFLOW_GROW_FACTOR);
+        recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
+      }
+      int entryPosition=0;
+      recordEntry[entryPosition]=recordType;
+      entryPosition++;
+      OIntegerSerializer.INSTANCE.serializeNative(content.length,recordEntry,entryPosition);
+      entryPosition+=OIntegerSerializer.INT_SIZE;
+      System.arraycopy(content,0,recordEntry,entryPosition,content.length);
+      long pagePointer=clusterPosition.longValue();
+      int recordsSizeDiff=0;
+      long prevPageRecordPointer=-1;
+      int currentPos=0;
+      while (pagePointer >= 0 && currentPos < recordEntry.length) {
+        int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+        long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+        int freePageIndex;
+        long dataPointer=diskCache.load(fileId,pageIndex);
+        try {
+          final OLocalPage localPage=new OLocalPage(dataPointer,false,writeAheadLog,pageIndex,id);
+          int freeSpace=localPage.getFreeSpace();
+          freePageIndex=calculateFreePageIndex(localPage);
+          long recordPointer=localPage.getRecordPointer(recordPosition);
+          int chunkSize=localPage.getRecordSize(recordPosition);
+          long nextPagePointer=OLongSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,recordPointer + chunkSize - OLongSerializer.LONG_SIZE);
+          int newChunkLen=Math.min(recordEntry.length - currentPos + OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE,chunkSize);
+          int dataLen=newChunkLen - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
+          byte[] newRecordChunk=new byte[newChunkLen];
+          System.arraycopy(recordEntry,currentPos,newRecordChunk,0,dataLen);
+          if (currentPos > 0)           newRecordChunk[newRecordChunk.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
+ else           newRecordChunk[newRecordChunk.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
+          OLongSerializer.INSTANCE.serializeNative(-1L,newRecordChunk,newRecordChunk.length - OLongSerializer.LONG_SIZE);
+          if (prevPageRecordPointer >= 0) {
+            long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
+            int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
+            long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
+            try {
+              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false,writeAheadLog,prevPageIndex,id);
+              long prevRecordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
+              int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
+              OLongSerializer.INSTANCE.serializeInDirectMemory(pagePointer,directMemory,prevRecordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);
+            }
+  finally {
+              diskCache.markDirty(fileId,prevPageIndex);
+              diskCache.release(fileId,prevPageIndex);
+            }
+          }
+          localPage.replaceRecord(recordPosition,newRecordChunk,recordVersion,recordVersion.getCounter() != -2);
+          currentPos+=dataLen;
+          recordsSizeDiff+=freeSpace - localPage.getFreeSpace();
+          prevPageRecordPointer=pagePointer;
+          pagePointer=nextPagePointer;
+        }
+  finally {
+          diskCache.markDirty(fileId,pageIndex);
+          diskCache.release(fileId,pageIndex);
+        }
+        updateFreePagesIndex(freePageIndex,pageIndex);
+      }
+      int from=currentPos;
+      int to=from + (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
+      if (to > recordEntry.length)       to=recordEntry.length;
+      while (from < to) {
+        byte[] entryContent=new byte[to - from + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE];
+        System.arraycopy(recordEntry,from,entryContent,0,to - from);
+        if (from > 0)         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
+ else         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
+        OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
+        final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+        recordsSizeDiff+=addEntryResult.recordsSizeDiff;
+        long addedPagePointer=addEntryResult.pagePointer;
+        if (prevPageRecordPointer >= 0) {
+          long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
+          int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
+          long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
+          try {
+            final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false,writeAheadLog,prevPageIndex,id);
+            long recordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
+            int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
+            OLongSerializer.INSTANCE.serializeInDirectMemory(addedPagePointer,directMemory,recordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);
+          }
+  finally {
+            diskCache.markDirty(fileId,prevPageIndex);
+            diskCache.release(fileId,prevPageIndex);
+          }
+        }
+        prevPageRecordPointer=addedPagePointer;
+        from=to;
+        to=to + (OLocalPage.MAX_RECORD_SIZE - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE);
+        if (to > recordEntry.length)         to=recordEntry.length;
+      }
+      recordsSize+=recordsSizeDiff;
+      logClusterState();
+    }
+  finally {
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    externalModificationLock.releaseModificationLock();
+  }
 }

@@ -1,0 +1,34 @@
+{
+  startAtomicUpdate();
+  try {
+    int entryIndexPosition=PAGE_INDEXES_OFFSET + entryIndex * INDEX_ITEM_SIZE;
+    if (updateVersion) {
+      byte[] serializedVersion=getBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,OVersionFactory.instance().getVersionSize());
+      ORecordVersion storedRecordVersion=OVersionFactory.instance().createVersion();
+      storedRecordVersion.getSerializer().fastReadFrom(serializedVersion,0,storedRecordVersion);
+      if (recordVersion.compareTo(storedRecordVersion) > 0) {
+        recordVersion.getSerializer().fastWriteTo(serializedVersion,0,recordVersion);
+        setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
+      }
+    }
+    int entryPointer=getIntValue(entryIndexPosition);
+    int entryPosition=entryPointer & POSITION_MASK;
+    int recordSize=getIntValue(entryPosition) - 3 * OIntegerSerializer.INT_SIZE;
+    int writtenBytes;
+    if (record.length <= recordSize) {
+      setIntValue(entryPointer + 2 * OIntegerSerializer.INT_SIZE,record.length);
+      setBinaryValue(entryPointer + 3 * OIntegerSerializer.INT_SIZE,record);
+      writtenBytes=record.length;
+    }
+ else {
+      byte[] newRecord=new byte[recordSize];
+      System.arraycopy(record,0,newRecord,0,newRecord.length);
+      setBinaryValue(entryPointer + 3 * OIntegerSerializer.INT_SIZE,newRecord);
+      writtenBytes=newRecord.length;
+    }
+    return writtenBytes;
+  }
+  finally {
+    endAtomicUpdate();
+  }
+}

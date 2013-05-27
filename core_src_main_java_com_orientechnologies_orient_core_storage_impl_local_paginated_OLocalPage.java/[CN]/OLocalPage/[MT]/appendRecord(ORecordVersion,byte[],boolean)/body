@@ -1,68 +1,62 @@
 {
-  startAtomicUpdate();
-  try {
-    int freePosition=getIntValue(FREE_POSITION_OFFSET);
-    int indexesLength=getIntValue(PAGE_INDEXES_LENGTH_OFFSET);
-    int lastEntryIndexPosition=PAGE_INDEXES_OFFSET + indexesLength * INDEX_ITEM_SIZE;
-    int entrySize=record.length + 3 * OIntegerSerializer.INT_SIZE;
-    int freeListHeader=getIntValue(FREELIST_HEADER_OFFSET);
-    if (!checkSpace(entrySize,freeListHeader))     return -1;
-    if (freeListHeader > 0) {
-      if (freePosition - entrySize < lastEntryIndexPosition)       doDefragmentation();
-    }
+  int freePosition=getIntValue(FREE_POSITION_OFFSET);
+  int indexesLength=getIntValue(PAGE_INDEXES_LENGTH_OFFSET);
+  int lastEntryIndexPosition=PAGE_INDEXES_OFFSET + indexesLength * INDEX_ITEM_SIZE;
+  int entrySize=record.length + 3 * OIntegerSerializer.INT_SIZE;
+  int freeListHeader=getIntValue(FREELIST_HEADER_OFFSET);
+  if (!checkSpace(entrySize,freeListHeader))   return -1;
+  if (freeListHeader > 0) {
+    if (freePosition - entrySize < lastEntryIndexPosition)     doDefragmentation();
+  }
  else {
-      if (freePosition - entrySize < lastEntryIndexPosition + INDEX_ITEM_SIZE)       doDefragmentation();
-    }
-    freePosition=getIntValue(FREE_POSITION_OFFSET);
-    freePosition-=entrySize;
-    int entryIndex;
-    if (freeListHeader > 0) {
-      entryIndex=freeListHeader - 1;
-      final int tombstonePointer=getIntValue(PAGE_INDEXES_OFFSET + INDEX_ITEM_SIZE * entryIndex);
-      int nextEntryPosition=tombstonePointer & POSITION_MASK;
-      if (nextEntryPosition > 0)       setIntValue(FREELIST_HEADER_OFFSET,nextEntryPosition);
- else       setIntValue(FREELIST_HEADER_OFFSET,0);
-      setIntValue(FREE_SPACE_COUNTER_OFFSET,getFreeSpace() - entrySize);
-      int entryIndexPosition=PAGE_INDEXES_OFFSET + entryIndex * INDEX_ITEM_SIZE;
-      setIntValue(entryIndexPosition,freePosition);
-      byte[] serializedVersion=getBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,OVersionFactory.instance().getVersionSize());
-      ORecordVersion existingRecordVersion=OVersionFactory.instance().createVersion();
-      existingRecordVersion.getSerializer().fastReadFrom(serializedVersion,0,existingRecordVersion);
-      if (existingRecordVersion.compareTo(recordVersion) < 0) {
-        recordVersion.getSerializer().fastWriteTo(serializedVersion,0,recordVersion);
-        setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
-      }
- else {
-        if (!keepTombstoneVersion) {
-          existingRecordVersion.increment();
-          existingRecordVersion.getSerializer().fastWriteTo(serializedVersion,0,existingRecordVersion);
-          setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
-        }
-      }
-    }
- else {
-      entryIndex=indexesLength;
-      setIntValue(PAGE_INDEXES_LENGTH_OFFSET,indexesLength + 1);
-      setIntValue(FREE_SPACE_COUNTER_OFFSET,getFreeSpace() - entrySize - INDEX_ITEM_SIZE);
-      int entryIndexPosition=PAGE_INDEXES_OFFSET + entryIndex * INDEX_ITEM_SIZE;
-      setIntValue(entryIndexPosition,freePosition);
-      byte[] serializedVersion=new byte[OVersionFactory.instance().getVersionSize()];
+    if (freePosition - entrySize < lastEntryIndexPosition + INDEX_ITEM_SIZE)     doDefragmentation();
+  }
+  freePosition=getIntValue(FREE_POSITION_OFFSET);
+  freePosition-=entrySize;
+  int entryIndex;
+  if (freeListHeader > 0) {
+    entryIndex=freeListHeader - 1;
+    final int tombstonePointer=getIntValue(PAGE_INDEXES_OFFSET + INDEX_ITEM_SIZE * entryIndex);
+    int nextEntryPosition=tombstonePointer & POSITION_MASK;
+    if (nextEntryPosition > 0)     setIntValue(FREELIST_HEADER_OFFSET,nextEntryPosition);
+ else     setIntValue(FREELIST_HEADER_OFFSET,0);
+    setIntValue(FREE_SPACE_COUNTER_OFFSET,getFreeSpace() - entrySize);
+    int entryIndexPosition=PAGE_INDEXES_OFFSET + entryIndex * INDEX_ITEM_SIZE;
+    setIntValue(entryIndexPosition,freePosition);
+    byte[] serializedVersion=getBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,OVersionFactory.instance().getVersionSize());
+    ORecordVersion existingRecordVersion=OVersionFactory.instance().createVersion();
+    existingRecordVersion.getSerializer().fastReadFrom(serializedVersion,0,existingRecordVersion);
+    if (existingRecordVersion.compareTo(recordVersion) < 0) {
       recordVersion.getSerializer().fastWriteTo(serializedVersion,0,recordVersion);
       setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
     }
-    int entryPosition=freePosition;
-    setIntValue(entryPosition,entrySize);
-    entryPosition+=OIntegerSerializer.INT_SIZE;
-    setIntValue(entryPosition,entryIndex);
-    entryPosition+=OIntegerSerializer.INT_SIZE;
-    setIntValue(entryPosition,record.length);
-    entryPosition+=OIntegerSerializer.INT_SIZE;
-    setBinaryValue(entryPosition,record);
-    setIntValue(FREE_POSITION_OFFSET,freePosition);
-    incrementEntriesCount();
-    return entryIndex;
+ else {
+      if (!keepTombstoneVersion) {
+        existingRecordVersion.increment();
+        existingRecordVersion.getSerializer().fastWriteTo(serializedVersion,0,existingRecordVersion);
+        setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
+      }
+    }
   }
-  finally {
-    endAtomicUpdate();
+ else {
+    entryIndex=indexesLength;
+    setIntValue(PAGE_INDEXES_LENGTH_OFFSET,indexesLength + 1);
+    setIntValue(FREE_SPACE_COUNTER_OFFSET,getFreeSpace() - entrySize - INDEX_ITEM_SIZE);
+    int entryIndexPosition=PAGE_INDEXES_OFFSET + entryIndex * INDEX_ITEM_SIZE;
+    setIntValue(entryIndexPosition,freePosition);
+    byte[] serializedVersion=new byte[OVersionFactory.instance().getVersionSize()];
+    recordVersion.getSerializer().fastWriteTo(serializedVersion,0,recordVersion);
+    setBinaryValue(entryIndexPosition + OIntegerSerializer.INT_SIZE,serializedVersion);
   }
+  int entryPosition=freePosition;
+  setIntValue(entryPosition,entrySize);
+  entryPosition+=OIntegerSerializer.INT_SIZE;
+  setIntValue(entryPosition,entryIndex);
+  entryPosition+=OIntegerSerializer.INT_SIZE;
+  setIntValue(entryPosition,record.length);
+  entryPosition+=OIntegerSerializer.INT_SIZE;
+  setBinaryValue(entryPosition,record);
+  setIntValue(FREE_POSITION_OFFSET,freePosition);
+  incrementEntriesCount();
+  return entryIndex;
 }

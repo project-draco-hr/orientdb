@@ -3,6 +3,10 @@
   try {
     acquireExclusiveLock();
     try {
+      if (writeAheadLog != null) {
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord());
+        lastLsn.set(lsn);
+      }
       long pagePointer=clusterPosition.longValue();
       int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
       long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
@@ -13,7 +17,7 @@
         long pointer=diskCache.load(fileId,pageIndex);
         int initialFreePageIndex;
         try {
-          final OLocalPage localPage=new OLocalPage(pointer,false,writeAheadLog,pageIndex,id);
+          final OLocalPage localPage=new OLocalPage(pointer,false);
           initialFreePageIndex=calculateFreePageIndex(localPage);
           long recordPointer=localPage.getRecordPointer(recordPosition);
           if (recordPointer == ODirectMemory.NULL_POINTER) {
@@ -25,6 +29,7 @@
           localPage.deleteRecord(recordPosition);
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+          logPageChanges(localPage,pageIndex);
         }
   finally {
           diskCache.markDirty(fileId,pageIndex);
@@ -38,6 +43,10 @@
       size--;
       recordsSize-=removedContentSize;
       logClusterState();
+      if (writeAheadLog != null) {
+        writeAheadLog.log(new OAtomicUnitEndRecord(lastLsn.get()));
+        lastLsn.set(null);
+      }
       return true;
     }
   finally {

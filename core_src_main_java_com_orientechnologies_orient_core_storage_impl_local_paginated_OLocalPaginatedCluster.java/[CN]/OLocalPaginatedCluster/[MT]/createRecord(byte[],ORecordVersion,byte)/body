@@ -3,6 +3,10 @@
   try {
     acquireExclusiveLock();
     try {
+      if (writeAheadLog != null) {
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord());
+        lastLsn.set(lsn);
+      }
       content=Snappy.compress(content);
       int grownContentSize=(int)(RECORD_GROW_FACTOR * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
@@ -22,6 +26,10 @@
         size++;
         recordsSize+=addEntryResult.recordsSizeDiff;
         logClusterState();
+        if (writeAheadLog != null) {
+          writeAheadLog.log(new OAtomicUnitEndRecord(lastLsn.get()));
+          lastLsn.set(null);
+        }
         return createPhysicalPosition(recordType,addEntryResult.pagePointer,addEntryResult.recordVersion);
       }
  else {
@@ -57,10 +65,11 @@
             int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
             long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
             try {
-              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false,writeAheadLog,prevPageIndex,id);
+              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false);
               long recordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
               int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
               OLongSerializer.INSTANCE.serializeInDirectMemory(addedPagePointer,directMemory,recordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);
+              logPageChanges(prevPage,prevPageIndex);
             }
   finally {
               diskCache.markDirty(fileId,prevPageIndex);
@@ -76,10 +85,15 @@
         size++;
         recordsSize+=recordsSizeDiff;
         logClusterState();
+        if (writeAheadLog != null) {
+          writeAheadLog.log(new OAtomicUnitEndRecord(lastLsn.get()));
+          lastLsn.set(null);
+        }
         return createPhysicalPosition(recordType,firstPagePointer,version);
       }
     }
   finally {
+      lastLsn.set(null);
       releaseExclusiveLock();
     }
   }

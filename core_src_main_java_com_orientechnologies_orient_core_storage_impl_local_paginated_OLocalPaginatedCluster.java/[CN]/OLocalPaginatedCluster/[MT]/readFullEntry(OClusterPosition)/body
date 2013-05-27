@@ -6,19 +6,22 @@
   final List<byte[]> recordChunks=new ArrayList<byte[]>();
   int contentSize=0;
   long nextPagePointer=-1;
+  boolean firstEntry=true;
   do {
     long pointer=diskCache.load(fileId,pageIndex);
     try {
-      final OLocalPage localPage=new OLocalPage(pointer,false,writeAheadLog,pageIndex,id);
+      final OLocalPage localPage=new OLocalPage(pointer,false);
       long recordPointer=localPage.getRecordPointer(recordPosition);
       if (recordPointer == ODirectMemory.NULL_POINTER) {
         if (recordChunks.isEmpty())         return null;
  else         throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
       }
       byte[] content=directMemory.get(recordPointer,localPage.getRecordSize(recordPosition));
+      if (firstEntry && content[content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE] == 0)       return null;
       recordChunks.add(content);
       nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
       contentSize+=content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
+      firstEntry=false;
     }
   finally {
       diskCache.release(fileId,pageIndex);

@@ -3,21 +3,26 @@
   try {
     acquireExclusiveLock();
     try {
-      if (writeAheadLog != null) {
-        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord());
-        lastLsn.set(lsn);
-      }
       long pagePointer=clusterPosition.longValue();
       int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
       long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
       if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
+      boolean isRecordSpreadAcrossSeveralPages=isRecordSpreadAcrossSeveralPages(pageIndex,recordPosition);
+      final OLocalPage.TrackMode trackMode;
+      if (writeAheadLog == null)       trackMode=OLocalPage.TrackMode.NONE;
+ else       if (isRecordSpreadAcrossSeveralPages)       trackMode=OLocalPage.TrackMode.BOTH;
+ else       trackMode=OLocalPage.TrackMode.FORWARD;
+      if (writeAheadLog != null) {
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages));
+        lastLsn.set(lsn);
+      }
       long nextPagePointer=-1;
       int removedContentSize=0;
       do {
         long pointer=diskCache.load(fileId,pageIndex);
         int initialFreePageIndex;
         try {
-          final OLocalPage localPage=new OLocalPage(pointer,false);
+          final OLocalPage localPage=new OLocalPage(pointer,false,trackMode);
           initialFreePageIndex=calculateFreePageIndex(localPage);
           long recordPointer=localPage.getRecordPointer(recordPosition);
           if (recordPointer == ODirectMemory.NULL_POINTER) {
@@ -35,7 +40,7 @@
           diskCache.markDirty(fileId,pageIndex);
           diskCache.release(fileId,pageIndex);
         }
-        updateFreePagesIndex(initialFreePageIndex,pageIndex);
+        updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);
         pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
         recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
       }

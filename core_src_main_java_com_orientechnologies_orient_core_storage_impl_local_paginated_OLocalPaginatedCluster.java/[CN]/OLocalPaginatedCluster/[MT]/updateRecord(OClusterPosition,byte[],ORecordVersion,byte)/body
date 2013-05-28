@@ -3,18 +3,28 @@
   try {
     acquireExclusiveLock();
     try {
-      if (writeAheadLog != null) {
-        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord());
-        lastLsn.set(lsn);
-      }
-      content=Snappy.compress(content);
       byte[] fullEntryContent=readFullEntry(clusterPosition);
+      if (fullEntryContent == null)       return;
+      content=Snappy.compress(content);
       int updatedContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
+      long pagePointer=clusterPosition.longValue();
+      int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+      long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+      boolean isRecordSpreadAcrossSeveralPages=isRecordSpreadAcrossSeveralPages(pageIndex,recordPosition);
       byte[] recordEntry;
       if (updatedContentLength <= fullEntryContent.length)       recordEntry=new byte[fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE];
  else {
         int grownContent=(int)(content.length * RECORD_OVERFLOW_GROW_FACTOR);
         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
+        isRecordSpreadAcrossSeveralPages=true;
+      }
+      final OLocalPage.TrackMode trackMode;
+      if (writeAheadLog == null)       trackMode=OLocalPage.TrackMode.NONE;
+ else       if (isRecordSpreadAcrossSeveralPages)       trackMode=OLocalPage.TrackMode.BOTH;
+ else       trackMode=OLocalPage.TrackMode.FORWARD;
+      if (writeAheadLog != null) {
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages));
+        lastLsn.set(lsn);
       }
       int entryPosition=0;
       recordEntry[entryPosition]=recordType;
@@ -22,17 +32,16 @@
       OIntegerSerializer.INSTANCE.serializeNative(content.length,recordEntry,entryPosition);
       entryPosition+=OIntegerSerializer.INT_SIZE;
       System.arraycopy(content,0,recordEntry,entryPosition,content.length);
-      long pagePointer=clusterPosition.longValue();
       int recordsSizeDiff=0;
       long prevPageRecordPointer=-1;
       int currentPos=0;
       while (pagePointer >= 0 && currentPos < recordEntry.length) {
-        int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
-        long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+        recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
+        pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
         int freePageIndex;
         long dataPointer=diskCache.load(fileId,pageIndex);
         try {
-          final OLocalPage localPage=new OLocalPage(dataPointer,false);
+          final OLocalPage localPage=new OLocalPage(dataPointer,false,trackMode);
           int freeSpace=localPage.getFreeSpace();
           freePageIndex=calculateFreePageIndex(localPage);
           long recordPointer=localPage.getRecordPointer(recordPosition);
@@ -50,7 +59,7 @@
             int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
             long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
             try {
-              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false);
+              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false,trackMode);
               long prevRecordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
               int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
               OLongSerializer.INSTANCE.serializeInDirectMemory(pagePointer,directMemory,prevRecordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);
@@ -72,7 +81,7 @@
           diskCache.markDirty(fileId,pageIndex);
           diskCache.release(fileId,pageIndex);
         }
-        updateFreePagesIndex(freePageIndex,pageIndex);
+        updateFreePagesIndex(freePageIndex,pageIndex,trackMode);
       }
       int from=currentPos;
       int to=from + (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
@@ -83,7 +92,7 @@
         if (from > 0)         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
  else         entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
-        final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+        final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
         recordsSizeDiff+=addEntryResult.recordsSizeDiff;
         long addedPagePointer=addEntryResult.pagePointer;
         if (prevPageRecordPointer >= 0) {
@@ -91,7 +100,7 @@
           int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
           long prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
           try {
-            final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false);
+            final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer,false,trackMode);
             long recordPointer=prevPage.getRecordPointer(prevPageRecordPosition);
             int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
             OLongSerializer.INSTANCE.serializeInDirectMemory(addedPagePointer,directMemory,recordPointer + prevPageRecordSize - OLongSerializer.LONG_SIZE);

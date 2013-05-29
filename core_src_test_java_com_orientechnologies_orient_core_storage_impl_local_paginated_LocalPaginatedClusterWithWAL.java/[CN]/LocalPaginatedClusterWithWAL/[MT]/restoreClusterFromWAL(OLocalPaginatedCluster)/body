@@ -1,0 +1,25 @@
+{
+  OWriteAheadLog log=new OWriteAheadLog(4,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,testStorage);
+  OLogSequenceNumber lsn=log.begin();
+  List<OWALRecord> atomicUnit=new ArrayList<OWALRecord>();
+  boolean atomicChangeIsProcessed=false;
+  while (lsn != null) {
+    OWALRecord walRecord=log.read(lsn);
+    atomicUnit.add(walRecord);
+    if (!atomicChangeIsProcessed) {
+      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
+      atomicChangeIsProcessed=true;
+    }
+ else     if (walRecord instanceof OAtomicUnitEndRecord) {
+      atomicChangeIsProcessed=false;
+      testCluster.restoreOperation(atomicUnit);
+      atomicUnit.clear();
+    }
+ else {
+      Assert.assertTrue(walRecord instanceof OAbstractPageWALRecord || walRecord instanceof OClusterStateRecord);
+    }
+    lsn=log.next(lsn);
+  }
+  Assert.assertTrue(atomicUnit.isEmpty());
+  log.close();
+}

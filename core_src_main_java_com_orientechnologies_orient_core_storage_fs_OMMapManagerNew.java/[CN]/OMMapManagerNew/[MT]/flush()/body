@@ -9,18 +9,24 @@
     file=mapEntry.getKey();
     lockManager.acquireLock(Thread.currentThread(),file,OLockManager.LOCK.EXCLUSIVE);
     try {
-      if (autoFlushUnusedTime > 0 || file.isClosed()) {
+      if (file.isClosed()) {
         OMMapBufferEntry[] notFlushed=EMPTY_BUFFER_ENTRIES;
         for (        OMMapBufferEntry entry : mapEntry.getValue()) {
           totalBlocks++;
-          if ((file.isClosed() || autoFlushUnusedTime == 0 || now - entry.getLastUsed() > autoFlushUnusedTime) && removeEntry(entry))           flushedBlocks++;
+          if (removeEntry(entry))           flushedBlocks++;
  else           notFlushed=addEntry(notFlushed,entry);
         }
         if (notFlushed.length == 0) {
           it.remove();
         }
- else {
-          mapEntry.setValue(notFlushed);
+ else         mapEntry.setValue(notFlushed);
+      }
+ else       if (autoFlushUnusedTime > 0) {
+        for (        OMMapBufferEntry entry : mapEntry.getValue()) {
+          if (entry.isDirty() && (autoFlushUnusedTime == 0 || now - entry.getLastUsed() > autoFlushUnusedTime)) {
+            flushedBlocks++;
+            entry.flush();
+          }
         }
       }
     }

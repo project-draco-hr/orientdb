@@ -22,9 +22,11 @@
     final OStorage storage;
     if (clusterMax.equals(db1Max))     storage=storage1;
  else     storage=storage2;
-    OPhysicalPosition[] physicalPositions=storage.higherPhysicalPositions(clusterId,new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(-1)));
+    OPhysicalPosition[] physicalPositions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(0)));
+    long recordsCounter=0;
     while (physicalPositions.length > 0) {
       for (      OPhysicalPosition physicalPosition : physicalPositions) {
+        recordsCounter++;
         final OClusterPosition position=physicalPosition.clusterPosition;
         rid.clusterPosition=position;
         if (isDocumentDatabases() && rid.equals(new ORecordId(storage1.getConfiguration().indexMgrRecordId)) && rid.equals(new ORecordId(storage2.getConfiguration().indexMgrRecordId)))         continue;
@@ -125,7 +127,9 @@
         }
       }
       physicalPositions=storage.higherPhysicalPositions(clusterId,physicalPositions[physicalPositions.length - 1]);
+      if (recordsCounter % 10000 == 0)       listener.onMessage("\n" + recordsCounter + " records were processed for cluster "+ clusterName+ " ...");
     }
+    listener.onMessage("\nCluster comparison was finished, " + recordsCounter + " records were processed for cluster "+ clusterName+ " ...");
   }
   return true;
 }

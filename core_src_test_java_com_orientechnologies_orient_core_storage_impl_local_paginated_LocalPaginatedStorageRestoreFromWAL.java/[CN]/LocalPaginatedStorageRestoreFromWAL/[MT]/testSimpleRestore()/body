@@ -1,0 +1,19 @@
+{
+  List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  baseDocumentTx.declareIntent(new OIntentMassiveInsert());
+  for (int i=0; i < 5; i++)   futures.add(executorService.submit(new DataPropagationTask()));
+  for (  Future<Void> future : futures)   future.get();
+  Thread.sleep(1500);
+  copyDataFromTestWithoutClose();
+  baseDocumentTx.close();
+  testDocumentTx=new ODatabaseDocumentTx("plocal:" + buildDir.getAbsolutePath() + "/testLocalPaginatedStorageRestoreFromWAL");
+  testDocumentTx.open("admin","admin");
+  testDocumentTx.close();
+  ODatabaseCompare databaseCompare=new ODatabaseCompare(testDocumentTx.getURL(),baseDocumentTx.getURL(),"admin","admin",new OCommandOutputListener(){
+    @Override public void onMessage(    String text){
+      System.out.println(text);
+    }
+  }
+);
+  Assert.assertTrue(databaseCompare.compare());
+}

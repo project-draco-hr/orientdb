@@ -23,7 +23,7 @@
  else       if (isRecordSpreadAcrossSeveralPages)       trackMode=OLocalPage.TrackMode.BOTH;
  else       trackMode=OLocalPage.TrackMode.FORWARD;
       if (writeAheadLog != null) {
-        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages));
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages,id));
         lastLsn.set(lsn);
       }
       int entryPosition=0;
@@ -64,9 +64,9 @@
               int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
               prevPage.setLongValue(prevRecordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,pagePointer);
               logPageChanges(prevPage,prevPageIndex);
+              diskCache.markDirty(fileId,prevPageIndex);
             }
   finally {
-              diskCache.markDirty(fileId,prevPageIndex);
               diskCache.release(fileId,prevPageIndex);
             }
           }
@@ -76,9 +76,9 @@
           prevPageRecordPointer=pagePointer;
           pagePointer=nextPagePointer;
           logPageChanges(localPage,pageIndex);
+          diskCache.markDirty(fileId,pageIndex);
         }
   finally {
-          diskCache.markDirty(fileId,pageIndex);
           diskCache.release(fileId,pageIndex);
         }
         updateFreePagesIndex(freePageIndex,pageIndex,trackMode);
@@ -105,9 +105,9 @@
             int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
             prevPage.setLongValue(recordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,addedPagePointer);
             logPageChanges(prevPage,prevPageIndex);
+            diskCache.markDirty(fileId,prevPageIndex);
           }
   finally {
-            diskCache.markDirty(fileId,prevPageIndex);
             diskCache.release(fileId,prevPageIndex);
           }
         }

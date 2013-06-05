@@ -26,7 +26,7 @@
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0 && writeAheadLog != null) {
-            OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages));
+            OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(isRecordSpreadAcrossSeveralPages,id));
             lastLsn.set(lsn);
           }
           byte[] content=localPage.getBinaryValue(recordPageOffset,localPage.getRecordSize(recordPosition));
@@ -35,9 +35,9 @@
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
           logPageChanges(localPage,pageIndex);
+          diskCache.markDirty(fileId,pageIndex);
         }
   finally {
-          diskCache.markDirty(fileId,pageIndex);
           diskCache.release(fileId,pageIndex);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);

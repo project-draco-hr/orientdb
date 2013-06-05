@@ -4,11 +4,19 @@
   try {
     acquireExclusiveLock();
     try {
+      if (writeAheadLog != null) {
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(false,id));
+        lastLsn.set(lsn);
+      }
       diskCache.truncateFile(fileId);
       clusterStateHolder.truncate();
       size=0;
       recordsSize=0;
       logClusterState();
+      if (writeAheadLog != null) {
+        writeAheadLog.log(new OAtomicUnitEndRecord(lastLsn.get()));
+        lastLsn.set(null);
+      }
       for (int i=0; i < freePageLists.length; i++)       freePageLists[i]=-1;
     }
   finally {

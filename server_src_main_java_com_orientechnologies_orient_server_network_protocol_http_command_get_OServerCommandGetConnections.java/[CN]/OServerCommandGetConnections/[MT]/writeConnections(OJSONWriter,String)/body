@@ -1,0 +1,41 @@
+{
+  json.beginCollection(1,true,"connections");
+  final List<OClientConnection> conns=OClientConnectionManager.instance().getConnections();
+  for (  OClientConnection c : conns) {
+    final ONetworkProtocolData data=c.data;
+    if (databaseName != null && !databaseName.equals((data.lastDatabase)))     continue;
+    final String lastCommandOn;
+    final String connectedOn;
+synchronized (dateTimeFormat) {
+      lastCommandOn=dateTimeFormat.format(new Date(data.lastCommandReceived));
+      connectedOn=dateTimeFormat.format(new Date(c.since));
+    }
+    json.beginObject(2);
+    writeField(json,2,"connectionId",c.id);
+    writeField(json,2,"remoteAddress",c.protocol.getChannel() != null ? c.protocol.getChannel().toString() : "Disconnected");
+    writeField(json,2,"db",data.lastDatabase != null ? data.lastDatabase : "-");
+    writeField(json,2,"user",data.lastUser != null ? data.lastUser : "-");
+    writeField(json,2,"totalRequests",data.totalRequests);
+    writeField(json,2,"commandInfo",data.commandInfo);
+    writeField(json,2,"commandDetail",data.commandDetail);
+    writeField(json,2,"lastCommandOn",lastCommandOn);
+    writeField(json,2,"lastCommandInfo",data.lastCommandInfo);
+    writeField(json,2,"lastCommandDetail",data.lastCommandDetail);
+    writeField(json,2,"lastExecutionTime",data.lastCommandExecutionTime);
+    writeField(json,2,"totalWorkingTime",data.totalCommandExecutionTime);
+    writeField(json,2,"connectedOn",connectedOn);
+    writeField(json,2,"protocol",c.protocol.getType());
+    writeField(json,2,"clientId",data.clientId);
+    final StringBuilder driver=new StringBuilder();
+    if (data.driverName != null) {
+      driver.append(data.driverName);
+      driver.append(" v");
+      driver.append(data.driverVersion);
+      driver.append(" Protocol v");
+      driver.append(data.protocolVersion);
+    }
+    writeField(json,2,"driver",driver.toString());
+    json.endObject(2);
+  }
+  json.endCollection(1,false);
+}

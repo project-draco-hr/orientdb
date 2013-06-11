@@ -3,6 +3,7 @@
   final boolean intentInstalled=getDatabase().declareIntent(new OIntentMassiveInsert());
   acquireExclusiveLock();
   try {
+    rebuildThread=Thread.currentThread();
     rebuilding=true;
     try {
       map.clear();
@@ -21,12 +22,17 @@
           if (indexDefinition == null)           throw new OConfigurationException("Index '" + name + "' cannot be rebuilt because has no a valid definition ("+ indexDefinition+ ")");
           final Object fieldValue=indexDefinition.getDocumentValueToIndex(doc);
           if (fieldValue != null) {
-            if (fieldValue instanceof Collection) {
-              for (              final Object fieldValueItem : (Collection<?>)fieldValue) {
-                put(fieldValueItem,doc);
+            try {
+              if (fieldValue instanceof Collection) {
+                for (                final Object fieldValueItem : (Collection<?>)fieldValue) {
+                  put(fieldValueItem,doc);
+                }
               }
+ else               put(fieldValue,doc);
             }
- else             put(fieldValue,doc);
+ catch (            OIndexException e) {
+              OLogManager.instance().error(this,"Exception during index rebuild. Exception was caused by following key/ value pair - key %s, value %s." + " Rebuild will continue from this point.",e,fieldValue,doc.getIdentity());
+            }
             ++documentIndexed;
           }
         }
@@ -50,6 +56,7 @@
   }
  finally {
     rebuilding=false;
+    rebuildThread=null;
     if (intentInstalled)     getDatabase().declareIntent(null);
     releaseExclusiveLock();
   }

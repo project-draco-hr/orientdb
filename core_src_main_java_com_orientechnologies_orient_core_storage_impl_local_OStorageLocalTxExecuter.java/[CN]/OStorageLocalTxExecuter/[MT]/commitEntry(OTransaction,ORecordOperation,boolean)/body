@@ -15,19 +15,19 @@ case ORecordOperation.LOADED:
 case ORecordOperation.CREATED:
 {
     byte[] stream=txEntry.getRecord().toStream();
-    final ORID oldRid=rid.copy();
+    final ORecordId oldRID=rid.isNew() ? rid.copy() : rid;
     if (rid.isNew()) {
       txEntry.getRecord().onBeforeIdentityChanged(rid);
       rid.clusterId=cluster.getId();
     }
     if (rid.isNew()) {
       final OPhysicalPosition ppos;
-      if (iUseLog)       ppos=createRecord(iTx.getId(),dataSegment,cluster,rid,stream,txEntry.getRecord().getRecordVersion(),txEntry.getRecord().getRecordType(),txEntry.dataSegmentId);
+      if (iUseLog)       ppos=createRecord(iTx.getId(),dataSegment,cluster,rid,stream,txEntry.getRecord().getRecordVersion(),txEntry.getRecord().getRecordType());
  else       ppos=iTx.getDatabase().getStorage().createRecord(txEntry.dataSegmentId,rid,stream,OVersionFactory.instance().createVersion(),txEntry.getRecord().getRecordType(),(byte)0,null).getResult();
       rid.clusterPosition=ppos.clusterPosition;
       txEntry.getRecord().getRecordVersion().copyFrom(ppos.recordVersion);
       txEntry.getRecord().onAfterIdentityChanged(txEntry.getRecord());
-      iTx.updateIndexIdentityAfterCommit(oldRid,rid);
+      iTx.updateIdentityAfterCommit(oldRID,rid);
     }
  else {
       if (iUseLog)       txEntry.getRecord().getRecordVersion().copyFrom(updateRecord(iTx.getId(),cluster,rid,stream,txEntry.getRecord().getRecordVersion(),txEntry.getRecord().getRecordType()));

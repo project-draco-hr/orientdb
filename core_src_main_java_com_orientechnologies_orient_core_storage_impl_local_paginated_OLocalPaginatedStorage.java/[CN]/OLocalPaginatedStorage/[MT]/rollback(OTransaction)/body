@@ -1,3 +1,24 @@
 {
-  throw new UnsupportedOperationException("rollback");
+  checkOpeness();
+  modificationLock.requestModificationLock();
+  try {
+    lock.acquireExclusiveLock();
+    try {
+      if (writeAheadLog == null)       throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
+      if (transaction == null)       throw new OStorageException("There is no active transaction, rollback can not be performed.");
+      if (transaction.getClientTx().getId() != clientTx.getId())       throw new OStorageException("Passed in and active transaction are different transactions. Passed in transaction can not be rolled back.");
+      final List<OWALRecord> operationUnit=readOperationUnit(transaction.getStartLSN(),transaction.getOperationUnitId());
+      undoOperation(operationUnit);
+      transaction=null;
+    }
+ catch (    IOException e) {
+      throw new OStorageException("Error during transaction rollback.",e);
+    }
+ finally {
+      lock.releaseExclusiveLock();
+    }
+  }
+  finally {
+    modificationLock.releaseModificationLock();
+  }
 }

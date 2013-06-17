@@ -1,0 +1,80 @@
+{
+  Random random=new Random();
+  final ODatabaseDocumentTx db=new ODatabaseDocumentTx(baseDocumentTx.getURL());
+  db.open("admin","admin");
+  int rollbacksCount=0;
+  try {
+    List<ORID> secondDocs=new ArrayList<ORID>();
+    List<ORID> firstDocs=new ArrayList<ORID>();
+    OClass classOne=db.getMetadata().getSchema().getClass("TestOne");
+    OClass classTwo=db.getMetadata().getSchema().getClass("TestTwo");
+    for (int i=0; i < 2000; i++) {
+      try {
+        db.begin(OTransaction.TXTYPE.OPTIMISTIC);
+        ODocument docOne=new ODocument(classOne);
+        docOne.field("intProp",random.nextInt());
+        byte[] stringData=new byte[256];
+        random.nextBytes(stringData);
+        String stringProp=new String(stringData);
+        docOne.field("stringProp",stringProp);
+        Set<String> stringSet=new HashSet<String>();
+        for (int n=0; n < 5; n++) {
+          stringSet.add("str" + random.nextInt());
+        }
+        docOne.field("stringSet",stringSet);
+        docOne.save();
+        ODocument docTwo=null;
+        if (random.nextBoolean()) {
+          docTwo=new ODocument(classTwo);
+          List<String> stringList=new ArrayList<String>();
+          for (int n=0; n < 5; n++) {
+            stringList.add("strnd" + random.nextInt());
+          }
+          docTwo.field("stringList",stringList);
+          docTwo.save();
+        }
+        if (!secondDocs.isEmpty()) {
+          int startIndex=random.nextInt(secondDocs.size());
+          int endIndex=random.nextInt(secondDocs.size() - startIndex) + startIndex;
+          Map<String,ORID> linkMap=new HashMap<String,ORID>();
+          for (int n=startIndex; n < endIndex; n++) {
+            ORID docTwoRid=secondDocs.get(n);
+            linkMap.put(docTwoRid.toString(),docTwoRid);
+          }
+          docOne.field("linkMap",linkMap);
+          docOne.save();
+        }
+        int deleteIndex=-1;
+        if (!firstDocs.isEmpty()) {
+          boolean deleteDoc=random.nextDouble() <= 0.2;
+          if (deleteDoc) {
+            deleteIndex=random.nextInt(firstDocs.size());
+            if (deleteIndex >= 0) {
+              ORID rid=firstDocs.get(deleteIndex);
+              db.delete(rid);
+            }
+          }
+        }
+        if (!secondDocs.isEmpty() && (random.nextDouble() <= 0.2)) {
+          ODocument conflictDocTwo=new ODocument();
+          conflictDocTwo.setIdentity(new ORecordId(secondDocs.get(0)));
+          conflictDocTwo.setDirty();
+          conflictDocTwo.save();
+        }
+        db.commit();
+        if (deleteIndex >= 0)         firstDocs.remove(deleteIndex);
+        firstDocs.add(docOne.getIdentity());
+        if (docTwo != null)         secondDocs.add(docTwo.getIdentity());
+      }
+ catch (      Exception e) {
+        db.rollback();
+        rollbacksCount++;
+      }
+    }
+  }
+  finally {
+    db.close();
+  }
+  System.out.println("Rollbacks count " + rollbacksCount);
+  return null;
+}

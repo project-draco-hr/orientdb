@@ -26,10 +26,16 @@
  else {
         OLogManager.instance().warn(this,"DISTRIBUTED -> routing operation %s in %s mode against %s/%s...",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,masterNodeId,dbName);
         try {
-          final DistributedTask<Object> task=new DistributedTask<Object>((Callable<Object>)iTask,iKey);
-          final Object remoteResult=executeOperation(task,EXECUTION_MODE.SYNCHRONOUS,null);
-          final Object localResult=iTask.setStatus(STATUS.LOCAL_EXEC).call();
-          if (remoteResult != null && localResult != null)           if (!remoteResult.equals(localResult)) {
+          final Object remoteResult;
+          if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.REMOTE_ONLY) {
+            final DistributedTask<Object> task=new DistributedTask<Object>((Callable<Object>)iTask,iKey);
+            remoteResult=executeOperation(task,EXECUTION_MODE.SYNCHRONOUS,null);
+          }
+ else           remoteResult=null;
+          final Object localResult;
+          if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.LOCAL_ONLY)           localResult=iTask.setStatus(STATUS.LOCAL_EXEC).call();
+ else           localResult=remoteResult;
+          if (iTask.getExecutionType() == EXEC_TYPE.BOTH)           if (remoteResult != null && localResult != null)           if (!remoteResult.equals(localResult)) {
             OLogManager.instance().warn(this,"DISTRIBUTED -> detected conflict on %s in %s mode against %s/%s: remote {%s} != local {%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,masterNodeId,dbName,remoteResult,localResult);
             iTask.handleConflict(masterNodeId,localResult,remoteResult);
           }

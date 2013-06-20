@@ -12,17 +12,18 @@
   long prevLogSize=0;
   int firstSegmentIndex=-1;
   int counter=0;
+  OLogSequenceNumber end=null;
   while (logSize > prevLogSize) {
     int contentSize=rnd.nextInt(OWALPage.PAGE_SIZE - 128) + 128;
     OWALRecord walRecord=new TestRecord(contentSize,false);
-    writeAheadLog.log(walRecord);
+    end=writeAheadLog.log(walRecord);
     writtenRecords.add(walRecord);
     prevLogSize=logSize;
     logSize=writeAheadLog.size();
     if (firstSegmentIndex < 0 && logSize > 2 * OWALPage.PAGE_SIZE)     firstSegmentIndex=counter;
     counter++;
   }
+  Assert.assertEquals(writeAheadLog.end(),end);
   assertLogContent(writeAheadLog,writtenRecords.subList(firstSegmentIndex + 1,writtenRecords.size()));
   Assert.assertNull(writeAheadLog.read(writtenRecords.get(firstSegmentIndex).getLsn()));
-  verify(paginatedStorage).scheduleFullCheckpoint();
 }

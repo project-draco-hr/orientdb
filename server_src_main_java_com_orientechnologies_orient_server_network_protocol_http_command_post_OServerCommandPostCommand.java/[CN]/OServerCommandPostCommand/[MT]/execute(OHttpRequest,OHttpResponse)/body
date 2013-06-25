@@ -5,6 +5,7 @@
   final int limit=urlParts.length > 4 ? Integer.parseInt(urlParts[4].trim()) : -1;
   final String fetchPlan=urlParts.length > 5 ? urlParts[5] : null;
   if (iRequest.content != null)   text=iRequest.content;
+  if (text == null)   throw new IllegalArgumentException("text cannot be null");
   iRequest.data.commandInfo="Command";
   iRequest.data.commandDetail=text;
   ODatabaseDocumentTx db=null;
@@ -15,7 +16,12 @@
     cmd.setText(text);
     cmd.setLimit(limit);
     cmd.setFetchPlan(fetchPlan);
-    response=db.command(cmd).execute();
+    final OCommandExecutor executor=OCommandManager.instance().getExecutor(cmd);
+    executor.setContext(cmd.getContext());
+    executor.setProgressListener(cmd.getProgressListener());
+    executor.parse(cmd);
+    if (!executor.isIdempotent() && iRequest.httpMethod.equals("GET"))     throw new OCommandExecutionException("Cannot execute non idempotent command using HTTP GET");
+    response=executor.execute(null);
     final String format=fetchPlan != null ? "fetchPlan:" + fetchPlan : null;
     iResponse.writeResult(response,format);
   }

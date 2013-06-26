@@ -1,0 +1,22 @@
+{
+  int closeId=random.nextInt(idGen.get());
+  Integer idToUpdate=addedIds.ceiling(closeId);
+  if (idToUpdate == null)   idToUpdate=addedIds.first();
+  idLockManager.acquireLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+  while (deletedIds.containsKey(idToUpdate)) {
+    idLockManager.releaseLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+    closeId=random.nextInt(idGen.get());
+    idToUpdate=addedIds.ceiling(closeId);
+    if (idToUpdate == null)     idToUpdate=addedIds.first();
+    idLockManager.acquireLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+  }
+  addedIds.remove(idToUpdate);
+  List<ODocument> documentsToUpdate=baseDB.query(new OSQLSynchQuery<ODocument>("select from TestClass where id  = " + idToUpdate));
+  Assert.assertTrue(!documentsToUpdate.isEmpty());
+  final ODocument documentToUpdate=documentsToUpdate.get(0);
+  documentToUpdate.field("timestamp",System.currentTimeMillis());
+  documentToUpdate.field("stringValue","vde" + random.nextLong());
+  saveDoc(documentToUpdate,baseDB,testDB);
+  updatedIds.add(idToUpdate);
+  idLockManager.releaseLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+}

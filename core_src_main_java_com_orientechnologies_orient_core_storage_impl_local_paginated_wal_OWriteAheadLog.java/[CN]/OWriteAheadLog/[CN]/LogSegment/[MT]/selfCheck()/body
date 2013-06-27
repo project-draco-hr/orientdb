@@ -2,11 +2,9 @@
   if (!pagesCache.isEmpty())   throw new IllegalStateException("WAL cache is not empty, we can not verify WAL after it was started to be used");
 synchronized (rndFile) {
     long pagesCount=rndFile.length() / OWALPage.PAGE_SIZE;
-    boolean errorsWereFound=false;
     if (rndFile.length() % OWALPage.PAGE_SIZE > 0) {
       OLogManager.instance().error(this,"Last WAL page was written partially, auto fix.");
       rndFile.setLength(OWALPage.PAGE_SIZE * pagesCount);
-      errorsWereFound=true;
     }
     long currentPage=pagesCount - 1;
     CRC32 crc32=new CRC32();
@@ -23,14 +21,12 @@ synchronized (rndFile) {
         currentPage--;
         pagesCount=currentPage + 1;
         rndFile.setLength(pagesCount * OWALPage.PAGE_SIZE);
-        errorsWereFound=true;
       }
  else {
-        if (!errorsWereFound)         break;
         long pointer=directMemory.allocate(content);
         try {
           OWALPage page=new OWALPage(pointer,false);
-          int pageOffset=findLastRecord(page);
+          int pageOffset=findLastRecord(page,false);
           if (pageOffset >= 0) {
             if (page.mergeWithNextPage(pageOffset)) {
               page.truncateTill(pageOffset);
@@ -47,12 +43,7 @@ synchronized (rndFile) {
             }
  else             break;
           }
- else {
-            OLogManager.instance().error(this,"%d WAL page has been broken and will be truncated.",currentPage);
-            currentPage--;
-            pagesCount=currentPage + 1;
-            rndFile.setLength(pagesCount * OWALPage.PAGE_SIZE);
-          }
+ else           break;
         }
   finally {
           directMemory.free(pointer);
@@ -60,6 +51,5 @@ synchronized (rndFile) {
       }
     }
     rndFile.getFD().sync();
-    return errorsWereFound;
   }
 }

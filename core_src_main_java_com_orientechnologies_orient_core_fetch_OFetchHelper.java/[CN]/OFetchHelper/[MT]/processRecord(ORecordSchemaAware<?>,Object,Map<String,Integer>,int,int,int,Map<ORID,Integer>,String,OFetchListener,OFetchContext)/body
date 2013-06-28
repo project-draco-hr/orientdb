@@ -24,16 +24,20 @@
     if (iFieldDepthLevel > -1)     depthLevel=iFieldDepthLevel;
     if (debug)     System.out.println("     depthLevel: " + depthLevel);
     fieldValue=record.field(fieldName);
-    if (fieldValue == null || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof ORecordLazyMultiValue) || !((ORecordLazyMultiValue)fieldValue).rawIterator().hasNext() || !(((ORecordLazyMultiValue)fieldValue).rawIterator().next() instanceof OIdentifiable)) && (!(OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue)) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue))) instanceof OIdentifiable))) {
+    boolean fetch=!(fieldValue instanceof ODocument) || depthLevel == -1 || iCurrentLevel <= depthLevel || iFetchPlan.containsKey(fieldPath);
+    final boolean isEmbedded=fieldValue instanceof ODocument && (((ODocument)fieldValue).isEmbedded() || !((ODocument)fieldValue).getIdentity().isValid());
+    if (!fetch && isEmbedded && iContext.fetchEmbeddedDocuments())     fetch=true;
+    if (fieldValue == null || (!fetch && fieldValue instanceof OIdentifiable) || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof ORecordLazyMultiValue) || !((ORecordLazyMultiValue)fieldValue).rawIterator().hasNext() || !(((ORecordLazyMultiValue)fieldValue).rawIterator().next() instanceof OIdentifiable)) && (!(OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue)) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue))) instanceof OIdentifiable))) {
       iContext.onBeforeStandardField(fieldValue,fieldName,iUserObject);
       iListener.processStandardField(record,fieldValue,fieldName,iContext,iUserObject);
       iContext.onAfterStandardField(fieldValue,fieldName,iUserObject);
     }
  else {
       try {
-        boolean fetch=!(fieldValue instanceof ODocument) || depthLevel == -1 || iCurrentLevel <= depthLevel || iFetchPlan.containsKey(fieldPath);
-        if (!fetch && (((ODocument)fieldValue).isEmbedded() || !((ODocument)fieldValue).getIdentity().isValid()) && iContext.fetchEmbeddedDocuments())         fetch=true;
-        if (fetch)         fetch(record,iUserObject,iFetchPlan,fieldValue,fieldName,iCurrentLevel,iLevelFromRoot + 1,iFieldDepthLevel,parsedRecords,depthLevel,fieldPath,iListener,iContext);
+        if (fetch) {
+          final int nextLevel=isEmbedded ? iLevelFromRoot : iLevelFromRoot + 1;
+          fetch(record,iUserObject,iFetchPlan,fieldValue,fieldName,iCurrentLevel,nextLevel,iFieldDepthLevel,parsedRecords,depthLevel,fieldPath,iListener,iContext);
+        }
       }
  catch (      Exception e) {
         e.printStackTrace();

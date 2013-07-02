@@ -1,16 +1,22 @@
 {
   acquireExclusiveLock();
   try {
-    if (!active)     return;
+    if (!active)     return this;
     active=false;
-    if (shutdownHook != null)     shutdownHook.cancel();
-    if (profiler != null)     profiler.shutdown();
+    if (memoryWatchDog != null)     memoryWatchDog.interrupt();
+    if (shutdownHook != null) {
+      shutdownHook.cancel();
+      shutdownHook=null;
+    }
     OLogManager.instance().debug(this,"Orient Engine is shutting down...");
     if (listeners != null)     for (    OOrientListener l : listeners) {
       if (l != null)       l.onShutdown();
     }
-    for (    OEngine engine : engines.values()) {
-      engine.shutdown();
+    if (engines != null) {
+      for (      OEngine engine : engines.values()) {
+        engine.shutdown();
+      }
+      engines.clear();
     }
     if (databaseFactory != null)     databaseFactory.shutdown();
     if (storages != null) {
@@ -24,9 +30,14 @@
     if (threadGroup != null)     threadGroup.interrupt();
     if (listeners != null)     listeners.clear();
     timer.cancel();
+    if (profiler != null) {
+      profiler.shutdown();
+      profiler=null;
+    }
     OLogManager.instance().info(this,"Orient Engine shutdown complete\n");
   }
   finally {
     releaseExclusiveLock();
   }
+  return this;
 }

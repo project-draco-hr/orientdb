@@ -1,0 +1,39 @@
+{
+  ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db '%s' align request starting from %d.%d",databaseName,lastRunId,lastOperationId);
+  int aligned;
+  final ODistributedServerManager dManager=getDistributedServerManager();
+  final String localNode=dManager.getLocalNodeId();
+  final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
+  if (synchronizer == null)   return 0;
+  final ODatabaseJournal log=synchronizer.getLog();
+  final Lock alignmentLock=dManager.getLock("align." + databaseName);
+  if (alignmentLock.tryLock())   try {
+    aligned=0;
+    final OMultipleDistributedTasks tasks=new OMultipleDistributedTasks(serverInstance,dManager,databaseName,EXECUTION_MODE.SYNCHRONOUS);
+    final List<Long> positions=new ArrayList<Long>();
+    Iterator<Long> it=log.browse(new long[]{lastRunId,lastOperationId});
+    while (it.hasNext()) {
+      final long pos=it.next();
+      final OAbstractDistributedTask<?> operation=log.getOperation(pos);
+      if (operation == null) {
+        ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"db '%s' skipped operation #%d.%d",databaseName,lastRunId,lastOperationId);
+        continue;
+      }
+      ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"db '%s' operation %s",databaseName,operation);
+      operation.setNodeSource(localNode);
+      operation.setDatabaseName(databaseName);
+      operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
+      tasks.addTask(operation);
+      positions.add(pos);
+      if (tasks.getTasks() >= OP_BUFFER)       aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    }
+    if (tasks.getTasks() > 0)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"db '%s' aligned %d operations",databaseName,aligned);
+  }
+  finally {
+    alignmentLock.unlock();
+  }
+ else   aligned=-1;
+  dManager.sendOperation2Node(getNodeSource(),new OAlignResponseDistributedTask(serverInstance,dManager,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,aligned));
+  return aligned;
+}

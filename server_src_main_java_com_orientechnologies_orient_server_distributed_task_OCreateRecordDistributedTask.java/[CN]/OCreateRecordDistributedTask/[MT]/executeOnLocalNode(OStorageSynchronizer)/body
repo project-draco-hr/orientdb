@@ -1,0 +1,17 @@
+{
+  ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"CREATING RECORD %s/%s v.%s...",databaseName,rid.toString(),version.toString());
+  final ORecordInternal<?> record=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  final ODatabaseDocumentTx database=openDatabase();
+  rid.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(-1);
+  try {
+    record.fill(rid,version,content,true);
+    if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()));
+ else     record.save();
+    rid=(ORecordId)record.getIdentity();
+    ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"CREATED RECORD %s/%s v.%s",databaseName,rid.toString(),version.toString());
+    return new OPhysicalPosition(rid.getClusterPosition(),record.getRecordVersion());
+  }
+  finally {
+    closeDatabase(database);
+  }
+}

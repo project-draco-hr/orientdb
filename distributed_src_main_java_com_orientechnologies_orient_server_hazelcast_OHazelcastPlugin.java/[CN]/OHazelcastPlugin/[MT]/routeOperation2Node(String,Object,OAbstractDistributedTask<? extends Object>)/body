@@ -1,8 +1,9 @@
 {
   final String dbName=iTask.getDatabaseName();
   String masterNodeId=getMasterNode(dbName,iClusterName,iKey);
+  iTask.setNodeDestination(masterNodeId);
   if (!masterNodeId.equals(localNodeId) && isOfflineNode(masterNodeId)) {
-    OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is offline (status=%s). Waiting for completition...",masterNodeId,getRemoteNodeStatus(masterNodeId));
+    ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"node is offline (status=%s). Waiting for completition...",getRemoteNodeStatus(masterNodeId));
     while (isOfflineNode(masterNodeId)) {
       try {
         Thread.sleep(200);
@@ -12,11 +13,11 @@
       }
       final String newMasterNodeId=getMasterNode(dbName,iClusterName,iKey);
       if (!newMasterNodeId.equals(masterNodeId)) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is the new owner of the requested key set",masterNodeId,getRemoteNodeStatus(masterNodeId));
+        ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"node %s is the new owner of the requested key set",getRemoteNodeStatus(masterNodeId));
         masterNodeId=newMasterNodeId;
       }
     }
-    OLogManager.instance().warn(this,"DISTRIBUTED -> node %s is aligned. Flushing pending operations...",masterNodeId);
+    ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"node %s is aligned. Flushing pending operations...");
   }
   for (int retry=0; retry < SEND_RETRY_MAX; ++retry) {
     try {
@@ -24,30 +25,34 @@
         return iTask.call();
       }
  else {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> routing operation %s in %s mode against %s/%s...",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,masterNodeId,dbName);
+        ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"routing operation %s against db '%s' in %s mode...",iTask.getName().toUpperCase(),dbName,EXECUTION_MODE.SYNCHRONOUS);
         try {
           final Object remoteResult;
           if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.REMOTE_ONLY) {
+            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"execution operation %s against db '%s' remotely type=%s...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType());
             final DistributedTask<Object> task=new DistributedTask<Object>((Callable<Object>)iTask,iKey);
             remoteResult=executeOperation(task,EXECUTION_MODE.SYNCHRONOUS,null);
           }
  else           remoteResult=null;
           final Object localResult;
-          if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.LOCAL_ONLY)           localResult=iTask.setStatus(STATUS.LOCAL_EXEC).call();
+          if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.LOCAL_ONLY) {
+            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"execution operation %s against db '%s' locally type=%s...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType());
+            localResult=iTask.call();
+          }
  else           localResult=remoteResult;
           if (iTask.getExecutionType() == EXEC_TYPE.BOTH)           if (remoteResult != null && localResult != null)           if (!remoteResult.equals(localResult)) {
-            OLogManager.instance().warn(this,"DISTRIBUTED -> detected conflict on %s in %s mode against %s/%s: remote {%s} != local {%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,masterNodeId,dbName,remoteResult,localResult);
+            ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"detected conflict on %s in %s mode: remote {%s} != local {%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,dbName,remoteResult,localResult);
             iTask.handleConflict(masterNodeId,localResult,remoteResult);
           }
           return localResult;
         }
  catch (        MemberLeftException e) {
-          OLogManager.instance().warn(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s because node left. Re-route it in transparent way",e,EXECUTION_MODE.SYNCHRONOUS,masterNodeId);
+          ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution of operation in %s mode, because node left. Re-route it in transparent way",e,EXECUTION_MODE.SYNCHRONOUS);
           return routeOperation2Node(iClusterName,iKey,iTask);
         }
 catch (        ExecutionException e) {
           if (e.getCause() instanceof OServerOfflineException) {
-            OLogManager.instance().warn(this,"DISTRIBUTED -> remote node %s is not online, retrying %d...",masterNodeId,retry + 1);
+            ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"remote node is not online, retrying %d...",retry + 1);
             try {
               Thread.sleep(200 + (retry * 50));
             }
@@ -56,7 +61,7 @@ catch (        ExecutionException e) {
             }
           }
  else {
-            OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s",e,EXECUTION_MODE.SYNCHRONOUS,masterNodeId);
+            ODistributedServerLog.error(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
             throw e;
           }
         }
@@ -66,7 +71,7 @@ catch (        ExecutionException e) {
       Thread.interrupted();
     }
 catch (    Exception e) {
-      OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against node %s",e,EXECUTION_MODE.SYNCHRONOUS,masterNodeId);
+      ODistributedServerLog.error(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
       throw new ExecutionException("error on execution of operation in " + EXECUTION_MODE.SYNCHRONOUS + " mode against node "+ masterNodeId,e);
     }
   }

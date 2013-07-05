@@ -1,4 +1,5 @@
 {
+  iTask.setNodeDestination(iNodeId);
   Member member=remoteClusterNodes.get(iNodeId);
   if (member == null) {
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
@@ -20,7 +21,7 @@
         }
       }
  catch (      Exception e) {
-        OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in ASYNCH mode against node: %s",e,clusterMember);
+        ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in ASYNCH mode",e);
       }
     }
   }
@@ -33,7 +34,7 @@
  catch (    ExecutionException e) {
       if (e.getCause() instanceof OServerOfflineException) {
         final OServerOfflineException exc=(OServerOfflineException)e.getCause();
-        OLogManager.instance().warn(this,"DISTRIBUTED -> remote node %s is not online (status=%s), retrying %d...",exc.getNodeId(),exc.getNodeStatus(),retry + 1);
+        ODistributedServerLog.warn(this,getLocalNodeId(),exc.getNodeId(),DIRECTION.OUT,"remote node %s is not online (status=%s), retrying %d...",exc.getNodeStatus(),retry + 1);
         try {
           Thread.sleep(200 + (retry * 50));
         }
@@ -43,12 +44,12 @@
         task=new DistributedTask<Object>((Callable<Object>)iTask,clusterMember);
       }
  else {
-        OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
+        ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
         throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against node: "+ member,e);
       }
     }
 catch (    Exception e) {
-      OLogManager.instance().error(this,"DISTRIBUTED -> error on execution of operation in %s mode against node: %s",e,iTask.getMode(),member);
+      ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,iTask.getMode());
       throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against node: "+ member,e);
     }
   }

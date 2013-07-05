@@ -1,16 +1,15 @@
 {
   if (iName == null)   throw new IllegalArgumentException("Storage path is null");
   final String name=iName.indexOf(':') > -1 ? iName.substring(iName.indexOf(':') + 1) : iName;
-  final OStorage stg=Orient.instance().getStorage(name);
+  final String dbName=Orient.isRegisterDatabaseByPath() ? getDatabaseDirectory() + name : name;
+  final String dbPath=Orient.isRegisterDatabaseByPath() ? dbName : getDatabaseDirectory() + name;
+  final OStorage stg=Orient.instance().getStorage(dbName);
   if (stg != null)   return stg.getURL();
-  String dbPath=configuration.getStoragePath(name);
-  if (dbPath == null) {
-    dbPath=OSystemVariableResolver.resolveSystemVariables("${" + Orient.ORIENTDB_HOME + "}/databases/"+ name);
-    File localFile=new File(OIOUtils.getPathFromDatabaseName(dbPath) + "/default.odh");
-    File plocalFile=new File(OIOUtils.getPathFromDatabaseName(dbPath) + "/default.pcl");
-    if (localFile.exists())     dbPath="local:" + dbPath;
- else     if (plocalFile.exists())     dbPath="plocal:" + dbPath;
- else     throw new OConfigurationException("Database '" + name + "' is not configured on server");
+  String dbURL=configuration.getStoragePath(name);
+  if (dbURL == null) {
+    if (new File(OIOUtils.getPathFromDatabaseName(dbPath) + "/default.odh").exists())     dbURL="local:" + dbPath;
+ else     if (new File(OIOUtils.getPathFromDatabaseName(dbPath) + "/default.pcl").exists())     dbURL="plocal:" + dbPath;
+ else     throw new OConfigurationException("Database '" + name + "' ("+ dbName+ ") is not configured on server");
   }
-  return dbPath;
+  return dbURL;
 }

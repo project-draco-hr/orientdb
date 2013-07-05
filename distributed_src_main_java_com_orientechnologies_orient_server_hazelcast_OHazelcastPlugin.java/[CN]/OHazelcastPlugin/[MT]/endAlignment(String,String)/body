@@ -1,7 +1,7 @@
 {
 synchronized (pendingAlignments) {
     if (pendingAlignments.remove(iNode + "/" + iDatabaseName) == null) {
-      OLogManager.instance().error(this,"DISTRIBUTED -> received response for an alignment against an unknown node %s database %s",iNode,iDatabaseName);
+      ODistributedServerLog.error(this,getLocalNodeId(),iNode,DIRECTION.OUT,"received response for an alignment against an unknown node %s database %s",iDatabaseName);
     }
     if (pendingAlignments.isEmpty())     setStatus("online");
  else {
@@ -14,14 +14,14 @@ synchronized (pendingAlignments) {
           long[] lastOperationId;
           try {
             lastOperationId=synch.getLog().getLastOperationId(false);
-            OLogManager.instance().info(this,"DISTRIBUTED ->[%s/%s] resend alignment request from %d:%d",node,databaseName,lastOperationId[0],lastOperationId[1]);
-            sendOperation2Node(node,new OAlignRequestDistributedTask(getLocalNodeId(),databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
+            ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.OUT,"resend alignment request db '%s' from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
+            sendOperation2Node(node,new OAlignRequestDistributedTask(serverInstance,this,databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
           }
  catch (          IOException e) {
-            OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",databaseName);
+            ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db '%s'",databaseName);
           }
         }
- else         OLogManager.instance().info(this,"DISTRIBUTED - database %s:%s is in alignment status yet, the node is not online yet",node,databaseName);
+ else         ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.NONE,"db '%s' is in alignment status yet, the node is not online yet",databaseName);
       }
     }
   }

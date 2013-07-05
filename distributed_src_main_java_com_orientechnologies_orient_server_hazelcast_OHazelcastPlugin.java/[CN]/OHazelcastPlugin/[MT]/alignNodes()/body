@@ -6,17 +6,17 @@ synchronized (synchronizers) {
       final String databaseName=entry.getKey();
       try {
         final long[] lastOperationId=entry.getValue().getLog().getLastOperationId(true);
-        OLogManager.instance().warn(this,"DISTRIBUTED --> send align request in broadcast for database %s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
+        ODistributedServerLog.warn(this,getLocalNodeId(),remoteClusterNodes.toString(),DIRECTION.OUT,"send align request in broadcast for database %s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
 synchronized (pendingAlignments) {
           for (          String node : remoteClusterNodes.keySet()) {
             pendingAlignments.put(node + "/" + databaseName,Boolean.FALSE);
-            OLogManager.instance().info(this,"DISTRIBUTED ->[%s/%s] setting node in alignment state",node,databaseName);
+            ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.NONE,"setting node in alignment state for db '%s'",databaseName);
           }
         }
-        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(getLocalNodeId(),databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
+        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(serverInstance,this,databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
       }
  catch (      IOException e) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",databaseName);
+        ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db '%s'",databaseName);
       }
     }
   }

@@ -1,8 +1,10 @@
 {
   String masterNode=getDatabaseClusterConfiguration(iDatabaseName,iClusterName).field("master");
   if (masterNode == null) {
-    OLogManager.instance().warn(this,"DISTRIBUTED found wrong configuration for database '%s': cannot find the 'master' field for the cluster '%s'. '$auto' will be used",iDatabaseName,iClusterName);
+    ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.NONE,"network partition: found wrong configuration for database '%s': cannot find the 'master' field for the cluster '%s'. '$auto' will be used",iDatabaseName,iClusterName);
   }
- else   if (!masterNode.equalsIgnoreCase("$auto"))   return masterNode;
-  return getNodeId(hazelcastInstance.getPartitionService().getPartition(iKey).getOwner());
+ else   if (masterNode.equalsIgnoreCase("$auto"))   masterNode=getNodeId(hazelcastInstance.getPartitionService().getPartition(iKey).getOwner());
+  final boolean local=masterNode.equals(getLocalNodeId());
+  ODistributedServerLog.info(this,getLocalNodeId(),null,DIRECTION.NONE,"network partition: get node master for key '%s' is assigned %s (local=%s)",iKey,masterNode,local);
+  return masterNode;
 }

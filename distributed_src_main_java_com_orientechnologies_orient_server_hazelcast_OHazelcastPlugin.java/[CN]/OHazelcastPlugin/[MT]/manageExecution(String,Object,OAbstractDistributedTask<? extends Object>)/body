@@ -25,29 +25,29 @@
         return iTask.call();
       }
  else {
-        ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"routing operation %s against db '%s' in %s mode...",iTask.getName().toUpperCase(),dbName,EXECUTION_MODE.SYNCHRONOUS);
+        ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"routing %s against db=%s in %s mode...",iTask.getName().toUpperCase(),dbName,EXECUTION_MODE.SYNCHRONOUS);
         try {
           final Object remoteResult;
           if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.REMOTE_ONLY) {
-            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"execution operation %s against db '%s' remotely type=%s...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType());
+            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"remote execution %s db=%s type=%s oper=%d.%d...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType(),iTask.getRunId(),iTask.getOperationSerial());
             remoteResult=executeOperation((Callable<Object>)iTask,iKey,EXECUTION_MODE.SYNCHRONOUS,null);
           }
  else           remoteResult=null;
           final Object localResult;
           if (iTask.getExecutionType() == EXEC_TYPE.BOTH || iTask.getExecutionType() == EXEC_TYPE.LOCAL_ONLY) {
-            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"execution operation %s against db '%s' locally type=%s...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType());
+            ODistributedServerLog.info(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"local execution %s against db=%s type=%s oper=%d.%d...",iTask.getName().toUpperCase(),dbName,iTask.getExecutionType(),iTask.getRunId(),iTask.getOperationSerial());
             localResult=iTask.call();
           }
  else           localResult=remoteResult;
           if (iTask.getExecutionType() == EXEC_TYPE.BOTH)           if (remoteResult != null && localResult != null)           if (!remoteResult.equals(localResult)) {
-            ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"detected conflict on %s in %s mode: remote {%s} != local {%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,dbName,remoteResult,localResult);
+            ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"detected conflict on %s mode=%s db=%s oper=%d.%d: remote={%s} != local={%s}",iTask.getName().toUpperCase(),EXECUTION_MODE.SYNCHRONOUS,dbName,iTask.getRunId(),iTask.getOperationSerial(),remoteResult,localResult);
             iTask.handleConflict(masterNodeId,localResult,remoteResult);
           }
           return localResult;
         }
  catch (        MemberLeftException e) {
           ODistributedServerLog.warn(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution of operation in %s mode, because node left. Re-route it in transparent way",e,EXECUTION_MODE.SYNCHRONOUS);
-          return routeOperation2Node(iClusterName,iKey,iTask);
+          return manageExecution(iClusterName,iKey,iTask);
         }
 catch (        ExecutionException e) {
           if (e.getCause() instanceof OServerOfflineException) {

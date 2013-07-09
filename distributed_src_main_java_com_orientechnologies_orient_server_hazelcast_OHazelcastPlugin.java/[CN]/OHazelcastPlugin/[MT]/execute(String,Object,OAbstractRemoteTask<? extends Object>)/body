@@ -1,0 +1,18 @@
+{
+  final String dbName=iTask.getDatabaseName();
+  String masterNodeId=getMasterNode(dbName,iClusterName,iKey);
+  iTask.setNodeDestination(masterNodeId);
+  masterNodeId=waitUntilMasterNodeIsOnline(iClusterName,iKey,dbName,masterNodeId);
+  try {
+    if (isLocalNodeMaster(iKey))     return executeLocallyAndPropagate((OAbstractReplicatedTask<? extends Object>)iTask);
+ else     return executeRemotelyAndApplyLocally(iClusterName,iKey,iTask,dbName);
+  }
+ catch (  InterruptedException e) {
+    Thread.interrupted();
+  }
+catch (  Exception e) {
+    ODistributedServerLog.error(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
+    throw new ExecutionException("error on execution of operation in " + EXECUTION_MODE.SYNCHRONOUS + " mode against node "+ masterNodeId,e);
+  }
+  return null;
+}

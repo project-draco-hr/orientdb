@@ -1,0 +1,32 @@
+{
+  final long operationLogOffset;
+  final OStorageSynchronizer dbSynchronizer=iTask.getDatabaseSynchronizer();
+  try {
+    operationLogOffset=dbSynchronizer.getLog().journalOperation(iTask);
+  }
+ catch (  IOException e) {
+    ODistributedServerLog.error(this,iTask.getDistributedServerManager().getLocalNodeId(),iTask.getNodeSource(),DIRECTION.IN,"error on logging operation %s db=%s %s",e,iTask.getName(),iTask.getDatabaseName(),iTask.getPayload());
+    throw new ODistributedException("Error on logging operation",e);
+  }
+  final Object localResult=executeLocal(iTask);
+  try {
+    iTask.setAsCompleted(dbSynchronizer,operationLogOffset);
+  }
+ catch (  IOException e) {
+    ODistributedServerLog.error(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.IN,"error on changing the log status for %s db=%s %s",e,getName(),iTask.getDatabaseName(),iTask.getPayload());
+    throw new ODistributedException("Error on changing the log status",e);
+  }
+  final Set<String> targetNodes=getRemoteNodeIdsBut(iTask.getNodeSource(),iTask.getNodeDestination());
+  if (!targetNodes.isEmpty()) {
+    iTask.setNodeSource(getLocalNodeId());
+    final Map<String,Object> remoteResults=propagate(targetNodes,iTask);
+    for (    Entry<String,Object> entry : remoteResults.entrySet()) {
+      final String remoteNode=entry.getKey();
+      final Object remoteResult=entry.getValue();
+      if ((localResult == null && remoteResult != null) || (localResult != null && remoteResult == null) || !localResult.equals(remoteResult)) {
+        iTask.handleConflict(remoteNode,localResult,remoteResult);
+      }
+    }
+  }
+  return localResult;
+}

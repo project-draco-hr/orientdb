@@ -2,7 +2,10 @@
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
   if (eventuallyConsistent || dManager.isLocalNodeMaster(iRecordId))   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
   try {
-    return new OStorageOperationResult<ORawBuffer>((ORawBuffer)dManager.execute(getClusterNameFromRID(iRecordId),iRecordId,new OReadRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId)));
+    final String clusterName=getClusterNameFromRID(iRecordId);
+    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId);
+    if (replicationData == null)     return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
+ else     return new OStorageOperationResult<ORawBuffer>((ORawBuffer)dManager.execute(clusterName,iRecordId,new OReadRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId),replicationData));
   }
  catch (  ExecutionException e) {
     handleDistributedException("Cannot route READ_RECORD operation against %s to the distributed node",e,iRecordId);

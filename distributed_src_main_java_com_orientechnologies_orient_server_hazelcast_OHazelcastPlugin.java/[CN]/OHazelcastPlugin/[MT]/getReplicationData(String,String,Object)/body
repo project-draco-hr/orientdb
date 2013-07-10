@@ -1,0 +1,16 @@
+{
+  final ODocument cfg=getDatabaseClusterConfiguration(iDatabaseName,iClusterName);
+  final Boolean active=cfg.field("synchronization");
+  if (active == null || !active)   return null;
+  final OReplicationConfig data=new OReplicationConfig();
+  data.masterNode=cfg.field("master");
+  if (data.masterNode == null) {
+    ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.NONE,"network partition: found wrong configuration for database '%s': cannot find the 'master' field for the cluster '%s'. '$auto' will be used",iDatabaseName,iClusterName);
+    data.masterNode=MASTER_AUTO;
+  }
+  if (data.masterNode.startsWith("$"))   data.masterNode=getReplicationStrategy(data.masterNode).getNode(this,iClusterName,iKey);
+  if (data.masterNode == null)   throw new ODistributedException("Cannot find a master node for the key '" + iKey + "'");
+  final boolean local=data.masterNode.equals(getLocalNodeId());
+  ODistributedServerLog.debug(this,getLocalNodeId(),"?",DIRECTION.OUT,"network partition: get node master for key '%s' is assigned %s (local=%s)",iKey,data.masterNode,local);
+  return data;
+}

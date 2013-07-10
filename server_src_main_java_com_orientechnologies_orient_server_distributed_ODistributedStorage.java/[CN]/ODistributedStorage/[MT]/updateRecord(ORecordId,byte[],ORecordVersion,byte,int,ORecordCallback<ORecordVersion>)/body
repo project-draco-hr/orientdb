@@ -2,7 +2,10 @@
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
   Object result=null;
   try {
-    result=dManager.execute(getClusterNameFromRID(iRecordId),iRecordId,new OUpdateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),updateRecordMode,iRecordId,iContent,iVersion,iRecordType));
+    final String clusterName=getClusterNameFromRID(iRecordId);
+    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId);
+    if (replicationData == null)     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
+ else     result=dManager.execute(clusterName,iRecordId,new OUpdateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),updateRecordMode,iRecordId,iContent,iVersion,iRecordType),replicationData);
   }
  catch (  ExecutionException e) {
     handleDistributedException("Cannot route UPDATE_RECORD operation against %s to the distributed node",e,iRecordId);

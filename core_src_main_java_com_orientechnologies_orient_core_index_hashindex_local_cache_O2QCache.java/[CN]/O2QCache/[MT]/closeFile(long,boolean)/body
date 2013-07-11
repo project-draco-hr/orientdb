@@ -8,13 +8,15 @@ synchronized (syncObject) {
     Arrays.sort(sortedPageIndexes);
     final SortedMap<Long,OLogSequenceNumber> fileDirtyPages=dirtyPages.get(fileId);
     for (    Long pageIndex : sortedPageIndexes) {
-      LRUEntry lruEntry=get(fileId,pageIndex);
+      LRUEntry lruEntry=get(fileId,pageIndex,true);
       if (lruEntry != null) {
         if (lruEntry.usageCounter == 0) {
           lruEntry=remove(fileId,pageIndex);
-          if (flush)           flushData(fileId,pageIndex,lruEntry.dataPointer);
           fileDirtyPages.remove(pageIndex);
-          directMemory.free(lruEntry.dataPointer);
+          if (lruEntry.dataPointer != ODirectMemory.NULL_POINTER) {
+            if (flush)             flushData(fileId,pageIndex,lruEntry.dataPointer);
+            directMemory.free(lruEntry.dataPointer);
+          }
         }
  else         throw new OStorageException("Page with index " + pageIndex + " for file with id "+ fileId+ "can not be freed because it is used.");
       }

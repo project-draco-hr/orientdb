@@ -7,7 +7,7 @@
       final long prevRecordsSize=recordsSize;
       byte[] fullEntryContent=readFullEntry(clusterPosition);
       if (fullEntryContent == null)       return;
-      content=COMPRESSION.compress(content);
+      content=compression.compress(content);
       int updatedContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
       long pagePointer=clusterPosition.longValue();
       int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
@@ -16,12 +16,12 @@
       byte[] recordEntry;
       if (updatedContentLength <= fullEntryContent.length)       recordEntry=new byte[fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE];
  else {
-        int grownContent=(int)(content.length * RECORD_OVERFLOW_GROW_FACTOR);
+        int grownContent=(int)(content.length * config.recordOverflowGrowFactor);
         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
         isRecordSpreadAcrossSeveralPages=true;
       }
       final OLocalPage.TrackMode trackMode;
-      if (writeAheadLog == null)       trackMode=OLocalPage.TrackMode.NONE;
+      if (!config.useWal || writeAheadLog == null)       trackMode=OLocalPage.TrackMode.NONE;
  else       if (transaction != null || isRecordSpreadAcrossSeveralPages)       trackMode=OLocalPage.TrackMode.BOTH;
  else       trackMode=OLocalPage.TrackMode.FORWARD;
       startRecordOperation(transaction,isRecordSpreadAcrossSeveralPages);

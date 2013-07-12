@@ -5,7 +5,8 @@ synchronized (synchronizers) {
     for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
       final String databaseName=entry.getKey();
       try {
-        final long[] lastOperationId=entry.getValue().getLog().getLastOperationId(true);
+        final long[] lastOperationId=entry.getValue().getLog().getLastOperationId(ODatabaseJournal.OPERATION_STATUS.COMMITTED);
+        if (lastOperationId[0] == -1 && lastOperationId[1] == -1)         continue;
         ODistributedServerLog.warn(this,getLocalNodeId(),remoteClusterNodes.keySet().toString(),DIRECTION.OUT,"send align request in broadcast for database %s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
 synchronized (pendingAlignments) {
           for (          String node : remoteClusterNodes.keySet()) {
@@ -19,5 +20,6 @@ synchronized (pendingAlignments) {
         ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);
       }
     }
+    if (pendingAlignments.isEmpty())     setStatus("online");
   }
 }

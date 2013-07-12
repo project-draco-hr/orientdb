@@ -1,11 +1,14 @@
 {
-  final List<ORecordId> uncommittedRecords=new ArrayList<ORecordId>();
+  final Map<ORecordId,Long> uncommittedRecords=new LinkedHashMap<ORecordId,Long>();
   long fileOffset=file.getFilledUpTo();
   while (fileOffset > 0) {
-    if (getOperationStatus(fileOffset))     break;
-    final OAbstractRemoteTask<?> op=getOperation(fileOffset);
-    ODistributedServerLog.info(this,cluster.getLocalNodeId(),null,DIRECTION.NONE,"db '%s' found uncommitted operation %s",storage.getName(),op);
-    if (op instanceof OAbstractRecordReplicatedTask<?>)     uncommittedRecords.add(((OAbstractRecordReplicatedTask<?>)op).getRid());
+    final OPERATION_STATUS status=getOperationStatus(fileOffset);
+    if (status == OPERATION_STATUS.COMMITTED)     break;
+    if (status != OPERATION_STATUS.CANCELED) {
+      final OAbstractRemoteTask<?> op=getOperation(fileOffset);
+      ODistributedServerLog.info(this,cluster.getLocalNodeId(),null,DIRECTION.NONE,"db '%s' found uncommitted operation %s",storage.getName(),op);
+      if (op instanceof OAbstractRecordReplicatedTask<?>)       uncommittedRecords.put(((OAbstractRecordReplicatedTask<?>)op).getRid(),fileOffset);
+    }
     fileOffset=getPreviousOperation(fileOffset);
   }
   return uncommittedRecords;

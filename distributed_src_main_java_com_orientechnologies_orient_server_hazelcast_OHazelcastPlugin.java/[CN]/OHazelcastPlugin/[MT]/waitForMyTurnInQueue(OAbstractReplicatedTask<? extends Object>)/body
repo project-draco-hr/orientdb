@@ -1,0 +1,19 @@
+{
+  while (true) synchronized (lockQueue) {
+    final Long last=executionQueue.get(iTask.getRunId());
+    if (last == null) {
+      executionQueue.put(iTask.getRunId(),0l);
+      break;
+    }
+ else     if (last != iTask.getOperationSerial() - 1) {
+      try {
+        ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %d tasks in queue %s. current=%d my=%d",(iTask.getOperationSerial() - last - 1),iTask.getRunId(),last,iTask.getOperationSerial());
+        lockQueue.wait(OGlobalConfiguration.STORAGE_LOCK_TIMEOUT.getValueAsLong());
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+ else     break;
+  }
+  ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
+}

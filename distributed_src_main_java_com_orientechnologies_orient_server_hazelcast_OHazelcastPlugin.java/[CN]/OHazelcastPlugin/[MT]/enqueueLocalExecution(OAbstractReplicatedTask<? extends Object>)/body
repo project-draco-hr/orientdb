@@ -1,42 +1,20 @@
 {
-  while (true) synchronized (executionQueue) {
-    final Long last=executionQueue.get(iTask.getRunId());
-    if (last != null && last < iTask.getOperationSerial() - 1) {
-      try {
-        ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %d tasks in queue %s. current=%d my=%d",(iTask.getOperationSerial() - last - 1),iTask.getRunId(),last,iTask.getOperationSerial());
-        executionQueue.wait(1000);
-      }
- catch (      InterruptedException e) {
-      }
-    }
- else     break;
-  }
-  ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
+  final OStorageSynchronizer dbSynchronizer=iTask.getDatabaseSynchronizer();
+  waitForMyTurnInQueue(iTask);
   try {
-    final long operationLogOffset;
-    final OStorageSynchronizer dbSynchronizer=iTask.getDatabaseSynchronizer();
+    ODistributedServerLog.debug(this,iTask.getNodeSource(),iTask.getNodeDestination(),DIRECTION.IN,"pop operation=%d:%d",iTask.getRunId(),iTask.getOperationSerial());
+    final long operationLogOffset=logOperation2Journal(dbSynchronizer,iTask);
     try {
-      operationLogOffset=dbSynchronizer.getLog().append(iTask);
+      final Object result=iTask.executeOnLocalNode();
+      updateJournal(iTask,dbSynchronizer,operationLogOffset,true);
+      return result;
     }
- catch (    IOException e) {
-      ODistributedServerLog.error(this,iTask.getDistributedServerManager().getLocalNodeId(),iTask.getNodeSource(),DIRECTION.IN,"error on logging operation %s db=%s %s",e,iTask.getName(),iTask.getDatabaseName(),iTask.getPayload());
-      throw new ODistributedException("Error on logging operation",e);
+ catch (    Exception e) {
+      updateJournal(iTask,dbSynchronizer,operationLogOffset,false);
+      throw e;
     }
-    final Object result=iTask.executeOnLocalNode();
-    try {
-      iTask.setAsCompleted(dbSynchronizer,operationLogOffset);
-    }
- catch (    IOException e) {
-      ODistributedServerLog.error(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.IN,"error on changing the log status for %s db=%s %s",e,getName(),iTask.getDatabaseName(),iTask.getPayload());
-      throw new ODistributedException("Error on changing the log status",e);
-    }
-    return result;
   }
   finally {
-synchronized (executionQueue) {
-      executionQueue.put(iTask.getRunId(),iTask.getOperationSerial());
-      executionQueue.notifyAll();
-    }
-    ODistributedThreadLocal.INSTANCE.set(null);
+    updateQueue(iTask);
   }
 }

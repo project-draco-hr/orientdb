@@ -3,9 +3,13 @@
   for (  ORecordId rid : log.getUncommittedOperations()) {
     try {
       if (getConflictResolver().existConflictsForRecord(rid))       continue;
-      final String clusterName=((ODistributedStorage)storage).getClusterNameFromRID(rid);
-      final OReplicationConfig replicationData=iCluster.getReplicationData(storageName,clusterName,rid);
-      final ORawBuffer record=(ORawBuffer)iCluster.execute(getClusterNameByRID(storage,rid),rid,new OReadRecordTask(server,server.getDistributedManager(),storageName,rid),replicationData);
+      OCluster cl=storage.getClusterById(rid.getClusterId());
+      if (cl == null) {
+        ODistributedServerLog.warn(this,iCluster.getLocalNodeId(),null,DIRECTION.NONE,"Cannot find cluster for RID %s, skip it",rid);
+        continue;
+      }
+      final OReplicationConfig replicationData=iCluster.getReplicationData(storageName,cl.getName(),rid,cluster.getLocalNodeId(),null);
+      final ORawBuffer record=(ORawBuffer)iCluster.execute(getClusterNameByRID(storage,rid),rid,new OReadRecordTask(server,cluster,storageName,rid),replicationData);
       if (record == null)       storage.deleteRecord(rid,OVersionFactory.instance().createUntrackedVersion(),0,null);
  else       storage.updateRecord(rid,record.buffer,record.version,record.recordType,0,null);
     }

@@ -1,0 +1,31 @@
+{
+  acquireExclusiveLock();
+  try {
+    configuration=config;
+    clustersToIndex.clear();
+    IndexMetadata indexMetadata=loadMetadata(configuration);
+    name=indexMetadata.getName();
+    indexDefinition=indexMetadata.getIndexDefinition();
+    clustersToIndex.addAll(indexMetadata.getClustersToIndex());
+    final ORID rid=config.field(CONFIG_MAP_RID,ORID.class);
+    try {
+      indexEngine.load(rid,name,isAutomatic());
+    }
+ catch (    Exception e) {
+      if (onCorruptionRepairDatabase(null,"load","Index will be rebuilt")) {
+        if (isAutomatic() && getDatabase().getStorage() instanceof OStorageEmbedded)         OLogManager.instance().warn(this,"Cannot load index '%s' from storage (rid=%s): rebuilt it from scratch",getName(),rid);
+        try {
+          rebuild();
+        }
+ catch (        Throwable t) {
+          OLogManager.instance().error(this,"Cannot rebuild index '%s' from storage (rid=%s) because '" + t + "'. The index will be removed in configuration",getName(),rid);
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

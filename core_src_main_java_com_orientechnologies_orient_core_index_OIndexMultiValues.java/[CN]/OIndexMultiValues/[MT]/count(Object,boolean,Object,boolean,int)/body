@@ -1,34 +1,16 @@
 {
   checkForRebuild();
-  if (iRangeFrom != null && iRangeTo != null && iRangeFrom.getClass() != iRangeTo.getClass())   throw new IllegalArgumentException("Range from-to parameters are of different types");
-  acquireExclusiveLock();
+  final OType[] types=getDefinition().getTypes();
+  if (types.length == 1) {
+    rangeFrom=OType.convert(rangeFrom,types[0].getDefaultJavaType());
+    rangeTo=OType.convert(rangeTo,types[0].getDefaultJavaType());
+  }
+  if (rangeFrom != null && rangeTo != null && rangeFrom.getClass() != rangeTo.getClass())   throw new IllegalArgumentException("Range from-to parameters are of different types");
+  acquireSharedLock();
   try {
-    final OMVRBTreeEntry<Object,Set<OIdentifiable>> firstEntry;
-    if (iRangeFrom == null)     firstEntry=(OMVRBTreeEntry<Object,Set<OIdentifiable>>)map.firstEntry();
- else     if (iFromInclusive)     firstEntry=map.getCeilingEntry(iRangeFrom,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
- else     firstEntry=map.getHigherEntry(iRangeFrom);
-    if (firstEntry == null)     return 0;
-    long count=0;
-    final int firstEntryIndex=map.getPageIndex();
-    final OMVRBTreeEntry<Object,Set<OIdentifiable>> lastEntry;
-    if (iRangeFrom == null)     lastEntry=(OMVRBTreeEntry<Object,Set<OIdentifiable>>)map.lastEntry();
- else     if (iToInclusive)     lastEntry=map.getHigherEntry(iRangeTo);
- else     lastEntry=map.getCeilingEntry(iRangeTo,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
-    final int lastEntryIndex;
-    if (lastEntry != null)     lastEntryIndex=map.getPageIndex();
- else     lastEntryIndex=-1;
-    OMVRBTreeEntry<Object,Set<OIdentifiable>> entry=firstEntry;
-    map.setPageIndex(firstEntryIndex);
-    while (entry != null && !(entry == lastEntry && map.getPageIndex() == lastEntryIndex)) {
-      final OMVRBTreeRIDSet values=(OMVRBTreeRIDSet)entry.getValue();
-      if (values.isEmpty())       continue;
-      count+=values.size();
-      if (maxValuesToFetch > -1 && maxValuesToFetch == count)       return maxValuesToFetch;
-      entry=OMVRBTree.next(entry);
-    }
-    return count;
+    return indexEngine.count(rangeFrom,fromInclusive,rangeTo,toInclusive,maxValuesToFetch,MultiValuesTransformer.INSTANCE);
   }
   finally {
-    releaseExclusiveLock();
+    releaseSharedLock();
   }
 }

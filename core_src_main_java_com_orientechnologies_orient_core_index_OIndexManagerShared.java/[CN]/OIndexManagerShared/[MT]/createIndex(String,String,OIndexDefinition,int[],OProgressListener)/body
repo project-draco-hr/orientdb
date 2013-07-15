@@ -7,7 +7,16 @@
     final OIndexInternal<?> index=OIndexes.createIndex(getDatabase(),iType);
     final String clusterName=indexDefinition != null && indexDefinition.getClassName() != null ? defaultClusterName : manualClusterName;
     if (iProgressListener == null)     iProgressListener=new OIndexRebuildOutputListener(index);
-    index.create(iName,indexDefinition,getDatabase(),clusterName,iClusterIdsToIndex,true,iProgressListener);
+    Set<String> clustersToIndex=new HashSet<String>();
+    ODatabase database=getDatabase();
+    if (clusterIdsToIndex != null) {
+      for (      int clusterId : clusterIdsToIndex) {
+        final String clusterNameToIndex=database.getClusterNameById(clusterId);
+        if (clusterNameToIndex == null)         throw new OIndexException("Cluster with id " + clusterId + " does not exist.");
+        clustersToIndex.add(clusterNameToIndex);
+      }
+    }
+    index.create(iName,indexDefinition,clusterName,clustersToIndex,true,iProgressListener);
     addIndexInternal(index);
     setDirty();
     save();

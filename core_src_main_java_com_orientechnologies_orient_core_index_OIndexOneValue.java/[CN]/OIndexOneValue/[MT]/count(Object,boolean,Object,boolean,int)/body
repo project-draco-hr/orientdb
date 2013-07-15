@@ -1,32 +1,11 @@
 {
   checkForRebuild();
   if (iRangeFrom != null && iRangeTo != null && iRangeFrom.getClass() != iRangeTo.getClass())   throw new IllegalArgumentException("Range from-to parameters are of different types");
-  acquireExclusiveLock();
+  acquireSharedLock();
   try {
-    final OMVRBTreeEntry<Object,OIdentifiable> firstEntry;
-    if (iRangeFrom == null)     firstEntry=(OMVRBTreeEntry<Object,OIdentifiable>)map.firstEntry();
- else     if (iFromInclusive)     firstEntry=map.getCeilingEntry(iRangeFrom,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
- else     firstEntry=map.getHigherEntry(iRangeFrom);
-    if (firstEntry == null)     return 0;
-    final int firstEntryIndex=map.getPageIndex();
-    final OMVRBTreeEntry<Object,OIdentifiable> lastEntry;
-    if (iRangeFrom == null)     lastEntry=(OMVRBTreeEntry<Object,OIdentifiable>)map.lastEntry();
- else     if (iToInclusive)     lastEntry=map.getHigherEntry(iRangeTo);
- else     lastEntry=map.getCeilingEntry(iRangeTo,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
-    final int lastEntryIndex;
-    if (lastEntry != null)     lastEntryIndex=map.getPageIndex();
- else     lastEntryIndex=-1;
-    OMVRBTreeEntry<Object,OIdentifiable> entry=firstEntry;
-    map.setPageIndex(firstEntryIndex);
-    final Set<OIdentifiable> result=new HashSet<OIdentifiable>();
-    long count=0;
-    while (entry != null && !(entry == lastEntry && map.getPageIndex() == lastEntryIndex) && !(maxValuesToFetch > -1 && result.size() == maxValuesToFetch)) {
-      count++;
-      entry=OMVRBTree.next(entry);
-    }
-    return count;
+    return indexEngine.count(iRangeFrom,iFromInclusive,iRangeTo,iToInclusive,maxValuesToFetch,null);
   }
   finally {
-    releaseExclusiveLock();
+    releaseSharedLock();
   }
 }

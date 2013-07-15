@@ -1,30 +1,10 @@
 {
   checkForRebuild();
-  acquireExclusiveLock();
+  acquireSharedLock();
   try {
-    final OMVRBTreeEntry<Object,Set<OIdentifiable>> firstEntry;
-    if (isInclusive)     firstEntry=map.getCeilingEntry(fromKey,OMVRBTree.PartialSearchMode.LOWEST_BOUNDARY);
- else     firstEntry=map.getHigherEntry(fromKey);
-    if (firstEntry == null)     return Collections.emptySet();
-    OMVRBTreeEntry<Object,Set<OIdentifiable>> entry=firstEntry;
-    final Set<ODocument> result=new HashSet<ODocument>();
-    while (entry != null) {
-      final Object key=entry.getKey();
-      final OMVRBTreeRIDSet values=(OMVRBTreeRIDSet)entry.getValue();
-      if (values.isEmpty())       continue;
-      for (      final OIdentifiable value : values) {
-        if (maxEntriesToFetch > -1 && result.size() == maxEntriesToFetch)         return result;
-        final ODocument document=new ODocument();
-        document.field("key",key);
-        document.field("rid",value.getIdentity());
-        document.unsetDirty();
-        result.add(document);
-      }
-      entry=OMVRBTree.next(entry);
-    }
-    return result;
+    return indexEngine.getEntriesMajor(fromKey,isInclusive,maxEntriesToFetch,MultiValuesTransformer.INSTANCE);
   }
   finally {
-    releaseExclusiveLock();
+    releaseSharedLock();
   }
 }

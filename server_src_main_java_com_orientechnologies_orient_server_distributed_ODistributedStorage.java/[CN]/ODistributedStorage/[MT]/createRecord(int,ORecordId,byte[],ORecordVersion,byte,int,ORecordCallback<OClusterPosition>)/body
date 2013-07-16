@@ -1,8 +1,11 @@
 {
-  if (ODistributedThreadLocal.INSTANCE.distributedExecution)   return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+  if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
   Object result=null;
   try {
-    result=dManager.routeOperation2Node(getClusterNameFromRID(iRecordId),iRecordId,new OCreateRecordDistributedTask(dManager.getLocalNodeId(),wrapped.getName(),createRecordMode,iRecordId,iContent,iRecordVersion,iRecordType));
+    final String clusterName=getClusterNameFromRID(iRecordId);
+    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId,dManager.getLocalNodeId(),null);
+    if (replicationData == null)     return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+ else     result=dManager.execute(clusterName,iRecordId,new OCreateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),createRecordMode,iRecordId,iContent,iRecordVersion,iRecordType),replicationData);
     iRecordId.clusterPosition=((OPhysicalPosition)result).clusterPosition;
   }
  catch (  ExecutionException e) {

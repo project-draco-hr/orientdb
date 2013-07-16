@@ -1,0 +1,40 @@
+{
+  if (lastRunId == -1 && lastOperationId == -1)   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db '%s' align request starting from the beginning (no log found)",databaseName,lastRunId,lastOperationId);
+ else   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db '%s' align request starting from %d.%d",databaseName,lastRunId,lastOperationId);
+  int aligned;
+  final ODistributedServerManager dManager=getDistributedServerManager();
+  final String localNode=dManager.getLocalNodeId();
+  final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
+  if (synchronizer == null)   return 0;
+  final ODatabaseJournal log=synchronizer.getLog();
+  final Lock alignmentLock=dManager.getLock("align." + databaseName);
+  if (alignmentLock.tryLock())   try {
+    aligned=0;
+    final OMultipleRemoteTasks tasks=new OMultipleRemoteTasks(serverInstance,dManager,databaseName,EXECUTION_MODE.SYNCHRONOUS);
+    final List<Long> positions=new ArrayList<Long>();
+    final Iterator<Long> it=log.browseLastOperations(new long[]{lastRunId,lastOperationId},ODatabaseJournal.OPERATION_STATUS.COMMITTED,-1);
+    while (it.hasNext()) {
+      final long pos=it.next();
+      final OAbstractReplicatedTask<?> operation=log.getOperation(pos);
+      if (operation == null) {
+        ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"db=%s skipped operation",databaseName);
+        continue;
+      }
+      ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"aligning operation=%d.%d db=%s %s",operation.getRunId(),operation.getOperationSerial(),databaseName,operation.getName().toUpperCase());
+      operation.setNodeSource(localNode);
+      operation.setDatabaseName(databaseName);
+      operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
+      tasks.addTask(operation);
+      positions.add(pos);
+      if (tasks.getTasks() >= OP_BUFFER)       aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    }
+    if (tasks.getTasks() > 0)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"aligned %d operations db=%s",aligned,databaseName);
+  }
+  finally {
+    alignmentLock.unlock();
+  }
+ else   aligned=-1;
+  dManager.sendOperation2Node(getNodeSource(),new OAlignResponseTask(serverInstance,dManager,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,aligned));
+  return aligned;
+}

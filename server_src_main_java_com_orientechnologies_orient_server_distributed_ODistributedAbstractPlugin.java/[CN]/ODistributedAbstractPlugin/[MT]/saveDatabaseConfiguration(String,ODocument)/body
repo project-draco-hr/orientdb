@@ -1,19 +1,23 @@
 {
-  File file=new File(serverInstance.getDatabaseDirectory() + iDatabaseName + "/"+ FILE_DISTRIBUTED_DB_CONFIG);
-  databaseConfiguration.put(iDatabaseName,cfg);
-  OLogManager.instance().config(this,"Saving distributed configuration for database '%s'",iDatabaseName);
-  FileOutputStream f=null;
-  try {
-    f=new FileOutputStream(file);
-    f.write(cfg.toJSON().getBytes());
-  }
- catch (  Exception e) {
-  }
- finally {
-    if (f != null)     try {
-      f.close();
+synchronized (databaseConfiguration) {
+    final ODocument oldCfg=databaseConfiguration.get(iDatabaseName);
+    if (oldCfg != null && Arrays.equals(oldCfg.toStream(),cfg.toStream()))     return;
+    databaseConfiguration.put(iDatabaseName,cfg);
+    OLogManager.instance().config(this,"Saving distributed configuration for database '%s'",iDatabaseName);
+    FileOutputStream f=null;
+    try {
+      File file=new File(serverInstance.getDatabaseDirectory() + iDatabaseName + "/"+ FILE_DISTRIBUTED_DB_CONFIG);
+      f=new FileOutputStream(file);
+      f.write(cfg.toJSON().getBytes());
     }
- catch (    IOException e) {
+ catch (    Exception e) {
+    }
+ finally {
+      if (f != null)       try {
+        f.close();
+      }
+ catch (      IOException e) {
+      }
     }
   }
 }

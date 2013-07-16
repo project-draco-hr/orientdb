@@ -1,0 +1,34 @@
+{
+  ODatabaseDocumentTx database=ODatabaseDocumentPool.global().acquire(getDatabaseURL(serverInstance.get(0)),"admin","admin");
+  try {
+    List<ODocument> result=database.query(new OSQLSynchQuery<OIdentifiable>("select count(*) from Person"));
+    beginInstances=((Long)result.get(0).field("count")).longValue();
+  }
+  finally {
+    database.close();
+  }
+  System.out.println("Creating Writers and Readers threads...");
+  final ExecutorService writerExecutor=Executors.newCachedThreadPool();
+  final ExecutorService readerExecutor=Executors.newCachedThreadPool();
+  int i=0;
+  for (  ServerRun server : serverInstance) {
+    Writer writer=new Writer(i++,getDatabaseURL(server));
+    writerExecutor.submit(writer);
+    Reader reader=new Reader(getDatabaseURL(server));
+    readerExecutor.submit(reader);
+  }
+  System.out.println("Threads started, waiting for the end");
+  writerExecutor.shutdown();
+  Assert.assertTrue(writerExecutor.awaitTermination(300,TimeUnit.MINUTES));
+  System.out.println("Writer threads finished, shutting down Reader threads...");
+  readerExecutor.shutdownNow();
+  Assert.assertTrue(readerExecutor.awaitTermination(10,TimeUnit.SECONDS));
+  System.out.println("All threads have finished, shutting down server instances");
+  for (  ServerRun server : serverInstance) {
+    printStats(getDatabaseURL(server));
+  }
+  checkInsertedEntries();
+  checkIndexedEntries();
+  dropIndexNode1();
+  recreateIndexNode2();
+}

@@ -1,9 +1,14 @@
 {
-  OLogManager.instance().warn(this,"CONFLICT against node %s UDPATE record %s (current=v%d, other=v%d)...",iRemoteNode,iCurrentRID,iCurrentVersion.getCounter(),iOtherVersion.getCounter());
+  ODistributedServerLog.warn(this,cluster.getLocalNodeId(),iRemoteNode,DIRECTION.IN,"Conflict on UDPATE record %s/%s (current=v%d, other=v%d)...",database.getName(),iCurrentRID,iCurrentVersion.getCounter(),iOtherVersion.getCounter());
   if (!existConflictsForRecord(iCurrentRID)) {
     final ODocument doc=createConflictDocument(ORecordOperation.UPDATED,iCurrentRID,iRemoteNode);
-    doc.field(FIELD_CURRENT_VERSION,iCurrentVersion.getCounter());
-    doc.field(FIELD_OTHER_VERSION,iOtherVersion.getCounter());
-    doc.save();
+    try {
+      doc.field(FIELD_CURRENT_VERSION,iCurrentVersion.getCounter());
+      doc.field(FIELD_OTHER_VERSION,iOtherVersion.getCounter());
+      doc.save();
+    }
+ catch (    Exception e) {
+      errorOnWriteConflict(iRemoteNode,doc);
+    }
   }
 }

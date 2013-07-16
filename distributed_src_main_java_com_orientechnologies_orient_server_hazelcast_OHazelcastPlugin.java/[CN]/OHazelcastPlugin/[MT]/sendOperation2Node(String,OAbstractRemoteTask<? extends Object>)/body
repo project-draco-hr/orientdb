@@ -1,0 +1,50 @@
+{
+  iTask.setNodeDestination(iNodeId);
+  Member member=remoteClusterNodes.get(iNodeId);
+  if (member == null) {
+    for (    Member m : hazelcastInstance.getCluster().getMembers()) {
+      if (getNodeId(m).equals(iNodeId)) {
+        member=m;
+        break;
+      }
+    }
+    if (member == null)     throw new ODistributedException("Remote node '" + iNodeId + "' is not configured");
+  }
+  final Member clusterMember=member;
+  ExecutionCallback<Object> callback=null;
+  if (iTask.getMode() == EXECUTION_MODE.ASYNCHRONOUS)   callback=new ExecutionCallback<Object>(){
+    @Override public void onResponse(    Object result){
+    }
+    @Override public void onFailure(    Throwable t){
+      ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in ASYNCH mode",t);
+    }
+  }
+;
+  for (int retry=0; retry < SEND_RETRY_MAX; ++retry) {
+    try {
+      Object result=executeOperation((Callable<Object>)iTask,clusterMember,iTask.getMode(),callback);
+      return result;
+    }
+ catch (    ExecutionException e) {
+      if (e.getCause() instanceof OServerOfflineException) {
+        final OServerOfflineException exc=(OServerOfflineException)e.getCause();
+        ODistributedServerLog.warn(this,getLocalNodeId(),exc.getNodeId(),DIRECTION.OUT,"remote node %s is not online (status=%s), retrying %d...",exc.getNodeStatus(),retry + 1);
+        try {
+          Thread.sleep(200 + (retry * 50));
+        }
+ catch (        InterruptedException ex) {
+          Thread.interrupted();
+        }
+      }
+ else {
+        ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,EXECUTION_MODE.SYNCHRONOUS);
+        throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against node: "+ member,e);
+      }
+    }
+catch (    Exception e) {
+      ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation in %s mode",e,iTask.getMode());
+      throw new ODistributedException("Error on executing remote operation in " + iTask.getMode() + " mode against node: "+ member,e);
+    }
+  }
+  throw new ODistributedException("Cannot complete the operation because the cluster is offline");
+}

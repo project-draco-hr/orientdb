@@ -1,14 +1,40 @@
 {
   final OStorage storage=openStorage(storageName);
-  for (  ORecordId rid : log.getUncommittedOperations()) {
-    try {
-      if (getConflictResolver().existConflictsForRecord(rid))       continue;
-      final ORawBuffer record=(ORawBuffer)iCluster.routeOperation2Node(getClusterNameByRID(storage,rid),rid,new OReadRecordDistributedTask(iCluster.getLocalNodeId(),storageName,rid));
-      if (record == null)       storage.deleteRecord(rid,OVersionFactory.instance().createUntrackedVersion(),0,null);
- else       storage.updateRecord(rid,record.buffer,record.version,record.recordType,0,null);
-    }
- catch (    ExecutionException e) {
-      OLogManager.instance().warn(this,"DISTRIBUTED Error on acquiring uncommitted record %s from other servers. The database could be unaligned with others!",e,rid);
+  ODistributedServerLog.info(this,iCluster.getLocalNodeId(),"*",DIRECTION.OUT,"recovering uncommitted operations...");
+  int updated=0;
+  int deleted=0;
+  try {
+    for (    Entry<ORecordId,Long> entry : log.getUncommittedOperations().entrySet()) {
+      final ORecordId rid=entry.getKey();
+      final long offset=entry.getValue();
+      try {
+        if (getConflictResolver().existConflictsForRecord(rid))         continue;
+        final OCluster recordCluster=storage.getClusterById(rid.getClusterId());
+        if (recordCluster == null) {
+          ODistributedServerLog.warn(this,iCluster.getLocalNodeId(),null,DIRECTION.NONE,"Cannot find cluster for RID %s, skip it",rid);
+          continue;
+        }
+        final OReplicationConfig replicationData=iCluster.getReplicationData(storageName,recordCluster.getName(),rid,cluster.getLocalNodeId(),null);
+        final ORawBuffer record=(ORawBuffer)iCluster.execute(getClusterNameByRID(storage,rid),rid,new OReadRecordTask(server,cluster,storageName,rid),replicationData);
+        if (record == null) {
+          storage.deleteRecord(rid,OVersionFactory.instance().createUntrackedVersion(),0,null);
+          ODistributedServerLog.info(this,iCluster.getLocalNodeId(),"?",DIRECTION.IN,"restored record %s (delete)",rid);
+          deleted++;
+        }
+ else {
+          storage.updateRecord(rid,record.buffer,record.version,record.recordType,0,null);
+          ODistributedServerLog.info(this,iCluster.getLocalNodeId(),"?",DIRECTION.IN,"restored record %s (update)",rid);
+          updated++;
+        }
+        log.setOperationStatus(offset,null,ODatabaseJournal.OPERATION_STATUS.CANCELED);
+      }
+ catch (      ExecutionException e) {
+        ODistributedServerLog.error(this,iCluster.getLocalNodeId(),null,DIRECTION.NONE,"error on acquiring uncommitted record %s from other servers. The database could not be unaligned with others nodes!",e,rid);
+      }
     }
   }
+  finally {
+    ODistributedServerLog.info(this,iCluster.getLocalNodeId(),"*",DIRECTION.OUT,"recovered %d operations: updated=%d deleted=%d",(updated + deleted),updated,deleted);
+  }
+  return updated + deleted;
 }

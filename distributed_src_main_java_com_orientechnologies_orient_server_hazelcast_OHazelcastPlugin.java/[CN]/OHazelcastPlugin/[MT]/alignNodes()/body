@@ -5,19 +5,21 @@ synchronized (synchronizers) {
     for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
       final String databaseName=entry.getKey();
       try {
-        final long[] lastOperationId=entry.getValue().getLog().getLastOperationId(true);
-        OLogManager.instance().warn(this,"DISTRIBUTED --> send align request in broadcast for database %s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
+        final long[] lastOperationId=entry.getValue().getLog().getLastOperationId(ODatabaseJournal.OPERATION_STATUS.COMMITTED);
+        if (lastOperationId[0] == -1 && lastOperationId[1] == -1)         continue;
+        ODistributedServerLog.warn(this,getLocalNodeId(),remoteClusterNodes.keySet().toString(),DIRECTION.OUT,"sending align request in broadcast for database %s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
 synchronized (pendingAlignments) {
           for (          String node : remoteClusterNodes.keySet()) {
             pendingAlignments.put(node + "/" + databaseName,Boolean.FALSE);
-            OLogManager.instance().info(this,"DISTRIBUTED ->[%s/%s] setting node in alignment state",node,databaseName);
+            ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.NONE,"setting node in alignment state for db=%s",databaseName);
           }
         }
-        sendOperation2Nodes(remoteClusterNodes.keySet(),new OAlignRequestDistributedTask(getLocalNodeId(),databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
+        propagate(remoteClusterNodes.keySet(),new OAlignRequestTask(serverInstance,this,databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
       }
  catch (      IOException e) {
-        OLogManager.instance().warn(this,"DISTRIBUTED -> error on retrieve last operation id from the log for db %s",databaseName);
+        ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);
       }
     }
+    if (pendingAlignments.isEmpty())     setStatus("online");
   }
 }

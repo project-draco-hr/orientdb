@@ -1,8 +1,11 @@
 {
-  if (ODistributedThreadLocal.INSTANCE.distributedExecution)   return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
+  if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
   Object result=null;
   try {
-    result=dManager.routeOperation2Node(getClusterNameFromRID(iRecordId),iRecordId,new ODeleteRecordDistributedTask(dManager.getLocalNodeId(),wrapped.getName(),updateRecordMode,iRecordId,iVersion));
+    final String clusterName=getClusterNameFromRID(iRecordId);
+    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId,dManager.getLocalNodeId(),null);
+    if (replicationData == null)     return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
+ else     result=dManager.execute(clusterName,iRecordId,new ODeleteRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),updateRecordMode,iRecordId,iVersion),replicationData);
   }
  catch (  ExecutionException e) {
     handleDistributedException("Cannot route DELETE_RECORD operation against %s to the distributed node",e,iRecordId);

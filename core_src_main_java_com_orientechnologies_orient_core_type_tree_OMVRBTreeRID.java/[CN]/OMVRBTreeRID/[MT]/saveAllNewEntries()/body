@@ -1,18 +1,24 @@
 {
-  if (hasNewItems()) {
-    final Set<ORecord<?>> temp=new HashSet<ORecord<?>>(newEntries.keySet());
-    for (    ORecord<?> record : temp) {
-      if (record.getIdentity().isNew())       record.save();
-      if (!record.getIdentity().isNew()) {
-        if (newEntries != null) {
-          newEntries.remove(record);
-          if (newEntries.size() == 0)           newEntries=null;
+  lock.acquireExclusiveLock();
+  try {
+    if (hasNewItems()) {
+      final Set<ORecord<?>> temp=new HashSet<ORecord<?>>(newEntries.keySet());
+      for (      ORecord<?> record : temp) {
+        if (record.getIdentity().isNew())         record.save();
+        if (!record.getIdentity().isNew()) {
+          if (newEntries != null) {
+            newEntries.remove(record);
+            if (newEntries.size() == 0)             newEntries=null;
+          }
+          internalPut(record.getIdentity(),null);
         }
-        internalPut(record.getIdentity(),null);
       }
+      if (!((OMVRBTreeRIDProvider)dataProvider).isEmbeddedStreaming())       super.commitChanges();
+      if (newEntries != null)       return false;
     }
-    if (!((OMVRBTreeRIDProvider)dataProvider).isEmbeddedStreaming())     super.commitChanges();
-    if (newEntries != null)     return false;
+    return true;
   }
-  return true;
+  finally {
+    lock.releaseExclusiveLock();
+  }
 }

@@ -1,7 +1,7 @@
 {
-  if (lastRunId == -1 && lastOperationId == -1)   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db '%s' align request starting from the beginning (no log found)",databaseName,lastRunId,lastOperationId);
- else   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db '%s' align request starting from %d.%d",databaseName,lastRunId,lastOperationId);
-  int aligned;
+  if (lastRunId == -1 && lastOperationId == -1)   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db=%s align request starting from the beginning (no log found)",databaseName);
+ else   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.IN,"db=%s align request starting from operation %d.%d",databaseName,lastRunId,lastOperationId);
+  int totAligned;
   final ODistributedServerManager dManager=getDistributedServerManager();
   final String localNode=dManager.getLocalNodeId();
   final OStorageSynchronizer synchronizer=getDatabaseSynchronizer();
@@ -9,7 +9,8 @@
   final ODatabaseJournal log=synchronizer.getLog();
   final Lock alignmentLock=dManager.getLock("align." + databaseName);
   if (alignmentLock.tryLock())   try {
-    aligned=0;
+    totAligned=0;
+    int aligned=0;
     final OMultipleRemoteTasks tasks=new OMultipleRemoteTasks(serverInstance,dManager,databaseName,EXECUTION_MODE.SYNCHRONOUS);
     final List<Long> positions=new ArrayList<Long>();
     final Iterator<Long> it=log.browseLastOperations(new long[]{lastRunId,lastOperationId},ODatabaseJournal.OPERATION_STATUS.COMMITTED,-1);
@@ -17,24 +18,25 @@
       final long pos=it.next();
       final OAbstractReplicatedTask<?> operation=log.getOperation(pos);
       if (operation == null) {
-        ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"db=%s skipped operation",databaseName);
+        ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"#%d db=%s skipped operation",aligned,databaseName);
         continue;
       }
-      ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"aligning operation=%d.%d db=%s %s",operation.getRunId(),operation.getOperationSerial(),databaseName,operation.getName().toUpperCase());
+      ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"#%d aligning operation=%d.%d db=%s %s",aligned,operation.getRunId(),operation.getOperationSerial(),databaseName,operation.getName().toUpperCase());
       operation.setNodeSource(localNode);
       operation.setDatabaseName(databaseName);
       operation.setMode(EXECUTION_MODE.SYNCHRONOUS);
       tasks.addTask(operation);
       positions.add(pos);
-      if (tasks.getTasks() >= OP_BUFFER)       aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+      aligned++;
+      if (tasks.getTasks() >= OP_BUFFER)       totAligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
     }
-    if (tasks.getTasks() > 0)     aligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
-    ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"aligned %d operations db=%s",aligned,databaseName);
+    if (tasks.getTasks() > 0)     totAligned+=flushBufferedTasks(dManager,synchronizer,tasks,positions);
+    ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"aligned %d operations db=%s",totAligned,databaseName);
   }
   finally {
     alignmentLock.unlock();
   }
- else   aligned=-1;
-  dManager.sendOperation2Node(getNodeSource(),new OAlignResponseTask(serverInstance,dManager,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,aligned));
-  return aligned;
+ else   totAligned=-1;
+  dManager.sendOperation2Node(getNodeSource(),new OAlignResponseTask(serverInstance,dManager,databaseName,EXECUTION_MODE.FIRE_AND_FORGET,totAligned));
+  return totAligned;
 }

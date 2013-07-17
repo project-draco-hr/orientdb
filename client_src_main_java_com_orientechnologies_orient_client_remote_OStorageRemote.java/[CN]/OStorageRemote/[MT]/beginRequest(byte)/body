@@ -2,14 +2,18 @@
   OChannelBinaryClient network=null;
   if (debug)   System.out.println("-> req: " + getSessionId());
 synchronized (networkPool) {
+    if (networkPoolCursor >= networkPool.size())     networkPoolCursor=networkPool.size() - 1;
     final int beginCursor=networkPoolCursor;
     while (network == null) {
-      if (networkPool.size() == 0)       openRemoteDatabase();
+      if (networkPool.size() == 0) {
+        openRemoteDatabase();
+        networkPoolCursor=0;
+      }
       if (networkPool.size() == 0)       throw new ONetworkProtocolException("Connection pool closed");
       if (networkPoolCursor >= networkPool.size())       networkPoolCursor=0;
       network=networkPool.get(networkPoolCursor);
       networkPoolCursor++;
-      if (network.getLockWrite().tryLock())       break;
+      if (network.getLockWrite().getUnderlying().tryLock())       break;
       network=null;
       if (networkPoolCursor == beginCursor) {
         if (networkPool.size() < maxPool) {

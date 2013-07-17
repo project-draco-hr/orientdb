@@ -1,0 +1,25 @@
+{
+  int closeId=random.nextInt(idGen.get());
+  Integer idToDelete=addedIds.ceiling(closeId);
+  if (idToDelete == null)   idToDelete=addedIds.first();
+  idLockManager.acquireLock(Thread.currentThread(),idToDelete,OLockManager.LOCK.EXCLUSIVE);
+  while (deletedIds.containsKey(idToDelete)) {
+    idLockManager.releaseLock(Thread.currentThread(),idToDelete,OLockManager.LOCK.EXCLUSIVE);
+    closeId=random.nextInt(idGen.get());
+    idToDelete=addedIds.ceiling(closeId);
+    if (idToDelete == null)     idToDelete=addedIds.first();
+    idLockManager.acquireLock(Thread.currentThread(),idToDelete,OLockManager.LOCK.EXCLUSIVE);
+  }
+  addedIds.remove(idToDelete);
+  updatedIds.remove(idToDelete);
+  ODatabaseRecordThreadLocal.INSTANCE.set(baseDB);
+  int deleted=baseDB.command(new OCommandSQL("delete from TestClass where id  = " + idToDelete)).execute();
+  Assert.assertEquals(deleted,1);
+  ODatabaseRecordThreadLocal.INSTANCE.set(testDB);
+  deleted=testDB.command(new OCommandSQL("delete from TestClass where id  = " + idToDelete)).execute();
+  Assert.assertEquals(deleted,1);
+  ODatabaseRecordThreadLocal.INSTANCE.set(baseDB);
+  long ts=System.currentTimeMillis();
+  deletedIds.put(idToDelete,ts);
+  idLockManager.releaseLock(Thread.currentThread(),idToDelete,OLockManager.LOCK.EXCLUSIVE);
+}

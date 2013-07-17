@@ -1,0 +1,30 @@
+{
+  super(new Socket(),iConfig);
+  socketTimeout=iConfig.getValueAsInteger(OGlobalConfiguration.NETWORK_SOCKET_TIMEOUT);
+  socket.setPerformancePreferences(0,2,1);
+  socket.setKeepAlive(true);
+  socket.setSendBufferSize(socketBufferSize);
+  socket.setReceiveBufferSize(socketBufferSize);
+  try {
+    socket.connect(new InetSocketAddress(remoteHost,remotePort),socketTimeout);
+    connected();
+  }
+ catch (  java.net.SocketTimeoutException e) {
+    throw new IOException("Cannot connect to host " + remoteHost + ":"+ remotePort,e);
+  }
+  inStream=new BufferedInputStream(socket.getInputStream(),socketBufferSize);
+  outStream=new BufferedOutputStream(socket.getOutputStream(),socketBufferSize);
+  in=new DataInputStream(inStream);
+  out=new DataOutputStream(outStream);
+  try {
+    srvProtocolVersion=readShort();
+  }
+ catch (  IOException e) {
+    throw new ONetworkProtocolException("Cannot read protocol version from remote server " + socket.getRemoteSocketAddress() + ": "+ e);
+  }
+  if (Math.abs(srvProtocolVersion - iProtocolVersion) > 2) {
+    close();
+    throw new ONetworkProtocolException("Binary protocol is incompatible with the Server connected: client=" + iProtocolVersion + ", server="+ srvProtocolVersion);
+  }
+  if (asynchEventListener != null)   serviceThread=new OAsynchChannelServiceThread(asynchEventListener,this);
+}

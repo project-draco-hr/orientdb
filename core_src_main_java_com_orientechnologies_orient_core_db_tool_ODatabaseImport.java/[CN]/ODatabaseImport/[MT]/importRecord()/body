@@ -30,11 +30,16 @@
     if (exporterVersion >= 4) {
       if (record.getIdentity().getClusterId() == manualIndexCluster)       return null;
     }
-    final String rid=record.getIdentity().toString();
-    final int clusterId=record.getIdentity().getClusterId();
-    if (hashClustersAreUsed && (clusterId != manualIndexCluster && clusterId != internalCluster && clusterId != indexCluster))     storeHashClusterRecord(new ORecordId(rid));
- else     storeLocalClusterRecord();
-    if (!record.getIdentity().toString().equals(rid))     throw new OSchemaException("Imported record '" + record.getIdentity() + "' has rid different from the original: "+ rid);
+    if (record.getIdentity().equals(indexMgrRecordId))     return null;
+    final ORID rid=record.getIdentity();
+    final int clusterId=rid.getClusterId();
+    if ((clusterId != manualIndexCluster && clusterId != internalCluster && clusterId != indexCluster)) {
+      record.getRecordVersion().copyFrom(OVersionFactory.instance().createVersion());
+      record.setDirty();
+      record.setIdentity(new ORecordId());
+      record.save(database.getClusterNameById(clusterId));
+      exportImportHashTable.put(rid,record.getIdentity());
+    }
   }
  catch (  Exception t) {
     if (record != null)     System.err.println("Error importing record " + record.getIdentity() + ". Source line "+ jsonReader.getLineNumber()+ ", column "+ jsonReader.getColumnNumber());

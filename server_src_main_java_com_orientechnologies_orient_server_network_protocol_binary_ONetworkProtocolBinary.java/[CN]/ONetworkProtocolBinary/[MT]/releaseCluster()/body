@@ -3,13 +3,14 @@
   final String dbName=channel.readString();
   final int clusterId=channel.readShort();
   checkServerAccess("database.release");
-  connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"local");
-  if (connection.database.exists()) {
+  ODatabaseDocumentTx databaseDocumentTx=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"plocal",false);
+  if (databaseDocumentTx != null)   connection.database=databaseDocumentTx;
+  if (databaseDocumentTx != null && databaseDocumentTx.exists()) {
     OLogManager.instance().info(this,"Realising database '%s' cluster %d",connection.database.getURL(),clusterId);
-    if (connection.database.isClosed()) {
-      openDatabase(connection.database,connection.serverUser.name,connection.serverUser.password);
+    if (databaseDocumentTx.isClosed()) {
+      openDatabase(databaseDocumentTx,connection.serverUser.name,connection.serverUser.password);
     }
-    connection.database.releaseCluster(clusterId);
+    databaseDocumentTx.releaseCluster(clusterId);
   }
  else {
     throw new OStorageException("Database with name '" + dbName + "' doesn't exits.");

@@ -1,0 +1,31 @@
+{
+  createSchema(baseDocumentTx);
+  createSchema(testDocumentTx);
+  System.out.println("Schema was created.");
+  System.out.println("Document creation was started.");
+  createDocuments();
+  System.out.println("Document creation was finished.");
+  System.out.println("Start documents update.");
+  List<Future> futures=new ArrayList<Future>();
+  for (int i=0; i < 5; i++) {
+    futures.add(executorService.submit(new DataUpdateTask(baseDocumentTx,testDocumentTx)));
+  }
+  Thread.sleep(150000);
+  long lastTs=System.currentTimeMillis();
+  process.destroy();
+  for (  Future future : futures) {
+    try {
+      future.get();
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+    }
+  }
+  System.out.println("Documents update was stopped.");
+  testDocumentTx=new ODatabaseDocumentTx("plocal:" + buildDir.getAbsolutePath() + "/testLocalPaginatedStorageUpdateCrashRestore");
+  testDocumentTx.open("admin","admin");
+  testDocumentTx.close();
+  testDocumentTx.open("admin","admin");
+  System.out.println("Start documents comparison.");
+  compareDocuments(lastTs);
+}

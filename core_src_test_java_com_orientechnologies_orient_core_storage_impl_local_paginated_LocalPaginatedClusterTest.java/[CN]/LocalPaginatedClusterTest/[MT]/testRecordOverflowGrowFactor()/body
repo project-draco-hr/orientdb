@@ -1,0 +1,27 @@
+{
+  paginatedCluster.set(OCluster.ATTRIBUTES.COMPRESSION,ONothingCompression.NAME);
+  paginatedCluster.set(OCluster.ATTRIBUTES.RECORD_GROW_FACTOR,1.5);
+  paginatedCluster.set(OCluster.ATTRIBUTES.RECORD_OVERFLOW_GROW_FACTOR,2.5);
+  byte[] record=new byte[100];
+  Random random=new Random();
+  random.nextBytes(record);
+  ORecordVersion version=OVersionFactory.instance().createVersion();
+  OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,version,(byte)1,null);
+  record=new byte[150];
+  random.nextBytes(record);
+  paginatedCluster.updateRecord(physicalPosition.clusterPosition,record,version,(byte)1,null);
+  long pagePointer=diskCache.load(1,0);
+  OLocalPage page=new OLocalPage(pagePointer,false,OLocalPage.TrackMode.NONE);
+  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),record.length + RECORD_SYSTEM_INFORMATION);
+  diskCache.release(1,0);
+  record=new byte[200];
+  random.nextBytes(record);
+  paginatedCluster.updateRecord(physicalPosition.clusterPosition,record,version,(byte)1,null);
+  pagePointer=diskCache.load(1,0);
+  page=new OLocalPage(pagePointer,false,OLocalPage.TrackMode.NONE);
+  int fullContentSize=500 + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
+  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),150 + RECORD_SYSTEM_INFORMATION);
+  fullContentSize-=150 + RECORD_SYSTEM_INFORMATION - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE;
+  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue() + 1),fullContentSize + (OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE));
+  diskCache.release(1,0);
+}

@@ -1,0 +1,30 @@
+{
+  Random random=new Random();
+  baseDB.open("admin","admin");
+  testDB.open("admin","admin");
+  int counter=0;
+  try {
+    while (true) {
+      final int idToUpdate=random.nextInt(idGen);
+      idLockManager.acquireLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        OSQLSynchQuery<ODocument> query=new OSQLSynchQuery<ODocument>("select from TestClass where id  = " + idToUpdate);
+        final List<ODocument> result=baseDB.query(query);
+        Assert.assertTrue(!result.isEmpty());
+        final ODocument document=result.get(0);
+        document.field("timestamp",System.currentTimeMillis());
+        document.field("stringValue","vde" + random.nextLong());
+        saveDoc(document,baseDB,testDB);
+        counter++;
+        if (counter % 50000 == 0)         System.out.println(counter + " records were updated.");
+      }
+  finally {
+        idLockManager.releaseLock(Thread.currentThread(),idToUpdate,OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  }
+  finally {
+    baseDB.close();
+    testDB.close();
+  }
+}

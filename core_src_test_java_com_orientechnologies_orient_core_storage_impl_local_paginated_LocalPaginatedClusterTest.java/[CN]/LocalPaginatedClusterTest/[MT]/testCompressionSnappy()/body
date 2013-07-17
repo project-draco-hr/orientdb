@@ -1,0 +1,17 @@
+{
+  paginatedCluster.set(OCluster.ATTRIBUTES.COMPRESSION,OSnappyCompression.NAME);
+  paginatedCluster.set(OCluster.ATTRIBUTES.RECORD_GROW_FACTOR,1);
+  byte[] record=new byte[100];
+  Random random=new Random();
+  random.nextBytes(record);
+  OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,OVersionFactory.instance().createVersion(),(byte)1,null);
+  record=OSnappyCompression.INSTANCE.compress(record);
+  long pagePointer=diskCache.load(1,0);
+  OLocalPage page=new OLocalPage(pagePointer,false,OLocalPage.TrackMode.NONE);
+  int recordPageOffset=page.getRecordPageOffset(physicalPosition.clusterPosition.intValue());
+  byte[] storedEntity=page.getBinaryValue(recordPageOffset,page.getRecordSize(physicalPosition.clusterPosition.intValue()));
+  byte[] storedRecord=new byte[record.length];
+  System.arraycopy(storedEntity,OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE,storedRecord,0,storedRecord.length);
+  Assert.assertEquals(storedRecord,record);
+  diskCache.release(1,0);
+}

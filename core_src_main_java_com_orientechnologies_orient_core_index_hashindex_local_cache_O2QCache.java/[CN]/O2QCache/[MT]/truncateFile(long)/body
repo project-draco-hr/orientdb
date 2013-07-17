@@ -2,7 +2,7 @@
 synchronized (syncObject) {
     final Set<Long> pageEntries=filePages.get(fileId);
     for (    Long pageIndex : pageEntries) {
-      LRUEntry lruEntry=get(fileId,pageIndex);
+      LRUEntry lruEntry=get(fileId,pageIndex,true);
       if (lruEntry != null) {
         if (lruEntry.usageCounter == 0) {
           lruEntry=remove(fileId,pageIndex);
@@ -14,8 +14,13 @@ synchronized (syncObject) {
         if (dataPointer != null)         directMemory.free(dataPointer);
       }
     }
-    dirtyPages.get(fileId).clear();
+    SortedMap<Long,OLogSequenceNumber> fileDirtyPages=dirtyPages.get(fileId);
+    for (    long pageIndex : fileDirtyPages.keySet()) {
+      Long dataPointer=evictedPages.remove(new FileLockKey(fileId,pageIndex));
+      if (dataPointer != null)       directMemory.free(dataPointer);
+    }
     pageEntries.clear();
+    fileDirtyPages.clear();
     files.get(fileId).shrink(0);
   }
 }

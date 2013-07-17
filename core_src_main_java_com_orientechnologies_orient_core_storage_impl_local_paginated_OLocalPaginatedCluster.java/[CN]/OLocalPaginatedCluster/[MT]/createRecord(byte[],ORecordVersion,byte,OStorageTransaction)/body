@@ -5,8 +5,8 @@
     try {
       final long prevSize=size;
       final long prevRecordsSize=recordsSize;
-      content=COMPRESSION.compress(content);
-      int grownContentSize=(int)(RECORD_GROW_FACTOR * content.length);
+      content=compression.compress(content);
+      int grownContentSize=(int)(config.recordGrowFactor * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
       if (entryContentLength < OLocalPage.MAX_RECORD_SIZE) {
         startRecordOperation(transaction,false);
@@ -22,7 +22,7 @@
         entryPosition++;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
         OLocalPage.TrackMode trackMode;
-        if (writeAheadLog == null)         trackMode=OLocalPage.TrackMode.NONE;
+        if (!config.useWal || writeAheadLog == null)         trackMode=OLocalPage.TrackMode.NONE;
  else         if (transaction != null)         trackMode=OLocalPage.TrackMode.BOTH;
  else         trackMode=OLocalPage.TrackMode.FORWARD;
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
@@ -34,7 +34,7 @@
       }
  else {
         startRecordOperation(transaction,true);
-        OLocalPage.TrackMode trackMode=writeAheadLog == null ? OLocalPage.TrackMode.NONE : OLocalPage.TrackMode.BOTH;
+        OLocalPage.TrackMode trackMode=(!config.useWal || writeAheadLog == null) ? OLocalPage.TrackMode.NONE : OLocalPage.TrackMode.BOTH;
         int entrySize=grownContentSize + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
         int fullEntryPosition=0;
         byte[] fullEntry=new byte[entrySize];
@@ -92,7 +92,6 @@
       }
     }
   finally {
-      currentUnitId.set(null);
       releaseExclusiveLock();
     }
   }

@@ -1,4 +1,38 @@
 {
-  storeClusterState();
+  OFile file=clusterStateHolder.getFile();
+  final CRC32 crc32=new CRC32();
+  byte[] clusterState=new byte[STATE_SIZE];
+  int offset=OIntegerSerializer.INT_SIZE;
+  if (config.useWal && writeAheadLog != null) {
+    OLogSequenceNumber end=writeAheadLog.end();
+    offset+=OIntegerSerializer.INT_SIZE;
+    OIntegerSerializer.INSTANCE.serializeNative(end.getSegment(),clusterState,offset);
+    offset+=OIntegerSerializer.INT_SIZE;
+    OLongSerializer.INSTANCE.serializeNative(end.getPosition(),clusterState,offset);
+    offset+=OLongSerializer.LONG_SIZE;
+  }
+ else {
+    OIntegerSerializer.INSTANCE.serializeNative(1,clusterState,offset);
+    offset+=OIntegerSerializer.INT_SIZE;
+    OLongSerializer.INSTANCE.serializeNative(System.currentTimeMillis(),clusterState,offset);
+    offset+=OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE;
+  }
+  OLongSerializer.INSTANCE.serializeNative(size,clusterState,offset);
+  offset+=OLongSerializer.LONG_SIZE;
+  OLongSerializer.INSTANCE.serializeNative(recordsSize,clusterState,offset);
+  offset+=OLongSerializer.LONG_SIZE;
+  OIntegerSerializer.INSTANCE.serializeNative(freePageLists.length,clusterState,offset);
+  offset+=OIntegerSerializer.INT_SIZE;
+  for (  long freePageIndex : freePageLists) {
+    OLongSerializer.INSTANCE.serializeNative(freePageIndex,clusterState,offset);
+    offset+=OLongSerializer.LONG_SIZE;
+  }
+  crc32.update(clusterState,OIntegerSerializer.INT_SIZE,STATE_SIZE - OIntegerSerializer.INT_SIZE);
+  OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),clusterState,0);
+  long fileOffset;
+  if (useFirstStateHolder)   fileOffset=0;
+ else   fileOffset=STATE_SIZE;
+  useFirstStateHolder=!useFirstStateHolder;
+  file.write(fileOffset,clusterState);
   clusterStateHolder.synch();
 }

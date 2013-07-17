@@ -1,0 +1,26 @@
+{
+  listener.onMessage("\nLinks are going to be updated according to new RIDs");
+  Collection<String> clusterNames=database.getClusterNames();
+  for (  String clusterName : clusterNames) {
+    if (OMetadata.CLUSTER_INDEX_NAME.equals(clusterName) || OMetadata.CLUSTER_INTERNAL_NAME.equals(clusterName) || OMetadata.CLUSTER_MANUAL_INDEX_NAME.equals(clusterName))     continue;
+    long documents=0;
+    listener.onMessage("\nRewrite links for " + clusterName + " cluster...");
+    int clusterId=database.getClusterIdByName(clusterName);
+    OCluster cluster=database.getStorage().getClusterById(clusterId);
+    OPhysicalPosition[] positions=cluster.ceilingPositions(new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(0)));
+    while (positions.length > 0) {
+      for (      OPhysicalPosition position : positions) {
+        ORecord record=database.load(new ORecordId(clusterId,position.clusterPosition));
+        if (record instanceof ODocument) {
+          ODocument document=(ODocument)record;
+          rewriteLinksInDocument(document);
+          documents++;
+          if (documents % 10000 == 0)           listener.onMessage("\n" + documents + " documents were processed...");
+        }
+      }
+      positions=cluster.higherPositions(positions[positions.length - 1]);
+    }
+    listener.onMessage("\nLinks for " + clusterName + " cluster were updated, "+ documents+ " were processed...");
+  }
+  listener.onMessage("\nLinks are successfully updated.");
+}

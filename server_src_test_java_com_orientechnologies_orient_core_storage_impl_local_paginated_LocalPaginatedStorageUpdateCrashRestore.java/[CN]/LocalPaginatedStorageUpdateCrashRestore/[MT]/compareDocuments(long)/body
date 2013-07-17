@@ -1,0 +1,30 @@
+{
+  long minTs=Long.MAX_VALUE;
+  int clusterId=baseDocumentTx.getClusterIdByName("TestClass");
+  OStorage baseStorage=baseDocumentTx.getStorage();
+  OPhysicalPosition[] physicalPositions=baseStorage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(0)));
+  int recordsRestored=0;
+  int recordsTested=0;
+  while (physicalPositions.length > 0) {
+    final ORecordId rid=new ORecordId(clusterId);
+    for (    OPhysicalPosition physicalPosition : physicalPositions) {
+      rid.clusterPosition=physicalPosition.clusterPosition;
+      ODatabaseRecordThreadLocal.INSTANCE.set(baseDocumentTx);
+      ODocument baseDocument=baseDocumentTx.load(rid);
+      ODatabaseRecordThreadLocal.INSTANCE.set(testDocumentTx);
+      List<ODocument> testDocuments=testDocumentTx.query(new OSQLSynchQuery<ODocument>("select from TestClass where id  = " + baseDocument.field("id")));
+      Assert.assertTrue(!testDocuments.isEmpty());
+      ODocument testDocument=testDocuments.get(0);
+      if (testDocument.field("timestamp").equals(baseDocument.field("timestamp")) && testDocument.field("stringValue").equals(baseDocument.field("stringValue"))) {
+        recordsRestored++;
+      }
+ else {
+        if (((Long)baseDocument.field("timestamp")) < minTs)         minTs=baseDocument.field("timestamp");
+      }
+      recordsTested++;
+      if (recordsTested % 10000 == 0)       System.out.println(recordsTested + " were tested, " + recordsRestored+ " were restored ...");
+    }
+    physicalPositions=baseStorage.higherPhysicalPositions(clusterId,physicalPositions[physicalPositions.length - 1]);
+  }
+  System.out.println(recordsRestored + " records were restored. Total records " + recordsTested+ ". Max interval for lost records "+ (lastTs - minTs));
+}

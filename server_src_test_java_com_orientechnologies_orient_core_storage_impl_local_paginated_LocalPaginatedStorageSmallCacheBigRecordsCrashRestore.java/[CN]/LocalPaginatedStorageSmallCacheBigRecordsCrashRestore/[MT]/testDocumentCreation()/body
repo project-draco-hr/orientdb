@@ -1,0 +1,24 @@
+{
+  createSchema(baseDocumentTx);
+  createSchema(testDocumentTx);
+  List<Future> futures=new ArrayList<Future>();
+  for (int i=0; i < 2; i++) {
+    futures.add(executorService.submit(new DataPropagationTask(baseDocumentTx,testDocumentTx)));
+  }
+  Thread.sleep(900000);
+  long lastTs=System.currentTimeMillis();
+  process.destroy();
+  for (  Future future : futures) {
+    try {
+      future.get();
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+    }
+  }
+  testDocumentTx=new ODatabaseDocumentTx("plocal:" + buildDir.getAbsolutePath() + "/testLocalPaginatedStorageSmallCacheBigRecordsCrashRestore");
+  testDocumentTx.open("admin","admin");
+  testDocumentTx.close();
+  testDocumentTx.open("admin","admin");
+  compareDocuments(lastTs);
+}

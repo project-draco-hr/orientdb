@@ -1,14 +1,18 @@
 {
   acquireExclusiveLock();
   try {
+    clearMetadata();
     final Collection<ODocument> idxs=document.field(CONFIG_INDEXES);
-    indexes.clear();
-    classPropertyIndex.clear();
     if (idxs != null) {
-      OIndex<?> index;
-      for (      final ODocument d : idxs) {
-        index=OIndexes.createIndex(getDatabase(),(String)d.field(OIndexInternal.CONFIG_TYPE));
-        if (((OIndexInternal<?>)index).loadFromConfiguration(d))         addIndexInternal(getIndexInstance(index));
+      for (      ODocument d : idxs) {
+        try {
+          OIndexInternal<?> newIndex=OIndexes.createIndex(getDatabase(),(String)d.field(OIndexInternal.CONFIG_TYPE));
+          OIndexInternal.IndexMetadata newIndexMetadata=newIndex.loadMetadata(d);
+          addIndexInternal(getRemoteIndexInstance(newIndex instanceof OIndexMultiValues,newIndexMetadata.getType(),newIndexMetadata.getName(),newIndexMetadata.getClustersToIndex(),newIndexMetadata.getIndexDefinition(),(ORID)d.field(OIndexAbstract.CONFIG_MAP_RID,OType.LINK),d));
+        }
+ catch (        Exception e) {
+          OLogManager.instance().error(this,"Error on loading of index by configuration: %s",e,d);
+        }
       }
     }
   }

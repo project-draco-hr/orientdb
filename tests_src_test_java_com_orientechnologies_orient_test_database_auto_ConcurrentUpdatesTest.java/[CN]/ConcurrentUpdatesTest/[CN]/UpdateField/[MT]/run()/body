@@ -1,7 +1,7 @@
 {
   try {
-    for (int i=0; i < 50; i++) {
-      while (true) {
+    for (int i=0; i < CYCLES; i++) {
+      for (int retry=0; retry < MAX_RETRIES; ++retry) {
         try {
           db.begin(TXTYPE.OPTIMISTIC);
           ODocument vDoc1=db.load(rid1,null,true);
@@ -11,10 +11,12 @@
           vDoc2.field(threadName,vDoc2.field(threadName) + ";" + i);
           vDoc2.save();
           db.commit();
+          counter.incrementAndGet();
+          totalRetries.addAndGet(retry);
           break;
         }
  catch (        ONeedRetryException e) {
-          System.out.println("Retry... " + Thread.currentThread().getName() + " "+ i);
+          System.out.println("Retry " + Thread.currentThread().getName() + " "+ i+ " - "+ retry+ "/"+ MAX_RETRIES+ "...");
         }
       }
       fieldValue+=";" + i;
@@ -22,5 +24,6 @@
   }
  catch (  Throwable e) {
     e.printStackTrace();
+    Assert.assertTrue(false);
   }
 }

@@ -1,15 +1,17 @@
 {
   try {
-    for (int i=0; i < 50; i++) {
+    for (int i=0; i < CYCLES; i++) {
       ODatabaseDocumentTx db=new ODatabaseDocumentTx(url).open("admin","admin");
       try {
-        while (true) {
+        for (int retry=0; retry < MAX_RETRIES; ++retry) {
           try {
-            List<ODocument> result=db.command(new OCommandSQL("select from Concurrent")).execute();
+            db.command(new OCommandSQL("select from Concurrent")).execute();
+            counter.incrementAndGet();
+            totalRetries.addAndGet(retry);
             break;
           }
  catch (          ONeedRetryException e) {
-            System.out.println("Retry...");
+            System.out.println("Retry " + retry + "/"+ MAX_RETRIES+ "...");
           }
         }
       }
@@ -20,5 +22,6 @@
   }
  catch (  Throwable e) {
     e.printStackTrace();
+    Assert.assertTrue(false);
   }
 }

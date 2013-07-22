@@ -1,0 +1,31 @@
+{
+  if (shallow) {
+    while (target.hasNext()) {
+      value=target.next();
+      index++;
+      if (value instanceof OIdentifiable) {
+        final ORecord<?> rec=((OIdentifiable)value).getRecord();
+        if (rec instanceof ODocument) {
+          if (command.getPredicate() != null) {
+            final Object conditionResult=command.getPredicate().evaluate(rec,null,command.getContext());
+            if (conditionResult != Boolean.TRUE)             continue;
+          }
+          sub.add(rec);
+          return rec;
+        }
+      }
+    }
+    target=sub.iterator();
+    index=-1;
+    shallow=false;
+  }
+  while (target.hasNext()) {
+    value=target.next();
+    index++;
+    final OTraverseRecordProcess subProcess=new OTraverseRecordProcess(command,(ODocument)value,true);
+    final OIdentifiable subValue=subProcess.process();
+    if (subValue != null)     return subValue;
+  }
+  sub=null;
+  return drop();
+}

@@ -1,13 +1,15 @@
 {
   setDataCommandInfo("Drop database");
   String dbName=channel.readString();
+  String storageType;
+  if (connection.data.protocolVersion >= 16)   storageType=channel.readString();
+ else   storageType="local";
   checkServerAccess("database.delete");
-  final ODatabaseDocumentTx databaseDocumentTx=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"plocal",false);
-  if (databaseDocumentTx != null)   connection.database=databaseDocumentTx;
-  if (databaseDocumentTx != null && databaseDocumentTx.exists()) {
-    OLogManager.instance().info(this,"Dropped database '%s'",databaseDocumentTx.getName());
-    if (databaseDocumentTx.isClosed())     openDatabase(databaseDocumentTx,connection.serverUser.name,connection.serverUser.password);
-    databaseDocumentTx.drop();
+  connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,storageType);
+  if (connection.database.exists()) {
+    OLogManager.instance().info(this,"Dropped database '%s'",connection.database.getName());
+    if (connection.database.isClosed())     openDatabase(connection.database,connection.serverUser.name,connection.serverUser.password);
+    connection.database.drop();
     connection.close();
   }
  else {

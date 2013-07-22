@@ -1,14 +1,15 @@
 {
   setDataCommandInfo("Exists database");
   final String dbName=channel.readString();
+  final String storageType;
+  if (connection.data.protocolVersion >= 16)   storageType=channel.readString();
+ else   storageType="local";
   checkServerAccess("database.exists");
-  ODatabaseDocumentTx databaseDocumentTx=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"plocal",false);
-  if (databaseDocumentTx != null)   connection.database=databaseDocumentTx;
+  connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,storageType);
   beginResponse();
   try {
     sendOk(clientTxId);
-    if (databaseDocumentTx == null)     channel.writeByte((byte)0);
- else     channel.writeByte((byte)(databaseDocumentTx.exists() ? 1 : 0));
+    channel.writeByte((byte)(connection.database.exists() ? 1 : 0));
   }
   finally {
     endResponse();

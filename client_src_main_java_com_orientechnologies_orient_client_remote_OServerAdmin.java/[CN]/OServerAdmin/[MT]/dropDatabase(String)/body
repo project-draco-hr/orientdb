@@ -1,0 +1,31 @@
+{
+  storage.checkConnection();
+  boolean retry=true;
+  while (retry)   try {
+    final OChannelBinaryClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_DB_DROP);
+    try {
+      network.writeString(storage.getName());
+      network.writeString(storageType);
+    }
+  finally {
+      storage.endRequest(network);
+    }
+    storage.getResponse(network);
+    retry=false;
+  }
+ catch (  OModificationOperationProhibitedException oope) {
+    retry=handleDBFreeze();
+  }
+catch (  Exception e) {
+    OLogManager.instance().exception("Cannot delete the remote storage: " + storage.getName(),e,OStorageException.class);
+  }
+  for (  OStorage s : Orient.instance().getStorages()) {
+    if (s.getURL().startsWith(getURL())) {
+      s.removeResource(OSchema.class.getSimpleName());
+      s.removeResource(OIndexManager.class.getSimpleName());
+      s.removeResource(OSecurity.class.getSimpleName());
+    }
+  }
+  ODatabaseRecordThreadLocal.INSTANCE.set(null);
+  return this;
+}

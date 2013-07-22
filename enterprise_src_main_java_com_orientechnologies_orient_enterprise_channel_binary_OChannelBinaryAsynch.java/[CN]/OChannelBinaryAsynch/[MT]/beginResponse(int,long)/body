@@ -4,7 +4,7 @@
     final long startClock=iTimeout > 0 ? System.currentTimeMillis() : 0;
     do {
       if (iTimeout <= 0)       acquireReadLock();
- else       if (!lockRead.getUnderlying().tryLock(iTimeout,TimeUnit.MILLISECONDS))       throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
+ else       if (!lockRead.tryAcquireLock(iTimeout,TimeUnit.MILLISECONDS))       throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
       if (!channelRead) {
         channelRead=true;
         try {
@@ -15,7 +15,7 @@
  catch (        IOException e) {
           channelRead=false;
           readCondition.signalAll();
-          lockRead.unlock();
+          releaseReadLock();
           throw e;
         }
       }
@@ -43,14 +43,14 @@
         Thread.currentThread().interrupt();
       }
  finally {
-        lockRead.unlock();
+        releaseReadLock();
       }
     }
  while (true);
     if (debug)     OLogManager.instance().debug(this,"%s - Session %d handle response",socket.getLocalAddress(),iRequesterId);
     handleStatus(currentStatus,currentSessionId);
   }
- catch (  InterruptedException e) {
+ catch (  OLockException e) {
     Thread.currentThread().interrupt();
     e.printStackTrace();
   }

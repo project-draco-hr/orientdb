@@ -2,12 +2,14 @@
   setDataCommandInfo("Release database");
   String dbName=channel.readString();
   checkServerAccess("database.release");
-  ODatabaseDocumentTx databaseDocumentTx=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,"plocal",false);
-  if (databaseDocumentTx != null)   connection.database=databaseDocumentTx;
-  if (databaseDocumentTx != null && databaseDocumentTx.exists()) {
-    OLogManager.instance().info(this,"Realising database '%s'",databaseDocumentTx.getURL());
-    if (databaseDocumentTx.isClosed())     openDatabase(databaseDocumentTx,connection.serverUser.name,connection.serverUser.password);
-    databaseDocumentTx.release();
+  final String storageType;
+  if (connection.data.protocolVersion >= 16)   storageType=channel.readString();
+ else   storageType="local";
+  connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,storageType);
+  if (connection.database.exists()) {
+    OLogManager.instance().info(this,"Realising database '%s'",connection.database.getURL());
+    if (connection.database.isClosed())     openDatabase(connection.database,connection.serverUser.name,connection.serverUser.password);
+    connection.database.release();
   }
  else {
     throw new OStorageException("Database with name '" + dbName + "' doesn't exits.");

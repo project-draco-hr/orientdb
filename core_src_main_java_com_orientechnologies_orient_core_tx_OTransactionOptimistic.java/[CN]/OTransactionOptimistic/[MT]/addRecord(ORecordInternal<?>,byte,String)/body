@@ -27,9 +27,14 @@ database.executeDeleteRecord(iRecord,iRecord.getRecordVersion(),false,false,OPER
 break;
 }
 final ORecordOperation txRecord=getRecordEntry(iRecord.getIdentity());
-if (txRecord != null && txRecord.record != iRecord) {
-OLogManager.instance().debug(this,"Update record in transaction: " + txRecord + ", rid="+ (txRecord != null ? txRecord.record : "NULL"));
+if (txRecord == null) {
+allEntries.put(iRecord.getIdentity(),new ORecordOperation(iRecord,iStatus));
+}
+ else if (txRecord.record != iRecord) {
+final String clusterName=getDatabase().getClusterNameById(iRecord.getIdentity().getClusterId());
+if (!clusterName.equals(OMetadata.CLUSTER_MANUAL_INDEX_NAME) && !clusterName.equals(OMetadata.CLUSTER_INDEX_NAME)) OLogManager.instance().warn(this,"Found record in transaction with the same RID %s but different instance. Probably the record has been loaded from another database instance.",iRecord.getIdentity());
 txRecord.record=iRecord;
+txRecord.type=iStatus;
 }
 }
  else {

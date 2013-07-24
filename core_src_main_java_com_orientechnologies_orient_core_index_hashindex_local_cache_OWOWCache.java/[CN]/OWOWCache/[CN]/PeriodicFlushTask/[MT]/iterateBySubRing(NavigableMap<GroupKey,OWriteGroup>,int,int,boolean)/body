@@ -1,0 +1,47 @@
+{
+  Iterator<Map.Entry<GroupKey,OWriteGroup>> entriesIterator=subMap.entrySet().iterator();
+  long currentTime=System.currentTimeMillis();
+  while (entriesIterator.hasNext() && flushedWriteGroups < writeGroupsToFlush) {
+    Map.Entry<GroupKey,OWriteGroup> entry=entriesIterator.next();
+    final OWriteGroup group=entry.getValue();
+    lockManager.acquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
+    try {
+      if (group.recencyBit && group.creationTime - currentTime < groupTTL || forceFlush)       group.recencyBit=false;
+ else {
+        boolean canBeFlushed=true;
+        final List<OCacheEntry> lockedEntries=new ArrayList<OCacheEntry>();
+        for (        final OCacheEntry cacheEntry : group.cacheEntries) {
+          cacheEntry.acquireExclusiveLock();
+          lockedEntries.add(cacheEntry);
+        }
+        try {
+          for (          final OCacheEntry cacheEntry : group.cacheEntries) {
+            if (cacheEntry != null && cacheEntry.usageCounter > 0) {
+              canBeFlushed=false;
+              break;
+            }
+          }
+          if (canBeFlushed) {
+            for (            final OCacheEntry cacheEntry : group.cacheEntries)             flushEntry(cacheEntry);
+            for (            final OCacheEntry cacheEntry : group.cacheEntries) {
+              cacheEntry.inWriteCache=false;
+              cacheSize.decrementAndGet();
+              if (!cacheEntry.inReadCache)               directMemory.free(cacheEntry.dataPointer);
+            }
+            lastGroupKey=entry.getKey();
+            entriesIterator.remove();
+            flushedWriteGroups++;
+          }
+ else           group.recencyBit=false;
+        }
+  finally {
+          for (          OCacheEntry cacheEntry : lockedEntries)           cacheEntry.releaseExclusiveLock();
+        }
+      }
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+  return flushedWriteGroups;
+}

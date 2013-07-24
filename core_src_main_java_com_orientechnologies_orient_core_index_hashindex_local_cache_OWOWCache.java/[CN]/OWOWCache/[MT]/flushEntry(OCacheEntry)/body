@@ -1,0 +1,15 @@
+{
+  if (entry.usageCounter > 0)   throw new OException("Cache entry is used and can not be deleted. (page index : " + entry.pageIndex + " file id : "+ entry.fileId+ ")");
+  if (writeAheadLog != null) {
+    OLogSequenceNumber lsn=getLogSequenceNumberFromPage(entry.dataPointer);
+    OLogSequenceNumber flushedLSN=writeAheadLog.getFlushedLSN();
+    if (flushedLSN == null || flushedLSN.compareTo(lsn) < 0)     writeAheadLog.flush();
+  }
+  final byte[] content=directMemory.get(entry.dataPointer,pageSize);
+  OLongSerializer.INSTANCE.serializeNative(MAGIC_NUMBER,content,0);
+  final int crc32=calculatePageCrc(content);
+  OIntegerSerializer.INSTANCE.serializeNative(crc32,content,OLongSerializer.LONG_SIZE);
+  final OFileClassic fileClassic=files.get(entry.fileId);
+  fileClassic.write(entry.pageIndex * pageSize,content);
+  if (syncOnPageFlush)   fileClassic.synch();
+}

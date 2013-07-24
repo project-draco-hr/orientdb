@@ -1,0 +1,26 @@
+{
+  try {
+    if (writeGroups.isEmpty())     return;
+    int writeGroupsToFlush;
+    double threshold=((double)cacheSize.get()) / cacheMaxSize;
+    if (threshold > 0.8)     writeGroupsToFlush=(int)(0.2 * writeGroups.size());
+ else     if (threshold > 0.9)     writeGroupsToFlush=(int)(0.4 * writeGroups.size());
+ else     writeGroupsToFlush=1;
+    int flushedGroups=0;
+    flushedGroups=flushRing(writeGroupsToFlush,flushedGroups,false);
+    if (flushedGroups < writeGroupsToFlush)     flushedGroups=flushRing(writeGroupsToFlush,flushedGroups,true);
+    if (flushedGroups < writeGroupsToFlush) {
+      if (OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.getValueAsBoolean()) {
+        final long oldCacheMaxSize=cacheMaxSize;
+        cacheMaxSize=(int)Math.ceil(cacheMaxSize * (1 + OGlobalConfiguration.SERVER_CACHE_INCREASE_STEP.getValueAsFloat()));
+        OLogManager.instance().warn(this,"Write cache size is increased from %d to %d",oldCacheMaxSize,cacheMaxSize);
+      }
+ else {
+        throw new OAllCacheEntriesAreUsedException("All records in write cache are used!");
+      }
+    }
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Exception during data flush.",e);
+  }
+}

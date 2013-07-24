@@ -1,0 +1,35 @@
+{
+  final GroupKey firstKey=new GroupKey(fileId,0);
+  final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
+  NavigableMap<GroupKey,OWriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
+  Iterator<Map.Entry<GroupKey,OWriteGroup>> entryIterator=subMap.entrySet().iterator();
+  while (entryIterator.hasNext()) {
+    Map.Entry<GroupKey,OWriteGroup> entry=entryIterator.next();
+    lockManager.acquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
+    try {
+      OWriteGroup writeGroup=entry.getValue();
+      List<OCacheEntry> lockedEntries=new ArrayList<OCacheEntry>();
+      for (      OCacheEntry cacheEntry : writeGroup.cacheEntries) {
+        cacheEntry.acquireExclusiveLock();
+        lockedEntries.add(cacheEntry);
+      }
+      try {
+        for (        OCacheEntry cacheEntry : writeGroup.cacheEntries)         flushEntry(cacheEntry);
+        for (        OCacheEntry cacheEntry : writeGroup.cacheEntries) {
+          cacheEntry.inWriteCache=false;
+          cacheSize.decrementAndGet();
+          if (!cacheEntry.inReadCache)           directMemory.free(cacheEntry.dataPointer);
+        }
+      }
+  finally {
+        for (        OCacheEntry cacheEntry : lockedEntries)         cacheEntry.releaseExclusiveLock();
+      }
+      entryIterator.remove();
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+  files.get(fileId).synch();
+  return null;
+}

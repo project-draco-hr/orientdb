@@ -1,28 +1,21 @@
 {
   final GroupKey firstKey=new GroupKey(fileId,0);
   final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
-  NavigableMap<GroupKey,OWriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
-  Iterator<Map.Entry<GroupKey,OWriteGroup>> entryIterator=subMap.entrySet().iterator();
+  NavigableMap<GroupKey,WriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
+  Iterator<Map.Entry<GroupKey,WriteGroup>> entryIterator=subMap.entrySet().iterator();
   while (entryIterator.hasNext()) {
-    Map.Entry<GroupKey,OWriteGroup> entry=entryIterator.next();
+    Map.Entry<GroupKey,WriteGroup> entry=entryIterator.next();
     lockManager.acquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
     try {
-      OWriteGroup writeGroup=entry.getValue();
-      List<OCacheEntry> lockedEntries=new ArrayList<OCacheEntry>();
-      for (      OCacheEntry cacheEntry : writeGroup.cacheEntries) {
-        cacheEntry.acquireExclusiveLock();
-        lockedEntries.add(cacheEntry);
-      }
-      try {
-        for (        OCacheEntry cacheEntry : writeGroup.cacheEntries)         flushEntry(cacheEntry);
-        for (        OCacheEntry cacheEntry : writeGroup.cacheEntries) {
-          cacheEntry.inWriteCache=false;
+      WriteGroup writeGroup=entry.getValue();
+      GroupKey groupKey=entry.getKey();
+      for (int i=0; i < 16; i++) {
+        long pagePointer=writeGroup.pages[i];
+        if (pagePointer != ODirectMemory.NULL_POINTER) {
+          flushPage(groupKey.fileId,groupKey.groupIndex * 16 + i,pagePointer);
+          directMemory.free(pagePointer);
           cacheSize.decrementAndGet();
-          if (!cacheEntry.inReadCache)           directMemory.free(cacheEntry.dataPointer);
         }
-      }
-  finally {
-        for (        OCacheEntry cacheEntry : lockedEntries)         cacheEntry.releaseExclusiveLock();
       }
       entryIterator.remove();
     }

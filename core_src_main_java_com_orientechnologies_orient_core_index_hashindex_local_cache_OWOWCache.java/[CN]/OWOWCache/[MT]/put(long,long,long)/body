@@ -1,0 +1,38 @@
+{
+synchronized (syncObject) {
+    final GroupKey groupKey=new GroupKey(fileId,pageIndex >>> 4);
+    lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      writeGroups.putIfAbsent(groupKey,new WriteGroup(System.currentTimeMillis()));
+      WriteGroup writeGroup=writeGroups.get(groupKey);
+      int entryIndex=(int)(pageIndex & 15);
+      final long dataPointer;
+      if (writeGroup.pages[entryIndex] == ODirectMemory.NULL_POINTER) {
+        dataPointer=directMemory.allocate(pageSize);
+        writeGroup.pages[entryIndex]=dataPointer;
+        cacheSize.incrementAndGet();
+      }
+ else {
+        dataPointer=writeGroup.pages[entryIndex];
+      }
+      directMemory.copyData(srcDataPointer,dataPointer,pageSize);
+      writeGroup.recencyBit=true;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    }
+    if (cacheSize.get() > cacheMaxSize) {
+      Future future=commitExecutor.submit(new PeriodicFlushTask());
+      try {
+        future.get();
+      }
+ catch (      InterruptedException e) {
+        Thread.interrupted();
+        throw new OException("File flush was interrupted",e);
+      }
+catch (      Exception e) {
+        throw new OException("File flush was abnormally terminated",e);
+      }
+    }
+  }
+}

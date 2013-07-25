@@ -1,7 +1,17 @@
 {
 synchronized (syncObject) {
-    readCache.clear(fileId);
-    writeCache.clear(fileId);
-    files.get(fileId).shrink(0);
+    writeCache.truncateFile(fileId);
+    final Set<Long> pageEntries=filePages.get(fileId);
+    for (    Long pageIndex : pageEntries) {
+      OCacheEntry cacheEntry=get(fileId,pageIndex,true);
+      if (cacheEntry != null) {
+        if (cacheEntry.usageCounter == 0) {
+          cacheEntry=remove(fileId,pageIndex);
+          if (cacheEntry.dataPointer != ODirectMemory.NULL_POINTER)           directMemory.free(cacheEntry.dataPointer);
+        }
+      }
+ else       throw new OStorageException("Page with index " + pageIndex + " was  not found in cache for file with id "+ fileId);
+    }
+    pageEntries.clear();
   }
 }

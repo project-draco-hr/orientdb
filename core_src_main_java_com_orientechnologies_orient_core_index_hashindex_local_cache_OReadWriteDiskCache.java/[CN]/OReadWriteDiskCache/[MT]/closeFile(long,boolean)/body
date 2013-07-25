@@ -1,8 +1,20 @@
 {
 synchronized (syncObject) {
-    if (flush)     writeCache.flush(fileId);
-    writeCache.clear(fileId);
-    readCache.clear(fileId);
-    files.get(fileId).close();
+    writeCache.close(fileId,flush);
+    final Set<Long> pageIndexes=filePages.get(fileId);
+    for (    Long pageIndex : pageIndexes) {
+      OCacheEntry cacheEntry=get(fileId,pageIndex,true);
+      if (cacheEntry != null) {
+        if (cacheEntry.usageCounter == 0) {
+          cacheEntry=remove(fileId,pageIndex);
+          if (cacheEntry.dataPointer != ODirectMemory.NULL_POINTER)           directMemory.free(cacheEntry.dataPointer);
+        }
+ else         throw new OStorageException("Page with index " + pageIndex + " for file with id "+ fileId+ "can not be freed because it is used.");
+      }
+ else {
+        throw new OStorageException("Page with index " + pageIndex + " for file with id "+ fileId+ " was not found in cache");
+      }
+    }
+    pageIndexes.clear();
   }
 }

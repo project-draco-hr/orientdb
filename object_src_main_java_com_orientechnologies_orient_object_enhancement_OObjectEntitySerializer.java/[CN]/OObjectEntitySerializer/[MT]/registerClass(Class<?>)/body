@@ -1,9 +1,11 @@
 {
   if (Proxy.class.isAssignableFrom(iClass) || classes.contains(iClass))   return;
   boolean reloadSchema=false;
+  boolean automaticSchemaGeneration=false;
   if (ODatabaseRecordThreadLocal.INSTANCE.isDefined() && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && !ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().existsClass(iClass.getSimpleName())) {
     ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().createClass(iClass.getSimpleName());
     reloadSchema=true;
+    if (ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner() instanceof OObjectDatabaseTx)     automaticSchemaGeneration=((OObjectDatabaseTx)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner()).isAutomaticSchemaGeneration();
   }
   for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
     if (!classes.contains(currentClass)) {
@@ -123,6 +125,9 @@
         }
       }
       registerCallbacks(currentClass);
+    }
+    if (automaticSchemaGeneration && !iClass.equals(Object.class) && !iClass.equals(ODocument.class)) {
+      generateSchema(iClass,ODatabaseRecordThreadLocal.INSTANCE.get());
     }
     String iClassName=currentClass.getSimpleName();
     currentClass=currentClass.getSuperclass();

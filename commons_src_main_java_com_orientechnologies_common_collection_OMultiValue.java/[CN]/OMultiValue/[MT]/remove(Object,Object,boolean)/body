@@ -1,22 +1,27 @@
 {
   if (iObject != null) {
     if (iObject instanceof OMultiCollectionIterator<?>) {
-      final Collection<Object> list=new ArrayList<Object>(OMultiValue.getSize(iObject));
+      final Collection<Object> list=new LinkedList<Object>();
       for (      Object o : ((OMultiCollectionIterator<?>)iObject))       list.add(o);
       iObject=list;
+    }
+    if (iToRemove instanceof OMultiCollectionIterator<?>) {
+      final Set<Object> set=new HashSet<Object>();
+      for (      Object o : ((OMultiCollectionIterator<?>)iToRemove))       set.add(o);
+      iToRemove=set;
     }
     if (iObject instanceof Collection<?>) {
       final Collection<Object> coll=(Collection<Object>)iObject;
       if (iToRemove instanceof Collection<?>) {
         for (        Object o : (Collection<Object>)iToRemove) {
-          if (isMultiValue(o))           remove(coll,o);
+          if (isMultiValue(o))           remove(coll,o,iAllOccurrences);
  else           coll.remove(o);
         }
       }
  else       if (iToRemove != null && iToRemove.getClass().isArray()) {
         for (int i=0; i < Array.getLength(iToRemove); ++i) {
           Object o=Array.get(iToRemove,i);
-          if (isMultiValue(o))           remove(coll,o);
+          if (isMultiValue(o))           remove(coll,o,iAllOccurrences);
  else           coll.remove(o);
         }
       }
@@ -25,9 +30,15 @@
       }
  else       if (iToRemove instanceof Iterator<?>) {
         if (iToRemove instanceof OMultiCollectionIterator<?>)         ((OMultiCollectionIterator<?>)iToRemove).reset();
-        for (Iterator<?> it=(Iterator<?>)iToRemove; it.hasNext(); ) {
-          final Object itemToRemove=it.next();
-          while (coll.remove(itemToRemove))           ;
+        if (iAllOccurrences) {
+          OMultiCollectionIterator<?> it=(OMultiCollectionIterator<?>)iToRemove;
+          batchRemove(coll,it);
+        }
+ else {
+          for (Iterator<?> it=(Iterator<?>)iToRemove; it.hasNext(); ) {
+            final Object itemToRemove=it.next();
+            while (coll.remove(itemToRemove))             if (!iAllOccurrences)             break;
+          }
         }
       }
  else       coll.remove(iToRemove);

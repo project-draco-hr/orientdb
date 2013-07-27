@@ -2,33 +2,28 @@
   final int delay=OGlobalConfiguration.SERVER_CHANNEL_CLEAN_DELAY.getValueAsInteger();
   Orient.instance().getTimer().schedule(new TimerTask(){
     @Override public void run(){
-      acquireExclusiveLock();
-      try {
-        final HashMap<Integer,OClientConnection> localConnections=new HashMap<Integer,OClientConnection>(connections);
-        for (        Entry<Integer,OClientConnection> entry : localConnections.entrySet()) {
-          final Socket socket;
-          if (entry.getValue().protocol == null || entry.getValue().protocol.getChannel() == null)           socket=null;
- else           socket=entry.getValue().protocol.getChannel().socket;
-          if (socket == null || socket.isClosed() || socket.isInputShutdown()) {
-            OLogManager.instance().debug(this,"[OClientConnectionManager] found and removed pending closed channel %d (%s)",entry.getKey(),socket);
-            try {
-              entry.getValue().close();
-            }
- catch (            Exception e) {
-            }
-            connections.remove(entry.getKey());
+      final Iterator<Entry<Integer,OClientConnection>> iterator=connections.entrySet().iterator();
+      while (iterator.hasNext()) {
+        final Entry<Integer,OClientConnection> entry=iterator.next();
+        final Socket socket;
+        if (entry.getValue().protocol == null || entry.getValue().protocol.getChannel() == null)         socket=null;
+ else         socket=entry.getValue().protocol.getChannel().socket;
+        if (socket == null || socket.isClosed() || socket.isInputShutdown()) {
+          OLogManager.instance().debug(this,"[OClientConnectionManager] found and removed pending closed channel %d (%s)",entry.getKey(),socket);
+          try {
+            entry.getValue().close();
           }
+ catch (          Exception e) {
+          }
+          iterator.remove();
         }
-      }
-  finally {
-        releaseExclusiveLock();
       }
     }
   }
 ,delay,delay);
   Orient.instance().getProfiler().registerHookValue("server.connections.actives","Number of active network connections",METRIC_TYPE.COUNTER,new OProfilerHookValue(){
     public Object getValue(){
-      return metricActiveConnections;
+      return connections.size();
     }
   }
 );

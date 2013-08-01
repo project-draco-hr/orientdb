@@ -1,2 +1,30 @@
 {
+  try {
+    ODatabaseDocumentTx exportDatabase=new ODatabaseDocumentTx(url);
+    exportDatabase.open("admin","admin");
+    OCommandOutputListener listener=new OCommandOutputListener(){
+      @Override public void onMessage(      String iText){
+      }
+    }
+;
+    ODatabaseExport export=new ODatabaseExport(exportDatabase,"objectSchemaTest/target/database.export.gz",listener);
+    export.exportDatabase();
+    export.close();
+    exportDatabase.close();
+    ODatabaseDocumentTx importDatabase=new ODatabaseDocumentTx(url + "_objectschema");
+    importDatabase.open("admin","admin");
+    ODatabaseImport impor=new ODatabaseImport(importDatabase,"objectSchemaTest/target/database.export.gz",listener);
+    for (    ORecordHook hook : new ArrayList<ORecordHook>(importDatabase.getHooks())) {
+      importDatabase.unregisterHook(hook);
+    }
+    impor.setDeleteRIDMapping(false);
+    impor.importDatabase();
+    impor.close();
+    importDatabase.close();
+    final File importDir=new File("objectSchemaTest/target/database.export.gz");
+    importDir.delete();
+  }
+ catch (  IOException e) {
+    Assert.fail("Export import didn't go as expected",e);
+  }
 }

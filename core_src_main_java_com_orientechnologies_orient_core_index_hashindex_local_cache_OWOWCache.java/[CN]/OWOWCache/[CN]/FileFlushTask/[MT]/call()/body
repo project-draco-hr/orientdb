@@ -9,15 +9,29 @@
     try {
       WriteGroup writeGroup=entry.getValue();
       GroupKey groupKey=entry.getKey();
+      List<PageKey> lockedPages=new ArrayList<PageKey>();
       for (int i=0; i < 16; i++) {
-        long pagePointer=writeGroup.pages[i];
-        if (pagePointer != ODirectMemory.NULL_POINTER) {
-          flushPage(groupKey.fileId,groupKey.groupIndex * 16 + i,pagePointer);
-          directMemory.free(pagePointer);
-          cacheSize.decrementAndGet();
-        }
+        final PageKey pageKey=new PageKey(groupKey.fileId,groupKey.groupIndex << 4 + i);
+        pageFlushLockManger.acquireLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED);
+        lockedPages.add(pageKey);
       }
-      entryIterator.remove();
+      try {
+        for (        OCachePointer pagePointer : writeGroup.pages) {
+          if (pagePointer != null && pagePointer.getUsagesCount() > 0)           throw new OException("Pages in write group with index " + groupKey.groupIndex + " are used and can not be flushed.");
+        }
+        for (int i=0; i < 16; i++) {
+          OCachePointer pagePointer=writeGroup.pages[i];
+          if (pagePointer != null) {
+            flushPage(groupKey.fileId,groupKey.groupIndex * 16 + i,pagePointer.getDataPointer());
+            pagePointer.decrementReferrer();
+            cacheSize.decrementAndGet();
+          }
+        }
+        entryIterator.remove();
+      }
+  finally {
+        for (        PageKey pageKey : lockedPages)         pageFlushLockManger.releaseLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED);
+      }
     }
   finally {
       lockManager.releaseLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);

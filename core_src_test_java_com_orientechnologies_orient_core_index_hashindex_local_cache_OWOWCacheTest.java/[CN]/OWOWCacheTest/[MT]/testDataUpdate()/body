@@ -9,13 +9,24 @@
     long pagePointer=directMemory.allocate(new byte[pageSize]);
     directMemory.set(pagePointer + systemOffset,data,0,data.length);
     pageIndexDataMap.put(pageIndex,pagePointer);
-    wowCache.put(fileId,pageIndex,pagePointer);
+    final OCachePointer cachePointer=new OCachePointer(directMemory.get(pagePointer,pageSize));
+    wowCache.put(fileId,pageIndex,cachePointer);
   }
   for (  Map.Entry<Long,Long> entry : pageIndexDataMap.entrySet()) {
     long pageIndex=entry.getKey();
     long pagePointer=entry.getValue();
     byte[] dataOne=directMemory.get(pagePointer + systemOffset,8);
-    byte[] dataTwo=directMemory.get(wowCache.get(fileId,pageIndex) + systemOffset,8);
+    OCachePointer cachePointer;
+    wowCache.acquireFlushLock(fileId,pageIndex);
+    try {
+      cachePointer=wowCache.get(fileId,pageIndex);
+      cachePointer.incrementReferrer();
+    }
+  finally {
+      wowCache.releaseFlushLock(fileId,pageIndex);
+    }
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
     Assert.assertEquals(dataTwo,dataOne);
   }
   for (int i=0; i < 300; i++) {
@@ -26,13 +37,24 @@
     byte[] data=new byte[8];
     random.nextBytes(data);
     directMemory.set(pagePointer + systemOffset,data,0,data.length);
-    wowCache.put(fileId,pageIndex,pagePointer);
+    final OCachePointer cachePointer=new OCachePointer(directMemory.get(pagePointer,pageSize));
+    wowCache.put(fileId,pageIndex,cachePointer);
   }
   for (  Map.Entry<Long,Long> entry : pageIndexDataMap.entrySet()) {
     long pageIndex=entry.getKey();
     long pagePointer=entry.getValue();
     byte[] dataOne=directMemory.get(pagePointer + systemOffset,8);
-    byte[] dataTwo=directMemory.get(wowCache.get(fileId,pageIndex) + systemOffset,8);
+    OCachePointer cachePointer;
+    wowCache.acquireFlushLock(fileId,pageIndex);
+    try {
+      cachePointer=wowCache.get(fileId,pageIndex);
+      cachePointer.incrementReferrer();
+    }
+  finally {
+      wowCache.releaseFlushLock(fileId,pageIndex);
+    }
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
     Assert.assertEquals(dataTwo,dataOne);
   }
   for (  long pagePointer : pageIndexDataMap.values())   directMemory.free(pagePointer);

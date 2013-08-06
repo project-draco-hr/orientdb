@@ -7,12 +7,24 @@
     random.nextBytes(data);
     pagePointers[i]=directMemory.allocate(new byte[pageSize]);
     directMemory.set(pagePointers[i] + systemOffset,data,0,data.length);
-    wowCache.put(fileId,i,pagePointers[i]);
+    final OCachePointer cachePointer=new OCachePointer(directMemory.get(pagePointers[i],pageSize));
+    wowCache.put(fileId,i,cachePointer);
   }
   for (int i=0; i < pagePointers.length; i++) {
     long dataPointer=pagePointers[i];
     byte[] dataOne=directMemory.get(dataPointer + systemOffset,8);
-    byte[] dataTwo=directMemory.get(wowCache.get(fileId,i) + systemOffset,8);
+    OCachePointer cachePointer;
+    wowCache.acquireFlushLock(fileId,i);
+    try {
+      cachePointer=wowCache.get(fileId,i);
+      cachePointer.incrementReferrer();
+    }
+  finally {
+      wowCache.releaseFlushLock(fileId,i);
+    }
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
+    cachePointer=null;
     Assert.assertEquals(dataTwo,dataOne);
   }
   wowCache.flush();

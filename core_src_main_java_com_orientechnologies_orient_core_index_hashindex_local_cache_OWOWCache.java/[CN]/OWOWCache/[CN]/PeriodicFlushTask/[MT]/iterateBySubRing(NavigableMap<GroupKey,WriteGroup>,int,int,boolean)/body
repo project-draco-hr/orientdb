@@ -1,7 +1,7 @@
 {
   Iterator<Map.Entry<GroupKey,WriteGroup>> entriesIterator=subMap.entrySet().iterator();
   long currentTime=System.currentTimeMillis();
-  while (entriesIterator.hasNext() && flushedWriteGroups < writeGroupsToFlush) {
+  groupsLoop:   while (entriesIterator.hasNext() && flushedWriteGroups < writeGroupsToFlush) {
     Map.Entry<GroupKey,WriteGroup> entry=entriesIterator.next();
     final WriteGroup group=entry.getValue();
     final GroupKey groupKey=entry.getKey();
@@ -9,17 +9,31 @@
     try {
       if (group.recencyBit && group.creationTime - currentTime < groupTTL && !forceFlush)       group.recencyBit=false;
  else {
+        List<PageKey> lockedPages=new ArrayList<PageKey>();
         for (int i=0; i < 16; i++) {
-          final long pagePointer=group.pages[i];
-          if (pagePointer != ODirectMemory.NULL_POINTER) {
-            flushPage(groupKey.fileId,groupKey.groupIndex * 16 + i,pagePointer);
-            directMemory.free(pagePointer);
-            cacheSize.decrementAndGet();
-          }
+          final PageKey pageKey=new PageKey(groupKey.fileId,groupKey.groupIndex << 4 + i);
+          pageFlushLockManger.acquireLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED);
+          lockedPages.add(pageKey);
         }
-        lastGroupKey=entry.getKey();
-        entriesIterator.remove();
-        flushedWriteGroups++;
+        try {
+          for (          OCachePointer pagePointer : group.pages) {
+            if (pagePointer != null && pagePointer.getUsagesCount() > 0)             continue groupsLoop;
+          }
+          for (int i=0; i < 16; i++) {
+            final OCachePointer pagePointer=group.pages[i];
+            if (pagePointer != null) {
+              flushPage(groupKey.fileId,groupKey.groupIndex * 16 + i,pagePointer.getDataPointer());
+              pagePointer.decrementReferrer();
+              cacheSize.decrementAndGet();
+            }
+          }
+          lastGroupKey=entry.getKey();
+          entriesIterator.remove();
+          flushedWriteGroups++;
+        }
+  finally {
+          for (          PageKey pageKey : lockedPages)           pageFlushLockManger.releaseLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED);
+        }
       }
     }
   finally {

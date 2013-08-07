@@ -1,7 +1,7 @@
 {
   if (!idOrVersionField) {
     if (value == null) {
-      final Object docValue=doc.field(fieldName,OObjectEntitySerializer.getTypeByClass(self.getClass(),fieldName));
+      final Object docValue=getDocFieldValue(self,fieldName);
       if (docValue != null) {
         value=lazyLoadField(self,fieldName,docValue,value);
       }
@@ -9,12 +9,12 @@
  else {
       if (((value instanceof Collection<?> || value instanceof Map<?,?>) && !(value instanceof OLazyObjectMultivalueElement)) || value.getClass().isArray()) {
         final Class<?> genericMultiValueType=OReflectionHelper.getGenericMultivalueType(OObjectEntitySerializer.getField(fieldName,self.getClass()));
-        if (genericMultiValueType != null && !OReflectionHelper.isJavaType(genericMultiValueType)) {
+        if (genericMultiValueType == null || !OReflectionHelper.isJavaType(genericMultiValueType)) {
           final Field f=OObjectEntitySerializer.getField(fieldName,self.getClass());
           if (OObjectEntitySerializer.isSerializedType(f) && !(value instanceof OLazyObjectCustomSerializer)) {
             value=manageSerializedCollections(self,fieldName,value);
           }
- else           if (genericMultiValueType.isEnum() && !(value instanceof OLazyObjectEnumSerializer)) {
+ else           if (genericMultiValueType != null && genericMultiValueType.isEnum() && !(value instanceof OLazyObjectEnumSerializer)) {
             value=manageEnumCollections(self,f.getName(),genericMultiValueType,value);
           }
  else {
@@ -22,7 +22,7 @@
           }
         }
  else {
-          final Object docValue=doc.field(fieldName,OObjectEntitySerializer.getTypeByClass(self.getClass(),fieldName));
+          final Object docValue=getDocFieldValue(self,fieldName);
           if (docValue == null) {
             if (value.getClass().isArray()) {
               OClass schemaClass=doc.getSchemaClass();
@@ -46,7 +46,7 @@
         }
       }
  else       if (!loadedFields.containsKey(fieldName) || loadedFields.get(fieldName).compareTo(doc.getRecordVersion()) < 0) {
-        final Object docValue=doc.field(fieldName,OObjectEntitySerializer.getTypeByClass(self.getClass(),fieldName));
+        final Object docValue=getDocFieldValue(self,fieldName);
         if (docValue != null && !docValue.equals(value)) {
           value=lazyLoadField(self,fieldName,docValue,value);
         }

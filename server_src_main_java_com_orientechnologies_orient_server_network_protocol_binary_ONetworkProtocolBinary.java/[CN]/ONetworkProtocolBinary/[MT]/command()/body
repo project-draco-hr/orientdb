@@ -5,49 +5,55 @@
   connection.data.commandDetail=command.getText();
   beginResponse();
   try {
+    final OAbstractCommandResultListener listener;
     if (asynch) {
-      final AtomicBoolean empty=new AtomicBoolean(true);
-      final Set<ODocument> recordsToSend=new HashSet<ODocument>();
-      final AsyncResultListener listener=new AsyncResultListener(empty,clientTxId,recordsToSend);
+      listener=new OAsyncCommandResultListener(this,clientTxId);
       command.setResultListener(listener);
-      final long serverTimeout=OGlobalConfiguration.COMMAND_TIMEOUT.getValueAsLong();
-      if (serverTimeout > 0 && command.getTimeoutTime() > serverTimeout)       command.setTimeout(serverTimeout,command.getTimeoutStrategy());
-      listener.setFetchPlan(((OCommandRequestInternal)connection.database.command(command)).getFetchPlan());
-      ((OCommandRequestInternal)connection.database.command(command)).execute();
-      if (empty.get())       try {
+    }
+ else     listener=new OSyncCommandResultListener();
+    final long serverTimeout=OGlobalConfiguration.COMMAND_TIMEOUT.getValueAsLong();
+    if (serverTimeout > 0 && command.getTimeoutTime() > serverTimeout)     command.setTimeout(serverTimeout,command.getTimeoutStrategy());
+    listener.setFetchPlan(((OCommandRequestInternal)connection.database.command(command)).getFetchPlan());
+    final Object result=((OCommandRequestInternal)connection.database.command(command)).execute();
+    if (asynch) {
+      if (listener.isEmpty())       try {
         sendOk(clientTxId);
       }
  catch (      IOException e1) {
       }
-      for (      ODocument doc : recordsToSend) {
-        channel.writeByte((byte)2);
-        writeIdentifiable(doc);
-      }
-      channel.writeByte((byte)0);
     }
  else {
-      final Object result=((OCommandRequestInternal)connection.database.command(command)).execute();
       sendOk(clientTxId);
       if (result == null) {
         channel.writeByte((byte)'n');
       }
  else       if (result instanceof OIdentifiable) {
         channel.writeByte((byte)'r');
+        listener.result(result);
         writeIdentifiable((OIdentifiable)result);
       }
  else       if (OMultiValue.isMultiValue(result)) {
         channel.writeByte((byte)'l');
         channel.writeInt(OMultiValue.getSize(result));
         for (        Object o : OMultiValue.getMultiValueIterable(result)) {
+          listener.result(o);
           writeIdentifiable((OIdentifiable)o);
         }
       }
  else {
         channel.writeByte((byte)'a');
         final StringBuilder value=new StringBuilder();
+        listener.result(result);
         ORecordSerializerStringAbstract.fieldTypeToString(value,OType.getTypeByClass(result.getClass()),result);
         channel.writeString(value.toString());
       }
+    }
+    if (asynch || connection.data.protocolVersion >= 17) {
+      for (      ODocument doc : listener.getFetchedRecordsToSend()) {
+        channel.writeByte((byte)2);
+        writeIdentifiable(doc);
+      }
+      channel.writeByte((byte)0);
     }
   }
   finally {

@@ -1,0 +1,29 @@
+{
+  OCacheEntry cacheEntry=am.get(fileId,pageIndex);
+  if (cacheEntry != null) {
+    am.putToMRU(cacheEntry);
+    return cacheEntry;
+  }
+  cacheEntry=a1out.remove(fileId,pageIndex);
+  if (cacheEntry != null) {
+    removeColdestPageIfNeeded();
+    CacheResult cacheResult=cacheFileContent(fileId,pageIndex);
+    cacheEntry.isDirty=cacheResult.isDirty;
+    OLogSequenceNumber lsn;
+    if (cacheResult.isDirty)     lsn=dirtyPages.get(fileId).get(pageIndex);
+ else     lsn=getLogSequenceNumberFromPage(cacheResult.dataPointer);
+    cacheEntry.loadedLSN=lsn;
+    am.putToMRU(cacheEntry);
+    return cacheEntry;
+  }
+  cacheEntry=a1in.get(fileId,pageIndex);
+  if (cacheEntry != null)   return cacheEntry;
+  removeColdestPageIfNeeded();
+  CacheResult cacheResult=cacheFileContent(fileId,pageIndex);
+  OLogSequenceNumber lsn;
+  if (cacheResult.isDirty)   lsn=dirtyPages.get(fileId).get(pageIndex);
+ else   lsn=getLogSequenceNumberFromPage(cacheResult.dataPointer);
+  a1in.putToMRU(cacheEntry);
+  filePages.get(fileId).add(pageIndex);
+  return cacheEntry;
+}

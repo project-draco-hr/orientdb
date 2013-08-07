@@ -1,0 +1,37 @@
+{
+  Random random=new Random();
+  long[] pagePointers=new long[200];
+  long fileId=wowCache.openFile(fileName);
+  for (int i=0; i < pagePointers.length; i++) {
+    byte[] data=new byte[8];
+    random.nextBytes(data);
+    pagePointers[i]=directMemory.allocate(new byte[pageSize]);
+    directMemory.set(pagePointers[i] + systemOffset,data,0,data.length);
+    final OCachePointer cachePointer=new OCachePointer(directMemory.get(pagePointers[i],pageSize));
+    wowCache.put(fileId,i,cachePointer);
+  }
+  for (int i=0; i < pagePointers.length; i++) {
+    long dataPointer=pagePointers[i];
+    byte[] dataOne=directMemory.get(dataPointer + systemOffset,8);
+    OCachePointer cachePointer;
+    wowCache.acquireFlushLock(fileId,i);
+    try {
+      cachePointer=wowCache.get(fileId,i);
+      cachePointer.incrementReferrer();
+    }
+  finally {
+      wowCache.releaseFlushLock(fileId,i);
+    }
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
+    Assert.assertEquals(dataTwo,dataOne);
+  }
+  Thread.sleep(5000);
+  for (int i=0; i < pagePointers.length; i++) {
+    byte[] dataContent=directMemory.get(pagePointers[i] + systemOffset,8);
+    assertFile(i,dataContent,new OLogSequenceNumber(0,0));
+  }
+  for (  long pagePointer : pagePointers) {
+    directMemory.free(pagePointer);
+  }
+}

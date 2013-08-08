@@ -9,7 +9,10 @@
       group.recencyBit=false;
       continue;
     }
-    lockManager.acquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
+    if (group.creationTime - currentTime < groupTTL && !forceFlush) {
+      if (!lockManager.tryAcquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE))       continue;
+    }
+ else     lockManager.acquireLock(Thread.currentThread(),entry.getKey(),OLockManager.LOCK.EXCLUSIVE);
     try {
       if (group.recencyBit && group.creationTime - currentTime < groupTTL && !forceFlush)       group.recencyBit=false;
  else {
@@ -17,8 +20,8 @@
         List<PageKey> lockedPages=new ArrayList<PageKey>();
         for (int i=0; i < 16; i++) {
           final PageKey pageKey=new PageKey(groupKey.fileId,(groupKey.groupIndex << 4) + i);
-          pageFlushLockManger.acquireLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED);
-          lockedPages.add(pageKey);
+          if (pageFlushLockManger.tryAcquireLock(Thread.currentThread(),pageKey,OLockManager.LOCK.SHARED))           lockedPages.add(pageKey);
+ else           continue groupsLoop;
         }
         try {
           for (          OCachePointer pagePointer : group.pages) {
@@ -28,6 +31,8 @@
             final OCachePointer pagePointer=group.pages[i];
             if (pagePointer != null) {
               flushPage(groupKey.fileId,(groupKey.groupIndex << 4) + i,pagePointer.getDataPointer());
+              final OLogSequenceNumber flushedLSN=OLocalPage.getLogSequenceNumberFromPage(directMemory,pagePointer.getDataPointer());
+              pagePointer.setLastFlushedLsn(flushedLSN);
               pagePointer.decrementReferrer();
               cacheSize.decrementAndGet();
             }

@@ -1,0 +1,41 @@
+{
+  closeBufferAndDeleteFile();
+  File file=new File(storageLocal.getConfiguration().getDirectory());
+  if (!file.exists())   file.mkdir();
+  writeAheadLog=new OWriteAheadLog(1024,-1,10 * 1024,100L * 1024 * 1024* 1024,storageLocal);
+  writeAheadLog.logFuzzyCheckPointStart();
+  OLogSequenceNumber pageLSN=writeAheadLog.logFuzzyCheckPointEnd();
+  final OStorageSegmentConfiguration segmentConfiguration=new OStorageSegmentConfiguration(storageLocal.getConfiguration(),"readWriteDiskCacheTest.tst",0);
+  segmentConfiguration.fileType=OFileFactory.CLASSIC;
+  buffer=new OReadWriteDiskCache(4 * (8 + systemOffset),2 * (8 + systemOffset),8 + systemOffset,10000,-1,storageLocal,writeAheadLog,true,false);
+  long fileId=buffer.openFile(fileName);
+  for (int i=0; i < 8; i++) {
+    long dataPointer=buffer.load(fileId,i);
+    setLsn(dataPointer,pageLSN);
+    buffer.markDirty(fileId,i);
+    buffer.release(fileId,i);
+  }
+  buffer.flushBuffer();
+  buffer.clear();
+  writeAheadLog.getFlushedLSN();
+  writeAheadLog.logFuzzyCheckPointStart();
+  OLogSequenceNumber lsn=writeAheadLog.logFuzzyCheckPointEnd();
+  for (int i=0; i < 8; i++) {
+    long dataPointer=buffer.load(fileId,i);
+    setLsn(dataPointer,lsn);
+    buffer.markDirty(fileId,i);
+    buffer.release(fileId,i);
+  }
+  Set<ODirtyPage> dirtyPages=buffer.logDirtyPagesTable();
+  Set<ODirtyPage> expectedDirtyPages=new HashSet<ODirtyPage>();
+  for (int i=7; i >= 6; i--)   expectedDirtyPages.add(new ODirtyPage("readWriteDiskCacheTest.tst",i,pageLSN));
+  Assert.assertEquals(dirtyPages,expectedDirtyPages);
+  lsn=writeAheadLog.begin();
+  OLogSequenceNumber prevLSN=null;
+  while (lsn != null) {
+    prevLSN=lsn;
+    lsn=writeAheadLog.next(lsn);
+  }
+  final ODirtyPagesRecord dirtyPagesRecord=(ODirtyPagesRecord)writeAheadLog.read(prevLSN);
+  Assert.assertEquals(dirtyPagesRecord.getDirtyPages(),dirtyPages);
+}

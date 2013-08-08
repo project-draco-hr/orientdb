@@ -4,10 +4,16 @@ synchronized (syncObject) {
     lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.SHARED);
     try {
       final WriteGroup writeGroup=writeGroups.get(groupKey);
-      if (writeGroup == null)       return cacheFileContent(fileId,pageIndex);
+      OCachePointer pagePointer;
+      if (writeGroup == null) {
+        pagePointer=cacheFileContent(fileId,pageIndex);
+        pagePointer.incrementReferrer();
+        return pagePointer;
+      }
       final int entryIndex=(int)(pageIndex & 15);
-      OCachePointer pagePointer=writeGroup.pages[entryIndex];
-      if (pagePointer == null)       return cacheFileContent(fileId,pageIndex);
+      pagePointer=writeGroup.pages[entryIndex];
+      if (pagePointer == null)       pagePointer=cacheFileContent(fileId,pageIndex);
+      pagePointer.incrementReferrer();
       return pagePointer;
     }
   finally {

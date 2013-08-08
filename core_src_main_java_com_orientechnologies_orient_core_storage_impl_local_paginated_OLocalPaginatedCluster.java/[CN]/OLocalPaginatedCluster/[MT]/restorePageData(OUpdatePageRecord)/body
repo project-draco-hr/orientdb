@@ -1,13 +1,15 @@
 {
   long pageIndex=updatePageRecord.getPageIndex();
-  long pagePointer=diskCache.load(fileId,pageIndex);
+  OCachePointer pagePointer=diskCache.load(fileId,pageIndex);
+  pagePointer.acquireExclusiveLock();
   try {
-    final OLocalPage page=new OLocalPage(pagePointer,false,OLocalPage.TrackMode.NONE);
+    final OLocalPage page=new OLocalPage(pagePointer.getDataPointer(),false,OLocalPage.TrackMode.NONE);
     page.restoreChanges(updatePageRecord.getChanges());
     page.setLsn(updatePageRecord.getLsn());
     diskCache.markDirty(fileId,pageIndex);
   }
   finally {
+    pagePointer.releaseExclusiveLock();
     diskCache.release(fileId,pageIndex);
   }
 }

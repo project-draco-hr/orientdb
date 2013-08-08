@@ -9,11 +9,13 @@
   long fileId=buffer.openFile(fileName);
   OLogSequenceNumber lsnToFlush=null;
   for (int i=0; i < 8; i++) {
-    long dataPointer=buffer.load(fileId,i);
+    OCachePointer dataPointer=buffer.load(fileId,i);
+    dataPointer.acquireExclusiveLock();
     OLogSequenceNumber pageLSN=writeAheadLog.log(new WriteAheadLogTest.TestRecord(30,false));
-    setLsn(dataPointer,pageLSN);
+    setLsn(dataPointer.getDataPointer(),pageLSN);
     if (i == 5)     lsnToFlush=pageLSN;
     buffer.markDirty(fileId,i);
+    dataPointer.releaseExclusiveLock();
     buffer.release(fileId,i);
   }
   Assert.assertEquals(writeAheadLog.getFlushedLSN(),lsnToFlush);

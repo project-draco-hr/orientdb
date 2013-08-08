@@ -17,10 +17,11 @@
       long nextPagePointer=-1;
       int removedContentSize=0;
       do {
-        long pointer=diskCache.load(fileId,pageIndex);
+        OCachePointer pointer=diskCache.load(fileId,pageIndex);
+        pointer.acquireExclusiveLock();
         int initialFreePageIndex;
         try {
-          final OLocalPage localPage=new OLocalPage(pointer,false,trackMode);
+          final OLocalPage localPage=new OLocalPage(pointer.getDataPointer(),false,trackMode);
           initialFreePageIndex=calculateFreePageIndex(localPage);
           int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
           if (recordPageOffset < 0) {
@@ -39,6 +40,7 @@
           diskCache.markDirty(fileId,pageIndex);
         }
   finally {
+          pointer.releaseExclusiveLock();
           diskCache.release(fileId,pageIndex);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);

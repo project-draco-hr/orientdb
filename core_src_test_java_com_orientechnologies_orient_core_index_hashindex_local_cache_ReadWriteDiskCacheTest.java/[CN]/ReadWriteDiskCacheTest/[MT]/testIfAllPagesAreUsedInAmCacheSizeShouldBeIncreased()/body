@@ -2,20 +2,23 @@
   boolean oldIncreaseOnDemand=OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.getValueAsBoolean();
   OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.setValue(true);
   long fileId=buffer.openFile(fileName);
-  long[] pointers;
-  pointers=new long[20];
+  OCachePointer[] pointers=new OCachePointer[20];
   for (int i=0; i < 6; i++) {
     pointers[i]=buffer.load(fileId,i);
+    pointers[i].acquireExclusiveLock();
     buffer.markDirty(fileId,i);
-    directMemory.set(pointers[i] + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+    directMemory.set(pointers[i].getDataPointer() + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+    pointers[i].releaseExclusiveLock();
     buffer.release(fileId,i);
   }
   for (int i=0; i < 4; i++) {
     pointers[i]=buffer.load(fileId,i);
+    pointers[i].acquireExclusiveLock();
     buffer.markDirty(fileId,i);
-    directMemory.set(pointers[i] + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+    directMemory.set(pointers[i].getDataPointer() + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
   }
   for (int i=0; i < 4; i++) {
+    pointers[i].releaseExclusiveLock();
     buffer.release(fileId,i);
   }
   int maxSize=buffer.getMaxSize();

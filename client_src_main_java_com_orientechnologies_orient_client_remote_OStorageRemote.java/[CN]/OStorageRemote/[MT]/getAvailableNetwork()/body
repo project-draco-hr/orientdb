@@ -1,0 +1,52 @@
+{
+  OChannelBinaryClient network=null;
+  int beginCursor=networkPoolCursor;
+  while (network == null) {
+    networkPoolLock.lock();
+    try {
+      if (networkPoolCursor < 0)       networkPoolCursor=0;
+ else       if (networkPoolCursor >= networkPool.size())       networkPoolCursor=0;
+      if (networkPool.size() == 0) {
+        createConnectionPool();
+        networkPoolCursor=0;
+      }
+      if (networkPool.size() == 0)       throw new ONetworkProtocolException("Connection pool closed");
+      network=networkPool.get(networkPoolCursor);
+      networkPoolCursor++;
+      final String serverURL=getServerURL();
+      if (serverURL == null || network.getServerURL().equals(serverURL)) {
+        if (network.getLockWrite().tryAcquireLock())         break;
+      }
+      network=null;
+      if (beginCursor >= networkPool.size())       beginCursor=networkPoolCursor;
+      if (networkPoolCursor == beginCursor) {
+        if (networkPool.size() < maxPool) {
+          network=createNetworkConnection();
+          network.getLockWrite().lock();
+        }
+ else {
+          OLogManager.instance().info(this,"Network connection pool is full (max=%d): increase max size to avoid such bottleneck on connections",maxPool);
+          final long startToWait=System.currentTimeMillis();
+          networkPoolLock.unlock();
+          try {
+synchronized (networkPool) {
+              networkPool.wait(5000);
+            }
+          }
+ catch (          InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new OStorageException("Cannot acquire a connection because the thread has been interrupted");
+          }
+ finally {
+            networkPoolLock.lock();
+          }
+          Orient.instance().getProfiler().stopChrono("system.network.connectionPool.waitingTime","Waiting for a free connection from the pool of channels",startToWait);
+        }
+      }
+    }
+  finally {
+      networkPoolLock.unlock();
+    }
+  }
+  return network;
+}

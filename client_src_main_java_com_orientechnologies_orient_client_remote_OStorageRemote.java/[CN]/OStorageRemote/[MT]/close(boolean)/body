@@ -2,7 +2,8 @@
   OChannelBinaryClient network=null;
   lock.acquireExclusiveLock();
   try {
-synchronized (networkPool) {
+    networkPoolLock.lock();
+    try {
       if (networkPool.size() > 0) {
         try {
           network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
@@ -12,11 +13,18 @@ synchronized (networkPool) {
         }
       }
     }
-    setSessionId(-1);
+  finally {
+      networkPoolLock.unlock();
+    }
+    setSessionId(null,-1);
     if (!checkForClose(iForce))     return;
-synchronized (networkPool) {
-      for (      OChannelBinaryClient n : networkPool)       n.close();
+    networkPoolLock.lock();
+    try {
+      for (      OChannelBinaryClient n : new ArrayList<OChannelBinaryClient>(networkPool))       n.close();
       networkPool.clear();
+    }
+  finally {
+      networkPoolLock.unlock();
     }
     level2Cache.shutdown();
     super.close(iForce);
@@ -25,7 +33,7 @@ synchronized (networkPool) {
   }
  catch (  Exception e) {
     OLogManager.instance().debug(this,"Error on closing remote connection: %s",network);
-    closeChannel(network);
+    network.close();
   }
  finally {
     lock.releaseExclusiveLock();

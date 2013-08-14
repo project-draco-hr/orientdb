@@ -1,0 +1,26 @@
+{
+  long seed=System.currentTimeMillis();
+  System.out.println("testUpdateValue seed : " + seed);
+  TreeSet<Long> keys=new TreeSet<Long>();
+  Random random=new Random(seed);
+  while (keys.size() < 2 * OSBTreeBucket.MAX_BUCKET_SIZE_BYTES / OLongSerializer.LONG_SIZE) {
+    keys.add(random.nextLong());
+  }
+  long pointer=directMemory.allocate(OSBTreeBucket.MAX_BUCKET_SIZE_BYTES);
+  OSBTreeBucket<Long> treeBucket=new OSBTreeBucket<Long>(pointer,true,OLongSerializer.INSTANCE);
+  Map<Long,Integer> keyIndexMap=new HashMap<Long,Integer>();
+  int index=0;
+  for (  Long key : keys) {
+    if (!treeBucket.addEntry(index,new OSBTreeBucket.SBTreeEntry<Long>(-1,-1,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index)))))     break;
+    keyIndexMap.put(key,index);
+    index++;
+  }
+  Assert.assertEquals(keyIndexMap.size(),treeBucket.size());
+  for (int i=0; i < treeBucket.size(); i++)   treeBucket.updateValue(i,new ORecordId(i + 5,OClusterPositionFactory.INSTANCE.valueOf(i + 5)));
+  for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
+    OSBTreeBucket.SBTreeEntry<Long> entry=treeBucket.getEntry(keyIndexEntry.getValue());
+    Assert.assertEquals(entry,new OSBTreeBucket.SBTreeEntry<Long>(-1,-1,keyIndexEntry.getKey(),new ORecordId(keyIndexEntry.getValue() + 5,OClusterPositionFactory.INSTANCE.valueOf(keyIndexEntry.getValue() + 5))));
+    Assert.assertEquals(keyIndexEntry.getKey(),treeBucket.getKey(keyIndexEntry.getValue()));
+  }
+  directMemory.free(pointer);
+}

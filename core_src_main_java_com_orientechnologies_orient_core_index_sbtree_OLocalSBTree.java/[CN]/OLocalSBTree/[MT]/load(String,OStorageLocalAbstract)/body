@@ -1,0 +1,23 @@
+{
+  acquireExclusiveLock();
+  try {
+    this.storage=storageLocal;
+    diskCache=storage.getDiskCache();
+    this.name=name;
+    fileId=diskCache.openFile(name + dataFileExtension);
+    long rootPointer=diskCache.load(fileId,ROOT_INDEX);
+    try {
+      OSBTreeBucket<K> rootBucket=new OSBTreeBucket<K>(rootPointer,true,keySerializer);
+      keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.INSTANCE.getObjectSerializer(rootBucket.getKeySerializerId());
+    }
+  finally {
+      diskCache.release(fileId,ROOT_INDEX);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during loading of sbtree " + name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

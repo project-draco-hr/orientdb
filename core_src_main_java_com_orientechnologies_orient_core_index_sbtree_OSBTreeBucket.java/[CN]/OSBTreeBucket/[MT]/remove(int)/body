@@ -1,2 +1,29 @@
 {
+  int entryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE);
+  int entrySize=keySerializer.getObjectSizeInDirectMemory(directMemory,cachePointer + entryPosition);
+  if (isLeaf) {
+    entrySize+=OLinkSerializer.RID_SIZE;
+  }
+ else {
+    throw new IllegalStateException("Remove is applies to leaf buckets only");
+  }
+  int size=size();
+  if (entryIndex < size - 1) {
+    directMemory.copyData(cachePointer + (entryIndex + 1) * OIntegerSerializer.INT_SIZE,cachePointer + entryIndex * OIntegerSerializer.INT_SIZE,(size - entryIndex - 1) * OIntegerSerializer.INT_SIZE);
+  }
+  size--;
+  OIntegerSerializer.INSTANCE.serializeInDirectMemory(size,directMemory,cachePointer + SIZE_OFFSET);
+  if (size > 0) {
+    int freePointer=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + FREE_POINTER_OFFSET);
+    if (entryPosition > freePointer) {
+      directMemory.copyData(freePointer,freePointer + entrySize,entryPosition - freePointer);
+    }
+    OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePointer + entrySize,directMemory,cachePointer + FREE_POINTER_OFFSET);
+  }
+  int currentPositionOffset=POSITIONS_ARRAY_OFFSET;
+  for (int i=0; i < size; i++) {
+    int currentEntryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + currentPositionOffset);
+    if (currentEntryPosition < entryPosition)     OIntegerSerializer.INSTANCE.serializeInDirectMemory(currentEntryPosition + entrySize,directMemory,cachePointer + currentPositionOffset);
+    currentPositionOffset+=OIntegerSerializer.INT_SIZE;
+  }
 }

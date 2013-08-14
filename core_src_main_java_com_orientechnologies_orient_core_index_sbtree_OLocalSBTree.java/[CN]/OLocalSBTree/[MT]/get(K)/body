@@ -1,0 +1,21 @@
+{
+  acquireSharedLock();
+  try {
+    BucketSearchResult bucketSearchResult=findBucket(key);
+    if (bucketSearchResult.index < 0)     return null;
+    long keyBucketPointer=diskCache.load(fileId,bucketSearchResult.pageIndex);
+    try {
+      OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer,keySerializer);
+      return keyBucket.getEntry(bucketSearchResult.index).value;
+    }
+  finally {
+      diskCache.release(fileId,bucketSearchResult.pageIndex);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during retrieving  of sbtree with name " + name,e);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

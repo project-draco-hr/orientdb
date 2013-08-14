@@ -1,3 +1,23 @@
 {
-  return null;
+  long pageIndex=ROOT_INDEX;
+  while (true) {
+    final long bucketPointer=diskCache.load(fileId,pageIndex);
+    final OSBTreeBucket.SBTreeEntry<K> entry;
+    try {
+      final OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(bucketPointer,keySerializer);
+      final int index=keyBucket.find(key);
+      if (keyBucket.isLeaf())       return new BucketSearchResult(index,pageIndex);
+      if (index >= 0)       entry=keyBucket.getEntry(index);
+ else {
+        final int insertionIndex=-index - 1;
+        if (insertionIndex >= keyBucket.size())         entry=keyBucket.getEntry(insertionIndex - 1);
+ else         entry=keyBucket.getEntry(insertionIndex);
+      }
+    }
+  finally {
+      diskCache.release(fileId,pageIndex);
+    }
+    if (comparator.compare(key,entry.key) >= 0)     pageIndex=entry.rightChild;
+ else     pageIndex=entry.leftChild;
+  }
 }

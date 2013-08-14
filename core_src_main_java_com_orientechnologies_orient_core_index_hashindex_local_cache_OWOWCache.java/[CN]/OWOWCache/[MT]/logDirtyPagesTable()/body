@@ -1,0 +1,22 @@
+{
+synchronized (syncObject) {
+    if (writeAheadLog == null)     return Collections.emptySet();
+    Set<ODirtyPage> logDirtyPages=new HashSet<ODirtyPage>(writeGroups.size() * 16);
+    for (    Map.Entry<GroupKey,WriteGroup> writeGroupEntry : writeGroups.entrySet()) {
+      final GroupKey groupKey=writeGroupEntry.getKey();
+      final WriteGroup writeGroup=writeGroupEntry.getValue();
+      for (int i=0; i < 16; i++) {
+        final OCachePointer cachePointer=writeGroup.pages[i];
+        if (cachePointer != null) {
+          final OLogSequenceNumber lastFlushedLSN=cachePointer.getLastFlushedLsn();
+          final String fileName=files.get(groupKey.fileId).getName();
+          final long pageIndex=(groupKey.groupIndex << 4) + i;
+          final ODirtyPage logDirtyPage=new ODirtyPage(fileName,pageIndex,lastFlushedLSN);
+          logDirtyPages.add(logDirtyPage);
+        }
+      }
+    }
+    writeAheadLog.logDirtyPages(logDirtyPages);
+    return logDirtyPages;
+  }
+}

@@ -4,12 +4,12 @@
   OSerializableStream command=iCommand;
   Object result=null;
   final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
+  OChannelBinaryClient network=null;
   do {
     OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
     try {
       final OCommandRequestText aquery=iCommand;
       final boolean asynch=iCommand instanceof OCommandRequestAsynch && ((OCommandRequestAsynch)iCommand).isAsynchronous();
-      OChannelBinaryClient network=null;
       try {
         network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
         network.writeByte((byte)(asynch ? 'a' : 's'));
@@ -81,6 +81,9 @@ if (record != null && status == 2) database.getLevel1Cache().updateRecord(record
 break;
 }
   finally {
+if (aquery.getResultListener() != null) {
+aquery.getResultListener().end();
+}
 endResponse(network);
 }
 }
@@ -88,7 +91,7 @@ endResponse(network);
 handleDBFreeze();
 }
 catch (Exception e) {
-handleException("Error on executing command: " + iCommand,e);
+handleException(network,"Error on executing command: " + iCommand,e);
 }
  finally {
 OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=false;

@@ -3,16 +3,18 @@
   try {
     BucketSearchResult bucketSearchResult=findBucket(key);
     if (bucketSearchResult.index < 0)     return null;
-    long keyBucketPointer=diskCache.load(fileId,bucketSearchResult.pageIndex);
+    OCachePointer keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    keyBucketPointer.acquireExclusiveLock();
     try {
-      OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer,keySerializer);
+      OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer);
       final ORID removed=keyBucket.getEntry(bucketSearchResult.index).value;
       keyBucket.remove(bucketSearchResult.index);
+      diskCache.markDirty(fileId,bucketSearchResult.getLastPathItem());
       return removed;
     }
   finally {
-      diskCache.markDirty(fileId,bucketSearchResult.pageIndex);
-      diskCache.release(fileId,bucketSearchResult.pageIndex);
+      keyBucketPointer.releaseExclusiveLock();
+      diskCache.release(fileId,bucketSearchResult.getLastPathItem());
     }
   }
  catch (  IOException e) {

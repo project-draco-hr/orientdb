@@ -6,13 +6,16 @@
     this.name=name;
     this.keySerializer=keySerializer;
     fileId=diskCache.openFile(name + dataFileExtension);
-    long rootPointer=diskCache.load(fileId,ROOT_INDEX);
+    OCachePointer rootPointer=diskCache.load(fileId,ROOT_INDEX);
+    rootPointer.acquireExclusiveLock();
     try {
-      OSBTreeBucket<K> rootBucket=new OSBTreeBucket<K>(rootPointer,true,keySerializer);
+      OSBTreeBucket<K> rootBucket=new OSBTreeBucket<K>(rootPointer.getDataPointer(),true,keySerializer);
       rootBucket.setKeySerializerId(keySerializer.getId());
       rootBucket.setTreeSize(0);
+      diskCache.markDirty(fileId,ROOT_INDEX);
     }
   finally {
+      rootPointer.releaseExclusiveLock();
       diskCache.release(fileId,ROOT_INDEX);
     }
   }

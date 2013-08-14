@@ -2,27 +2,31 @@
   acquireExclusiveLock();
   try {
     BucketSearchResult bucketSearchResult=findBucket(key);
-    long keyBucketPointer=diskCache.load(fileId,bucketSearchResult.pageIndex);
-    OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer,keySerializer);
+    OCachePointer keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    keyBucketPointer.acquireExclusiveLock();
+    OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer);
     if (bucketSearchResult.index >= 0) {
       keyBucket.updateValue(bucketSearchResult.index,value);
     }
  else {
       int insertionIndex=-bucketSearchResult.index - 1;
       while (!keyBucket.addEntry(insertionIndex,new OSBTreeBucket.SBTreeEntry<K>(-1,-1,key,value))) {
-        diskCache.release(fileId,bucketSearchResult.pageIndex);
-        bucketSearchResult=splitBucket(bucketSearchResult.pageIndex,insertionIndex);
+        keyBucketPointer.releaseExclusiveLock();
+        diskCache.release(fileId,bucketSearchResult.getLastPathItem());
+        bucketSearchResult=splitBucket(bucketSearchResult.path,insertionIndex,key);
         insertionIndex=bucketSearchResult.index;
-        keyBucketPointer=diskCache.load(fileId,bucketSearchResult.pageIndex);
-        keyBucket=new OSBTreeBucket<K>(keyBucketPointer,keySerializer);
+        keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+        keyBucketPointer.acquireExclusiveLock();
+        keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer);
       }
     }
-    diskCache.markDirty(fileId,bucketSearchResult.pageIndex);
-    diskCache.release(fileId,bucketSearchResult.pageIndex);
+    keyBucketPointer.releaseExclusiveLock();
+    diskCache.markDirty(fileId,bucketSearchResult.getLastPathItem());
+    diskCache.release(fileId,bucketSearchResult.getLastPathItem());
     setSize(size() + 1);
   }
  catch (  IOException e) {
-    throw new OIndexException("Error during index update",e);
+    throw new OIndexException("Error during index update with key " + key + " and value "+ value,e);
   }
  finally {
     releaseExclusiveLock();

@@ -7,9 +7,10 @@
     final long pageIndex=getPageIndex(bucketPointer);
     final int fileLevel=getFileLevel(bucketPointer);
     final V removed;
-    long dataPointer=loadPage(pageIndex,fileLevel);
+    final OCachePointer dataPointer=loadPage(pageIndex,fileLevel);
+    dataPointer.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer,directMemory,keySerializer,valueSerializer);
+      final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer.getDataPointer(),directMemory,keySerializer,valueSerializer);
       final int positionIndex=bucket.getIndex(key);
       if (positionIndex < 0)       return null;
       removed=bucket.deleteEntry(positionIndex).value;
@@ -17,6 +18,7 @@
       if (!mergeBucketsAfterDeletion(nodePath,bucket))       markPageAsDirty(pageIndex,fileLevel);
     }
   finally {
+      dataPointer.releaseExclusiveLock();
       releasePage(pageIndex,fileLevel);
     }
     if (nodePath.parent != null) {

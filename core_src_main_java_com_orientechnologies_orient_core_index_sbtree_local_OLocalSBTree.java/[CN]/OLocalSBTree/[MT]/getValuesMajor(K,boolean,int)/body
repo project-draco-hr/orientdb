@@ -1,0 +1,41 @@
+{
+  List<ORID> results=new ArrayList<ORID>();
+  acquireSharedLock();
+  try {
+    BucketSearchResult bucketSearchResult=findBucket(key);
+    long pageIndex=bucketSearchResult.getLastPathItem();
+    int index;
+    if (bucketSearchResult.index >= 0) {
+      index=inclusive ? bucketSearchResult.index : bucketSearchResult.index + 1;
+    }
+ else {
+      index=-bucketSearchResult.index - 1;
+    }
+    resultsLoop:     while (true) {
+      long nextPageIndex=-1;
+      final OCachePointer pointer=diskCache.load(fileId,pageIndex);
+      try {
+        OSBTreeBucket<K> bucket=new OSBTreeBucket<K>(pointer.getDataPointer(),keySerializer);
+        int bucketSize=bucket.size();
+        for (int i=index; i < bucketSize; i++) {
+          results.add(bucket.getEntry(i).value);
+          if (maxValuesToFetch > -1 && results.size() >= maxValuesToFetch)           break resultsLoop;
+        }
+        if (bucket.getRightSibling() >= 0)         nextPageIndex=bucket.getRightSibling();
+ else         break;
+      }
+  finally {
+        diskCache.release(fileId,pageIndex);
+      }
+      pageIndex=nextPageIndex;
+      index=0;
+    }
+    return results;
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Error during fetch of major values for key " + key + " in sbtree "+ name);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

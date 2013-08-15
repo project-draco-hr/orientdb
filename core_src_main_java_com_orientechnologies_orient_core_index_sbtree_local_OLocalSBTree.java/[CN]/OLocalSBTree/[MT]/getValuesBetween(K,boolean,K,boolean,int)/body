@@ -1,55 +1,12 @@
 {
-  List<ORID> results=new ArrayList<ORID>();
-  acquireSharedLock();
-  try {
-    BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom);
-    long pageIndexFrom=bucketSearchResultFrom.getLastPathItem();
-    int indexFrom;
-    if (bucketSearchResultFrom.index >= 0) {
-      indexFrom=fromInclusive ? bucketSearchResultFrom.index : bucketSearchResultFrom.index + 1;
+  final List<ORID> result=new ArrayList<ORID>();
+  loadEntriesBetween(keyFrom,fromInclusive,keyTo,toInclusive,new RangeResultListener<K>(){
+    @Override public boolean addResult(    OSBTreeBucket.SBTreeEntry<K> entry){
+      result.add(entry.value);
+      if (maxValuesToFetch > 0 && result.size() >= maxValuesToFetch)       return false;
+      return true;
     }
- else {
-      indexFrom=-bucketSearchResultFrom.index - 1;
-    }
-    BucketSearchResult bucketSearchResultTo=findBucket(keyTo);
-    long pageIndexTo=bucketSearchResultTo.getLastPathItem();
-    int indexTo;
-    if (bucketSearchResultTo.index >= 0) {
-      indexTo=toInclusive ? bucketSearchResultTo.index : bucketSearchResultTo.index - 1;
-    }
- else {
-      indexTo=-bucketSearchResultTo.index - 2;
-    }
-    int startIndex=indexFrom;
-    int endIndex;
-    long pageIndex=pageIndexFrom;
-    resultsLoop:     while (true) {
-      long nextPageIndex=-1;
-      final OCachePointer pointer=diskCache.load(fileId,pageIndex);
-      try {
-        OSBTreeBucket<K> bucket=new OSBTreeBucket<K>(pointer.getDataPointer(),keySerializer);
-        if (pageIndex != pageIndexTo)         endIndex=bucket.size() - 1;
- else         endIndex=indexTo;
-        for (int i=startIndex; i <= endIndex; i++) {
-          results.add(bucket.getEntry(i).value);
-          if (maxValuesToFetch > -1 && results.size() >= maxValuesToFetch)           break resultsLoop;
-        }
-        if (pageIndex == pageIndexTo)         break;
-        if (bucket.getRightSibling() >= 0)         nextPageIndex=bucket.getRightSibling();
- else         break;
-      }
-  finally {
-        diskCache.release(fileId,pageIndex);
-      }
-      pageIndex=nextPageIndex;
-      startIndex=0;
-    }
-    return results;
   }
- catch (  IOException ioe) {
-    throw new OIndexException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ name);
-  }
- finally {
-    releaseSharedLock();
-  }
+);
+  return result;
 }

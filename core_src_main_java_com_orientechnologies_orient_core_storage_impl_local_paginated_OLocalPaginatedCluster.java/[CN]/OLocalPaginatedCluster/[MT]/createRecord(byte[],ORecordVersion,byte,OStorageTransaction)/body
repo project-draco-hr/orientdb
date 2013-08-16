@@ -8,7 +8,7 @@
       content=compression.compress(content);
       int grownContentSize=(int)(config.recordGrowFactor * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
-      if (entryContentLength < OLocalPage.MAX_RECORD_SIZE) {
+      if (entryContentLength < OPLocalPage.MAX_RECORD_SIZE) {
         startRecordOperation(transaction,false);
         byte[] entryContent=new byte[entryContentLength];
         int entryPosition=0;
@@ -21,10 +21,10 @@
         entryContent[entryPosition]=1;
         entryPosition++;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
-        OLocalPage.TrackMode trackMode;
-        if (!config.useWal || writeAheadLog == null)         trackMode=OLocalPage.TrackMode.NONE;
- else         if (transaction != null)         trackMode=OLocalPage.TrackMode.BOTH;
- else         trackMode=OLocalPage.TrackMode.FORWARD;
+        OPLocalPage.TrackMode trackMode;
+        if (!config.useWal || writeAheadLog == null)         trackMode=OAbstractPLocalPage.TrackMode.NONE;
+ else         if (transaction != null)         trackMode=OAbstractPLocalPage.TrackMode.BOTH;
+ else         trackMode=OAbstractPLocalPage.TrackMode.FORWARD;
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
         size++;
         recordsSize+=addEntryResult.recordsSizeDiff;
@@ -34,7 +34,7 @@
       }
  else {
         startRecordOperation(transaction,true);
-        OLocalPage.TrackMode trackMode=(!config.useWal || writeAheadLog == null) ? OLocalPage.TrackMode.NONE : OLocalPage.TrackMode.BOTH;
+        OPLocalPage.TrackMode trackMode=(!config.useWal || writeAheadLog == null) ? OAbstractPLocalPage.TrackMode.NONE : OAbstractPLocalPage.TrackMode.BOTH;
         int entrySize=grownContentSize + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
         int fullEntryPosition=0;
         byte[] fullEntry=new byte[entrySize];
@@ -47,7 +47,7 @@
         long firstPagePointer=-1;
         ORecordVersion version=null;
         int from=0;
-        int to=from + (OLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
+        int to=from + (OPLocalPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
         int recordsSizeDiff=0;
         do {
           byte[] entryContent=new byte[to - from + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE];
@@ -68,7 +68,7 @@
             final OCachePointer prevPageMemoryPointer=diskCache.load(fileId,prevPageIndex);
             prevPageMemoryPointer.acquireExclusiveLock();
             try {
-              final OLocalPage prevPage=new OLocalPage(prevPageMemoryPointer.getDataPointer(),false,OLocalPage.TrackMode.BOTH);
+              final OPLocalPage prevPage=new OPLocalPage(prevPageMemoryPointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.BOTH);
               int prevRecordPageOffset=prevPage.getRecordPageOffset(prevPageRecordPosition);
               int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
               prevPage.setLongValue(prevRecordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,addedPagePointer);
@@ -82,7 +82,7 @@
           }
           prevPageRecordPointer=addedPagePointer;
           from=to;
-          to=to + (OLocalPage.MAX_RECORD_SIZE - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE);
+          to=to + (OPLocalPage.MAX_RECORD_SIZE - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE);
           if (to > fullEntry.length)           to=fullEntry.length;
         }
  while (from < to);

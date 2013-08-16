@@ -4,35 +4,41 @@
   if (isLeaf)   entrySize+=OLinkSerializer.RID_SIZE;
  else   entrySize+=2 * OLongSerializer.LONG_SIZE;
   int size=size();
-  int freePointer=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + FREE_POINTER_OFFSET);
+  int freePointer=getIntValue(FREE_POINTER_OFFSET);
   if (freePointer - entrySize < (size + 1) * OIntegerSerializer.INT_SIZE + POSITIONS_ARRAY_OFFSET)   return false;
   if (index <= size - 1) {
-    directMemory.copyData(cachePointer + POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE,cachePointer + POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE,(size - index) * OIntegerSerializer.INT_SIZE);
+    copyData(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE,(size - index) * OIntegerSerializer.INT_SIZE);
   }
   freePointer-=entrySize;
-  OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePointer,directMemory,cachePointer + FREE_POINTER_OFFSET);
-  OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePointer,directMemory,cachePointer + POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE);
-  OIntegerSerializer.INSTANCE.serializeInDirectMemory(size + 1,directMemory,cachePointer + SIZE_OFFSET);
+  setIntValue(FREE_POINTER_OFFSET,freePointer);
+  setIntValue(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE,freePointer);
+  setIntValue(SIZE_OFFSET,size + 1);
   if (isLeaf) {
-    keySerializer.serializeInDirectMemory(treeEntry.key,directMemory,cachePointer + freePointer);
+    byte[] serializedKey=new byte[keySize];
+    keySerializer.serializeNative(treeEntry.key,serializedKey,0);
+    setBinaryValue(freePointer,serializedKey);
     freePointer+=keySize;
-    OLinkSerializer.INSTANCE.serializeInDirectMemory(treeEntry.value,directMemory,cachePointer + freePointer);
+    byte[] serializedLink=new byte[OLinkSerializer.RID_SIZE];
+    OLinkSerializer.INSTANCE.serializeNative(treeEntry.value,serializedLink,0);
+    setBinaryValue(freePointer,serializedLink);
   }
  else {
-    OLongSerializer.INSTANCE.serializeInDirectMemory(treeEntry.leftChild,directMemory,cachePointer + freePointer);
+    setLongValue(freePointer,treeEntry.leftChild);
     freePointer+=OLongSerializer.LONG_SIZE;
-    OLongSerializer.INSTANCE.serializeInDirectMemory(treeEntry.rightChild,directMemory,cachePointer + freePointer);
+    setLongValue(freePointer,treeEntry.rightChild);
     freePointer+=OLongSerializer.LONG_SIZE;
-    keySerializer.serializeInDirectMemory(treeEntry.key,directMemory,cachePointer + freePointer);
+    byte[] serializedKey=new byte[keySize];
+    keySerializer.serializeNative(treeEntry.key,serializedKey,0);
+    setBinaryValue(freePointer,serializedKey);
     size++;
     if (updateNeighbors && size > 1) {
       if (index < size - 1) {
-        final int nextEntryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,POSITIONS_ARRAY_OFFSET + cachePointer + (index + 1) * OIntegerSerializer.INT_SIZE);
-        OLongSerializer.INSTANCE.serializeInDirectMemory(treeEntry.rightChild,directMemory,cachePointer + nextEntryPosition);
+        final int nextEntryPosition=getIntValue(POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE);
+        setLongValue(nextEntryPosition,treeEntry.rightChild);
       }
       if (index > 0) {
-        final int prevEntryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,POSITIONS_ARRAY_OFFSET + cachePointer + (index - 1) * OIntegerSerializer.INT_SIZE);
-        OLongSerializer.INSTANCE.serializeInDirectMemory(treeEntry.leftChild,directMemory,cachePointer + prevEntryPosition + OLongSerializer.LONG_SIZE);
+        final int prevEntryPosition=getIntValue(POSITIONS_ARRAY_OFFSET + (index - 1) * OIntegerSerializer.INT_SIZE);
+        setLongValue(prevEntryPosition + OLongSerializer.LONG_SIZE,treeEntry.leftChild);
       }
     }
   }

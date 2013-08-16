@@ -1,6 +1,6 @@
 {
-  int entryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE);
-  int entrySize=keySerializer.getObjectSizeInDirectMemory(directMemory,cachePointer + entryPosition);
+  int entryPosition=getIntValue(POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE);
+  int entrySize=keySerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition);
   if (isLeaf) {
     entrySize+=OLinkSerializer.RID_SIZE;
   }
@@ -9,21 +9,21 @@
   }
   int size=size();
   if (entryIndex < size - 1) {
-    directMemory.copyData(cachePointer + POSITIONS_ARRAY_OFFSET + (entryIndex + 1) * OIntegerSerializer.INT_SIZE,cachePointer + POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE,(size - entryIndex - 1) * OIntegerSerializer.INT_SIZE);
+    copyData(POSITIONS_ARRAY_OFFSET + (entryIndex + 1) * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE,(size - entryIndex - 1) * OIntegerSerializer.INT_SIZE);
   }
   size--;
-  OIntegerSerializer.INSTANCE.serializeInDirectMemory(size,directMemory,cachePointer + SIZE_OFFSET);
+  setIntValue(SIZE_OFFSET,size);
   if (size > 0) {
-    int freePointer=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + FREE_POINTER_OFFSET);
+    int freePointer=getIntValue(FREE_POINTER_OFFSET);
     if (entryPosition > freePointer) {
-      directMemory.copyData(cachePointer + freePointer,cachePointer + freePointer + entrySize,entryPosition - freePointer);
+      copyData(freePointer,freePointer + entrySize,entryPosition - freePointer);
     }
-    OIntegerSerializer.INSTANCE.serializeInDirectMemory(freePointer + entrySize,directMemory,cachePointer + FREE_POINTER_OFFSET);
+    setIntValue(FREE_POINTER_OFFSET,freePointer + entrySize);
   }
   int currentPositionOffset=POSITIONS_ARRAY_OFFSET;
   for (int i=0; i < size; i++) {
-    int currentEntryPosition=OIntegerSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,cachePointer + currentPositionOffset);
-    if (currentEntryPosition < entryPosition)     OIntegerSerializer.INSTANCE.serializeInDirectMemory(currentEntryPosition + entrySize,directMemory,cachePointer + currentPositionOffset);
+    int currentEntryPosition=getIntValue(currentPositionOffset);
+    if (currentEntryPosition < entryPosition)     setIntValue(currentPositionOffset,currentEntryPosition + entrySize);
     currentPositionOffset+=OIntegerSerializer.INT_SIZE;
   }
 }

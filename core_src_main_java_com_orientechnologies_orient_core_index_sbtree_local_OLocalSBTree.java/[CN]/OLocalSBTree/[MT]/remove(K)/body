@@ -3,18 +3,19 @@
   try {
     BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
     if (bucketSearchResult.index < 0)     return null;
-    OCachePointer keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
     keyBucketPointer.acquireExclusiveLock();
     try {
       OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer,com.orientechnologies.orient.core.storage.impl.local.paginated.OAbstractPLocalPage.TrackMode.BOTH);
       final ORID removed=keyBucket.getEntry(bucketSearchResult.index).value;
       keyBucket.remove(bucketSearchResult.index);
-      diskCache.markDirty(fileId,bucketSearchResult.getLastPathItem());
+      keyBucketCacheEntry.markDirty();
       return removed;
     }
   finally {
       keyBucketPointer.releaseExclusiveLock();
-      diskCache.release(fileId,bucketSearchResult.getLastPathItem());
+      diskCache.release(keyBucketCacheEntry);
     }
   }
  catch (  IOException e) {

@@ -2,7 +2,8 @@
   acquireExclusiveLock();
   try {
     BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
-    OCachePointer keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
     keyBucketPointer.acquireExclusiveLock();
     OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer,com.orientechnologies.orient.core.storage.impl.local.paginated.OAbstractPLocalPage.TrackMode.BOTH);
     if (bucketSearchResult.index >= 0) {
@@ -12,17 +13,18 @@
       int insertionIndex=-bucketSearchResult.index - 1;
       while (!keyBucket.addEntry(insertionIndex,new OSBTreeBucket.SBTreeEntry<K>(-1,-1,key,value),true)) {
         keyBucketPointer.releaseExclusiveLock();
-        diskCache.release(fileId,bucketSearchResult.getLastPathItem());
+        diskCache.release(keyBucketCacheEntry);
         bucketSearchResult=splitBucket(bucketSearchResult.path,insertionIndex,key);
         insertionIndex=bucketSearchResult.index;
-        keyBucketPointer=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+        keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem());
+        keyBucketPointer=keyBucketCacheEntry.getCachePointer();
         keyBucketPointer.acquireExclusiveLock();
         keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer,com.orientechnologies.orient.core.storage.impl.local.paginated.OAbstractPLocalPage.TrackMode.BOTH);
       }
     }
     keyBucketPointer.releaseExclusiveLock();
-    diskCache.markDirty(fileId,bucketSearchResult.getLastPathItem());
-    diskCache.release(fileId,bucketSearchResult.getLastPathItem());
+    keyBucketCacheEntry.markDirty();
+    diskCache.release(keyBucketCacheEntry);
     setSize(size() + 1);
   }
  catch (  IOException e) {

@@ -10,18 +10,19 @@
       final long prevSize=size;
       final long prevRecordsSize=recordsSize;
       boolean isRecordSpreadAcrossSeveralPages=isRecordSpreadAcrossSeveralPages(pageIndex,recordPosition);
-      final OPLocalPage.TrackMode trackMode;
+      final OLocalPage.TrackMode trackMode;
       if (!config.useWal || writeAheadLog == null)       trackMode=OAbstractPLocalPage.TrackMode.NONE;
  else       if (transaction != null || isRecordSpreadAcrossSeveralPages)       trackMode=OAbstractPLocalPage.TrackMode.BOTH;
  else       trackMode=OAbstractPLocalPage.TrackMode.FORWARD;
       long nextPagePointer=-1;
       int removedContentSize=0;
       do {
-        final OCachePointer pointer=diskCache.load(fileId,pageIndex);
+        final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex);
+        final OCachePointer pointer=cacheEntry.getCachePointer();
         pointer.acquireExclusiveLock();
         int initialFreePageIndex;
         try {
-          final OPLocalPage localPage=new OPLocalPage(pointer.getDataPointer(),false,trackMode);
+          final OLocalPage localPage=new OLocalPage(pointer.getDataPointer(),false,trackMode);
           initialFreePageIndex=calculateFreePageIndex(localPage);
           int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
           if (recordPageOffset < 0) {
@@ -37,11 +38,11 @@
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
           logPageChanges(localPage,pageIndex,false);
-          diskCache.markDirty(fileId,pageIndex);
+          cacheEntry.markDirty();
         }
   finally {
           pointer.releaseExclusiveLock();
-          diskCache.release(fileId,pageIndex);
+          diskCache.release(cacheEntry);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);
         pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;

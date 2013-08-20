@@ -6,15 +6,16 @@
     long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
     if (diskCache.getFilledUpTo(fileId) <= pageIndex)     return null;
     ORecordVersion recordVersion=null;
-    OCachePointer pointer=diskCache.load(fileId,pageIndex);
+    OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex);
+    OCachePointer pointer=cacheEntry.getCachePointer();
     try {
-      final OPLocalPage localPage=new OPLocalPage(pointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
+      final OLocalPage localPage=new OLocalPage(pointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
       int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
       if (recordPageOffset < 0)       return null;
       recordVersion=localPage.getRecordVersion(recordPosition);
     }
   finally {
-      diskCache.release(fileId,pageIndex);
+      diskCache.release(cacheEntry);
     }
     byte[] fullContent=readFullEntry(clusterPosition);
     if (fullContent == null)     return null;

@@ -6,18 +6,19 @@
     this.name=name;
     this.keySerializer=keySerializer;
     fileId=diskCache.openFile(name + dataFileExtension);
-    OCachePointer rootPointer=diskCache.load(fileId,ROOT_INDEX);
+    OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX);
+    OCachePointer rootPointer=rootCacheEntry.getCachePointer();
     rootPointer.acquireExclusiveLock();
     try {
       OSBTreeBucket<K> rootBucket=new OSBTreeBucket<K>(rootPointer.getDataPointer(),true,keySerializer,com.orientechnologies.orient.core.storage.impl.local.paginated.OAbstractPLocalPage.TrackMode.BOTH);
       rootBucket.setKeySerializerId(keySerializer.getId());
       rootBucket.setTreeSize(0);
       rootBucket.setKeySize((byte)keySize);
-      diskCache.markDirty(fileId,ROOT_INDEX);
+      rootCacheEntry.markDirty();
     }
   finally {
       rootPointer.releaseExclusiveLock();
-      diskCache.release(fileId,ROOT_INDEX);
+      diskCache.release(rootCacheEntry);
     }
   }
  catch (  IOException e) {

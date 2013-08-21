@@ -5,16 +5,18 @@
   Random random=new Random();
   random.nextBytes(record);
   OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,OVersionFactory.instance().createVersion(),(byte)1,null);
-  OCacheEntry cacheEntry=diskCache.load(1,0);
+  OCacheEntry cacheEntry=diskCache.load(1,1,false);
   OCachePointer pagePointer=cacheEntry.getCachePointer();
-  OLocalPage page=new OLocalPage(pagePointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
-  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),((int)(record.length * 1.5)) + RECORD_SYSTEM_INFORMATION);
+  OClusterPage page=new OClusterPage(pagePointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
+  int recordIndex=(int)(physicalPosition.clusterPosition.longValue() & 0xFFFF);
+  Assert.assertEquals(page.getRecordSize(recordIndex),((int)(record.length * 1.5)) + RECORD_SYSTEM_INFORMATION);
   diskCache.release(cacheEntry);
   paginatedCluster.set(OCluster.ATTRIBUTES.RECORD_GROW_FACTOR,2);
   physicalPosition=paginatedCluster.createRecord(record,OVersionFactory.instance().createVersion(),(byte)1,null);
-  cacheEntry=diskCache.load(1,0);
+  recordIndex=(int)(physicalPosition.clusterPosition.longValue() & 0xFFFF);
+  cacheEntry=diskCache.load(1,1,false);
   pagePointer=cacheEntry.getCachePointer();
-  page=new OLocalPage(pagePointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
-  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),record.length * 2 + RECORD_SYSTEM_INFORMATION);
+  page=new OClusterPage(pagePointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
+  Assert.assertEquals(page.getRecordSize(recordIndex),record.length * 2 + RECORD_SYSTEM_INFORMATION);
   diskCache.release(cacheEntry);
 }

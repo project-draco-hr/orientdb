@@ -1,0 +1,29 @@
+{
+  storageLocal.checkForClusterPermissions(getName());
+  externalModificationLock.requestModificationLock();
+  try {
+    acquireExclusiveLock();
+    try {
+      if (config.useWal && writeAheadLog != null) {
+        OOperationUnitId operationUnitId=OOperationUnitId.generateId();
+        OLogSequenceNumber lsn=writeAheadLog.log(new OAtomicUnitStartRecord(false,operationUnitId));
+        currentUnitId.set(operationUnitId);
+        startLSN.set(lsn);
+      }
+      diskCache.truncateFile(fileId);
+      initCusterState();
+      if (config.useWal && writeAheadLog != null) {
+        writeAheadLog.log(new OAtomicUnitEndRecord(currentUnitId.get(),false));
+        currentUnitId.set(null);
+        startLSN.set(null);
+      }
+    }
+  finally {
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    externalModificationLock.releaseModificationLock();
+  }
+  storageLocal.scheduleFullCheckpoint();
+}

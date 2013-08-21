@@ -1,0 +1,15 @@
+{
+  long restoredPagePointer=directMemory.allocate(new byte[OClusterPage.PAGE_SIZE]);
+  try {
+    OClusterPage restoredPage=new OClusterPage(restoredPagePointer,false,ODurablePage.TrackMode.FULL);
+    restoredPage.restoreChanges(localPage.getPageChanges());
+    Assert.assertEquals(directMemory.get(restoredPagePointer + SYSTEM_OFFSET,OClusterPage.PAGE_SIZE - SYSTEM_OFFSET),directMemory.get(pagePointer + SYSTEM_OFFSET,OClusterPage.PAGE_SIZE - SYSTEM_OFFSET));
+    List<OFullPageDiff<?>> changes=new ArrayList<OFullPageDiff<?>>();
+    for (    OPageDiff<?> pageDiff : localPage.getPageChanges())     changes.add((OFullPageDiff<?>)pageDiff);
+    restoredPage.revertChanges(changes);
+    Assert.assertEquals(directMemory.get(restoredPagePointer + SYSTEM_OFFSET,OClusterPage.PAGE_SIZE - SYSTEM_OFFSET),new byte[OClusterPage.PAGE_SIZE - SYSTEM_OFFSET]);
+  }
+  finally {
+    directMemory.free(restoredPagePointer);
+  }
+}

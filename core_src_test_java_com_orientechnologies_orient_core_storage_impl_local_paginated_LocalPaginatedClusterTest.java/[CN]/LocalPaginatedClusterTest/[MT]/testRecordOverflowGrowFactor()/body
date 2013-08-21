@@ -10,20 +10,21 @@
   record=new byte[150];
   random.nextBytes(record);
   paginatedCluster.updateRecord(physicalPosition.clusterPosition,record,version,(byte)1,null);
-  OCacheEntry cacheEntry=diskCache.load(1,0);
+  OCacheEntry cacheEntry=diskCache.load(1,1,false);
+  int recordIndex=(int)(physicalPosition.clusterPosition.longValue() & 0xFFFF);
   OCachePointer pagePointer=cacheEntry.getCachePointer();
-  OLocalPage page=new OLocalPage(pagePointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
-  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),record.length + RECORD_SYSTEM_INFORMATION);
+  OClusterPage page=new OClusterPage(pagePointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
+  Assert.assertEquals(page.getRecordSize(recordIndex),record.length + RECORD_SYSTEM_INFORMATION);
   diskCache.release(cacheEntry);
   record=new byte[200];
   random.nextBytes(record);
   paginatedCluster.updateRecord(physicalPosition.clusterPosition,record,version,(byte)1,null);
-  cacheEntry=diskCache.load(1,0);
+  cacheEntry=diskCache.load(1,1,false);
   pagePointer=cacheEntry.getCachePointer();
-  page=new OLocalPage(pagePointer.getDataPointer(),false,OAbstractPLocalPage.TrackMode.NONE);
+  page=new OClusterPage(pagePointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
   int fullContentSize=500 + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
-  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue()),150 + RECORD_SYSTEM_INFORMATION);
+  Assert.assertEquals(page.getRecordSize(recordIndex),150 + RECORD_SYSTEM_INFORMATION);
   fullContentSize-=150 + RECORD_SYSTEM_INFORMATION - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE;
-  Assert.assertEquals(page.getRecordSize(physicalPosition.clusterPosition.intValue() + 1),fullContentSize + (OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE));
+  Assert.assertEquals(page.getRecordSize(recordIndex + 1),fullContentSize + (OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE));
   diskCache.release(cacheEntry);
 }

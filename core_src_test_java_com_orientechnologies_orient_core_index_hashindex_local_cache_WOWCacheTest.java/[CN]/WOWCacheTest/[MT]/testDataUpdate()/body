@@ -1,0 +1,51 @@
+{
+  final NavigableMap<Long,byte[]> pageIndexDataMap=new TreeMap<Long,byte[]>();
+  long fileId=wowCache.openFile(fileName);
+  Random random=new Random();
+  for (int i=0; i < 600; i++) {
+    long pageIndex=random.nextInt(2048);
+    byte[] data=new byte[8];
+    random.nextBytes(data);
+    pageIndexDataMap.put(pageIndex,data);
+    final OCachePointer cachePointer=wowCache.load(fileId,pageIndex);
+    cachePointer.acquireExclusiveLock();
+    directMemory.set(cachePointer.getDataPointer() + systemOffset,data,0,data.length);
+    cachePointer.releaseExclusiveLock();
+    wowCache.store(fileId,pageIndex,cachePointer);
+    cachePointer.decrementReferrer();
+  }
+  for (  Map.Entry<Long,byte[]> entry : pageIndexDataMap.entrySet()) {
+    long pageIndex=entry.getKey();
+    byte[] dataOne=entry.getValue();
+    OCachePointer cachePointer=wowCache.load(fileId,pageIndex);
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
+    Assert.assertEquals(dataTwo,dataOne);
+  }
+  for (int i=0; i < 300; i++) {
+    long desiredIndex=random.nextInt(2048);
+    Long pageIndex=pageIndexDataMap.ceilingKey(desiredIndex);
+    if (pageIndex == null)     pageIndex=pageIndexDataMap.floorKey(desiredIndex);
+    byte[] data=new byte[8];
+    random.nextBytes(data);
+    pageIndexDataMap.put(pageIndex,data);
+    final OCachePointer cachePointer=wowCache.load(fileId,pageIndex);
+    cachePointer.acquireExclusiveLock();
+    directMemory.set(cachePointer.getDataPointer() + systemOffset,data,0,data.length);
+    cachePointer.releaseExclusiveLock();
+    wowCache.store(fileId,pageIndex,cachePointer);
+    cachePointer.decrementReferrer();
+  }
+  for (  Map.Entry<Long,byte[]> entry : pageIndexDataMap.entrySet()) {
+    long pageIndex=entry.getKey();
+    byte[] dataOne=entry.getValue();
+    OCachePointer cachePointer=wowCache.load(fileId,pageIndex);
+    byte[] dataTwo=directMemory.get(cachePointer.getDataPointer() + systemOffset,8);
+    cachePointer.decrementReferrer();
+    Assert.assertEquals(dataTwo,dataOne);
+  }
+  wowCache.flush();
+  for (  Map.Entry<Long,byte[]> entry : pageIndexDataMap.entrySet()) {
+    assertFile(entry.getKey(),entry.getValue(),new OLogSequenceNumber(0,0));
+  }
+}

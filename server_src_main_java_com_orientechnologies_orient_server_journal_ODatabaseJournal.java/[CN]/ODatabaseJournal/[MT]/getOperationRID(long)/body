@@ -1,0 +1,25 @@
+{
+  lock.acquireExclusiveLock();
+  try {
+    final long runId=file.readLong(iOffsetEndOperation - OFFSET_BACK_RUNID);
+    final long operationId=file.readLong(iOffsetEndOperation - OFFSET_BACK_OPERATID);
+    final int varSize=file.readInt(iOffsetEndOperation - OFFSET_BACK_SIZE);
+    final long offset=iOffsetEndOperation - OFFSET_BACK_SIZE - varSize- OFFSET_VARDATA;
+    final OPERATION_TYPES operationType=OPERATION_TYPES.values()[file.readByte(offset + OFFSET_OPERATION_TYPE)];
+switch (operationType) {
+case RECORD_CREATE:
+      final ORecordId rid=new ORecordId(file.readShort(offset + OFFSET_VARDATA),OClusterPositionFactory.INSTANCE.valueOf(file.readLong(offset + OFFSET_VARDATA + OBinaryProtocol.SIZE_SHORT)));
+    if (rid.isNew())     rid.clusterPosition=storage.getClusterDataRange(rid.clusterId)[1];
+  return rid;
+case RECORD_UPDATE:
+return new ORecordId(file.readShort(offset + OFFSET_VARDATA),OClusterPositionFactory.INSTANCE.valueOf(file.readLong(offset + OFFSET_VARDATA + OBinaryProtocol.SIZE_SHORT)));
+case RECORD_DELETE:
+return new ORecordId(file.readShort(offset + OFFSET_VARDATA),OClusterPositionFactory.INSTANCE.valueOf(file.readLong(offset + OFFSET_VARDATA + OBinaryProtocol.SIZE_SHORT)));
+default :
+return null;
+}
+}
+  finally {
+lock.releaseExclusiveLock();
+}
+}

@@ -7,17 +7,14 @@
     if (connectionOptions.containsKey(PARAM_MAX_POOL))     maxPool=Integer.parseInt(connectionOptions.get(PARAM_MAX_POOL).toString());
     if (connectionOptions.containsKey(PARAM_DB_TYPE))     connectionDbType=connectionOptions.get(PARAM_DB_TYPE).toString();
   }
-  setSessionId(-1);
-  createConnectionPool();
-  boolean availableConnections;
-synchronized (networkPool) {
-    availableConnections=!networkPool.isEmpty();
-  }
+  boolean availableConnections=true;
+  OChannelBinaryClient network=null;
   while (availableConnections) {
-    OChannelBinaryClient network=null;
     try {
+      network=getAvailableNetwork();
       try {
-        network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_OPEN);
+        network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
+        network.writeInt(getSessionId());
         sendClientInfo(network);
         network.writeString(name);
         if (network.getSrvProtocolVersion() >= 8)         network.writeString(connectionDbType);
@@ -31,38 +28,27 @@ synchronized (networkPool) {
       try {
         beginResponse(network);
         sessionId=network.readInt();
-        setSessionId(sessionId);
-        OLogManager.instance().debug(this,"Client connected with session id: " + sessionId);
+        setSessionId(network.getServerURL(),sessionId);
+        OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
         readDatabaseInformation(network);
         updateClusterConfiguration(network.readBytes());
         if (network.getSrvProtocolVersion() >= 14)         network.readString();
         status=STATUS.OPEN;
-        return;
+        return network;
       }
   finally {
         endResponse(network);
       }
     }
- catch (    IOException e) {
-      OLogManager.instance().debug(this,"Error while reading response on creation of connection ",e);
-      if (network != null) synchronized (networkPool) {
-        network.close();
-        networkPool.remove(network);
-      }
+ catch (    Exception e) {
+      handleException(network,"Cannot create a connection to remote server address(es): " + serverURLs,e);
     }
-catch (    OTimeoutException e) {
-      OLogManager.instance().debug(this,"Error while reading response on creation of connection ",e);
-      if (network != null) synchronized (networkPool) {
-        network.close();
-        networkPool.remove(network);
-      }
-    }
-catch (    Exception e) {
-      handleException("Cannot create a connection to remote server address(es): " + serverURLs,e);
-    }
-    createConnectionPool();
-synchronized (networkPool) {
+    networkPoolLock.lock();
+    try {
       availableConnections=!networkPool.isEmpty();
+    }
+  finally {
+      networkPoolLock.unlock();
     }
   }
   throw new OStorageException("Cannot create a connection to remote server address(es): " + serverURLs);

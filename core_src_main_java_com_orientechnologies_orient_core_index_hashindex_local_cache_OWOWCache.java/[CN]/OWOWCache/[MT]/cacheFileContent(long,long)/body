@@ -1,0 +1,19 @@
+{
+  final long startPosition=pageIndex * pageSize;
+  final long endPosition=startPosition + pageSize;
+  byte[] content=new byte[pageSize];
+  OCachePointer dataPointer;
+  final OFileClassic fileClassic=files.get(fileId);
+  if (fileClassic.getFilledUpTo() >= endPosition) {
+    fileClassic.read(startPosition,content,content.length);
+    final long pointer=directMemory.allocate(content);
+    final OLogSequenceNumber storedLSN=OLocalPage.getLogSequenceNumberFromPage(directMemory,pointer);
+    dataPointer=new OCachePointer(pointer,storedLSN);
+  }
+ else {
+    fileClassic.allocateSpace((int)(endPosition - fileClassic.getFilledUpTo()));
+    final long pointer=directMemory.allocate(content);
+    dataPointer=new OCachePointer(pointer,new OLogSequenceNumber(0,-1));
+  }
+  return dataPointer;
+}

@@ -1,0 +1,32 @@
+{
+  acquireExclusiveLock();
+  OStorageTransaction transaction=storage.getStorageTransaction();
+  try {
+    startDurableOperation(transaction);
+    BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
+    if (bucketSearchResult.itemIndex < 0)     return null;
+    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
+    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
+    keyBucketPointer.acquireExclusiveLock();
+    try {
+      OSBTreeBucket<K> keyBucket=new OSBTreeBucket<K>(keyBucketPointer.getDataPointer(),keySerializer,getTrackMode());
+      final ORID removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
+      keyBucket.remove(bucketSearchResult.itemIndex);
+      logPageChanges(keyBucket,fileId,keyBucketCacheEntry.getPageIndex(),false);
+      keyBucketCacheEntry.markDirty();
+      endDurableOperation(transaction,false);
+      return removed;
+    }
+  finally {
+      keyBucketPointer.releaseExclusiveLock();
+      diskCache.release(keyBucketCacheEntry);
+    }
+  }
+ catch (  IOException e) {
+    rollback(transaction);
+    throw new OIndexException("Error during removing key " + key + " from sbtree "+ name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

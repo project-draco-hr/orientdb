@@ -4,6 +4,7 @@
   final ORecordId rid=(ORecordId)iRecord.getIdentity();
   if (rid == null)   throw new ODatabaseException("Cannot create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   setCurrentDatabaseinThreadLocal();
+  iRecord.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.MARSHALLING);
   try {
     final boolean wasNew=iForceCreate || rid.isNew();
     if (wasNew && rid.clusterId == -1 && iClusterName != null)     rid.clusterId=getClusterIdByName(iClusterName);
@@ -16,11 +17,19 @@
     if (stream != null && stream.length > 0) {
       if (iCallTriggers)       if (wasNew) {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
-        if (callbackHooks(TYPE.BEFORE_CREATE,iRecord) == RESULT.RECORD_CHANGED)         stream=iRecord.toStream();
+        if (callbackHooks(TYPE.BEFORE_CREATE,iRecord) == RESULT.RECORD_CHANGED) {
+          iRecord.unsetDirty();
+          iRecord.setDirty();
+          stream=iRecord.toStream();
+        }
       }
  else {
         checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
-        if (callbackHooks(TYPE.BEFORE_UPDATE,iRecord) == RESULT.RECORD_CHANGED)         stream=iRecord.toStream();
+        if (callbackHooks(TYPE.BEFORE_UPDATE,iRecord) == RESULT.RECORD_CHANGED) {
+          iRecord.unsetDirty();
+          iRecord.setDirty();
+          stream=iRecord.toStream();
+        }
       }
     }
     if (!iRecord.isDirty())     return (RET)iRecord;
@@ -57,6 +66,9 @@
   }
 catch (  Throwable t) {
     throw new ODatabaseException("Error on saving record in cluster #" + iRecord.getIdentity().getClusterId(),t);
+  }
+ finally {
+    iRecord.setInternalStatus(com.orientechnologies.orient.core.db.record.ORecordElement.STATUS.LOADED);
   }
   return (RET)iRecord;
 }

@@ -1,0 +1,42 @@
+{
+  acquireExclusiveLock();
+  final OStorageTransaction transaction=storage.getStorageTransaction();
+  try {
+    startDurableOperation(transaction);
+    BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
+    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
+    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
+    keyBucketPointer.acquireExclusiveLock();
+    OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,valueSerializer,getTrackMode());
+    if (bucketSearchResult.itemIndex >= 0) {
+      keyBucket.updateValue(bucketSearchResult.itemIndex,value);
+      logPageChanges(keyBucket,fileId,bucketSearchResult.getLastPathItem(),false);
+    }
+ else {
+      int insertionIndex=-bucketSearchResult.itemIndex - 1;
+      while (!keyBucket.addEntry(insertionIndex,new OSBTreeBucket.SBTreeEntry<K,V>(-1,-1,key,value),true)) {
+        keyBucketPointer.releaseExclusiveLock();
+        diskCache.release(keyBucketCacheEntry);
+        bucketSearchResult=splitBucket(bucketSearchResult.path,insertionIndex,key);
+        insertionIndex=bucketSearchResult.itemIndex;
+        keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
+        keyBucketPointer=keyBucketCacheEntry.getCachePointer();
+        keyBucketPointer.acquireExclusiveLock();
+        keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,valueSerializer,getTrackMode());
+      }
+      logPageChanges(keyBucket,fileId,bucketSearchResult.getLastPathItem(),false);
+    }
+    keyBucketPointer.releaseExclusiveLock();
+    keyBucketCacheEntry.markDirty();
+    diskCache.release(keyBucketCacheEntry);
+    setSize(size() + 1);
+    endDurableOperation(transaction,false);
+  }
+ catch (  IOException e) {
+    rollback(transaction);
+    throw new OIndexException("Error during index update with key " + key + " and value "+ value,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

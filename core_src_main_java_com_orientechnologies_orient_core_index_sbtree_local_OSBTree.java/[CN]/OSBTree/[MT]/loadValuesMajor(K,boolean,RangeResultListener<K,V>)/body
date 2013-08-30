@@ -1,0 +1,42 @@
+{
+  acquireSharedLock();
+  try {
+    final PartialSearchMode partialSearchMode;
+    if (inclusive)     partialSearchMode=PartialSearchMode.LOWEST_BOUNDARY;
+ else     partialSearchMode=PartialSearchMode.HIGHEST_BOUNDARY;
+    BucketSearchResult bucketSearchResult=findBucket(key,partialSearchMode);
+    long pageIndex=bucketSearchResult.getLastPathItem();
+    int index;
+    if (bucketSearchResult.itemIndex >= 0) {
+      index=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex + 1;
+    }
+ else {
+      index=-bucketSearchResult.itemIndex - 1;
+    }
+    resultsLoop:     while (true) {
+      long nextPageIndex=-1;
+      final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+      final OCachePointer pointer=cacheEntry.getCachePointer();
+      try {
+        OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(pointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        int bucketSize=bucket.size();
+        for (int i=index; i < bucketSize; i++) {
+          if (!listener.addResult(bucket.getEntry(i)))           break resultsLoop;
+        }
+        if (bucket.getRightSibling() >= 0)         nextPageIndex=bucket.getRightSibling();
+ else         break;
+      }
+  finally {
+        diskCache.release(cacheEntry);
+      }
+      pageIndex=nextPageIndex;
+      index=0;
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Error during fetch of major values for key " + key + " in sbtree "+ name);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

@@ -1,19 +1,23 @@
 {
-  while (true) synchronized (lockQueue) {
-    final Long last=executionQueue.get(iTask.getRunId());
-    if (last == null) {
-      executionQueue.put(iTask.getRunId(),0l);
-      break;
-    }
- else     if (last != iTask.getOperationSerial() - 1) {
-      try {
-        ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %d tasks in queue %s. current=%d my=%d",(iTask.getOperationSerial() - last - 1),iTask.getRunId(),last,iTask.getOperationSerial());
-        lockQueue.wait(OGlobalConfiguration.STORAGE_LOCK_TIMEOUT.getValueAsLong());
+  final OStorageSynchronizer dbSynchronizer=getDatabaseSynchronizer(iTask.getDatabaseName());
+  while (true) {
+    if (!checkOperationSequence(iTask))     break;
+synchronized (lockQueue) {
+      final long[] lastExecutedOperation=dbSynchronizer.getLog().getLastExecutedOperationId();
+      if ((lastExecutedOperation[0] != iTask.getRunId() && iTask.getOperationSerial() > 1) || (lastExecutedOperation[0] == iTask.getRunId() && lastExecutedOperation[1] != iTask.getOperationSerial() - 1)) {
+        try {
+          final String tasksToWait=lastExecutedOperation[0] != iTask.getRunId() ? ">=1 (prev run)" : "" + (iTask.getOperationSerial() - lastExecutedOperation[1] - 1);
+          ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %s task(s) in queue %s, current=%d my=%d thread=%s",tasksToWait,iTask.getRunId(),lastExecutedOperation[1],iTask.getOperationSerial(),Thread.currentThread().getName());
+          lockQueue.wait(OGlobalConfiguration.STORAGE_LOCK_TIMEOUT.getValueAsLong());
+        }
+ catch (        InterruptedException e) {
+        }
       }
- catch (      InterruptedException e) {
+ else {
+        ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
+        return true;
       }
     }
- else     break;
   }
-  ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
+  return false;
 }

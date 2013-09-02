@@ -1,7 +1,7 @@
 {
   String masterNodeId=null;
   try {
-    if (replicationData == null) {
+    if (replicationData == null || !(iTask instanceof OAbstractReplicatedTask)) {
       ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
       try {
         return ((OAbstractRemoteTask<? extends Object>)iTask).executeOnLocalNode();
@@ -24,6 +24,10 @@
   }
  catch (  InterruptedException e) {
     Thread.interrupted();
+  }
+catch (  ONeedRetryException e) {
+    ODistributedServerLog.debug(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution %d.%d of operation in %s mode raising a ONeedRetryException",iTask.getRunId(),iTask.getOperationSerial(),EXECUTION_MODE.SYNCHRONOUS);
+    throw e;
   }
 catch (  Exception e) {
     ODistributedServerLog.error(this,getLocalNodeId(),masterNodeId,DIRECTION.OUT,"error on execution %d.%d of operation in %s mode",e,iTask.getRunId(),iTask.getOperationSerial(),EXECUTION_MODE.SYNCHRONOUS);

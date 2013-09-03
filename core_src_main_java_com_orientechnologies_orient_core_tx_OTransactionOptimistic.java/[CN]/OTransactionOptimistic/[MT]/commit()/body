@@ -1,7 +1,7 @@
 {
   checkTransaction();
   status=TXSTATUS.COMMITTING;
-  if (database.getStorage() instanceof OStorageProxy)   database.getStorage().commit(this);
+  if (database.getStorage() instanceof OStorageProxy)   database.getStorage().commit(this,null);
  else {
     final List<String> involvedIndexes=getInvolvedIndexes();
     if (involvedIndexes != null)     Collections.sort(involvedIndexes);
@@ -42,9 +42,8 @@
             }
             for (            OIndexAbstract<?> index : lockedIndexes)             index.acquireExclusiveLock();
           }
-          database.getStorage().callInLock(new Callable<Void>(){
-            public Void call() throws Exception {
-              database.getStorage().commit(OTransactionOptimistic.this);
+          final Runnable callback=new Runnable(){
+            @Override public void run(){
               final ODocument indexEntries=getIndexChanges();
               if (indexEntries != null) {
                 for (                Entry<String,Object> indexEntry : indexEntries) {
@@ -52,10 +51,10 @@
                   index.commit((ODocument)indexEntry.getValue());
                 }
               }
-              return null;
             }
           }
-,true);
+;
+          database.getStorage().commit(OTransactionOptimistic.this,callback);
           break;
         }
   finally {

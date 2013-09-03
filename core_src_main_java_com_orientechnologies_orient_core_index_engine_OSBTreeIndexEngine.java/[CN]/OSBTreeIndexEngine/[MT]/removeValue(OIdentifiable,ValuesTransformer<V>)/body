@@ -1,0 +1,29 @@
+{
+  acquireExclusiveLock();
+  try {
+    final Set<Object> keySetToRemove=new HashSet<Object>();
+    if (sbTree.size() == 0)     return 0;
+    final Object firstKey=sbTree.firstKey();
+    final Object lastKey=sbTree.lastKey();
+    sbTree.loadEntriesBetween(firstKey,true,lastKey,true,new OSBTree.RangeResultListener<Object,V>(){
+      @Override public boolean addResult(      OSBTreeBucket.SBTreeEntry<Object,V> entry){
+        if (transformer == null) {
+          if (entry.value.equals(value))           keySetToRemove.add(entry.key);
+        }
+ else {
+          Collection<OIdentifiable> identifiables=transformer.transformFromValue(entry.value);
+          for (          OIdentifiable identifiable : identifiables) {
+            if (identifiable.equals(value))             keySetToRemove.add(value);
+          }
+        }
+        return true;
+      }
+    }
+);
+    for (    Object keyToRemove : keySetToRemove)     sbTree.remove(keyToRemove);
+    return keySetToRemove.size();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

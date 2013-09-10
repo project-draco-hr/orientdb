@@ -3,10 +3,12 @@ synchronized (syncObject) {
     writeCache.truncateFile(fileId);
     final Set<Long> pageEntries=filePages.get(fileId);
     for (    Long pageIndex : pageEntries) {
-      OReadCacheEntry cacheEntry=get(fileId,pageIndex,true);
+      OCacheEntry cacheEntry=get(fileId,pageIndex,true);
+      if (cacheEntry == null)       cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
       if (cacheEntry != null) {
         if (cacheEntry.usagesCount == 0) {
           cacheEntry=remove(fileId,pageIndex);
+          if (cacheEntry == null)           cacheEntry=pinnedPages.remove(new PinnedPage(fileId,pageIndex));
           if (cacheEntry.dataPointer != null) {
             cacheEntry.dataPointer.decrementReferrer();
             cacheEntry.dataPointer=null;

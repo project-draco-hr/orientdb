@@ -4,13 +4,15 @@
   byte[] record=new byte[100];
   Random random=new Random();
   random.nextBytes(record);
-  OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,OVersionFactory.instance().createVersion(),(byte)1,null);
-  OCachePointer pagePointer=diskCache.load(1,0);
-  OLocalPage page=new OLocalPage(pagePointer.getDataPointer(),false,OLocalPage.TrackMode.NONE);
-  int recordPageOffset=page.getRecordPageOffset(physicalPosition.clusterPosition.intValue());
-  byte[] storedEntity=page.getBinaryValue(recordPageOffset,page.getRecordSize(physicalPosition.clusterPosition.intValue()));
+  OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,OVersionFactory.instance().createVersion(),(byte)1);
+  OCacheEntry cacheEntry=diskCache.load(1,1,false);
+  OCachePointer pagePointer=cacheEntry.getCachePointer();
+  OClusterPage page=new OClusterPage(pagePointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
+  int recordIndex=(int)(physicalPosition.clusterPosition.longValue() & 0xFFFF);
+  int recordPageOffset=page.getRecordPageOffset(recordIndex);
+  byte[] storedEntity=page.getBinaryValue(recordPageOffset,page.getRecordSize(recordIndex));
   byte[] storedRecord=new byte[100];
   System.arraycopy(storedEntity,OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE,storedRecord,0,storedRecord.length);
   Assert.assertEquals(storedRecord,record);
-  diskCache.release(1,0);
+  diskCache.release(cacheEntry);
 }

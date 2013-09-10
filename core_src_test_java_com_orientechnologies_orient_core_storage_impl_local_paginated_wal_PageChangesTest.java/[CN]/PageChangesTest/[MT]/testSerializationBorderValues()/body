@@ -1,0 +1,29 @@
+{
+  Random random=new Random();
+  byte[] firstChange=new byte[127];
+  random.nextBytes(firstChange);
+  byte[] secondChange=new byte[16383];
+  random.nextBytes(secondChange);
+  byte[] thirdChange=new byte[2097151];
+  random.nextBytes(thirdChange);
+  OPageChanges pageChanges=new OPageChanges();
+  pageChanges.addChanges(0,firstChange,new byte[127]);
+  pageChanges.addChanges(130,secondChange,new byte[16383]);
+  pageChanges.addChanges(17000,thirdChange,new byte[2097151]);
+  int contentSize=pageChanges.serializedSize();
+  byte[] content=new byte[contentSize + 10];
+  Assert.assertEquals(pageChanges.toStream(content,10),content.length);
+  OPageChanges deserializedPageChanges=new OPageChanges();
+  Assert.assertEquals(deserializedPageChanges.fromStream(content,10),content.length);
+  ODirectMemory directMemory=ODirectMemoryFactory.INSTANCE.directMemory();
+  long pointer=directMemory.allocate(4000000);
+  deserializedPageChanges.applyChanges(pointer);
+  Assert.assertEquals(directMemory.get(pointer,127),firstChange);
+  Assert.assertEquals(directMemory.get(pointer + 130,16383),secondChange);
+  Assert.assertEquals(directMemory.get(pointer + 17000,2097151),thirdChange);
+  deserializedPageChanges.revertChanges(pointer);
+  Assert.assertEquals(directMemory.get(pointer,127),new byte[127]);
+  Assert.assertEquals(directMemory.get(pointer + 130,16383),new byte[16383]);
+  Assert.assertEquals(directMemory.get(pointer + 17000,2097151),new byte[2097151]);
+  directMemory.free(pointer);
+}

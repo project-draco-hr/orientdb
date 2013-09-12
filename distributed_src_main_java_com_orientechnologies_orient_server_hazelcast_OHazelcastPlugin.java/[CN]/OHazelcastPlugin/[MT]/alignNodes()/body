@@ -4,6 +4,7 @@
 synchronized (synchronizers) {
     for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
       final String databaseName=entry.getKey();
+      final OReplicationConfig replicationData=getReplicationData(databaseName,null,null,getLocalNodeId(),null);
       try {
         final long[] lastOperationId=entry.getValue().getLog().getLastJournaledOperationId(ODatabaseJournal.OPERATION_STATUS.COMMITTED);
         if (lastOperationId[0] == -1 && lastOperationId[1] == -1)         continue;
@@ -14,7 +15,7 @@ synchronized (pendingAlignments) {
             ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.NONE,"setting node in alignment state for db=%s",databaseName);
           }
         }
-        propagate(remoteClusterNodes.keySet(),new OAlignRequestTask(serverInstance,this,databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]));
+        propagate(new OAlignRequestTask(serverInstance,this,databaseName,EXECUTION_MODE.ASYNCHRONOUS,lastOperationId[0],lastOperationId[1]),replicationData);
       }
  catch (      IOException e) {
         ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);

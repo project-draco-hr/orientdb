@@ -1,0 +1,36 @@
+{
+  long pagePointer=directMemory.allocate(new byte[OClusterPage.PAGE_SIZE]);
+  try {
+    OClusterPage localPage=new OClusterPage(pagePointer,true,ODurablePage.TrackMode.FULL);
+    ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
+    recordVersion.increment();
+    List<Integer> positions=new ArrayList<Integer>();
+    int lastPosition;
+    byte counter=0;
+    int freeSpace=localPage.getFreeSpace();
+    do {
+      lastPosition=localPage.appendRecord(recordVersion,new byte[]{counter,counter,counter},false);
+      if (lastPosition >= 0) {
+        Assert.assertEquals(lastPosition,positions.size());
+        positions.add(lastPosition);
+        counter++;
+        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - (19 + OVersionFactory.instance().getVersionSize()));
+        freeSpace=localPage.getFreeSpace();
+      }
+    }
+ while (lastPosition >= 0);
+    Assert.assertEquals(localPage.getRecordsCount(),positions.size());
+    counter=0;
+    for (    int position : positions) {
+      int pageOffset=localPage.getRecordPageOffset(position);
+      Assert.assertEquals(localPage.getBinaryValue(pageOffset,3),new byte[]{counter,counter,counter});
+      Assert.assertEquals(localPage.getRecordSize(position),3);
+      Assert.assertEquals(localPage.getRecordVersion(position),recordVersion);
+      counter++;
+    }
+    assertChangesTracking(localPage,pagePointer);
+  }
+  finally {
+    directMemory.free(pagePointer);
+  }
+}

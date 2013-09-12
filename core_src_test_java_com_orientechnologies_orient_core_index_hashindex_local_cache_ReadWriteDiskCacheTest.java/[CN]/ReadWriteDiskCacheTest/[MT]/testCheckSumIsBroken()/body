@@ -1,19 +1,19 @@
 {
   long fileId=buffer.openFile(fileName);
-  OCachePointer[] pointers=new OCachePointer[6];
+  OCacheEntry[] entries=new OCacheEntry[6];
   for (int i=0; i < 6; i++) {
-    pointers[i]=buffer.load(fileId,i);
-    pointers[i].acquireExclusiveLock();
-    buffer.markDirty(fileId,i);
-    directMemory.set(pointers[i].getDataPointer() + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
-    pointers[i].releaseExclusiveLock();
-    buffer.release(fileId,i);
+    entries[i]=buffer.load(fileId,i,false);
+    entries[i].getCachePointer().acquireExclusiveLock();
+    entries[i].markDirty();
+    directMemory.set(entries[i].getCachePointer().getDataPointer() + systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+    entries[i].getCachePointer().releaseExclusiveLock();
+    buffer.release(entries[i]);
   }
   buffer.flushBuffer();
   byte[] brokenByte=new byte[1];
   brokenByte[0]=13;
   updateFilePage(2,systemOffset + 2,brokenByte);
-  updateFilePage(4,systemOffset + 3,brokenByte);
+  updateFilePage(4,systemOffset + 4,brokenByte);
   OPageDataVerificationError[] pageErrors=buffer.checkStoredPages(null);
   Assert.assertEquals(2,pageErrors.length);
   Assert.assertFalse(pageErrors[0].incorrectMagicNumber);

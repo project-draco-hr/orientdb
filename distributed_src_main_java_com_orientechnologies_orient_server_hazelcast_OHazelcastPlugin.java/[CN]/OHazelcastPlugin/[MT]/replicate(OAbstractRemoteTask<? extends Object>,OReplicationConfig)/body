@@ -1,0 +1,32 @@
+{
+  final Map<String,Object> results=new HashMap<String,Object>();
+  if ((iReplicationData.synchReplicas == null || iReplicationData.synchReplicas.length == 0) && (iReplicationData.asynchReplicas == null || iReplicationData.asynchReplicas.length == 0))   return results;
+  iTask.setNodeSource(getLocalNodeId());
+  final Map<OAbstractRemoteTask<? extends Object>,Future<Object>> synchTasks=new HashMap<OAbstractRemoteTask<? extends Object>,Future<Object>>();
+  if (iReplicationData.synchReplicas != null && iReplicationData.synchReplicas.length > 0) {
+    ODistributedServerLog.debug(this,iTask.getNodeSource(),Arrays.toString(iReplicationData.synchReplicas),DIRECTION.OUT,"propagate to SYNCHRONOUS nodes %s oper=%d.%d",iTask.getName().toUpperCase(),iTask.getRunId(),iTask.getOperationSerial());
+    for (    String nodeId : iReplicationData.synchReplicas) {
+      final OAbstractRemoteTask<? extends Object> task=iTask instanceof OAbstractReplicatedTask ? ((OAbstractReplicatedTask<? extends Object>)iTask).copy() : iTask;
+      synchTasks.put(task,sendTask2Node(nodeId,task,EXECUTION_MODE.SYNCHRONOUS,results));
+    }
+  }
+  if (iReplicationData.asynchReplicas != null && iReplicationData.asynchReplicas.length > 0) {
+    ODistributedServerLog.debug(this,iTask.getNodeSource(),Arrays.toString(iReplicationData.asynchReplicas),DIRECTION.OUT,"propagate to ASYNCHRONOUS nodes %s oper=%d.%d",iTask.getName().toUpperCase(),iTask.getRunId(),iTask.getOperationSerial());
+    for (    String nodeId : iReplicationData.asynchReplicas) {
+      final OAbstractRemoteTask<? extends Object> task=iTask instanceof OAbstractReplicatedTask ? ((OAbstractReplicatedTask<? extends Object>)iTask).copy() : iTask;
+      sendTask2Node(nodeId,task,EXECUTION_MODE.ASYNCHRONOUS,results);
+    }
+  }
+  if (iReplicationData.synchReplicas != null && iReplicationData.synchReplicas.length > 0) {
+    for (    Map.Entry<OAbstractRemoteTask<? extends Object>,Future<Object>> f : synchTasks.entrySet()) {
+      final OAbstractRemoteTask<? extends Object> task=f.getKey();
+      try {
+        results.put(task.getNodeDestination(),f.getValue().get());
+      }
+ catch (      Throwable e) {
+        ODistributedExecutionCallback.handleTaskException(this,task,EXECUTION_MODE.SYNCHRONOUS,task.getNodeDestination(),results,e);
+      }
+    }
+  }
+  return results;
+}

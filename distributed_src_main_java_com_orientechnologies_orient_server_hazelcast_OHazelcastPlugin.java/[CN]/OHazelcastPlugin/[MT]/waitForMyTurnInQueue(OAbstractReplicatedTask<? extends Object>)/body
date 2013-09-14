@@ -1,24 +1,35 @@
 {
-  final OStorageSynchronizer dbSynchronizer=getDatabaseSynchronizer(iTask.getDatabaseName());
-  while (true) {
-    if (!checkOperationSequence(iTask))     break;
-    final long opSerial=iTask.getOperationSerial();
+  try {
+    final OStorageSynchronizer dbSynchronizer=getDatabaseSynchronizer(iTask.getDatabaseName());
+    while (true) {
+      if (!checkOperationSequence(iTask))       break;
+      final long opSerial=iTask.getOperationSerial();
 synchronized (lockQueue) {
-      final long[] lastExecutedOperation=dbSynchronizer.getLog().getLastExecutedOperationId();
-      if ((lastExecutedOperation[0] != iTask.getRunId() && opSerial > 1) || (lastExecutedOperation[0] == iTask.getRunId() && lastExecutedOperation[1] != opSerial - 1)) {
-        try {
-          final String tasksToWait=lastExecutedOperation[0] != iTask.getRunId() ? ">=1 (prev run)" : "" + (opSerial - lastExecutedOperation[1] - 1);
-          ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %s task(s) in queue %s, current=%d my=%d thread=%s",tasksToWait,iTask.getRunId(),lastExecutedOperation[1],opSerial,Thread.currentThread().getName());
-          lockQueue.wait(OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong());
+        final long[] lastExecutedOperation=dbSynchronizer.getLog().getLastExecutedOperationId();
+        if ((lastExecutedOperation[0] != iTask.getRunId() && opSerial > 1) || (lastExecutedOperation[0] == iTask.getRunId() && lastExecutedOperation[1] != opSerial - 1)) {
+          final long timeSinceLastJournalUpdate=System.currentTimeMillis() - lastExecutedOperation[2];
+          if (timeSinceLastJournalUpdate > RESET_OPERATION_TIMEOUT) {
+            lastExecutedOperation[1]++;
+            ODistributedServerLog.warn(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"timeout expired waiting for operation, skip task %d.%d thread=%s",lastExecutedOperation[0],lastExecutedOperation[1],Thread.currentThread().getName());
+            dbSynchronizer.getLog().updateLastOperation(lastExecutedOperation[0],lastExecutedOperation[1],false);
+          }
+ else           try {
+            final String tasksToWait=lastExecutedOperation[0] != iTask.getRunId() ? ">=1 (prev run)" : "" + (opSerial - lastExecutedOperation[1] - 1);
+            ODistributedServerLog.debug(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"waiting for %s task(s) queue=%s current=%d my=%d thread=%s",tasksToWait,iTask.getRunId(),lastExecutedOperation[1],opSerial,Thread.currentThread().getName());
+            lockQueue.wait(OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong());
+          }
+ catch (          InterruptedException e) {
+          }
         }
- catch (        InterruptedException e) {
-        }
-      }
  else {
-        ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
-        return true;
+          ODistributedThreadLocal.INSTANCE.set(iTask.getNodeSource());
+          return true;
+        }
       }
     }
+  }
+ catch (  Throwable r) {
+    ODistributedServerLog.error(this,getLocalNodeId(),iTask.getNodeSource(),DIRECTION.NONE,"error while checking for queue sequence, queue=%s, thread=%s",iTask.getRunId(),Thread.currentThread().getName());
   }
   return false;
 }

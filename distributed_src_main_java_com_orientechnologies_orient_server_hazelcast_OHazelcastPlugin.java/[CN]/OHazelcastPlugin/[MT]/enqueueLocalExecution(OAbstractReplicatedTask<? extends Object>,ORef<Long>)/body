@@ -9,17 +9,8 @@
   if (!waitForMyTurnInQueue(iTask))   return null;
   try {
     ODistributedServerLog.debug(this,iTask.getNodeSource(),iTask.getNodeDestination(),DIRECTION.IN,"local exec: pop operation=%d.%d, thread=%s",iTask.getRunId(),opSerial,Thread.currentThread().getName());
-    final OStorageSynchronizer dbSynchronizer=iTask.getDatabaseSynchronizer();
-    final long operationLogOffset=logOperation2Journal(dbSynchronizer,iTask);
-    try {
-      final Object result=iTask.executeOnLocalNode();
-      updateJournal(iTask,dbSynchronizer,operationLogOffset,true);
-      return result;
-    }
- catch (    Exception e) {
-      updateJournal(iTask,dbSynchronizer,operationLogOffset,false);
-      throw e;
-    }
+    iOperationOffset.value=logOperation2Journal(iTask.getDatabaseSynchronizer(),iTask);
+    return iTask.executeOnLocalNode();
   }
   finally {
     notifyQueueWaiters(iTask.getDatabaseName(),iTask.getRunId(),opSerial,false);

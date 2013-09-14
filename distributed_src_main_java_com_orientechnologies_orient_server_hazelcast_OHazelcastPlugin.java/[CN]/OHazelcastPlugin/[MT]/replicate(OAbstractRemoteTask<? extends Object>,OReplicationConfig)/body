@@ -24,9 +24,14 @@
     for (    Map.Entry<OAbstractRemoteTask<? extends Object>,Future<Object>> f : synchTasks.entrySet()) {
       final OAbstractRemoteTask<? extends Object> task=f.getKey();
       try {
-        results.put(task.getNodeDestination(),f.getValue().get());
+        results.put(task.getNodeDestination(),f.getValue().get(task.getTimeout(),TimeUnit.MILLISECONDS));
       }
- catch (      Throwable e) {
+ catch (      TimeoutException e) {
+        ODistributedServerLog.error(this,getLocalNodeId(),task.getNodeDestination(),DIRECTION.OUT,"timeout on replication of operation %d.%d task=%s, db=%s...",task,task.getRunId(),task.getOperationSerial(),task.getDatabaseName());
+        f.getValue().cancel(true);
+        ODistributedExecutionCallback.handleTaskException(this,task,EXECUTION_MODE.SYNCHRONOUS,task.getNodeDestination(),results,e);
+      }
+catch (      Throwable e) {
         ODistributedExecutionCallback.handleTaskException(this,task,EXECUTION_MODE.SYNCHRONOUS,task.getNodeDestination(),results,e);
       }
     }

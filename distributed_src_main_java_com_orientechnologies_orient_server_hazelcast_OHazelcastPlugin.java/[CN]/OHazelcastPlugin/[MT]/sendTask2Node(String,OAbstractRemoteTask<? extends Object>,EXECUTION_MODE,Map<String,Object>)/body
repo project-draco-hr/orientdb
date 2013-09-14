@@ -1,0 +1,20 @@
+{
+  iTask.setNodeDestination(iNodeId);
+  final Member clusterMember=getHazelcastMember(iNodeId);
+  try {
+    if (iMode == EXECUTION_MODE.SYNCHRONOUS) {
+      final IExecutorService exec=hazelcastInstance.getExecutorService(SYNCH_EXECUTOR_NAME);
+      return exec.submitToMember((Callable<Object>)iTask,clusterMember);
+    }
+ else {
+      final IExecutorService exec=hazelcastInstance.getExecutorService(ASYNCH_EXECUTOR_NAME);
+      final ODistributedExecutionCallback callback=new ODistributedExecutionCallback(iTask,iMode,iNodeId,iResults);
+      exec.submitToMember((Callable<Object>)iTask,clusterMember,callback);
+      return null;
+    }
+  }
+ catch (  Exception e) {
+    ODistributedServerLog.error(this,getLocalNodeId(),iNodeId,DIRECTION.OUT,"error on execution of operation %d.%d in %s mode",e,iTask.getRunId(),iTask.getOperationSerial(),iMode);
+    throw new ODistributedException("Error on executing remote operation " + iTask.getRunId() + "."+ iTask.getOperationSerial()+ " in "+ iMode+ " mode against node: "+ clusterMember,e);
+  }
+}

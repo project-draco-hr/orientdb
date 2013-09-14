@@ -1,0 +1,30 @@
+{
+  if (remoteClusterNodes.isEmpty())   return;
+  setStatus("aligning");
+  final Map<OAlignRequestTask,OReplicationConfig> tasks=new HashMap<OAlignRequestTask,OReplicationConfig>();
+synchronized (synchronizers) {
+    for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
+      final String databaseName=entry.getKey();
+      final OReplicationConfig replicationData=getReplicationData(databaseName,null,null,getLocalNodeId(),null);
+      try {
+        final long[] lastOperationId=entry.getValue().getLog().getLastJournaledOperationId(null);
+        if (lastOperationId[0] == -1 && lastOperationId[1] == -1)         continue;
+        ODistributedServerLog.warn(this,getLocalNodeId(),remoteClusterNodes.keySet().toString(),DIRECTION.OUT,"sending align request in broadcast for database '%s' from operation %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
+synchronized (pendingAlignments) {
+          for (          String node : remoteClusterNodes.keySet()) {
+            pendingAlignments.put(node + "/" + databaseName,Boolean.FALSE);
+            ODistributedServerLog.info(this,getLocalNodeId(),node,DIRECTION.NONE,"setting node in alignment state for db=%s",databaseName);
+          }
+        }
+        tasks.put(new OAlignRequestTask(serverInstance,this,databaseName,lastOperationId[0],lastOperationId[1]),replicationData);
+      }
+ catch (      IOException e) {
+        ODistributedServerLog.warn(this,getLocalNodeId(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);
+      }
+    }
+    if (pendingAlignments.isEmpty())     setStatus("online");
+  }
+  for (  Entry<OAlignRequestTask,OReplicationConfig> t : tasks.entrySet()) {
+    replicate(t.getKey(),t.getValue());
+  }
+}

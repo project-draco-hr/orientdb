@@ -1,6 +1,15 @@
 {
   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"flushing aligning %d operations db=%s...",tasks.getTasks(),databaseName);
-  dManager.sendOperation2Node(getNodeSource(),tasks,EXECUTION_MODE.FIRE_AND_FORGET);
+  final Future<Object> future=dManager.sendTask2Node(getNodeSource(),tasks,EXECUTION_MODE.SYNCHRONOUS,new HashMap<String,Object>());
+  if (future != null) {
+    try {
+      future.get(getTimeout(),TimeUnit.MILLISECONDS);
+    }
+ catch (    TimeoutException e) {
+      ODistributedServerLog.error(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT,"timeout on flushing alignment operations db=%s...",databaseName);
+      future.cancel(true);
+    }
+  }
   final int aligned=tasks.getTasks();
   ODistributedServerLog.info(this,getDistributedServerManager().getLocalNodeId(),getNodeSource(),DIRECTION.OUT," flushed aligning %d operations db=%s...",aligned,databaseName);
   tasks.clearTasks();

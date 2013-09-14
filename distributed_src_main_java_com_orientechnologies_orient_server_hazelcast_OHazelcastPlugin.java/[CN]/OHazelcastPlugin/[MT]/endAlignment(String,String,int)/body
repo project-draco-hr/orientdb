@@ -3,7 +3,18 @@ synchronized (pendingAlignments) {
     if (pendingAlignments.remove(iNode + "/" + iDatabaseName) == null) {
       ODistributedServerLog.error(this,getLocalNodeId(),iNode,DIRECTION.OUT,"received response for an alignment against an unknown node %s database %s",iDatabaseName);
     }
-    if (pendingAlignments.isEmpty())     setStatus("online");
+    if (pendingAlignments.isEmpty()) {
+      setStatus("online");
+      if (alignedOperations > 0) {
+        ODistributedServerLog.error(this,getLocalNodeId(),iNode,DIRECTION.OUT,"aligned %d operations, schedule another realignment in %dms to get the new operations if any, database %s",alignedOperations,REALIGN_DELAY_TIME,iDatabaseName);
+        Orient.instance().getTimer().schedule(new TimerTask(){
+          @Override public void run(){
+            broadcastAlignmentRequest();
+          }
+        }
+,REALIGN_DELAY_TIME);
+      }
+    }
  else {
       for (      Entry<String,Boolean> entry : pendingAlignments.entrySet()) {
         final String[] parts=entry.getKey().split("/");

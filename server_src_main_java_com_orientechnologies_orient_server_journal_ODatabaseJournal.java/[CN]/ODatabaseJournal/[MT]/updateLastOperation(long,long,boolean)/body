@@ -1,13 +1,19 @@
 {
   lock.lock();
   try {
-    if (!iForce && lastExecuted[0] == iRunId && lastExecuted[1] >= iOperationSerial) {
+    final boolean updated;
+    final boolean alreadyExecuted=lastExecuted[0] == iRunId && lastExecuted[1] >= iOperationSerial;
+    if (alreadyExecuted && !iForce) {
       ODistributedServerLog.debug(this,cluster.getLocalNodeId(),null,DIRECTION.NONE,"skipped updating journal last task db='%s' op=%d.%d found=%d.%d",storage.getName(),iRunId,iOperationSerial,lastExecuted[0],lastExecuted[1]);
-      return;
+      updated=false;
     }
-    ODistributedServerLog.debug(this,cluster.getLocalNodeId(),null,DIRECTION.NONE,"updating journal last task db='%s' op=%d.%d",storage.getName(),iRunId,iOperationSerial);
-    lastExecuted[0]=iRunId;
-    lastExecuted[1]=iOperationSerial;
+ else {
+      ODistributedServerLog.debug(this,cluster.getLocalNodeId(),null,DIRECTION.NONE,"updating journal last task db='%s' op=%d.%d found=%d.%d force=%s",storage.getName(),iRunId,iOperationSerial,lastExecuted[0],lastExecuted[1],iForce);
+      lastExecuted[0]=iRunId;
+      lastExecuted[1]=iOperationSerial;
+      updated=true;
+    }
+    return updated;
   }
   finally {
     lock.unlock();

@@ -1,7 +1,14 @@
 {
+  final long opSerial=iTask.getOperationSerial();
+  if (opSerial == -1)   try {
+    return iTask.executeOnLocalNode();
+  }
+  finally {
+    notifyQueueWaiters(iTask.getDatabaseName(),iTask.getRunId(),opSerial,false);
+  }
   if (!waitForMyTurnInQueue(iTask))   return null;
   try {
-    ODistributedServerLog.debug(this,iTask.getNodeSource(),iTask.getNodeDestination(),DIRECTION.IN,"local exec: pop operation=%d.%d, thread=%s",iTask.getRunId(),iTask.getOperationSerial(),Thread.currentThread().getName());
+    ODistributedServerLog.debug(this,iTask.getNodeSource(),iTask.getNodeDestination(),DIRECTION.IN,"local exec: pop operation=%d.%d, thread=%s",iTask.getRunId(),opSerial,Thread.currentThread().getName());
     final OStorageSynchronizer dbSynchronizer=iTask.getDatabaseSynchronizer();
     final long operationLogOffset=logOperation2Journal(dbSynchronizer,iTask);
     try {
@@ -15,6 +22,6 @@
     }
   }
   finally {
-    notifyQueueWaiters(iTask.getDatabaseName(),iTask.getRunId(),iTask.getOperationSerial(),false);
+    notifyQueueWaiters(iTask.getDatabaseName(),iTask.getRunId(),opSerial,false);
   }
 }

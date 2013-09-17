@@ -1,0 +1,42 @@
+{
+  final String databaseName=iRequest.getDatabaseName();
+  final String clusterName=iRequest.getClusterName();
+  final ITopic<ODistributedRequest> topic=getRequestTopic(databaseName,clusterName);
+  final Thread currentThread=Thread.currentThread();
+  final ODistributedConfiguration cfg=manager.getConfiguration(databaseName);
+  final ODistributedPartitioningStrategy strategy=manager.getStrategy(cfg.getPartitionStrategy(clusterName));
+  final ODistributedPartition partition=strategy.getPartition(databaseName,clusterName);
+  final List<String> nodes=partition.getNodes();
+  final int writeQuorum=cfg.getWriteQuorum(clusterName);
+  final int queueSize=nodes.size();
+  iRequest.setSenderThreadId(currentThread.getId());
+  final ArrayBlockingQueue<ODistributedResponse> responseQueue=new ArrayBlockingQueue<ODistributedResponse>(queueSize,true);
+  threadQueues.put(currentThread.getId(),responseQueue);
+  try {
+    final ODistributedResponse[] responses=new ODistributedResponse[queueSize];
+    topic.publish(iRequest);
+    int receivedResponses=0;
+    ODistributedResponse firstResponse=null;
+    final long beginTime=System.currentTimeMillis();
+    for (int i=0; i < writeQuorum; ++i) {
+      responses[i]=responseQueue.poll(MAX_PULL_TIMEOUT - (System.currentTimeMillis() - beginTime),TimeUnit.MILLISECONDS);
+      if (responses[i] != null) {
+        if (firstResponse == null)         firstResponse=responses[i];
+        receivedResponses++;
+      }
+    }
+    if (queueSize > writeQuorum) {
+    }
+    for (int i=0; i < responses.length; ++i) {
+    }
+    if (receivedResponses < writeQuorum) {
+    }
+    return firstResponse;
+  }
+ catch (  Exception e) {
+    throw new ODistributedException("Error on sending distributed request against " + databaseName + (clusterName != null ? ":" + clusterName : ""),e);
+  }
+ finally {
+    threadQueues.remove(currentThread.getId());
+  }
+}

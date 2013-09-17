@@ -1,14 +1,17 @@
 {
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
-  Object result=null;
   try {
     final String clusterName=getClusterNameFromRID(iRecordId);
-    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId,dManager.getLocalNodeId(),null);
-    if (replicationData == null)     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
- else     result=dManager.execute(clusterName,iRecordId,new OUpdateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId,iContent,iVersion,iRecordType),replicationData);
+    final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+    if (!dConfig.isReplicationActive(clusterName))     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
+    final ODistributedRequest request=dManager.getMessageService().createRequest();
+    request.setPayload(new OUpdateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId,iContent,iVersion,iRecordType));
+    final Object result=dManager.getMessageService().send(request).getPayload();
+    if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);
+    return new OStorageOperationResult<ORecordVersion>((ORecordVersion)result);
   }
- catch (  ExecutionException e) {
+ catch (  Exception e) {
     handleDistributedException("Cannot route UPDATE_RECORD operation against %s to the distributed node",e,iRecordId);
+    return null;
   }
-  return new OStorageOperationResult<ORecordVersion>((ORecordVersion)result);
 }

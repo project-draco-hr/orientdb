@@ -1,7 +1,7 @@
 {
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.command(iCommand);
-  final OReplicationConfig replicationData=dManager.getReplicationData(getName(),null,null,dManager.getLocalNodeId(),null);
-  if (replicationData == null)   return wrapped.command(iCommand);
+  final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+  if (!dConfig.isReplicationActive(null))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
@@ -11,10 +11,15 @@
  else   if (exec instanceof OCommandDistributedReplicateRequest)   distribute=true;
   if (!distribute)   return wrapped.executeCommand(iCommand,executor);
   try {
-    return dManager.execute(null,null,new OSQLCommandTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iCommand.getText()),replicationData);
+    dManager.sendRequest();
+    final ODistributedRequest request=dManager.getMessageService().createRequest();
+    request.setPayload(new OSQLCommandTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iCommand.getText()));
+    final Object result=dManager.getMessageService().send(request).getPayload();
+    if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);
+    return result;
   }
- catch (  ExecutionException e) {
+ catch (  Exception e) {
     handleDistributedException("Cannot route COMMAND operation to the distributed node",e);
+    return null;
   }
-  return null;
 }

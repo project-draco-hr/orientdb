@@ -1,0 +1,24 @@
+{
+  final String pluginName=pluginFile.getName();
+  OServerPluginInfo currentPluginData;
+  OLogManager.instance().info(this,"Installing dynamic plugin '%s'...",pluginName);
+  try {
+    final URLClassLoader pluginClassLoader=new URLClassLoader(new URL[]{pluginFile.toURI().toURL()},this.getClass().getClassLoader());
+    final InputStream pluginPropertiesFile=pluginClassLoader.getResourceAsStream("plugin.properties");
+    if (pluginPropertiesFile == null || pluginPropertiesFile.available() == 0)     OLogManager.instance().error(this,"Error on loading plugin.properties for dynamic plugin '%s'",IllegalArgumentException.class,pluginName);
+    final Properties properties=new Properties();
+    properties.load(pluginPropertiesFile);
+    final String pluginClass=properties.getProperty("class");
+    List<OServerParameterConfiguration> params=new ArrayList<OServerParameterConfiguration>();
+    for (    Object prop : properties.keySet()) {
+      final String propName=prop.toString();
+      if (propName.startsWith("param."))       params.add(new OServerParameterConfiguration(propName.substring("param.".length()),properties.getProperty(propName)));
+    }
+    final OServerParameterConfiguration[] pluginParams=params.toArray(new OServerParameterConfiguration[params.size()]);
+    currentPluginData=new OServerPluginInfo(pluginName,startPluginClass(pluginClassLoader,pluginClass,pluginParams),pluginFile.lastModified());
+    registerPlugin(currentPluginData);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on installing dynamic plugin '%s'",e,pluginName);
+  }
+}

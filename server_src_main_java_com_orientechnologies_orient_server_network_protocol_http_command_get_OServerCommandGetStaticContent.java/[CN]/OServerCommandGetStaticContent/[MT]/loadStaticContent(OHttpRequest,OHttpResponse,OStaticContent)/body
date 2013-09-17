@@ -1,0 +1,66 @@
+{
+  if (filePath == null && rootPath == null) {
+    rootPath=iRequest.configuration.getValueAsString("orientdb.www.path","src/site");
+    if (rootPath == null) {
+      OLogManager.instance().warn(this,"No path configured. Specify the 'root.path', 'file.path' or the global 'orientdb.www.path' variable",rootPath);
+      return;
+    }
+  }
+  if (filePath == null) {
+    final File wwwPathDirectory=new File(rootPath);
+    if (!wwwPathDirectory.exists())     OLogManager.instance().warn(this,"path variable points to '%s' but it doesn't exists",rootPath);
+    if (!wwwPathDirectory.isDirectory())     OLogManager.instance().warn(this,"path variable points to '%s' but it isn't a directory",rootPath);
+  }
+  String path;
+  if (filePath != null)   path=filePath;
+ else {
+    final String url=getResource(iRequest);
+    if (url.startsWith("/www"))     path=rootPath + url.substring("/www".length(),url.length());
+ else     path=rootPath + url;
+  }
+  path=URLDecoder.decode(path,"UTF-8");
+  if (OGlobalConfiguration.SERVER_CACHE_FILE_STATIC.getValueAsBoolean()) {
+    final OStaticContentCachedEntry cachedEntry=cacheContents.get(path);
+    if (cachedEntry != null) {
+      staticContent.is=new ByteArrayInputStream(cachedEntry.content);
+      staticContent.contentSize=cachedEntry.size;
+      staticContent.type=cachedEntry.type;
+    }
+  }
+  if (staticContent.is == null) {
+    File inputFile=new File(path);
+    if (!inputFile.exists()) {
+      OLogManager.instance().debug(this,"Static resource not found: %s",path);
+      iResponse.sendStream(404,"File not found",null,null,0);
+      return;
+    }
+    if (filePath == null && inputFile.isDirectory()) {
+      inputFile=new File(path + "/index.htm");
+      if (inputFile.exists())       path=path + "/index.htm";
+ else {
+        inputFile=new File(path + "/index.html");
+        if (inputFile.exists())         path=path + "/index.html";
+      }
+    }
+    if (path.endsWith(".htm") || path.endsWith(".html"))     staticContent.type="text/html";
+ else     if (path.endsWith(".png"))     staticContent.type="image/png";
+ else     if (path.endsWith(".jpeg"))     staticContent.type="image/jpeg";
+ else     if (path.endsWith(".js"))     staticContent.type="application/x-javascript";
+ else     if (path.endsWith(".css"))     staticContent.type="text/css";
+ else     if (path.endsWith(".ico"))     staticContent.type="image/x-icon";
+ else     if (path.endsWith(".otf"))     staticContent.type="font/opentype";
+ else     staticContent.type="text/plain";
+    staticContent.is=new BufferedInputStream(new FileInputStream(inputFile));
+    staticContent.contentSize=inputFile.length();
+    if (OGlobalConfiguration.SERVER_CACHE_FILE_STATIC.getValueAsBoolean()) {
+      final byte[] buffer=new byte[(int)staticContent.contentSize];
+      for (int i=0; i < staticContent.contentSize; ++i)       buffer[i]=(byte)staticContent.is.read();
+      OStaticContentCachedEntry cachedEntry=new OStaticContentCachedEntry();
+      cachedEntry.content=buffer;
+      cachedEntry.size=staticContent.contentSize;
+      cachedEntry.type=staticContent.type;
+      cacheContents.put(path,cachedEntry);
+      staticContent.is=new ByteArrayInputStream(cachedEntry.content);
+    }
+  }
+}

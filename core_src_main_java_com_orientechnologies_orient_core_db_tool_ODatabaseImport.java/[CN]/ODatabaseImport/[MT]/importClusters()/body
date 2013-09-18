@@ -12,6 +12,7 @@
     removeDefaultClusters();
     recreateManualIndex=true;
   }
+  final Set<String> indexesToRebuild=new HashSet<String>();
   @SuppressWarnings("unused") ORecordId rid=null;
   while (jsonReader.lastChar() != ']') {
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
@@ -49,12 +50,34 @@
       }
  else       throw new OConfigurationException("Imported cluster '" + name + "' has id="+ clusterId+ " different from the original: "+ id+ ". To continue the import drop the cluster '"+ database.getClusterNameById(clusterId - 1)+ "' that has "+ database.countClusterElements(clusterId - 1)+ " records");
     }
-    if (name != null && !(name.equalsIgnoreCase(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME) || name.equalsIgnoreCase(OMetadataDefault.CLUSTER_INTERNAL_NAME) || name.equalsIgnoreCase(OMetadataDefault.CLUSTER_INDEX_NAME)))     database.getStorage().getClusterById(clusterId).truncate();
-    listener.onMessage("OK, assigned id=" + clusterId);
+    if (name != null && !(name.equalsIgnoreCase(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME) || name.equalsIgnoreCase(OMetadataDefault.CLUSTER_INTERNAL_NAME) || name.equalsIgnoreCase(OMetadataDefault.CLUSTER_INDEX_NAME))) {
+      database.command(new OCommandSQL("truncate cluster " + name)).execute();
+      for (      OIndex existingIndex : database.getMetadata().getIndexManager().getIndexes()) {
+        if (existingIndex.getClusters().contains(name)) {
+          indexesToRebuild.add(existingIndex.getName());
+        }
+      }
+    }
+    listener.onMessage("\nOK, assigned id=" + clusterId);
     total++;
     jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
   }
   jsonReader.readNext(OJSONReader.COMMA_SEPARATOR);
+  listener.onMessage("\nRebuilding indexes of truncated clusters ...");
+  for (  final String indexName : indexesToRebuild)   database.getMetadata().getIndexManager().getIndex(indexName).rebuild(new OProgressListener(){
+    @Override public void onBegin(    Object iTask,    long iTotal){
+      listener.onMessage("\nCluster content was truncated and index " + indexName + " will be rebuilt");
+    }
+    @Override public boolean onProgress(    Object iTask,    long iCounter,    float iPercent){
+      listener.onMessage(String.format("\nIndex %s is rebuilt on %f percent",indexName,iPercent));
+      return true;
+    }
+    @Override public void onCompletition(    Object iTask,    boolean iSucceed){
+      listener.onMessage("\nIndex " + indexName + " was successfully rebuilt.");
+    }
+  }
+);
+  listener.onMessage("\nDone " + indexesToRebuild.size() + " indexes were rebuilt.");
   if (recreateManualIndex) {
     database.addCluster(OStorage.CLUSTER_TYPE.PHYSICAL.toString(),OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME,null,null);
     database.getMetadata().getIndexManager().create();

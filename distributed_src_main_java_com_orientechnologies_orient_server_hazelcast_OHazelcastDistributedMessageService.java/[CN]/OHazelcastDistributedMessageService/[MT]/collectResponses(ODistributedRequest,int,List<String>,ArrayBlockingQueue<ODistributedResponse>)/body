@@ -7,15 +7,16 @@
   int availableNodes=0;
   for (  String node : iNodes) {
     if (manager.isNodeAvailable(node))     availableNodes++;
+ else     ODistributedServerLog.warn(this,getLocalNodeNameAndThread(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
   }
   final int expectedSynchronousResponses=Math.min(availableNodes,Math.min(queueSize,writeQuorum));
   final long beginTime=System.currentTimeMillis();
   for (int i=0; i < expectedSynchronousResponses; ++i) {
     final long elapsed=System.currentTimeMillis() - beginTime;
-    responses[i]=responseQueue.poll(MAX_PULL_TIMEOUT - elapsed,TimeUnit.MILLISECONDS);
+    responses[i]=responseQueue.poll(MSG_RECEIVE_RESPONSE_TIMEOUT - elapsed,TimeUnit.MILLISECONDS);
     if (responses[i] != null) {
       if (responses[i].getRequestId() != iRequest.getId()) {
-        ODistributedServerLog.error(this,getLocalNodeNameAndThread(),responses[i].getSenderNodeName(),DIRECTION.OUT,"ignore message from another request (%d)",responses[i].getRequestId());
+        ODistributedServerLog.error(this,getLocalNodeNameAndThread(),responses[i].getSenderNodeName(),DIRECTION.OUT,"ignore message %d from another request (%d)",responses[i].getRequestId(),responses[i].getSenderThreadId());
         --i;
         continue;
       }

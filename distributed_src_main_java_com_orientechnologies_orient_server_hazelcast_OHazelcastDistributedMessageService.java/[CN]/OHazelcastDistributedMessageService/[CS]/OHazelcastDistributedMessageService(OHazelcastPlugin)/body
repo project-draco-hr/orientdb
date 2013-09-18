@@ -1,15 +1,23 @@
 {
   this.manager=manager;
-  this.threadQueues=new ConcurrentHashMap<Long,ArrayBlockingQueue<ODistributedResponse>>();
-  responseQueue=manager.getHazelcastInstance().getQueue("node." + manager.getLocalNodeName());
-  responseQueue.clear();
+  this.internalThreadQueues=new ConcurrentHashMap<Long,ArrayBlockingQueue<ODistributedResponse>>();
+  final String queueName=getResponseQueueName(manager.getLocalNodeName());
+  nodeResponseQueue=getNodeQueue(queueName);
+  checkForPendingMessages(nodeResponseQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
-      while (!Thread.interrupted())       try {
-        notifyResponse(responseQueue.take());
-      }
- catch (      Throwable e) {
-        ODistributedServerLog.error(this,manager.getLocalNodeName(),null,DIRECTION.IN,"error on reading distributed response");
+      while (!Thread.interrupted()) {
+        String senderNode=null;
+        try {
+          final ODistributedResponse message=nodeResponseQueue.take();
+          if (message != null) {
+            senderNode=message.getSenderNodeName();
+            dispatchResponseToThread(message);
+          }
+        }
+ catch (        Throwable e) {
+          ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response");
+        }
       }
     }
   }

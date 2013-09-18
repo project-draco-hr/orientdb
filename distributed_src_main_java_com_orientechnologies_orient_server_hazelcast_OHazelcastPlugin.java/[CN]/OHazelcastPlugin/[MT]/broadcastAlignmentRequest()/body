@@ -1,25 +1,3 @@
 {
-  if (remoteClusterNodes.isEmpty())   return;
-  setStatus(STATUS.ALIGNING);
-synchronized (synchronizers) {
-    for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
-      final String databaseName=entry.getKey();
-      try {
-        final long[] lastOperationId=entry.getValue().getLog().getLastJournaledOperationId(null);
-        if (lastOperationId[0] == -1 && lastOperationId[1] == -1)         continue;
-        ODistributedServerLog.warn(this,getLocalNodeName(),remoteClusterNodes.keySet().toString(),DIRECTION.OUT,"sending align request in broadcast for database '%s' from operation %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
-synchronized (pendingAlignments) {
-          for (          String node : remoteClusterNodes.keySet()) {
-            pendingAlignments.put(node + "/" + databaseName,Boolean.FALSE);
-            ODistributedServerLog.info(this,getLocalNodeName(),node,DIRECTION.NONE,"setting node in alignment state for db=%s",databaseName);
-          }
-        }
-        sendRequest(databaseName,new OAlignRequestTask(lastOperationId[0],lastOperationId[1]));
-      }
- catch (      IOException e) {
-        ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);
-      }
-    }
-    if (pendingAlignments.isEmpty())     setStatus(STATUS.ONLINE);
-  }
+  if (cachedClusterNodes.isEmpty())   return;
 }

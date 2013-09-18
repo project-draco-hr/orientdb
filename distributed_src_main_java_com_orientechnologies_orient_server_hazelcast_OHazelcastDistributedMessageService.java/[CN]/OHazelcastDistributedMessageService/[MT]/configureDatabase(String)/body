@@ -1,9 +1,23 @@
 {
-  final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-  for (  String clusterName : cfg.getClusterNames()) {
-    final ITopic<ODistributedRequest> topic=getRequestTopic(databaseName,clusterName);
-    topic.addMessageListener(this);
+  final String queueName=getRequestQueueName(manager.getLocalNodeName(),iDatabaseName);
+  final IQueue<ODistributedRequest> requestQueue=getNodeQueue(queueName);
+  checkForPendingMessages(requestQueue,queueName);
+  new Thread(new Runnable(){
+    @Override public void run(){
+      while (!Thread.interrupted()) {
+        String senderNode=null;
+        try {
+          final ODistributedRequest message=requestQueue.take();
+          if (message != null) {
+            senderNode=message.getSenderNodeName();
+            onMessage(message);
+          }
+        }
+ catch (        Throwable e) {
+          ODistributedServerLog.error(this,getLocalNodeNameAndThread(),senderNode,DIRECTION.IN,"error on reading distributed request");
+        }
+      }
+    }
   }
-  final ITopic<ODistributedRequest> topic=getRequestTopic(databaseName,null);
-  topic.addMessageListener(this);
+).start();
 }

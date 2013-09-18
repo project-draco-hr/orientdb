@@ -1,52 +1,37 @@
 {
   final String databaseName=iRequest.getDatabaseName();
   final String clusterName=iRequest.getClusterName();
-  final ITopic<ODistributedRequest> topic=getRequestTopic(databaseName,clusterName);
   final Thread currentThread=Thread.currentThread();
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
   final ODistributedPartitioningStrategy strategy=manager.getStrategy(cfg.getPartitionStrategy(clusterName));
   final ODistributedPartition partition=strategy.getPartition(manager,databaseName,clusterName);
   final List<String> nodes=partition.getNodes();
+  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
   final int writeQuorum=cfg.getWriteQuorum(clusterName);
   final int queueSize=nodes.size();
   iRequest.setSenderNodeName(manager.getLocalNodeName());
   iRequest.setSenderThreadId(currentThread.getId());
   final ArrayBlockingQueue<ODistributedResponse> responseQueue=new ArrayBlockingQueue<ODistributedResponse>(queueSize,true);
-  threadQueues.put(currentThread.getId(),responseQueue);
+  internalThreadQueues.put(currentThread.getId(),responseQueue);
   try {
-    final ODistributedResponse[] responses=new ODistributedResponse[queueSize];
-synchronized (topic) {
+    requestLock.lock();
+    try {
       iRequest.assignUniqueId(manager.getRunId(),manager.incrementDistributedSerial(databaseName));
-      topic.publish(iRequest);
-    }
-    if (iRequest.getExecutionMode() == EXECUTION_MODE.NO_RESPONSE)     return null;
-    int receivedResponses=0;
-    ODistributedResponse firstResponse=null;
-    final long beginTime=System.currentTimeMillis();
-    final int expectedSynchronousResponses=Math.min(queueSize,writeQuorum);
-    for (int i=0; i < expectedSynchronousResponses; ++i) {
-      final long elapsed=System.currentTimeMillis() - beginTime;
-      responses[i]=responseQueue.poll(MAX_PULL_TIMEOUT - elapsed,TimeUnit.MILLISECONDS);
-      if (responses[i] != null) {
-        ODistributedServerLog.debug(this,manager.getLocalNodeName() + ":" + currentThread.getId(),null,DIRECTION.IN,"received response: %s",responses[i]);
-        if (firstResponse == null)         firstResponse=responses[i];
-        receivedResponses++;
+      ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
+      for (      IQueue<ODistributedRequest> queue : reqQueues) {
+        queue.offer(iRequest,MAX_PUSH_TIMEOUT,TimeUnit.MILLISECONDS);
       }
- else       ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.IN,"- timeout (%dms) on response for request: %s",elapsed,iRequest);
     }
-    if (queueSize > writeQuorum) {
+  finally {
+      requestLock.unlock();
     }
-    for (int i=0; i < responses.length; ++i) {
-    }
-    if (receivedResponses < writeQuorum) {
-      iRequest.undo();
-    }
+    final ODistributedResponse firstResponse=collectResponses(iRequest,writeQuorum,nodes,responseQueue);
     return firstResponse;
   }
  catch (  Exception e) {
     throw new ODistributedException("Error on sending distributed request against " + databaseName + (clusterName != null ? ":" + clusterName : ""),e);
   }
  finally {
-    threadQueues.remove(currentThread.getId());
+    internalThreadQueues.remove(currentThread.getId());
   }
 }

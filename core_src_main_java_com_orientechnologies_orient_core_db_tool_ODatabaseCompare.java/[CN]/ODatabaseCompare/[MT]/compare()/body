@@ -11,13 +11,9 @@
     ODocumentHelper.RIDMapper ridMapper=null;
     if (autoDetectExportImportMap) {
       listener.onMessage("\nAuto discovery of mapping between RIDs of exported and imported records is switched on, try to discover mapping data on disk.");
-      File file=new File(databaseDocumentTxTwo.getStorage().getConfiguration().getDirectory() + File.separator + ODatabaseImport.EXPORT_IMPORT_MAP_NAME+ ODatabaseImport.EXPORT_IMPORT_MAP_TREE_STATE_EXT);
-      if (file.exists()) {
+      exportImportHashTable=(OIndex<OIdentifiable>)databaseDocumentTxTwo.getMetadata().getIndexManager().getIndex(ODatabaseImport.EXPORT_IMPORT_MAP_NAME);
+      if (exportImportHashTable != null) {
         listener.onMessage("\nMapping data were found and will be loaded.");
-        OMurmurHash3HashFunction<OIdentifiable> keyHashFunction=new OMurmurHash3HashFunction<OIdentifiable>();
-        keyHashFunction.setValueSerializer(OLinkSerializer.INSTANCE);
-        exportImportHashTable=new OLocalHashTable<OIdentifiable,OIdentifiable>(ODatabaseImport.EXPORT_IMPORT_MAP_METADATA_EXT,ODatabaseImport.EXPORT_IMPORT_MAP_TREE_STATE_EXT,ODatabaseImport.EXPORT_IMPORT_MAP_BF_EXT,keyHashFunction);
-        exportImportHashTable.load(ODatabaseImport.EXPORT_IMPORT_MAP_NAME,(OStorageLocalAbstract)databaseDocumentTxTwo.getStorage());
         ridMapper=new ODocumentHelper.RIDMapper(){
           @Override public ORID map(          ORID rid){
             if (rid == null)             return null;
@@ -34,7 +30,6 @@
     compareClusters();
     compareRecords(ridMapper);
     if (isDocumentDatabases())     compareIndexes(ridMapper);
-    if (exportImportHashTable != null)     exportImportHashTable.close();
     if (differences == 0) {
       listener.onMessage("\n\nDatabases match.");
       return true;

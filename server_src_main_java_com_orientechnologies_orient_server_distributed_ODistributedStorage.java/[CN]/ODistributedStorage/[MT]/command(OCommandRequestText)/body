@@ -1,6 +1,6 @@
 {
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.command(iCommand);
-  final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+  final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
   if (!dConfig.isReplicationActive(null))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
@@ -11,10 +11,7 @@
  else   if (exec instanceof OCommandDistributedReplicateRequest)   distribute=true;
   if (!distribute)   return wrapped.executeCommand(iCommand,executor);
   try {
-    dManager.sendRequest();
-    final ODistributedRequest request=dManager.getMessageService().createRequest();
-    request.setPayload(new OSQLCommandTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iCommand.getText()));
-    final Object result=dManager.getMessageService().send(request).getPayload();
+    final Object result=dManager.sendRequest(getName(),new OSQLCommandTask(iCommand.getText()));
     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);
     return result;
   }

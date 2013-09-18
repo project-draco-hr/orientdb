@@ -1,5 +1,5 @@
 {
-  OAbstractReplicatedTask<?> task=null;
+  OAbstractReplicatedTask task=null;
   lock.lock();
   try {
     final long runId=file.readLong(iOffsetEndOperation - OFFSET_BACK_RUNID);
@@ -12,8 +12,10 @@ case RECORD_CREATE:
 {
         final ORecordId rid=new ORecordId(file.readShort(offset + OFFSET_VARDATA),OClusterPositionFactory.INSTANCE.valueOf(file.readLong(offset + OFFSET_VARDATA + OBinaryProtocol.SIZE_SHORT)));
         if (rid.isNew())         rid.clusterPosition=storage.getClusterDataRange(rid.clusterId)[1];
-        final ORawBuffer record=storage.readRecord(rid,null,false,null,false).getResult();
-        if (record != null)         task=new OCreateRecordTask(runId,operationId,rid,record.buffer,record.version,record.recordType);
+        if (rid.clusterPosition.isPersistent()) {
+          final ORawBuffer record=storage.readRecord(rid,null,false,null,false).getResult();
+          if (record != null)           task=new OCreateRecordTask(runId,operationId,rid,record.buffer,record.version,record.recordType);
+        }
         break;
       }
 case RECORD_UPDATE:
@@ -44,7 +46,7 @@ case SQL_COMMAND:
 default :
 return null;
 }
-if (task != null) task.setServerInstance(server);
+if (task != null) task.setAlign(true);
 }
   finally {
 lock.unlock();

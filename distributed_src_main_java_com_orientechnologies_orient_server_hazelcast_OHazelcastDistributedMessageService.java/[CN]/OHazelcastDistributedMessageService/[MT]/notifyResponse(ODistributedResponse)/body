@@ -1,11 +1,15 @@
 {
   final long threadId=response.getSenderThreadId();
+  ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.IN,"- forward response -> thread %d",threadId);
   final ArrayBlockingQueue<ODistributedResponse> responseQueue=threadQueues.get(threadId);
-  if (responseQueue == null)   throw new ODistributedException("Cannot dispatch response to the thread " + threadId + " because the queue was not found");
+  if (responseQueue == null) {
+    ODistributedServerLog.error(this,manager.getLocalNodeName(),null,DIRECTION.IN,"cannot dispatch response to the thread %d because the queue was not found (timeout?)",threadId);
+    return;
+  }
   try {
-    if (!responseQueue.offer(response,MAX_PUSH_TIMEOUT,TimeUnit.MILLISECONDS))     throw new ODistributedException("Timeout on dispatching response to the thread " + threadId);
+    if (!responseQueue.offer(response,MAX_PUSH_TIMEOUT,TimeUnit.MILLISECONDS))     ODistributedServerLog.error(this,manager.getLocalNodeName(),null,DIRECTION.IN,"timeout on dispatching response to the internal thread queue %d",threadId);
   }
  catch (  Exception e) {
-    throw new ODistributedException("Cannot dispatch response to the thread " + threadId,e);
+    ODistributedServerLog.error(this,manager.getLocalNodeName(),null,DIRECTION.IN,"error on dispatching response to the internal thread queue %d",e,threadId);
   }
 }

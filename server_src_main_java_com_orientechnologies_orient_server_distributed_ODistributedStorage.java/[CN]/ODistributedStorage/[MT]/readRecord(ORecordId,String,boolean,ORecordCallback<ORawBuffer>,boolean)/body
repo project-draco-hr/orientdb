@@ -3,11 +3,9 @@
   if (eventuallyConsistent || dManager.isLocalNodeMaster(iRecordId))   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
   try {
     final String clusterName=getClusterNameFromRID(iRecordId);
-    final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
     if (!dConfig.isReplicationActive(clusterName))     return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
-    final ODistributedRequest request=dManager.getMessageService().createRequest();
-    request.setPayload(new OReadRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId));
-    final Object result=dManager.getMessageService().send(request).getPayload();
+    final Object result=dManager.sendRequest(getName(),new OReadRecordTask(iRecordId));
     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed READ_RECORD",(Throwable)result);
     return new OStorageOperationResult<ORawBuffer>((ORawBuffer)result);
   }

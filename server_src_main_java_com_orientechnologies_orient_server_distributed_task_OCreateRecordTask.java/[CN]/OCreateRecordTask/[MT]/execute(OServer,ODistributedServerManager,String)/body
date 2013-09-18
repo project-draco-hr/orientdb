@@ -1,0 +1,16 @@
+{
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"- creating record %s/%s v.%s oper=%d.%d...",iDatabaseName,rid.toString(),version.toString(),runId,operationSerial);
+  final ORecordInternal<?> record=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  final ODatabaseDocumentTx database=openDatabase(iServer,iDatabaseName);
+  try {
+    record.fill(rid,version,content,true);
+    if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()),true);
+ else     record.save();
+    rid=(ORecordId)record.getIdentity();
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"  - assigned new rid %s/%s v.%d oper=%d.%d",iDatabaseName,rid.toString(),record.getVersion(),runId,operationSerial);
+    return new OPhysicalPosition(rid.getClusterPosition(),record.getRecordVersion());
+  }
+  finally {
+    closeDatabase(database);
+  }
+}

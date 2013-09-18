@@ -1,7 +1,6 @@
 {
   if (remoteClusterNodes.isEmpty())   return;
-  setStatus("aligning");
-  final List<OAlignRequestTask> tasks=new ArrayList<OAlignRequestTask>();
+  setStatus(STATUS.ALIGNING);
 synchronized (synchronizers) {
     for (    Entry<String,OStorageSynchronizer> entry : synchronizers.entrySet()) {
       final String databaseName=entry.getKey();
@@ -15,13 +14,12 @@ synchronized (pendingAlignments) {
             ODistributedServerLog.info(this,getLocalNodeName(),node,DIRECTION.NONE,"setting node in alignment state for db=%s",databaseName);
           }
         }
-        tasks.add(new OAlignRequestTask(serverInstance,this,databaseName,lastOperationId[0],lastOperationId[1]));
+        sendRequest(databaseName,new OAlignRequestTask(lastOperationId[0],lastOperationId[1]));
       }
  catch (      IOException e) {
         ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);
       }
     }
-    if (pendingAlignments.isEmpty())     setStatus("online");
+    if (pendingAlignments.isEmpty())     setStatus(STATUS.ONLINE);
   }
-  for (  OAbstractRemoteTask<?> t : tasks)   sendRequest(t);
 }

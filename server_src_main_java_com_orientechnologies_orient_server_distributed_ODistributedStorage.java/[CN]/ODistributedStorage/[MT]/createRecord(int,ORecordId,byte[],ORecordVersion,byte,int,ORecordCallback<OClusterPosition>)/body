@@ -3,11 +3,9 @@
   Object result=null;
   try {
     final String clusterName=getClusterNameFromRID(iRecordId);
-    final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
     if (!dConfig.isReplicationActive(clusterName))     return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
-    final ODistributedRequest request=dManager.getMessageService().createRequest();
-    request.setPayload(new OCreateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId,iContent,iRecordVersion,iRecordType));
-    result=dManager.getMessageService().send(request).getPayload();
+    result=dManager.sendRequest(getName(),new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType));
     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed CREATE_RECORD",(Throwable)result);
     iRecordId.clusterPosition=((OPhysicalPosition)result).clusterPosition;
     return new OStorageOperationResult<OPhysicalPosition>((OPhysicalPosition)result);

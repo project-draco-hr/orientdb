@@ -1,0 +1,21 @@
+{
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),null,DIRECTION.IN,"- delete record %s/%s v.%s oper=%d.%d",iDatabaseName,rid.toString(),version.toString(),runId,operationSerial);
+  final ODatabaseDocumentTx database=openDatabase(iServer,iDatabaseName);
+  try {
+    final ORecordInternal<?> record=database.load(rid);
+    if (record != null) {
+      record.getRecordVersion().copyFrom(version);
+      if (align && !version.isUntracked()) {
+        record.getRecordVersion().setRollbackMode();
+        record.setDirty();
+        record.save();
+      }
+      record.delete();
+      return Boolean.TRUE;
+    }
+    return Boolean.FALSE;
+  }
+  finally {
+    closeDatabase(database);
+  }
+}

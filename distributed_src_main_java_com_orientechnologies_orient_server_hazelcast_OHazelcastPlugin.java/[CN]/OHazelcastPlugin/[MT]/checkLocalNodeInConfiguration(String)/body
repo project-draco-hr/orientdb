@@ -1,0 +1,25 @@
+{
+  final String localNode=getLocalNodeName();
+  loadDatabaseConfiguration(iDatabaseName,getDistributedConfigFile(iDatabaseName));
+  final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabaseName);
+  for (  String clusterName : cfg.getClusterNames()) {
+    final List<List<String>> partitions=cfg.getPartitions(clusterName);
+    if (partitions != null)     for (    List<String> partition : partitions) {
+      for (      String node : partition)       if (node.equals(localNode))       return;
+    }
+  }
+  boolean dirty=false;
+  for (  String clusterName : cfg.getClusterNames()) {
+    final List<List<String>> partitions=cfg.getPartitions(clusterName);
+    if (partitions != null)     for (int p=0; p < partitions.size(); ++p) {
+      List<String> partition=partitions.get(p);
+      for (      String node : partition)       if (node.equalsIgnoreCase(ODistributedConfiguration.NEW_NODE_TAG)) {
+        OLogManager.instance().config(this,"Adding node '%s' in partition: %s.%s.%d",localNode,iDatabaseName,clusterName,p);
+        partition.add(localNode);
+        dirty=true;
+        break;
+      }
+    }
+  }
+  if (dirty)   saveDatabaseConfiguration(iDatabaseName,cfg.serialize());
+}

@@ -2,11 +2,9 @@
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
   try {
     final String clusterName=getClusterNameFromRID(iRecordId);
-    final ODistributedConfiguration dConfig=dManager.getConfiguration(getName());
+    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
     if (!dConfig.isReplicationActive(clusterName))     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
-    final ODistributedRequest request=dManager.getMessageService().createRequest();
-    request.setPayload(new OUpdateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId,iContent,iVersion,iRecordType));
-    final Object result=dManager.getMessageService().send(request).getPayload();
+    final Object result=dManager.sendRequest(getName(),new OUpdateRecordTask(iRecordId,iContent,iVersion,iRecordType));
     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);
     return new OStorageOperationResult<ORecordVersion>((ORecordVersion)result);
   }

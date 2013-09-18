@@ -4,16 +4,7 @@ synchronized (pendingAlignments) {
       ODistributedServerLog.error(this,getLocalNodeName(),iNode,DIRECTION.OUT,"received response for an alignment against an unknown node %s database %s",iDatabaseName);
     }
     if (pendingAlignments.isEmpty()) {
-      setStatus("online");
-      if (alignedOperations > 0) {
-        ODistributedServerLog.error(this,getLocalNodeName(),iNode,DIRECTION.OUT,"aligned %d operations, schedule another realignment in %dms to get the new operations if any, database %s",alignedOperations,REALIGN_DELAY_TIME,iDatabaseName);
-        Orient.instance().getTimer().schedule(new TimerTask(){
-          @Override public void run(){
-            broadcastAlignmentRequest();
-          }
-        }
-,REALIGN_DELAY_TIME);
-      }
+      setStatus(STATUS.ONLINE);
     }
  else {
       for (      Entry<String,Boolean> entry : pendingAlignments.entrySet()) {
@@ -26,7 +17,7 @@ synchronized (pendingAlignments) {
           try {
             lastOperationId=synch.getLog().getLastJournaledOperationId(null);
             ODistributedServerLog.info(this,getLocalNodeName(),node,DIRECTION.OUT,"resend alignment request db=%s from %d:%d",databaseName,lastOperationId[0],lastOperationId[1]);
-            sendTask2Node(node,new OAlignRequestTask(serverInstance,this,databaseName,lastOperationId[0],lastOperationId[1]),EXECUTION_MODE.ASYNCHRONOUS,new HashMap<String,Object>());
+            sendRequest(databaseName,new OAlignRequestTask(lastOperationId[0],lastOperationId[1]));
           }
  catch (          IOException e) {
             ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.OUT,"error on retrieve last operation id from the log for db=%s",databaseName);

@@ -1,0 +1,39 @@
+{
+  if (lastRunId == -1 && lastOperationId == -1)   ODistributedServerLog.info(this,iManager.getLocalNodeName(),null,DIRECTION.IN,"db=%s align request starting from the beginning (no log found)",iDatabaseName);
+ else   ODistributedServerLog.info(this,iManager.getLocalNodeName(),null,DIRECTION.IN,"db=%s align request starting from operation %d.%d",iDatabaseName,lastRunId,lastOperationId);
+  int totAligned;
+  final ODistributedServerManager dManager=iManager;
+  final OStorageSynchronizer synchronizer=iManager.getDatabaseSynchronizer(iDatabaseName);
+  if (synchronizer == null)   return 0;
+  final ODatabaseJournal log=synchronizer.getLog();
+  final Lock alignmentLock=dManager.getLock("align." + iDatabaseName);
+  if (alignmentLock.tryLock())   try {
+    totAligned=0;
+    int aligned=0;
+    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),null,DIRECTION.OUT,"****** BEGIN PREPARING ALIGNMENT BLOCK db=%s ******",iDatabaseName);
+    final OMultipleRemoteTasks tasks=new OMultipleRemoteTasks();
+    final List<Long> positions=new ArrayList<Long>();
+    final Iterator<Long> it=log.browseLastOperations(new long[]{lastRunId,lastOperationId},ODatabaseJournal.OPERATION_STATUS.COMMITTED,-1);
+    while (it.hasNext()) {
+      final long pos=it.next();
+      final OAbstractReplicatedTask operation=log.getOperation(pos);
+      if (operation == null) {
+        ODistributedServerLog.info(this,iManager.getLocalNodeName(),null,DIRECTION.OUT,"#%d db=%s skipped operation",aligned,iDatabaseName);
+        continue;
+      }
+      ODistributedServerLog.info(this,iManager.getLocalNodeName(),null,DIRECTION.OUT,"#%d aligning operation=%d.%d db=%s %s",aligned,operation.getRunId(),operation.getOperationSerial(),iDatabaseName,operation);
+      tasks.addTask(operation);
+      positions.add(pos);
+      aligned++;
+      if (tasks.getTasks() >= OP_BUFFER)       totAligned+=flushBufferedTasks(dManager,iDatabaseName,tasks,positions);
+    }
+    if (tasks.getTasks() > 0)     totAligned+=flushBufferedTasks(dManager,iDatabaseName,tasks,positions);
+    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),null,DIRECTION.OUT,"****** END PREPARING ALIGNMENT BLOCK db=%s total=%d ******",iDatabaseName,totAligned);
+  }
+  finally {
+    alignmentLock.unlock();
+  }
+ else   totAligned=-1;
+  dManager.sendRequest(iDatabaseName,new OAlignResponseTask(totAligned));
+  return totAligned;
+}

@@ -1,10 +1,14 @@
 {
   if (!enabled)   return;
+  OLogManager.instance().info(this,"Starting distributed server '%s'...",getLocalNodeName());
   remoteClusterNodes.clear();
   synchronizers.clear();
   try {
     hazelcastInstance=Hazelcast.newHazelcastInstance(new FileSystemXmlConfig(hazelcastConfigFile));
-    OServer.registerServerInstance(localNodeId,serverInstance);
+    nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
+    timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
+    OServer.registerServerInstance(getLocalNodeName(),serverInstance);
+    messageService=new OHazelcastDistributedMessageService(this);
     initDistributedDatabases();
   }
  catch (  FileNotFoundException e) {
@@ -12,7 +16,7 @@
   }
   final IMap<String,Object> configurationMap=getConfigurationMap();
   configurationMap.addEntryListener(this,true);
-  setStatus("aligning");
+  setStatus(STATUS.ALIGNING);
   configurationMap.putIfAbsent("runId",hazelcastInstance.getCluster().getClusterTime());
   runId=(Long)getConfigurationMap().get("runId");
   registerAndAlignNodes();

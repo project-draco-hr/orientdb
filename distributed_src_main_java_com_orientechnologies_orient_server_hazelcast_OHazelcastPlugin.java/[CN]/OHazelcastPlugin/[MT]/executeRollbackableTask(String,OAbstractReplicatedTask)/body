@@ -1,0 +1,15 @@
+{
+  final OStorageSynchronizer dbSynch=getDatabaseSynchronizer(databaseName);
+  long operationLogOffset=-1;
+  try {
+    operationLogOffset=dbSynch.getLog().append(task);
+    final Serializable response=(Serializable)task.execute(serverInstance,this,databaseName);
+    if (operationLogOffset > -1)     updateJournal(databaseName,task,dbSynch,operationLogOffset,true);
+    return response;
+  }
+ catch (  Exception e1) {
+    if (operationLogOffset > -1)     updateJournal(databaseName,task,dbSynch,operationLogOffset,false);
+    if (e1 instanceof ONeedRetryException)     throw (ONeedRetryException)e1;
+    throw new ODistributedException("Error on executing task: " + task,e1);
+  }
+}

@@ -1,0 +1,18 @@
+{
+  URL locationUrl=getClass().getClassLoader().getResource("apache-aries/file24/META-INF/persistence.xml");
+  Collection<? extends PersistenceUnitInfo> parsedUnits=PersistenceXmlUtil.parse(locationUrl);
+  assertNotNull("Persistence units shouldn't be null.",parsedUnits);
+  assertEquals("An incorrect number of persistence units has been returned.",33,parsedUnits.size());
+  List<OJPAPersistenceUnitInfo> units=new ArrayList<OJPAPersistenceUnitInfo>();
+  units.addAll((Collection<OJPAPersistenceUnitInfo>)parsedUnits);
+  assertEquals("An incorrect number of units has been returned.",33,units.size());
+  Collections.sort(units,new Comparator<OJPAPersistenceUnitInfo>(){
+    @Override public int compare(    OJPAPersistenceUnitInfo p1,    OJPAPersistenceUnitInfo p2){
+      return Integer.valueOf(p1.getPersistenceUnitName()).compareTo(Integer.valueOf(p2.getPersistenceUnitName()));
+    }
+  }
+);
+  for (int counter=1; counter < units.size(); counter++) {
+    assertPersistenceUnit(units.get(counter - 1),new Rule[]{new Rule("The schema version was incorrect","1.0","getPersistenceXMLSchemaVersion"),new Rule("The unit name was incorrect",Integer.toString(counter),"getPersistenceUnitName"),new Rule("The transaction type was incorrect",JTA,"getTransactionType"),new Rule("The provider class name was incorrect","provider." + counter,"getPersistenceProviderClassName"),new Rule("Incorrect mapping files were listed",asList("mappingFile." + counter),"getMappingFileNames"),new Rule("Incorrect jar URLs were listed",asURLList("jarFile." + counter),"getJarFileUrls"),new Rule("Incorrect managed classes were listed",asList("class." + counter),"getManagedClassNames"),new Rule("We should not exclude any classes",true,"excludeUnlistedClasses"),new Rule("The properties should never be null",asProperty("some.prop." + counter,"prop.value." + counter),"getProperties")});
+  }
+}

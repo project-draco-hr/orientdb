@@ -1,11 +1,17 @@
 {
   if (iCurrentRID.equals(iOtherRID)) {
-    ODistributedServerLog.debug(this,cluster.getLocalNodeId(),iRemoteNode,DIRECTION.IN,"Resolved conflict automatically between versions on CREATE record %s/%s v.%d (other RID=%s v.%d). Current record version will be overwritten",database.getName(),iCurrentRID,iCurrentVersion,iOtherRID,iOtherVersion);
-    final ORecordInternal<?> record=iCurrentRID.getRecord();
-    record.setVersion(iOtherVersion - 1);
-    record.setDirty();
-    record.save();
-    return;
+    for (int retry=0; retry < MAX_RETRIES; ++retry) {
+      ODistributedServerLog.debug(this,cluster.getLocalNodeId(),iRemoteNode,DIRECTION.IN,"Resolved conflict automatically between versions on CREATE record %s/%s v.%d (other RID=%s v.%d). Current record version will be overwritten",database.getName(),iCurrentRID,iCurrentVersion,iOtherRID,iOtherVersion);
+      final ORecordInternal<?> record=iCurrentRID.getRecord();
+      record.setVersion(iOtherVersion - 1);
+      record.setDirty();
+      try {
+        record.save();
+        return;
+      }
+ catch (      OConcurrentModificationException e) {
+      }
+    }
   }
   ODistributedServerLog.warn(this,cluster.getLocalNodeId(),iRemoteNode,DIRECTION.IN,"Conflict on CREATE record %s/%s v.%d (other RID=%s v.%d)...",database.getName(),iCurrentRID,iCurrentVersion,iOtherRID,iOtherVersion);
   if (!existConflictsForRecord(iCurrentRID)) {

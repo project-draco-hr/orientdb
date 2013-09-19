@@ -1,20 +1,22 @@
 {
   final String queueName=getRequestQueueName(manager.getLocalNodeName(),iDatabaseName);
   final IQueue<ODistributedRequest> requestQueue=getNodeQueue(queueName);
+  ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
   checkForPendingMessages(requestQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
       while (!Thread.interrupted()) {
         String senderNode=null;
+        ODistributedRequest message=null;
         try {
-          final ODistributedRequest message=requestQueue.take();
+          message=requestQueue.take();
           if (message != null) {
             senderNode=message.getSenderNodeName();
             onMessage(message);
           }
         }
  catch (        Throwable e) {
-          ODistributedServerLog.error(this,getLocalNodeNameAndThread(),senderNode,DIRECTION.IN,"error on reading distributed request",e);
+          ODistributedServerLog.error(this,getLocalNodeNameAndThread(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getPayload() : "-");
         }
       }
     }

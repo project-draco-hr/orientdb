@@ -3,20 +3,22 @@
   this.internalThreadQueues=new ConcurrentHashMap<Long,ArrayBlockingQueue<ODistributedResponse>>();
   final String queueName=getResponseQueueName(manager.getLocalNodeName());
   nodeResponseQueue=getNodeQueue(queueName);
+  ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
   checkForPendingMessages(nodeResponseQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
       while (!Thread.interrupted()) {
         String senderNode=null;
+        ODistributedResponse message=null;
         try {
-          final ODistributedResponse message=nodeResponseQueue.take();
+          message=nodeResponseQueue.take();
           if (message != null) {
             senderNode=message.getSenderNodeName();
             dispatchResponseToThread(message);
           }
         }
  catch (        Throwable e) {
-          ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e);
+          ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
         }
       }
     }

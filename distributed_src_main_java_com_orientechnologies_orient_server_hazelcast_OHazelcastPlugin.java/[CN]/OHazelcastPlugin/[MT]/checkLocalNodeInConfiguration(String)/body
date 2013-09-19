@@ -1,0 +1,29 @@
+{
+  final String localNode=getLocalNodeName();
+  loadDatabaseConfiguration(iDatabaseName,getDistributedConfigFile(iDatabaseName));
+  final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabaseName);
+  for (  String clusterName : cfg.getClusterNames()) {
+    final List<List<String>> partitions=cfg.getPartitions(clusterName);
+    if (partitions != null)     for (    List<String> partition : partitions) {
+      for (      String node : partition)       if (node.equals(localNode))       return;
+    }
+  }
+  boolean dirty=false;
+  for (  String clusterName : cfg.getClusterNames()) {
+    final List<List<String>> partitions=cfg.getPartitions(clusterName);
+    if (partitions != null)     for (int p=0; p < partitions.size(); ++p) {
+      List<String> partition=partitions.get(p);
+      for (      String node : partition)       if (node.equalsIgnoreCase(ODistributedConfiguration.NEW_NODE_TAG)) {
+        ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: %s.%s.%d",localNode,iDatabaseName,clusterName,p);
+        partition.add(localNode);
+        dirty=true;
+        break;
+      }
+    }
+  }
+  if (dirty) {
+    final ODocument doc=cfg.serialize();
+    getConfigurationMap().put(CONFIG_DATABASE_PREFIX + iDatabaseName,doc);
+    updateDatabaseConfiguration(iDatabaseName,doc);
+  }
+}

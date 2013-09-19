@@ -1,0 +1,15 @@
+{
+  final long now=System.currentTimeMillis();
+  for (Iterator<Entry<Long,ODistributedResponseManager>> it=asynchResponses.entrySet().iterator(); it.hasNext(); ) {
+    final Entry<Long,ODistributedResponseManager> item=it.next();
+    if (now - item.getKey().longValue() > MSG_ASYNCH_TIMEOUT) {
+      final ODistributedResponseManager resp=item.getValue();
+      final List<String> missingNodes=resp.getMissingNodes();
+      if (missingNodes.size() > 0) {
+        ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.IN,"%d missed response(s) for message %d by nodes %s",missingNodes.size(),resp.getMessageId(),missingNodes);
+      }
+      Orient.instance().getProfiler().updateCounter("distributed.replication.timeouts","Number of timeouts on replication messages responses",+1);
+      it.remove();
+    }
+  }
+}

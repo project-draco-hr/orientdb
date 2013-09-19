@@ -8,10 +8,10 @@
         return;
       }
     }
- else     if (param.name.equalsIgnoreCase("alias"))     alias=param.value;
+ else     if (param.name.equalsIgnoreCase("nodeName"))     nodeName=param.value;
  else     if (param.name.startsWith(PAR_DEF_DISTRIB_DB_CONFIG)) {
-      final String path=OSystemVariableResolver.resolveSystemVariables(param.value);
-      if (loadDatabaseConfiguration("*",path) == null)       throw new OConfigurationException("Error on loading distributed database configuration from " + path);
+      defaultDatabaseConfigFile=new File(OSystemVariableResolver.resolveSystemVariables(param.value));
+      if (!defaultDatabaseConfigFile.exists())       throw new OConfigurationException("Cannot find distributed database config file: " + defaultDatabaseConfigFile);
     }
  else     if (param.name.equalsIgnoreCase("conflict.resolver.impl"))     try {
       confictResolverClass=(Class<? extends OReplicationConflictResolver>)Class.forName(param.value);
@@ -21,18 +21,15 @@
     }
  else     if (param.name.equalsIgnoreCase("alignment.startup"))     alignmentStartup=Boolean.parseBoolean(param.value);
  else     if (param.name.equalsIgnoreCase("alignment.timer"))     alignmentTimer=Integer.parseInt(param.value);
- else     if (param.name.startsWith("replication.strategy.")) {
+ else     if (param.name.startsWith("sharding.strategy.")) {
       try {
-        strategies.put(param.name.substring("replication.strategy.".length()),(OReplicationStrategy)Class.forName(param.value).newInstance());
+        strategies.put(param.name.substring("sharding.strategy.".length()),(ODistributedPartitioningStrategy)Class.forName(param.value).newInstance());
       }
  catch (      Exception e) {
-        OLogManager.instance().error(this,"Cannot create replication strategy instance '%s'",e,param.value);
+        OLogManager.instance().error(this,"Cannot create sharding strategy instance '%s'",e,param.value);
         e.printStackTrace();
       }
     }
-  }
-synchronized (databaseConfiguration) {
-    if (!databaseConfiguration.containsKey("*"))     throw new OConfigurationException("Invalid cluster configuration: cannot find settings '" + PAR_DEF_DISTRIB_DB_CONFIG + "' for the default database");
   }
   if (serverInstance.getUser(REPLICATOR_USER) == null)   try {
     serverInstance.addUser(REPLICATOR_USER,null,"database.passthrough");

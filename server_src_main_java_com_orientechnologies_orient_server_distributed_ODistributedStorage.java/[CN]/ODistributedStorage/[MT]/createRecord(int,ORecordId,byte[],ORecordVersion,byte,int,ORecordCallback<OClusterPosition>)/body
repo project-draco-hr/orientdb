@@ -2,14 +2,16 @@
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
   Object result=null;
   try {
-    final String clusterName=getClusterNameFromRID(iRecordId);
-    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId,dManager.getLocalNodeId(),null);
-    if (replicationData == null)     return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
- else     result=dManager.execute(clusterName,iRecordId,new OCreateRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId,iContent,iRecordVersion,iRecordType),replicationData);
+    final String clusterName=getClusterNameByRID(iRecordId);
+    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
+    if (!dConfig.isReplicationActive(clusterName))     return wrapped.createRecord(iDataSegmentId,iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+    result=dManager.sendRequest(getName(),new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE);
+    if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed CREATE_RECORD",(Throwable)result);
     iRecordId.clusterPosition=((OPhysicalPosition)result).clusterPosition;
+    return new OStorageOperationResult<OPhysicalPosition>((OPhysicalPosition)result);
   }
- catch (  ExecutionException e) {
+ catch (  Exception e) {
     handleDistributedException("Cannot route CREATE_RECORD operation against %s to the distributed node",e,iRecordId);
+    return null;
   }
-  return new OStorageOperationResult<OPhysicalPosition>((OPhysicalPosition)result);
 }

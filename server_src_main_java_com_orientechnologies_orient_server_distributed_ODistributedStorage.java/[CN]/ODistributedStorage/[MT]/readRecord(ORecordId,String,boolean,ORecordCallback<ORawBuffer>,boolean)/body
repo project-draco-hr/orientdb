@@ -2,13 +2,15 @@
   if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
   if (eventuallyConsistent || dManager.isLocalNodeMaster(iRecordId))   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
   try {
-    final String clusterName=getClusterNameFromRID(iRecordId);
-    final OReplicationConfig replicationData=dManager.getReplicationData(getName(),clusterName,iRecordId,dManager.getLocalNodeId(),null);
-    if (replicationData == null)     return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
- else     return new OStorageOperationResult<ORawBuffer>((ORawBuffer)dManager.execute(clusterName,iRecordId,new OReadRecordTask(serverInstance,serverInstance.getDistributedManager(),wrapped.getName(),iRecordId),replicationData));
+    final String clusterName=getClusterNameByRID(iRecordId);
+    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
+    if (!dConfig.isReplicationActive(clusterName))     return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones);
+    final Object result=dManager.sendRequest(getName(),new OReadRecordTask(iRecordId),EXECUTION_MODE.RESPONSE);
+    if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed READ_RECORD",(Throwable)result);
+    return new OStorageOperationResult<ORawBuffer>((ORawBuffer)result);
   }
- catch (  ExecutionException e) {
+ catch (  Exception e) {
     handleDistributedException("Cannot route READ_RECORD operation against %s to the distributed node",e,iRecordId);
+    return null;
   }
-  return new OStorageOperationResult<ORawBuffer>(null);
 }

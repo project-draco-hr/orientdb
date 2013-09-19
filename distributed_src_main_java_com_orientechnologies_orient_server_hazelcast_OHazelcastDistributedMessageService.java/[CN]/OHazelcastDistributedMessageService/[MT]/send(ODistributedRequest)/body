@@ -1,0 +1,36 @@
+{
+  final String databaseName=iRequest.getDatabaseName();
+  final String clusterName=iRequest.getClusterName();
+  final Thread currentThread=Thread.currentThread();
+  final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
+  final ODistributedPartitioningStrategy strategy=manager.getStrategy(cfg.getPartitionStrategy(clusterName));
+  final ODistributedPartition partition=strategy.getPartition(manager,databaseName,clusterName);
+  final List<String> nodes=partition.getNodes();
+  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
+  final int writeQuorum=cfg.getWriteQuorum(clusterName);
+  final int queueSize=nodes.size();
+  final long threadId=currentThread.getId();
+  iRequest.setSenderNodeName(manager.getLocalNodeName());
+  iRequest.setSenderThreadId(threadId);
+  final ArrayBlockingQueue<ODistributedResponse> responseQueue=new ArrayBlockingQueue<ODistributedResponse>(queueSize + 2,true);
+  internalThreadQueues.put(threadId,responseQueue);
+  try {
+    requestLock.lock();
+    try {
+      iRequest.assignUniqueId(manager.getRunId(),manager.incrementDistributedSerial(databaseName));
+      ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
+      for (      IQueue<ODistributedRequest> queue : reqQueues) {
+        queue.offer(iRequest,MSG_SEND_REQUEST_TIMEOUT,TimeUnit.MILLISECONDS);
+      }
+      Orient.instance().getProfiler().updateCounter("distributed.replication.msgSent","Number of replication messages sent from current node",+1);
+    }
+  finally {
+      requestLock.unlock();
+    }
+    final ODistributedResponse firstResponse=collectResponses(iRequest,writeQuorum,nodes,responseQueue);
+    return firstResponse;
+  }
+ catch (  Throwable e) {
+    throw new ODistributedException("Error on sending distributed request against " + databaseName + (clusterName != null ? ":" + clusterName : ""),e);
+  }
+}

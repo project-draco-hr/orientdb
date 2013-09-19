@@ -1,0 +1,17 @@
+{
+  Orient.instance().getProfiler().updateCounter("distributed.replication.msgReceived","Number of replication messages received in current node",+1);
+  final long threadId=response.getSenderThreadId();
+  final String targetLocalNodeThread=manager.getLocalNodeName() + ":" + threadId;
+  ODistributedServerLog.debug(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"- forward response to the internal thread");
+  final ArrayBlockingQueue<ODistributedResponse> responseQueue=internalThreadQueues.get(threadId);
+  if (responseQueue == null) {
+    ODistributedServerLog.debug(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"cannot dispatch response to the internal thread because the thread queue was not found (timeout?): %s",response.getPayload());
+    return;
+  }
+  try {
+    if (!responseQueue.offer(response,MSG_FORWARD_TIMEOUT,TimeUnit.MILLISECONDS))     ODistributedServerLog.error(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"timeout on dispatching response to the internal thread queue");
+  }
+ catch (  Exception e) {
+    ODistributedServerLog.error(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"error on dispatching response to the internal thread queue",e);
+  }
+}

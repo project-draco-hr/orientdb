@@ -4,31 +4,32 @@ switch (iType) {
 case EMBEDDEDLIST:
 case EMBEDDEDSET:
     return embeddedCollectionFromStream((ODocument)iSourceRecord,iType,iLinkedClass,iLinkedType,iValue);
-case LINKLIST:
 case LINKSET:
-{
-    if (iValue.length() == 0)     return null;
-    final String value=iValue.startsWith("[") || iValue.startsWith("<") ? iValue.substring(1,iValue.length() - 1) : iValue;
-    return iType == OType.LINKLIST ? new ORecordLazyList((ODocument)iSourceRecord).setStreamedContent(new StringBuilder(value)) : new OMVRBTreeRIDSet(iSourceRecord).fromStream(new StringBuilder(iValue));
-  }
-case LINKMAP:
+  if (iValue.startsWith(OStringSerializerHelper.LINKSET_PREFIX))   return OSBTreeRIDSet.fromStream(iValue);
+case LINKLIST:
 {
   if (iValue.length() == 0)   return null;
-  String value=iValue.substring(1,iValue.length() - 1);
-  @SuppressWarnings("rawtypes") final Map map=new ORecordLazyMap((ODocument)iSourceRecord,ODocument.RECORD_TYPE);
-  if (value.length() == 0)   return map;
-  final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR,true);
-  for (  String item : items) {
-    if (item != null && !item.isEmpty()) {
-      final List<String> entry=OStringSerializerHelper.smartSplit(item,OStringSerializerHelper.ENTRY_SEPARATOR);
-      if (!entry.isEmpty()) {
-        String mapValue=entry.get(1);
-        if (mapValue != null && !mapValue.isEmpty())         mapValue=mapValue.substring(1);
-        map.put(fieldTypeFromStream((ODocument)iSourceRecord,OType.STRING,entry.get(0)),new ORecordId(mapValue));
-      }
+  final String value=iValue.startsWith("[") || iValue.startsWith("<") ? iValue.substring(1,iValue.length() - 1) : iValue;
+  return iType == OType.LINKLIST ? new ORecordLazyList((ODocument)iSourceRecord).setStreamedContent(new StringBuilder(value)) : new OMVRBTreeRIDSet(iSourceRecord).fromStream(new StringBuilder(iValue));
+}
+case LINKMAP:
+{
+if (iValue.length() == 0) return null;
+String value=iValue.substring(1,iValue.length() - 1);
+@SuppressWarnings("rawtypes") final Map map=new ORecordLazyMap((ODocument)iSourceRecord,ODocument.RECORD_TYPE);
+if (value.length() == 0) return map;
+final List<String> items=OStringSerializerHelper.smartSplit(value,OStringSerializerHelper.RECORD_SEPARATOR,true);
+for (String item : items) {
+  if (item != null && !item.isEmpty()) {
+    final List<String> entry=OStringSerializerHelper.smartSplit(item,OStringSerializerHelper.ENTRY_SEPARATOR);
+    if (!entry.isEmpty()) {
+      String mapValue=entry.get(1);
+      if (mapValue != null && !mapValue.isEmpty())       mapValue=mapValue.substring(1);
+      map.put(fieldTypeFromStream((ODocument)iSourceRecord,OType.STRING,entry.get(0)),new ORecordId(mapValue));
     }
   }
-  return map;
+}
+return map;
 }
 case EMBEDDEDMAP:
 return embeddedMapFromStream((ODocument)iSourceRecord,iLinkedType,iValue,iName);

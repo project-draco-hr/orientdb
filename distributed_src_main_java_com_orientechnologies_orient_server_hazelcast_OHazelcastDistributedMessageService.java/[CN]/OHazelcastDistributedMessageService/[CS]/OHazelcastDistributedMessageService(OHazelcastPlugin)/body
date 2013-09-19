@@ -1,6 +1,14 @@
 {
   this.manager=manager;
   this.internalThreadQueues=new ConcurrentHashMap<Long,ArrayBlockingQueue<ODistributedResponse>>();
+  this.asynchResponses=new ConcurrentHashMap<Long,ODistributedResponseManager>();
+  asynchMessageManager=new TimerTask(){
+    @Override public void run(){
+      checkAsynchronousMessages();
+    }
+  }
+;
+  Orient.instance().getTimer().schedule(asynchMessageManager,ASYNCH_CHECK_DELAY,ASYNCH_CHECK_DELAY);
   final String queueName=getResponseQueueName(manager.getLocalNodeName());
   nodeResponseQueue=getNodeQueue(queueName);
   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);

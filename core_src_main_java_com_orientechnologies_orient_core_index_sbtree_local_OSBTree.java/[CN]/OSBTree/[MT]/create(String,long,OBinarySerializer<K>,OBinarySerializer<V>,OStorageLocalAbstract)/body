@@ -8,7 +8,10 @@
     this.valueSerializer=valueSerializer;
     fileId=diskCache.openFile(name + dataFileExtension);
     initDurableComponent(storageLocal);
-    OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+    OCacheEntry rootCacheEntry;
+    if (rootIndex < 0)     rootCacheEntry=diskCache.allocateNewPage(fileId);
+ else     rootCacheEntry=diskCache.load(fileId,rootIndex,false);
+    this.rootIndex=rootCacheEntry.getPageIndex();
     OCachePointer rootPointer=rootCacheEntry.getCachePointer();
     rootPointer.acquireExclusiveLock();
     try {
@@ -17,7 +20,7 @@
       rootBucket.setKeySerializerId(keySerializer.getId());
       rootBucket.setValueSerializerId(valueSerializer.getId());
       rootBucket.setTreeSize(0);
-      super.logPageChanges(rootBucket,fileId,ROOT_INDEX,true);
+      super.logPageChanges(rootBucket,fileId,this.rootIndex,true);
       rootCacheEntry.markDirty();
     }
   finally {

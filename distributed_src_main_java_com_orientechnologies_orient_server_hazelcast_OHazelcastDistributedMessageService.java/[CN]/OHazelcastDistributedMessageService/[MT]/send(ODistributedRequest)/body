@@ -12,22 +12,22 @@
   final int quorum=iRequest.getPayload().isWriteOperation() ? cfg.getWriteQuorum(clusterName) : queueSize;
   iRequest.setSenderNodeName(manager.getLocalNodeName());
   iRequest.setSenderThreadId(threadId);
-  final ODistributedResponseManager currentResponseMgr;
+  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(iRequest.getId(),nodes,iRequest.getPayload().getTotalTimeout(queueSize));
+  responsesByRequestIds.put(iRequest.getId(),currentResponseMgr);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
+  final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
+  final Lock requestLock=getLock(databaseName);
   try {
     requestLock.lock();
     try {
-      iRequest.assignUniqueId(manager.getRunId(),manager.incrementDistributedSerial(databaseName));
-      currentResponseMgr=new ODistributedResponseManager(iRequest.getId(),nodes,iRequest.getPayload().getTotalTimeout(queueSize));
-      responsesByRequestIds.put(iRequest.getId(),currentResponseMgr);
-      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
       for (      IQueue<ODistributedRequest> queue : reqQueues) {
-        queue.offer(iRequest,OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong(),TimeUnit.MILLISECONDS);
+        queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
       }
-      Orient.instance().getProfiler().updateCounter("distributed.replication.msgSent","Number of replication messages sent from current node",+1);
     }
   finally {
       requestLock.unlock();
     }
+    Orient.instance().getProfiler().updateCounter("distributed.replication.msgSent","Number of replication messages sent from current node",+1);
     return collectResponses(iRequest,quorum,nodes,currentResponseMgr);
   }
  catch (  Throwable e) {

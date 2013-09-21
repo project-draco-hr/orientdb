@@ -1,17 +1,18 @@
 {
   this.manager=manager;
   this.internalThreadQueues=new ConcurrentHashMap<Long,ArrayBlockingQueue<ODistributedResponse>>();
-  this.asynchResponses=new ConcurrentHashMap<Long,ODistributedResponseManager>();
+  this.responsesByRequestIds=new ConcurrentHashMap<Long,ODistributedResponseManager>();
+  requestLock=manager.getHazelcastInstance().getLock("orientdb.messageLock");
   asynchMessageManager=new TimerTask(){
     @Override public void run(){
-      checkAsynchronousMessages();
+      purgePendingMessages();
     }
   }
 ;
-  Orient.instance().getTimer().schedule(asynchMessageManager,ASYNCH_CHECK_DELAY,ASYNCH_CHECK_DELAY);
+  Orient.instance().getTimer().schedule(asynchMessageManager,OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong());
   final String queueName=getResponseQueueName(manager.getLocalNodeName());
   nodeResponseQueue=getNodeQueue(queueName);
-  ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
   checkForPendingMessages(nodeResponseQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
@@ -25,7 +26,11 @@
             dispatchResponseToThread(message);
           }
         }
- catch (        Throwable e) {
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        Throwable e) {
           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
         }
       }

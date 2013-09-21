@@ -4,11 +4,11 @@
   this.asynchResponses=new ConcurrentHashMap<Long,ODistributedResponseManager>();
   asynchMessageManager=new TimerTask(){
     @Override public void run(){
-      checkAsynchronousMessages();
+      purgePendingMessages();
     }
   }
 ;
-  Orient.instance().getTimer().schedule(asynchMessageManager,ASYNCH_CHECK_DELAY,ASYNCH_CHECK_DELAY);
+  Orient.instance().getTimer().schedule(asynchMessageManager,OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong());
   final String queueName=getResponseQueueName(manager.getLocalNodeName());
   nodeResponseQueue=getNodeQueue(queueName);
   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
@@ -25,7 +25,11 @@
             dispatchResponseToThread(message);
           }
         }
- catch (        Throwable e) {
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        Throwable e) {
           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
         }
       }

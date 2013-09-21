@@ -2,6 +2,7 @@
   final String queueName=getRequestQueueName(manager.getLocalNodeName(),iDatabaseName);
   final IQueue<ODistributedRequest> requestQueue=getNodeQueue(queueName);
   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
+  final IMap<Object,Object> undoMap=restoreMessagesBeforeFailure(iDatabaseName);
   checkForPendingMessages(requestQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
@@ -10,12 +11,18 @@
         ODistributedRequest message=null;
         try {
           message=requestQueue.take();
+          undoMap.put(iDatabaseName,message);
           if (message != null) {
             senderNode=message.getSenderNodeName();
             onMessage(message);
           }
+          undoMap.remove(iDatabaseName);
         }
- catch (        Throwable e) {
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        Throwable e) {
           ODistributedServerLog.error(this,getLocalNodeNameAndThread(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getPayload() : "-");
         }
       }

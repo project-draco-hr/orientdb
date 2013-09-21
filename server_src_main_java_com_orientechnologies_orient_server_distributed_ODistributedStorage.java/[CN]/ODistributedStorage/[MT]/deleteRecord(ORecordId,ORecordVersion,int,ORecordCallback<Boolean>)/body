@@ -1,14 +1,18 @@
 {
-  if (ODistributedThreadLocal.INSTANCE.get() != null)   return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
+  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
     final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
     if (!dConfig.isReplicationActive(clusterName))     return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
-    final Object result=dManager.sendRequest(getName(),new ODeleteRecordTask(iRecordId,iVersion),EXECUTION_MODE.RESPONSE);
-    if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);
+    final Object result=dManager.sendRequest(getName(),clusterName,new ODeleteRecordTask(iRecordId,iVersion),EXECUTION_MODE.RESPONSE);
+    if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
+ else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed DELETE_RECORD",(Throwable)result);
     return new OStorageOperationResult<Boolean>((Boolean)result);
   }
- catch (  Exception e) {
+ catch (  ONeedRetryException e) {
+    throw e;
+  }
+catch (  Exception e) {
     handleDistributedException("Cannot route DELETE_RECORD operation against %s to the distributed node",e,iRecordId);
     return null;
   }

@@ -6,27 +6,27 @@
   int availableNodes=0;
   for (  String node : nodes) {
     if (manager.isNodeAvailable(node))     availableNodes++;
- else     ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
+ else {
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
+    }
   }
   final int expectedSynchronousResponses=Math.min(availableNodes,Math.min(queueSize,iQuorum));
-  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(iRequest.getId(),nodes,iRequest.getPayload().getTotalTimeout(queueSize));
   final long beginTime=System.currentTimeMillis();
   final long synchTimeout=iRequest.getPayload().getSynchronousTimeout(expectedSynchronousResponses);
   boolean executeOnLocalNode=nodes.contains(manager.getLocalNodeName());
   boolean receivedCurrentNode=false;
+  final ArrayBlockingQueue<ODistributedResponse> responseQueue=getInternalThreadQueue(iRequest.getSenderThreadId());
   while ((executeOnLocalNode && !receivedCurrentNode) || currentResponseMgr.getReceivedResponses() < expectedSynchronousResponses) {
     long elapsed=System.currentTimeMillis() - beginTime;
     final ODistributedResponse currentResponse=responseQueue.poll(synchTimeout - elapsed,TimeUnit.MILLISECONDS);
     if (currentResponse != null) {
       if (currentResponse.getRequestId() == iRequest.getId()) {
-        currentResponseMgr.addResponse(currentResponse);
         if (executeOnLocalNode && currentResponse.isExecutedOnLocalNode())         receivedCurrentNode=true;
       }
  else {
-        processAsynchResponse(currentResponse);
         continue;
       }
-      ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),currentResponse.getSenderNodeName(),DIRECTION.IN,"received response: %s",currentResponse);
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),currentResponse.getSenderNodeName(),DIRECTION.IN,"received response: %s",currentResponse);
       if (firstResponse == null)       firstResponse=currentResponse;
       receivedSynchResponses++;
     }
@@ -37,7 +37,6 @@
     }
   }
   if (!receivedCurrentNode)   ODistributedServerLog.warn(this,getLocalNodeNameAndThread(),manager.getLocalNodeName(),DIRECTION.IN,"no response received from local node about message %d",iRequest.getId());
-  if (currentResponseMgr.getMissingResponses() > 0)   asynchResponses.put(iRequest.getId(),currentResponseMgr);
   if (receivedSynchResponses < iQuorum) {
     iRequest.undo();
   }

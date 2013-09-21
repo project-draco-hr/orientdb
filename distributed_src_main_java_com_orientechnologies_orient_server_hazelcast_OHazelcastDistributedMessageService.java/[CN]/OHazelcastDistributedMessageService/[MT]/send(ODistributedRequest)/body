@@ -1,7 +1,6 @@
 {
   final Thread currentThread=Thread.currentThread();
   final long threadId=currentThread.getId();
-  final ArrayBlockingQueue<ODistributedResponse> responseQueue=getInternalThreadQueue(threadId);
   final String databaseName=iRequest.getDatabaseName();
   final String clusterName=iRequest.getClusterName();
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
@@ -13,11 +12,14 @@
   final int quorum=iRequest.getPayload().isWriteOperation() ? cfg.getWriteQuorum(clusterName) : queueSize;
   iRequest.setSenderNodeName(manager.getLocalNodeName());
   iRequest.setSenderThreadId(threadId);
+  final ODistributedResponseManager currentResponseMgr;
   try {
     requestLock.lock();
     try {
       iRequest.assignUniqueId(manager.getRunId(),manager.incrementDistributedSerial(databaseName));
-      ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
+      currentResponseMgr=new ODistributedResponseManager(iRequest.getId(),nodes,iRequest.getPayload().getTotalTimeout(queueSize));
+      responsesByRequestIds.put(iRequest.getId(),currentResponseMgr);
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
       for (      IQueue<ODistributedRequest> queue : reqQueues) {
         queue.offer(iRequest,OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong(),TimeUnit.MILLISECONDS);
       }
@@ -26,8 +28,7 @@
   finally {
       requestLock.unlock();
     }
-    final ODistributedResponse firstResponse=collectResponses(iRequest,quorum,nodes,responseQueue);
-    return firstResponse;
+    return collectResponses(iRequest,quorum,nodes,currentResponseMgr);
   }
  catch (  Throwable e) {
     throw new ODistributedException("Error on sending distributed request against " + databaseName + (clusterName != null ? ":" + clusterName : ""),e);

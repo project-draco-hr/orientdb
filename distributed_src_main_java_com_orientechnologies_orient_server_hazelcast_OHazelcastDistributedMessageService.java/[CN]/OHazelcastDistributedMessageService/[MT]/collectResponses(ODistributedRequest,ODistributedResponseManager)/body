@@ -1,0 +1,30 @@
+{
+  if (iRequest.getExecutionMode() == EXECUTION_MODE.NO_RESPONSE)   return null;
+  final long beginTime=System.currentTimeMillis();
+  int expectedSynchronousResponses=currentResponseMgr.getExpectedSynchronousResponses();
+  final long synchTimeout=iRequest.getPayload().getSynchronousTimeout(expectedSynchronousResponses);
+  final ArrayBlockingQueue<ODistributedResponse> responseQueue=getInternalThreadQueue(iRequest.getSenderThreadId());
+  ODistributedResponse firstResponse=null;
+  while (currentResponseMgr.waitForSynchronousResponses()) {
+    long elapsed=System.currentTimeMillis() - beginTime;
+    final ODistributedResponse currentResponse=responseQueue.poll(synchTimeout - elapsed,TimeUnit.MILLISECONDS);
+    if (currentResponse != null) {
+      if (currentResponse.getRequestId() != iRequest.getId()) {
+        continue;
+      }
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),currentResponse.getSenderNodeName(),DIRECTION.IN,"received response: %s",currentResponse);
+      if (firstResponse == null)       firstResponse=currentResponse;
+    }
+ else {
+      elapsed=System.currentTimeMillis() - beginTime;
+      ODistributedServerLog.warn(this,getLocalNodeNameAndThread(),null,DIRECTION.IN,"timeout (%dms) on waiting for synchronous responses from nodes=%s responsesSoFar=%s request=%s",elapsed,currentResponseMgr.getExpectedNodes(),currentResponseMgr.getRespondingNodes(),iRequest);
+      break;
+    }
+  }
+  if (currentResponseMgr.isExecuteOnLocalNode() && !currentResponseMgr.isReceivedCurrentNode())   ODistributedServerLog.warn(this,getLocalNodeNameAndThread(),manager.getLocalNodeName(),DIRECTION.IN,"no response received from local node about message %d",iRequest.getId());
+  if (currentResponseMgr.getReceivedResponses() < currentResponseMgr.getQuorum()) {
+    iRequest.undo();
+  }
+  if (firstResponse == null)   throw new ODistributedException("No response from connected nodes");
+  return getResponse(iRequest,firstResponse,currentResponseMgr);
+}

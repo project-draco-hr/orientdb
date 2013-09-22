@@ -1,0 +1,50 @@
+{
+  final Lock lock=iManager.getLock(database.getName());
+  if (lock.tryLock()) {
+    try {
+      ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"backuping database %s...",database.getName());
+      final File f=new File(BACKUP_DIRECTORY + "/" + database.getName());
+      try {
+        database.freeze();
+        try {
+          ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"exporting database %s to %s...",database.getName(),f);
+          final ODatabaseExport export=new ODatabaseExport(database,f.getAbsolutePath(),null);
+          try {
+            export.exportDatabase();
+          }
+  finally {
+            export.close();
+          }
+        }
+  finally {
+          database.release();
+        }
+        ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"exporting database %s to %s...",database.getName(),f);
+        final ByteArrayOutputStream out=new ByteArrayOutputStream(CHUNK_MAX_SIZE);
+        final FileInputStream in=new FileInputStream(f);
+        try {
+          final long fileSize=f.length();
+          ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"copying %s bytes to remote node...",OFileUtils.getSizeAsString(fileSize));
+          for (int byteCopied=0; byteCopied < fileSize; ) {
+            byteCopied+=OIOUtils.copyStream(in,out,CHUNK_MAX_SIZE);
+            if ((Boolean)iManager.sendRequest(database.getName(),null,new OCopyDatabaseChunkTask(out.toByteArray()),EXECUTION_MODE.RESPONSE)) {
+              out.reset();
+            }
+          }
+          return "deployed";
+        }
+  finally {
+          out.close();
+        }
+      }
+  finally {
+        OFileUtils.deleteRecursively(new File("exportDatabase/"));
+      }
+    }
+  finally {
+      lock.unlock();
+    }
+  }
+ else   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.NONE,"skip deploying database because another node is doing it",database.getName());
+  return "skipped";
+}

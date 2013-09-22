@@ -1,0 +1,20 @@
+{
+  for (  Entry<String,Object> entry : getConfigurationMap().entrySet()) {
+    if (entry.getKey().startsWith(CONFIG_DATABASE_PREFIX)) {
+      final String dbName=entry.getKey().substring(CONFIG_DATABASE_PREFIX.length());
+      if (!configuredDatabases.contains(dbName)) {
+        final ODocument config=(ODocument)entry.getValue();
+        final Boolean autoDeploy=config.field("autoDeploy");
+        if (autoDeploy != null && autoDeploy) {
+          ByteArrayInputStream is=new ByteArrayInputStream((byte[])sendRequest(dbName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE));
+          final ODatabaseDocumentTx db=new ODatabaseDocumentTx("databases/" + dbName).create();
+          try {
+            new ODatabaseImport(db,is,null);
+          }
+ catch (          IOException e) {
+          }
+        }
+      }
+    }
+  }
+}

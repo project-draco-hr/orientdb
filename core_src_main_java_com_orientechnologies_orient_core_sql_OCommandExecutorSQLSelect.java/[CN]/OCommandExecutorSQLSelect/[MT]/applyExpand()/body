@@ -1,36 +1,42 @@
 {
   if (expandTarget == null)   return;
   Object fieldValue;
-  if (tempResult == null) {
-    tempResult=new ArrayList<OIdentifiable>();
-    if (expandTarget instanceof OSQLFilterItemVariable) {
-      Object r=((OSQLFilterItemVariable)expandTarget).getValue(null,context);
-      if (r != null) {
-        if (r instanceof OIdentifiable)         ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)r);
- else         if (OMultiValue.isMultiValue(r)) {
-          for (          Object o : OMultiValue.getMultiValueIterable(r))           ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)o);
+  final long startExpand=System.currentTimeMillis();
+  try {
+    if (tempResult == null) {
+      tempResult=new ArrayList<OIdentifiable>();
+      if (expandTarget instanceof OSQLFilterItemVariable) {
+        Object r=((OSQLFilterItemVariable)expandTarget).getValue(null,context);
+        if (r != null) {
+          if (r instanceof OIdentifiable)           ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)r);
+ else           if (OMultiValue.isMultiValue(r)) {
+            for (            Object o : OMultiValue.getMultiValueIterable(r))             ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)o);
+          }
         }
       }
     }
-  }
  else {
-    final OMultiCollectionIterator<OIdentifiable> finalResult=new OMultiCollectionIterator<OIdentifiable>();
-    finalResult.setLimit(limit);
-    for (    OIdentifiable id : tempResult) {
-      if (expandTarget instanceof OSQLFilterItem)       fieldValue=((OSQLFilterItem)expandTarget).getValue(id.getRecord(),context);
- else       if (expandTarget instanceof OSQLFunctionRuntime)       fieldValue=((OSQLFunctionRuntime)expandTarget).getResult();
- else       fieldValue=expandTarget.toString();
-      if (fieldValue != null)       if (fieldValue instanceof Collection<?>) {
-        finalResult.add((Collection<OIdentifiable>)fieldValue);
+      final OMultiCollectionIterator<OIdentifiable> finalResult=new OMultiCollectionIterator<OIdentifiable>();
+      finalResult.setLimit(limit);
+      for (      OIdentifiable id : tempResult) {
+        if (expandTarget instanceof OSQLFilterItem)         fieldValue=((OSQLFilterItem)expandTarget).getValue(id.getRecord(),context);
+ else         if (expandTarget instanceof OSQLFunctionRuntime)         fieldValue=((OSQLFunctionRuntime)expandTarget).getResult();
+ else         fieldValue=expandTarget.toString();
+        if (fieldValue != null)         if (fieldValue instanceof Collection<?>) {
+          finalResult.add((Collection<OIdentifiable>)fieldValue);
+        }
+ else         if (fieldValue instanceof Map<?,?>) {
+          finalResult.add(((Map<?,OIdentifiable>)fieldValue).values());
+        }
+ else         if (fieldValue instanceof OMultiCollectionIterator) {
+          finalResult.add((OMultiCollectionIterator<OIdentifiable>)fieldValue);
+        }
+ else         if (fieldValue instanceof OIdentifiable)         finalResult.add((OIdentifiable)fieldValue);
       }
- else       if (fieldValue instanceof Map<?,?>) {
-        finalResult.add(((Map<?,OIdentifiable>)fieldValue).values());
-      }
- else       if (fieldValue instanceof OMultiCollectionIterator) {
-        finalResult.add((OMultiCollectionIterator<OIdentifiable>)fieldValue);
-      }
- else       if (fieldValue instanceof OIdentifiable)       finalResult.add((OIdentifiable)fieldValue);
+      tempResult=finalResult;
     }
-    tempResult=finalResult;
+  }
+  finally {
+    context.setVariable("expandElapsed",(System.currentTimeMillis() - startExpand));
   }
 }

@@ -1,4 +1,5 @@
 {
+  final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
   for (  Entry<String,Object> entry : getConfigurationMap().entrySet()) {
     if (entry.getKey().startsWith(CONFIG_DATABASE_PREFIX)) {
       final String databaseName=entry.getKey().substring(CONFIG_DATABASE_PREFIX.length());
@@ -8,8 +9,15 @@
         if (autoDeploy != null && autoDeploy) {
           final OHazelcastDistributedMessageService msgService=new OHazelcastDistributedMessageService(this,databaseName);
           messageServices.put(databaseName,msgService);
-          final OBuffer result=(OBuffer)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+          final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
           final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
+          OBuffer result=null;
+          for (          Entry<String,OBuffer> r : results.entrySet())           if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
+            result=r.getValue();
+            ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
+            break;
+          }
+          if (result == null)           throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
           new File(dbPath).mkdirs();
           final ODatabaseDocumentTx db=new ODatabaseDocumentTx("local:" + dbPath);
           final ByteArrayInputStream in=new ByteArrayInputStream(result.getBuffer());

@@ -1,7 +1,7 @@
 {
   final String executorNode=response.getExecutorNodeName();
   if (!responses.containsKey(executorNode)) {
-    ODistributedServerLog.warn(this,response.getSenderNodeName(),executorNode,DIRECTION.IN,"received response for message %d from unexpected node. Expected are: %s",messageId,getExpectedNodes());
+    ODistributedServerLog.warn(this,response.getSenderNodeName(),executorNode,DIRECTION.IN,"received response for message %d from unexpected node. Expected are: %s",request.getId(),getExpectedNodes());
     Orient.instance().getProfiler().updateCounter("distributed.replication.unexpectedNodeResponse","Number of responses from unexpected nodes",+1);
     return false;
   }
@@ -11,5 +11,15 @@
   responses.put(executorNode,response);
   receivedResponses++;
   if (waitForLocalNode && response.isExecutedOnLocalNode())   receivedCurrentNode=true;
-  return getExpectedResponses() == receivedResponses;
+  final boolean completed=getExpectedResponses() == receivedResponses;
+  if (completed) {
+    lock.lock();
+    try {
+      synchronousResponsesArrived.signalAll();
+    }
+  finally {
+      lock.unlock();
+    }
+  }
+  return completed;
 }

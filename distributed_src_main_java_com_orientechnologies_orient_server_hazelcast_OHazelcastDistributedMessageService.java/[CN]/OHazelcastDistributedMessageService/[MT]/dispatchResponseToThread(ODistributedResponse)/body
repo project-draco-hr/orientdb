@@ -1,17 +1,14 @@
 {
-  Orient.instance().getProfiler().updateCounter("distributed.replication.msgReceived","Number of replication messages received in current node",+1);
-  final long threadId=response.getSenderThreadId();
-  final String targetLocalNodeThread=manager.getLocalNodeName() + ":" + threadId;
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"- forward response to the internal thread");
-  final ArrayBlockingQueue<ODistributedResponse> responseQueue=internalThreadQueues.get(threadId);
-  if (responseQueue == null) {
-    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"cannot dispatch response to the internal thread because the thread queue %d was not found: %s",threadId,response.getPayload());
-    return;
+  try {
+    final long reqId=response.getRequestId();
+    final ODistributedResponseManager asynchMgr=responsesByRequestIds.get(reqId);
+    if (asynchMgr == null) {
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,manager.getLocalNodeName(),response.getExecutorNodeName(),DIRECTION.IN,"received response for message %d after the timeout (%dms)",reqId,OGlobalConfiguration.DISTRIBUTED_ASYNCH_RESPONSES_TIMEOUT.getValueAsLong());
+    }
+ else     if (asynchMgr.addResponse(response))     responsesByRequestIds.remove(reqId);
   }
-  if (processAsynchResponse(response))   try {
-    if (!responseQueue.offer(response,OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong(),TimeUnit.MILLISECONDS))     ODistributedServerLog.debug(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"timeout on dispatching response of message %d to the internal thread queue",response.getRequestId());
-  }
- catch (  Exception e) {
-    ODistributedServerLog.error(this,manager.getLocalNodeName(),targetLocalNodeThread,DIRECTION.OUT,"error on dispatching response to the internal thread queue",e);
+  finally {
+    Orient.instance().getProfiler().updateCounter("distributed.replication.msgReceived","Number of replication messages received in current node",+1);
+    Orient.instance().getProfiler().updateCounter("distributed.replication." + response.getExecutorNodeName() + ".msgReceived","Number of replication messages received in current node from a node",+1);
   }
 }

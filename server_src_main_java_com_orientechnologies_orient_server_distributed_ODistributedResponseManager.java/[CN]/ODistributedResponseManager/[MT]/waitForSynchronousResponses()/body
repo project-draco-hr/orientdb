@@ -1,3 +1,14 @@
 {
-  return (waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses;
+  final long beginTime=System.currentTimeMillis();
+  lock.lock();
+  try {
+    if ((waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses) {
+      if (!synchronousResponsesArrived.await(synchTimeout,TimeUnit.MILLISECONDS))       return false;
+    }
+    return true;
+  }
+  finally {
+    lock.unlock();
+    Orient.instance().getProfiler().stopChrono("distributed.replication.synchResponses","Time to collect all the synchronous responses from distributed nodes",beginTime);
+  }
 }

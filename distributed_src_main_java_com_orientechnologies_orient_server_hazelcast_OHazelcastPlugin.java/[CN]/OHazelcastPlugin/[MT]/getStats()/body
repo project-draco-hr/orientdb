@@ -2,6 +2,17 @@
   final ODocument doc=new ODocument();
   final Map<String,HashMap<String,Object>> nodes=new HashMap<String,HashMap<String,Object>>();
   doc.field("nodes",nodes);
+  Map<String,Object> localNode=new HashMap<String,Object>();
+  doc.field("localNode",localNode);
+  localNode.put("name",getLocalNodeName());
+  Map<String,Object> databases=new HashMap<String,Object>();
+  localNode.put("databases",databases);
+  for (  String dbName : messageService.getDatabases()) {
+    Map<String,Object> db=new HashMap<String,Object>();
+    databases.put(dbName,db);
+    final OProfilerEntry chrono=Orient.instance().getProfiler().getChrono("distributed.replication." + dbName + ".resynch");
+    if (chrono != null)     db.put("resync",new ODocument().fromJSON(chrono.toJSON()));
+  }
   for (  Entry<String,QueueConfig> entry : hazelcastInstance.getConfig().getQueueConfigs().entrySet()) {
     final String queueName=entry.getKey();
     if (!queueName.startsWith(OHazelcastDistributedMessageService.NODE_QUEUE_PREFIX))     continue;
@@ -23,7 +34,8 @@
         node.put(dbName,db);
       }
       db.put("requests",queue.size());
-      if (!queue.isEmpty())       db.put("lastMessage",queue.peek().toString());
+      final Object lastMessage=queue.peek();
+      if (lastMessage != null)       db.put("lastMessage",lastMessage.toString());
     }
   }
   return doc;

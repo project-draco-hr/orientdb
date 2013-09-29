@@ -8,8 +8,7 @@
   final ODistributedPartition partition=strategy.getPartition(manager,databaseName,clusterName);
   final Set<String> nodes=partition.getNodes();
   final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
-  final int queueSize=nodes.size();
-  int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes,queueSize);
+  int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes);
   iRequest.setSenderNodeName(manager.getLocalNodeName());
   iRequest.setSenderThreadId(threadId);
   int availableNodes=0;
@@ -19,6 +18,7 @@
       if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
     }
   }
+  final int queueSize=nodes.size();
   int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : queueSize;
   final boolean waitLocalNode=nodes.contains(manager.getLocalNodeName()) && cfg.isReadYourWrites(clusterName);
   final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getPayload().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getPayload().getTotalTimeout(queueSize));
@@ -35,7 +35,7 @@
   finally {
       requestLock.unlock();
     }
-    Orient.instance().getProfiler().updateCounter("distributed.replication.msgSent","Number of replication messages sent from current node",+1);
+    Orient.instance().getProfiler().updateCounter("distributed.replication." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.replication.*.msgSent");
     return collectResponses(iRequest,currentResponseMgr);
   }
  catch (  Throwable e) {

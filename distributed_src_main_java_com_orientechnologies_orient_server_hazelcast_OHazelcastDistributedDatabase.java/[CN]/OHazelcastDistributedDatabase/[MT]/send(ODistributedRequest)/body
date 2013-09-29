@@ -9,7 +9,7 @@
   final Set<String> nodes=partition.getNodes();
   final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
   final int queueSize=nodes.size();
-  final int quorum=iRequest.getPayload().isWriteOperation() ? cfg.getWriteQuorum(clusterName) : queueSize;
+  int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes,queueSize);
   iRequest.setSenderNodeName(manager.getLocalNodeName());
   iRequest.setSenderThreadId(threadId);
   int availableNodes=0;
@@ -19,9 +19,9 @@
       if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
     }
   }
-  final int expectedSynchronousResponses=Math.min(availableNodes,quorum);
+  int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : queueSize;
   final boolean waitLocalNode=nodes.contains(manager.getLocalNodeName()) && cfg.isReadYourWrites(clusterName);
-  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getPayload().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getPayload().getTotalTimeout(queueSize));
+  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getPayload().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getPayload().getTotalTimeout(queueSize));
   msgService.registerRequest(iRequest.getId(),currentResponseMgr);
   if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getPayload());
   final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();

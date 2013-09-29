@@ -1,0 +1,32 @@
+{
+  if (quorum == 0)   return;
+  if (responseGroups.size() == 1)   return;
+  final int bestResponsesGroupIndex=getBestResponsesGroup();
+  final List<ODistributedResponse> bestResponsesGroup=responseGroups.get(bestResponsesGroupIndex);
+  final int maxCoherentResponses=bestResponsesGroup.size();
+  final int conflicts=getExpectedResponses() - maxCoherentResponses;
+  if (maxCoherentResponses >= quorum) {
+    for (    List<ODistributedResponse> responseGroup : responseGroups) {
+      if (responseGroup != bestResponsesGroup && responseGroup.size() == maxCoherentResponses) {
+        final List<String> a=new ArrayList<String>();
+        for (        ODistributedResponse r : bestResponsesGroup)         a.add(r.getExecutorNodeName());
+        final List<String> b=new ArrayList<String>();
+        for (        ODistributedResponse r : responseGroup)         b.add(r.getExecutorNodeName());
+        ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected possible split brain network where 2 groups of servers A%s and B%s have different contents. Cannot decide who is the winner even if the quorum (%d) has been reached",a,b,quorum);
+        return;
+      }
+    }
+    final ODistributedResponse goodResponse=bestResponsesGroup.get(0);
+    ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected %d conflicts, but the quorum (%d) has been reached. Fixing remote records",conflicts,quorum);
+    for (    List<ODistributedResponse> responseGroup : responseGroups) {
+      if (responseGroup != bestResponsesGroup) {
+        for (        ODistributedResponse r : responseGroup) {
+          ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"fixing response for request=%s in server %s to be: %s",r.getExecutorNodeName(),request,goodResponse);
+          final OAbstractRemoteTask fixRequest=((OAbstractReplicatedTask)request.getPayload()).getFixTask(request,goodResponse);
+          dManager.sendRequest2Node(request.getDatabaseName(),r.getExecutorNodeName(),fixRequest);
+        }
+      }
+    }
+  }
+ else   ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected %d conflicts where the quorum (%d) has not been reached, cannot guarantee coherency against this resources",conflicts,quorum);
+}

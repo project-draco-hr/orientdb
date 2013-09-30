@@ -1,5 +1,5 @@
 {
-  if (from == null && to == null && rid == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  if (fromExpr == null && toExpr == null && rid == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
   if (rid != null) {
     final OrientEdge e=graph.getEdge(rid);
@@ -11,11 +11,15 @@
  else {
     final Set<OrientEdge> edges=new HashSet<OrientEdge>();
     if (query == null) {
-      if (from != null && to != null) {
-        for (        Edge e : graph.getVertex(from).getEdges(Direction.OUT))         if (to.equals(((OrientEdge)e).getInVertex()))         edges.add((OrientEdge)e);
+      Set<ORID> fromIds=null;
+      if (fromExpr != null)       fromIds=parseTarget(graph.getRawGraph(),fromExpr);
+      Set<ORID> toIds=null;
+      if (toExpr != null)       toIds=parseTarget(graph.getRawGraph(),toExpr);
+      if (fromIds != null && toIds != null) {
+        for (        ORID fromId : fromIds)         for (        Edge e : graph.getVertex(fromId).getEdges(Direction.OUT))         if (toIds.contains(((OrientEdge)e).getInVertex().getIdentity()))         edges.add((OrientEdge)e);
       }
- else       if (from != null)       edges.add((OrientEdge)graph.getVertex(from).getEdges(Direction.OUT));
- else       if (to != null)       edges.add((OrientEdge)graph.getVertex(to).getEdges(Direction.IN));
+ else       if (fromIds != null)       for (      ORID fromId : fromIds)       edges.add((OrientEdge)graph.getVertex(fromId).getEdges(Direction.OUT));
+ else       if (toIds != null)       for (      ORID toId : toIds)       edges.add((OrientEdge)graph.getVertex(toId).getEdges(Direction.IN));
  else       throw new OCommandExecutionException("Invalid target");
       if (compiledFilter != null) {
         for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
@@ -26,8 +30,7 @@
       removed=edges.size();
       for (      OrientEdge edge : edges)       edge.remove();
     }
- else     if (query != null)     query.execute(iArgs);
- else     throw new OCommandExecutionException("Invalid target");
+ else     query.execute(iArgs);
   }
   return removed;
 }

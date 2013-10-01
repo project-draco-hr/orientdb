@@ -1,0 +1,49 @@
+{
+  byte[] serializeValue=new byte[valueSerializer.getObjectSize(value)];
+  valueSerializer.serializeNative(value,serializeValue,0);
+  final int amountOfPages=OSBTreeValuePage.calculateAmountOfPage(serializeValue.length);
+  int position=0;
+  OCacheEntry cacheEntry=allocateValuePage();
+  final long valueLink=cacheEntry.getPageIndex();
+  OCachePointer cachePointer=cacheEntry.getCachePointer();
+  try {
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(cachePointer.getDataPointer(),getTrackMode());
+    position=valuePage.fillBinaryContent(serializeValue,position);
+    cacheEntry.markDirty();
+    logPageChanges(valuePage,fileId,cacheEntry.getPageIndex(),true);
+  }
+  finally {
+    cachePointer.releaseExclusiveLock();
+    diskCache.release(cacheEntry);
+  }
+  long prevPage=valueLink;
+  for (int i=1; i < amountOfPages; i++) {
+    cacheEntry=allocateValuePage();
+    cachePointer=cacheEntry.getCachePointer();
+    try {
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(cachePointer.getDataPointer(),getTrackMode());
+      position=valuePage.fillBinaryContent(serializeValue,position);
+      cacheEntry.markDirty();
+      logPageChanges(valuePage,fileId,cacheEntry.getPageIndex(),true);
+    }
+  finally {
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(cacheEntry);
+    }
+    OCacheEntry prevPageCacheEntry=diskCache.load(fileId,prevPage,false);
+    OCachePointer prevPageCachePointer=prevPageCacheEntry.getCachePointer();
+    prevPageCachePointer.acquireExclusiveLock();
+    try {
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(cachePointer.getDataPointer(),getTrackMode());
+      valuePage.setNextPage(cacheEntry.getPageIndex());
+      cacheEntry.markDirty();
+      logPageChanges(valuePage,fileId,prevPage,false);
+    }
+  finally {
+      prevPageCachePointer.releaseExclusiveLock();
+      diskCache.release(prevPageCacheEntry);
+    }
+    prevPage=cacheEntry.getPageIndex();
+  }
+  return valueLink;
+}

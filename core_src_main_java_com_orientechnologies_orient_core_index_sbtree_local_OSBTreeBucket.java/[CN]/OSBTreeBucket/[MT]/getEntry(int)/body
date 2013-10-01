@@ -3,8 +3,12 @@
   if (isLeaf) {
     K key=keySerializer.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition);
     entryPosition+=keySerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition);
-    V value=valueSerializer.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition);
-    return new SBTreeEntry<K,V>(-1,-1,key,value);
+    boolean isLinkValue=directMemory.getByte(pagePointer + entryPosition) > 0;
+    long link=-1;
+    V value=null;
+    if (isLinkValue)     link=OLongSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition + OByteSerializer.BYTE_SIZE);
+ else     value=valueSerializer.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition + OByteSerializer.BYTE_SIZE);
+    return new SBTreeEntry<K,V>(-1,-1,key,new OSBTreeValue<V>(link >= 0,link,value));
   }
  else {
     long leftChild=getLongValue(entryPosition);

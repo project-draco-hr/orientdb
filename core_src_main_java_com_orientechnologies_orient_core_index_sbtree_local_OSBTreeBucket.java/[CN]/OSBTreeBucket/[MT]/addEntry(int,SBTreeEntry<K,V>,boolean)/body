@@ -4,9 +4,11 @@
   int entrySize=keySize;
   if (isLeaf) {
     if (valueSerializer.isFixedLength())     valueSize=valueSerializer.getFixedLength();
- else     valueSize=valueSerializer.getObjectSize(treeEntry.value);
-    entrySize+=valueSize;
-    checkEntreeSize(entrySize);
+ else {
+      if (treeEntry.value.isLink())       valueSize=OLongSerializer.LONG_SIZE;
+ else       valueSize=valueSerializer.getObjectSize(treeEntry.value.getValue());
+    }
+    entrySize+=valueSize + OByteSerializer.BYTE_SIZE;
   }
  else   entrySize+=2 * OLongSerializer.LONG_SIZE;
   int size=size();
@@ -24,8 +26,11 @@
     keySerializer.serializeNative(treeEntry.key,serializedKey,0);
     setBinaryValue(freePointer,serializedKey);
     freePointer+=keySize;
+    setByteValue(freePointer,treeEntry.value.isLink() ? (byte)1 : (byte)0);
+    freePointer+=OByteSerializer.BYTE_SIZE;
     byte[] serializedValue=new byte[valueSize];
-    valueSerializer.serializeNative(treeEntry.value,serializedValue,0);
+    if (treeEntry.value.isLink())     OLongSerializer.INSTANCE.serializeNative(treeEntry.value.getLink(),serializedValue,0);
+ else     valueSerializer.serializeNative(treeEntry.value.getValue(),serializedValue,0);
     setBinaryValue(freePointer,serializedValue);
   }
  else {

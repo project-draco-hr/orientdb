@@ -1,0 +1,51 @@
+{
+  long seed=System.currentTimeMillis();
+  System.out.println("testShrink seed : " + seed);
+  TreeSet<Long> keys=new TreeSet<Long>();
+  Random random=new Random(seed);
+  while (keys.size() < 2 * OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES / OLongSerializer.LONG_SIZE) {
+    keys.add(random.nextLong());
+  }
+  long pointer=directMemory.allocate(OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES);
+  OSBTreeBonsaiBucket<Long,OIdentifiable> treeBucket=new OSBTreeBonsaiBucket<Long,OIdentifiable>(pointer,false,OLongSerializer.INSTANCE,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
+  int index=0;
+  for (  Long key : keys) {
+    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(index,index + 1,key,null),true))     break;
+    index++;
+  }
+  int originalSize=treeBucket.size();
+  treeBucket.shrink(treeBucket.size() / 2);
+  Assert.assertEquals(treeBucket.size(),index / 2);
+  index=0;
+  final Map<Long,Integer> keyIndexMap=new HashMap<Long,Integer>();
+  Iterator<Long> keysIterator=keys.iterator();
+  while (keysIterator.hasNext() && index < treeBucket.size()) {
+    Long key=keysIterator.next();
+    keyIndexMap.put(key,index);
+    index++;
+  }
+  for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
+    int bucketIndex=treeBucket.find(keyIndexEntry.getKey());
+    Assert.assertEquals(bucketIndex,(int)keyIndexEntry.getValue());
+  }
+  for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
+    OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable> entry=treeBucket.getEntry(keyIndexEntry.getValue());
+    Assert.assertEquals(entry,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(keyIndexEntry.getValue(),keyIndexEntry.getValue() + 1,keyIndexEntry.getKey(),null));
+  }
+  int keysToAdd=originalSize - treeBucket.size();
+  int addedKeys=0;
+  while (keysIterator.hasNext() && index < originalSize) {
+    Long key=keysIterator.next();
+    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(index,index + 1,key,null),true))     break;
+    keyIndexMap.put(key,index);
+    index++;
+    addedKeys++;
+  }
+  for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
+    OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable> entry=treeBucket.getEntry(keyIndexEntry.getValue());
+    Assert.assertEquals(entry,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(keyIndexEntry.getValue(),keyIndexEntry.getValue() + 1,keyIndexEntry.getKey(),null));
+  }
+  Assert.assertEquals(treeBucket.size(),originalSize);
+  Assert.assertEquals(addedKeys,keysToAdd);
+  directMemory.free(pointer);
+}

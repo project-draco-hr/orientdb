@@ -1,0 +1,58 @@
+{
+  acquireSharedLock();
+  try {
+    LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
+    long bucketIndex=rootIndex;
+    OCacheEntry cacheEntry=diskCache.load(fileId,bucketIndex,false);
+    OCachePointer cachePointer=cacheEntry.getCachePointer();
+    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+    int itemIndex=bucket.size() - 1;
+    try {
+      while (true) {
+        if (!bucket.isLeaf()) {
+          if (itemIndex < 0) {
+            if (!path.isEmpty()) {
+              PagePathItemUnit pagePathItemUnit=path.removeLast();
+              bucketIndex=pagePathItemUnit.pageIndex;
+              itemIndex=pagePathItemUnit.itemIndex - 1;
+            }
+ else             return null;
+          }
+ else {
+            OSBTreeBonsaiBucket.SBTreeEntry<K,V> entry=bucket.getEntry(itemIndex);
+            path.add(new PagePathItemUnit(bucketIndex,itemIndex));
+            bucketIndex=entry.rightChild;
+            itemIndex=OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1;
+          }
+        }
+ else {
+          if (bucket.isEmpty()) {
+            if (!path.isEmpty()) {
+              PagePathItemUnit pagePathItemUnit=path.removeLast();
+              bucketIndex=pagePathItemUnit.pageIndex;
+              itemIndex=pagePathItemUnit.itemIndex - 1;
+            }
+ else             return null;
+          }
+ else {
+            return bucket.getKey(bucket.size() - 1);
+          }
+        }
+        diskCache.release(cacheEntry);
+        cacheEntry=diskCache.load(fileId,bucketIndex,false);
+        cachePointer=cacheEntry.getCachePointer();
+        bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        if (itemIndex == OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1)         itemIndex=bucket.size() - 1;
+      }
+    }
+  finally {
+      diskCache.release(cacheEntry);
+    }
+  }
+ catch (  IOException e) {
+    throw new OSBTreeException("Error during finding first key in sbtree [" + name + "]");
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

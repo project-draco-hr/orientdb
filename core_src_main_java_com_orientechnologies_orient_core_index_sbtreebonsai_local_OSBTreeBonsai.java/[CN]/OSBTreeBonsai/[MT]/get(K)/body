@@ -1,0 +1,23 @@
+{
+  acquireSharedLock();
+  try {
+    BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
+    if (bucketSearchResult.itemIndex < 0)     return null;
+    long pageIndex=bucketSearchResult.getLastPathItem();
+    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,pageIndex,false);
+    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
+    try {
+      OSBTreeBonsaiBucket<K,V> keyBucket=new OSBTreeBonsaiBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+      return keyBucket.getEntry(bucketSearchResult.itemIndex).value;
+    }
+  finally {
+      diskCache.release(keyBucketCacheEntry);
+    }
+  }
+ catch (  IOException e) {
+    throw new OSBTreeException("Error during retrieving  of sbtree with name " + name,e);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

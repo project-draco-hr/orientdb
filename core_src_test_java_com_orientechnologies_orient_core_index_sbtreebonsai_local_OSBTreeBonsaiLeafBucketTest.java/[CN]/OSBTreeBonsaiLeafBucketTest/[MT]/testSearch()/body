@@ -1,0 +1,24 @@
+{
+  long seed=System.currentTimeMillis();
+  System.out.println("testSearch seed : " + seed);
+  TreeSet<Long> keys=new TreeSet<Long>();
+  Random random=new Random(seed);
+  while (keys.size() < 2 * OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES / OLongSerializer.LONG_SIZE) {
+    keys.add(random.nextLong());
+  }
+  long pointer=directMemory.allocate(OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES);
+  OSBTreeBonsaiBucket<Long,OIdentifiable> treeBucket=new OSBTreeBonsaiBucket<Long,OIdentifiable>(pointer,true,OLongSerializer.INSTANCE,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
+  int index=0;
+  Map<Long,Integer> keyIndexMap=new HashMap<Long,Integer>();
+  for (  Long key : keys) {
+    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index))),true))     break;
+    keyIndexMap.put(key,index);
+    index++;
+  }
+  Assert.assertEquals(treeBucket.size(),keyIndexMap.size());
+  for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
+    int bucketIndex=treeBucket.find(keyIndexEntry.getKey());
+    Assert.assertEquals(bucketIndex,(int)keyIndexEntry.getValue());
+  }
+  directMemory.free(pointer);
+}

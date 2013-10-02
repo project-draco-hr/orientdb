@@ -1,0 +1,31 @@
+{
+  acquireExclusiveLock();
+  OStorageTransaction transaction=storage.getStorageTransaction();
+  try {
+    startDurableOperation(transaction);
+    diskCache.truncateFile(fileId);
+    OCacheEntry cacheEntry=diskCache.load(fileId,rootIndex,false);
+    OCachePointer rootPointer=cacheEntry.getCachePointer();
+    rootPointer.acquireExclusiveLock();
+    try {
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),true,keySerializer,valueSerializer,getTrackMode());
+      rootBucket.setKeySerializerId(keySerializer.getId());
+      rootBucket.setValueSerializerId(valueSerializer.getId());
+      rootBucket.setTreeSize(0);
+      logPageChanges(rootBucket,fileId,rootIndex,true);
+      cacheEntry.markDirty();
+    }
+  finally {
+      rootPointer.releaseExclusiveLock();
+      diskCache.release(cacheEntry);
+    }
+    endDurableOperation(transaction,false);
+  }
+ catch (  IOException e) {
+    rollback(transaction);
+    throw new OSBTreeException("Error during clear of sbtree with name " + name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

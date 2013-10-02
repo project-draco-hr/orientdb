@@ -2,10 +2,13 @@
   final long beginTime=System.currentTimeMillis();
   lock.lock();
   try {
-    if ((waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses) {
-      if (!synchronousResponsesArrived.await(synchTimeout,TimeUnit.MILLISECONDS))       return false;
+    do {
+      if ((waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses) {
+        if (synchronousResponsesArrived.await(synchTimeout,TimeUnit.MILLISECONDS))         break;
+      }
     }
-    return true;
+ while (waitForLocalNode && !receivedCurrentNode);
+    return receivedResponses >= expectedSynchronousResponses;
   }
   finally {
     lock.unlock();

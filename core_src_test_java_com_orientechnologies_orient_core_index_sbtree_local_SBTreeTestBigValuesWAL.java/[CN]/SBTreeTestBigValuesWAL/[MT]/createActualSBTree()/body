@@ -1,0 +1,25 @@
+{
+  actualStorage=mock(OLocalPaginatedStorage.class);
+  OStorageConfiguration storageConfiguration=mock(OStorageConfiguration.class);
+  storageConfiguration.clusters=new ArrayList<OStorageClusterConfiguration>();
+  storageConfiguration.fileTemplate=new OStorageSegmentConfiguration();
+  actualStorageDir=buildDirectory + "/sbtreeWithBigValuesWALTestActual";
+  when(actualStorage.getStoragePath()).thenReturn(actualStorageDir);
+  when(actualStorage.getName()).thenReturn("sbtreeBigValuesWithWALTesActual");
+  File buildDir=new File(buildDirectory);
+  if (!buildDir.exists())   buildDir.mkdirs();
+  File actualStorageDirFile=new File(actualStorageDir);
+  if (!actualStorageDirFile.exists())   actualStorageDirFile.mkdirs();
+  writeAheadLog=new OWriteAheadLog(6000,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,actualStorage);
+  actualDiskCache=new OReadWriteDiskCache(400L * 1024 * 1024* 1024,1648L * 1024 * 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,1000000,100,actualStorage,null,false,false);
+  OStorageVariableParser variableParser=new OStorageVariableParser(actualStorageDir);
+  when(actualStorage.getStorageTransaction()).thenReturn(null);
+  when(actualStorage.getDiskCache()).thenReturn(actualDiskCache);
+  when(actualStorage.getWALInstance()).thenReturn(writeAheadLog);
+  when(actualStorage.getVariableParser()).thenReturn(variableParser);
+  when(actualStorage.getConfiguration()).thenReturn(storageConfiguration);
+  when(actualStorage.getMode()).thenReturn("rw");
+  when(storageConfiguration.getDirectory()).thenReturn(actualStorageDir);
+  sbTree=new OSBTree<Integer,byte[]>(".sbt",1,true);
+  sbTree.create("actualSBTree",OIntegerSerializer.INSTANCE,OBinaryTypeSerializer.INSTANCE,actualStorage);
+}

@@ -1,34 +1,40 @@
 {
-  final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
-  for (  Entry<String,Object> entry : getConfigurationMap().entrySet()) {
-    if (entry.getKey().startsWith(CONFIG_DATABASE_PREFIX)) {
-      final String databaseName=entry.getKey().substring(CONFIG_DATABASE_PREFIX.length());
-      if (!configuredDatabases.contains(databaseName)) {
-        final ODocument config=(ODocument)entry.getValue();
-        final Boolean autoDeploy=config.field("autoDeploy");
-        if (autoDeploy != null && autoDeploy) {
-          final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName).configureDatabase(null);
-          final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
-          final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
-          OBuffer result=null;
-          for (          Entry<String,OBuffer> r : results.entrySet())           if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
-            result=r.getValue();
-            ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
-            break;
-          }
-          if (result == null)           throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
-          new File(dbPath).mkdirs();
-          final ODatabaseDocumentTx db=new ODatabaseDocumentTx("local:" + dbPath);
-          final ByteArrayInputStream in=new ByteArrayInputStream(result.getBuffer());
-          try {
-            db.restore(in,null);
-            in.close();
-            db.close();
-            Orient.instance().unregisterStorageByName(db.getName());
-            distrDatabase.setOnline(true);
-          }
- catch (          IOException e) {
-            ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.IN,"error on copying database '%s' on local server",e,databaseName);
+synchronized (installDatabaseLock) {
+    final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
+    for (    Entry<String,Object> entry : getConfigurationMap().entrySet()) {
+      if (entry.getKey().startsWith(CONFIG_DATABASE_PREFIX)) {
+        final String databaseName=entry.getKey().substring(CONFIG_DATABASE_PREFIX.length());
+        if (!configuredDatabases.contains(databaseName)) {
+          final ODocument config=(ODocument)entry.getValue();
+          final Boolean autoDeploy=config.field("autoDeploy");
+          if (autoDeploy != null && autoDeploy) {
+            final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
+            distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class);
+            distrDatabase.configureDatabase(null,false);
+            final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+            final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
+            OBuffer result=null;
+            for (            Entry<String,OBuffer> r : results.entrySet())             if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
+              result=r.getValue();
+              ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
+              break;
+            }
+            if (result == null)             throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
+            new File(dbPath).mkdirs();
+            final ODatabaseDocumentTx db=new ODatabaseDocumentTx("local:" + dbPath);
+            final ByteArrayInputStream in=new ByteArrayInputStream(result.getBuffer());
+            try {
+              db.restore(in,null);
+              in.close();
+              db.close();
+              Orient.instance().unregisterStorageByName(db.getName());
+              ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"installed database %s in %s, setting it online...",databaseName,dbPath);
+              distrDatabase.setOnline();
+              ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"database %s in online",databaseName);
+            }
+ catch (            IOException e) {
+              ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.IN,"error on copying database '%s' on local server",e,databaseName);
+            }
           }
         }
       }

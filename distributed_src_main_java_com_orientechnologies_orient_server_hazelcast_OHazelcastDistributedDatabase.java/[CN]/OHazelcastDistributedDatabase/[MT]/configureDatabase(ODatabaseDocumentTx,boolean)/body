@@ -1,13 +1,8 @@
 {
-  if (iDatabase == null) {
-    final OServerUserConfiguration replicatorUser=manager.getServerInstance().getUser(ODistributedAbstractPlugin.REPLICATOR_USER);
-    database=(ODatabaseDocumentTx)manager.getServerInstance().openDatabase("document",databaseName,replicatorUser.name,replicatorUser.password);
-  }
- else   database=iDatabase;
   final String queueName=OHazelcastDistributedMessageService.getRequestQueueName(manager.getLocalNodeName(),databaseName);
   final IQueue<ODistributedRequest> requestQueue=msgService.getQueue(queueName);
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
-  final IMap<Object,Object> undoMap=restoreMessagesBeforeFailure();
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
+  final IMap<Object,Object> undoMap=restoreMessagesBeforeFailure(iRestoreMessages);
   msgService.checkForPendingMessages(requestQueue,queueName);
   new Thread(new Runnable(){
     @Override public void run(){
@@ -15,7 +10,7 @@
         String senderNode=null;
         ODistributedRequest message=null;
         try {
-          message=requestQueue.take();
+          message=readRequest(requestQueue);
           undoMap.put(databaseName,message);
           if (message != null) {
             senderNode=message.getSenderNodeName();
@@ -28,12 +23,11 @@
           break;
         }
 catch (        Throwable e) {
-          ODistributedServerLog.error(this,getLocalNodeNameAndThread(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getPayload() : "-");
+          ODistributedServerLog.error(this,getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getTask() : "-");
         }
       }
     }
   }
 ).start();
-  checkLocalNodeInConfiguration();
   return this;
 }

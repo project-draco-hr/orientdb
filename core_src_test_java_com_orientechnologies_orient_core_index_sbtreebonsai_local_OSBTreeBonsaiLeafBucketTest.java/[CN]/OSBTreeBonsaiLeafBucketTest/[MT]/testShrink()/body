@@ -7,10 +7,10 @@
     keys.add(random.nextLong());
   }
   long pointer=directMemory.allocate(OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024);
-  OSBTreeBonsaiBucket<Long,OIdentifiable> treeBucket=new OSBTreeBonsaiBucket<Long,OIdentifiable>(pointer,true,OLongSerializer.INSTANCE,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
+  OSBTreeBonsaiBucket<Long,OIdentifiable> treeBucket=new OSBTreeBonsaiBucket<Long,OIdentifiable>(pointer,0,true,OLongSerializer.INSTANCE,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
   int index=0;
   for (  Long key : keys) {
-    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index))),true))     break;
+    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(OBonsaiBucketPointer.NULL,OBonsaiBucketPointer.NULL,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index))),true))     break;
     index++;
   }
   int originalSize=treeBucket.size();
@@ -32,14 +32,14 @@
   int addedKeys=0;
   while (keysIterator.hasNext() && index < originalSize) {
     Long key=keysIterator.next();
-    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index))),true))     break;
+    if (!treeBucket.addEntry(index,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(OBonsaiBucketPointer.NULL,OBonsaiBucketPointer.NULL,key,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index))),true))     break;
     keyIndexMap.put(key,index);
     index++;
     addedKeys++;
   }
   for (  Map.Entry<Long,Integer> keyIndexEntry : keyIndexMap.entrySet()) {
     OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable> entry=treeBucket.getEntry(keyIndexEntry.getValue());
-    Assert.assertEquals(entry,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,keyIndexEntry.getKey(),new ORecordId(keyIndexEntry.getValue(),OClusterPositionFactory.INSTANCE.valueOf(keyIndexEntry.getValue()))));
+    Assert.assertEquals(entry,new OSBTreeBonsaiBucket.SBTreeEntry<Long,OIdentifiable>(OBonsaiBucketPointer.NULL,OBonsaiBucketPointer.NULL,keyIndexEntry.getKey(),new ORecordId(keyIndexEntry.getValue(),OClusterPositionFactory.INSTANCE.valueOf(keyIndexEntry.getValue()))));
   }
   Assert.assertEquals(treeBucket.size(),originalSize);
   Assert.assertEquals(addedKeys,keysToAdd);

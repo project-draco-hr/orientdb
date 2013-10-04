@@ -11,16 +11,16 @@
     OCacheEntry rootCacheEntry;
     if (rootIndex < 0)     rootCacheEntry=diskCache.allocateNewPage(fileId);
  else     rootCacheEntry=diskCache.load(fileId,rootIndex,false);
-    this.rootIndex=rootCacheEntry.getPageIndex();
+    rootBucketPointer=new OBonsaiBucketPointer(rootCacheEntry.getPageIndex());
     OCachePointer rootPointer=rootCacheEntry.getCachePointer();
     rootPointer.acquireExclusiveLock();
     try {
       super.startDurableOperation(null);
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),true,keySerializer,valueSerializer,getTrackMode());
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getTrackMode());
       rootBucket.setKeySerializerId(keySerializer.getId());
       rootBucket.setValueSerializerId(valueSerializer.getId());
       rootBucket.setTreeSize(0);
-      super.logPageChanges(rootBucket,fileId,this.rootIndex,true);
+      super.logPageChanges(rootBucket,fileId,rootBucketPointer.getPageIndex(),true);
       rootCacheEntry.markDirty();
     }
   finally {

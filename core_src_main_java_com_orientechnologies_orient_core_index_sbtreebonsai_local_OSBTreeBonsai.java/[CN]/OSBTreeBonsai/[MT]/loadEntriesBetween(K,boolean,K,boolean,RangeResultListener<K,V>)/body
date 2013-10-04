@@ -5,7 +5,7 @@
     if (fromInclusive)     partialSearchModeFrom=PartialSearchMode.LOWEST_BOUNDARY;
  else     partialSearchModeFrom=PartialSearchMode.HIGHEST_BOUNDARY;
     BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom,partialSearchModeFrom);
-    long pageIndexFrom=bucketSearchResultFrom.getLastPathItem();
+    OBonsaiBucketPointer bucketPointerFrom=bucketSearchResultFrom.getLastPathItem();
     int indexFrom;
     if (bucketSearchResultFrom.itemIndex >= 0) {
       indexFrom=fromInclusive ? bucketSearchResultFrom.itemIndex : bucketSearchResultFrom.itemIndex + 1;
@@ -17,7 +17,7 @@
     if (toInclusive)     partialSearchModeTo=PartialSearchMode.HIGHEST_BOUNDARY;
  else     partialSearchModeTo=PartialSearchMode.LOWEST_BOUNDARY;
     BucketSearchResult bucketSearchResultTo=findBucket(keyTo,partialSearchModeTo);
-    long pageIndexTo=bucketSearchResultTo.getLastPathItem();
+    OBonsaiBucketPointer bucketPointerTo=bucketSearchResultTo.getLastPathItem();
     int indexTo;
     if (bucketSearchResultTo.itemIndex >= 0) {
       indexTo=toInclusive ? bucketSearchResultTo.itemIndex : bucketSearchResultTo.itemIndex - 1;
@@ -27,26 +27,24 @@
     }
     int startIndex=indexFrom;
     int endIndex;
-    long pageIndex=pageIndexFrom;
+    OBonsaiBucketPointer bucketPointer=bucketPointerFrom;
     resultsLoop:     while (true) {
-      long nextPageIndex=-1;
-      final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+      final OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
       final OCachePointer pointer=cacheEntry.getCachePointer();
       try {
-        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
-        if (pageIndex != pageIndexTo)         endIndex=bucket.size() - 1;
+        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        if (!bucketPointer.equals(bucketPointerTo))         endIndex=bucket.size() - 1;
  else         endIndex=indexTo;
         for (int i=startIndex; i <= endIndex; i++) {
           if (!listener.addResult(bucket.getEntry(i)))           break resultsLoop;
         }
-        if (pageIndex == pageIndexTo)         break;
-        if (bucket.getRightSibling() >= 0)         nextPageIndex=bucket.getRightSibling();
- else         break;
+        if (bucketPointer.equals(bucketPointerTo))         break;
+        bucketPointer=bucket.getRightSibling();
+        if (bucketPointer.getPageIndex() < 0)         break;
       }
   finally {
         diskCache.release(cacheEntry);
       }
-      pageIndex=nextPageIndex;
       startIndex=0;
     }
   }

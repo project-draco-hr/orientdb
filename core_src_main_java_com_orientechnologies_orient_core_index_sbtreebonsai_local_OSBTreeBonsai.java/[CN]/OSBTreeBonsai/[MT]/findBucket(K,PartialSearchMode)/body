@@ -1,6 +1,6 @@
 {
-  long pageIndex=rootIndex;
-  final ArrayList<Long> path=new ArrayList<Long>();
+  OBonsaiBucketPointer bucketPointer=rootBucketPointer;
+  final ArrayList<OBonsaiBucketPointer> path=new ArrayList<OBonsaiBucketPointer>();
   if (!(keySize == 1 || ((OCompositeKey)key).getKeys().size() == keySize || partialSearchMode.equals(PartialSearchMode.NONE))) {
     final OCompositeKey fullKey=new OCompositeKey((Comparable<? super K>)key);
     int itemsToAdd=keySize - fullKey.getKeys().size();
@@ -11,12 +11,12 @@
     key=(K)fullKey;
   }
   while (true) {
-    path.add(pageIndex);
-    final OCacheEntry bucketEntry=diskCache.load(fileId,pageIndex,false);
-    final OCachePointer bucketPointer=bucketEntry.getCachePointer();
+    path.add(bucketPointer);
+    final OCacheEntry bucketEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+    final OCachePointer pointer=bucketEntry.getCachePointer();
     final OSBTreeBonsaiBucket.SBTreeEntry<K,V> entry;
     try {
-      final OSBTreeBonsaiBucket<K,V> keyBucket=new OSBTreeBonsaiBucket<K,V>(bucketPointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+      final OSBTreeBonsaiBucket<K,V> keyBucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
       final int index=keyBucket.find(key);
       if (keyBucket.isLeaf())       return new BucketSearchResult(index,path);
       if (index >= 0)       entry=keyBucket.getEntry(index);
@@ -29,7 +29,7 @@
   finally {
       diskCache.release(bucketEntry);
     }
-    if (comparator.compare(key,entry.key) >= 0)     pageIndex=entry.rightChild;
- else     pageIndex=entry.leftChild;
+    if (comparator.compare(key,entry.key) >= 0)     bucketPointer=entry.rightChild;
+ else     bucketPointer=entry.leftChild;
   }
 }

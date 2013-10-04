@@ -2,46 +2,48 @@
   acquireSharedLock();
   try {
     LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
-    long bucketIndex=rootIndex;
-    OCacheEntry cacheEntry=diskCache.load(fileId,bucketIndex,false);
+    OBonsaiBucketPointer bucketPointer=rootBucketPointer;
+    OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
     OCachePointer cachePointer=cacheEntry.getCachePointer();
-    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
     int itemIndex=bucket.size() - 1;
     try {
       while (true) {
-        if (!bucket.isLeaf()) {
+        if (bucket.isLeaf()) {
+          if (bucket.isEmpty()) {
+            if (path.isEmpty()) {
+              return null;
+            }
+ else {
+              PagePathItemUnit pagePathItemUnit=path.removeLast();
+              bucketPointer=pagePathItemUnit.bucketPointer;
+              itemIndex=pagePathItemUnit.itemIndex - 1;
+            }
+          }
+ else {
+            return bucket.getKey(bucket.size() - 1);
+          }
+        }
+ else {
           if (itemIndex < 0) {
             if (!path.isEmpty()) {
               PagePathItemUnit pagePathItemUnit=path.removeLast();
-              bucketIndex=pagePathItemUnit.pageIndex;
+              bucketPointer=pagePathItemUnit.bucketPointer;
               itemIndex=pagePathItemUnit.itemIndex - 1;
             }
  else             return null;
           }
  else {
             OSBTreeBonsaiBucket.SBTreeEntry<K,V> entry=bucket.getEntry(itemIndex);
-            path.add(new PagePathItemUnit(bucketIndex,itemIndex));
-            bucketIndex=entry.rightChild;
+            path.add(new PagePathItemUnit(bucketPointer,itemIndex));
+            bucketPointer=entry.rightChild;
             itemIndex=OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1;
           }
         }
- else {
-          if (bucket.isEmpty()) {
-            if (!path.isEmpty()) {
-              PagePathItemUnit pagePathItemUnit=path.removeLast();
-              bucketIndex=pagePathItemUnit.pageIndex;
-              itemIndex=pagePathItemUnit.itemIndex - 1;
-            }
- else             return null;
-          }
- else {
-            return bucket.getKey(bucket.size() - 1);
-          }
-        }
         diskCache.release(cacheEntry);
-        cacheEntry=diskCache.load(fileId,bucketIndex,false);
+        cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
         cachePointer=cacheEntry.getCachePointer();
-        bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        bucket=new OSBTreeBonsaiBucket<K,V>(cachePointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
         if (itemIndex == OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1)         itemIndex=bucket.size() - 1;
       }
     }

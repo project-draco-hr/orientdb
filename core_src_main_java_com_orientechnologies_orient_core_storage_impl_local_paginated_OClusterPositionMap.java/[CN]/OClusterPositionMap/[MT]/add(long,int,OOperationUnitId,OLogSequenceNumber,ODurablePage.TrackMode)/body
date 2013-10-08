@@ -1,0 +1,38 @@
+{
+  acquireExclusiveLock();
+  try {
+    long lastPage=diskCache.getFilledUpTo(fileId) - 1;
+    boolean isNewPage=false;
+    if (lastPage < 0) {
+      lastPage=0;
+      isNewPage=true;
+    }
+    OCacheEntry cacheEntry=diskCache.load(fileId,lastPage,false);
+    OCachePointer cachePointer=cacheEntry.getCachePointer();
+    cachePointer.acquireExclusiveLock();
+    try {
+      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+      if (bucket.isFull()) {
+        cachePointer.releaseExclusiveLock();
+        diskCache.release(cacheEntry);
+        isNewPage=true;
+        cacheEntry=diskCache.allocateNewPage(fileId);
+        cachePointer=cacheEntry.getCachePointer();
+        cachePointer.acquireExclusiveLock();
+        bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+      }
+      final long index=bucket.add(pageIndex,recordPosition);
+      final OClusterPosition result=OClusterPositionFactory.INSTANCE.valueOf(index + cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES);
+      logPageChanges(bucket,fileId,cacheEntry.getPageIndex(),isNewPage,unitId,startLSN);
+      cacheEntry.markDirty();
+      return result;
+    }
+  finally {
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(cacheEntry);
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

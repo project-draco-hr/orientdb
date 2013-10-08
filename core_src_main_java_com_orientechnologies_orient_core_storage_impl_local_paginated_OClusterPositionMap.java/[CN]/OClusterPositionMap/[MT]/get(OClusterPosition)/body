@@ -1,0 +1,20 @@
+{
+  acquireSharedLock();
+  try {
+    final long position=clusterPosition.longValue();
+    long pageIndex=position / OClusterPositionMapBucket.MAX_ENTRIES;
+    int index=(int)(position % OClusterPositionMapBucket.MAX_ENTRIES);
+    final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+    final OCachePointer cachePointer=cacheEntry.getCachePointer();
+    try {
+      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE);
+      return bucket.get(index);
+    }
+  finally {
+      diskCache.release(cacheEntry);
+    }
+  }
+  finally {
+    releaseSharedLock();
+  }
+}

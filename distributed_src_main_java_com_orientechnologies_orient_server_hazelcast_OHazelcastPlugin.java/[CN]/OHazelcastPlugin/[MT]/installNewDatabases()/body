@@ -1,19 +1,24 @@
 {
   setStatus(STATUS.ALIGNING);
 synchronized (installDatabaseLock) {
-    final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
     for (    Entry<String,Object> entry : getConfigurationMap().entrySet()) {
       if (entry.getKey().startsWith(CONFIG_DATABASE_PREFIX)) {
         final String databaseName=entry.getKey().substring(CONFIG_DATABASE_PREFIX.length());
-        if (!configuredDatabases.contains(databaseName)) {
-          final ODocument config=(ODocument)entry.getValue();
-          final Boolean autoDeploy=config.field("autoDeploy");
-          if (autoDeploy != null && autoDeploy) {
+        final ODocument config=(ODocument)entry.getValue();
+        final Boolean autoDeploy=config.field("autoDeploy");
+        if (autoDeploy != null && autoDeploy) {
+          final Boolean hotAlignment=config.field("hotAlignment");
+          final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
+          final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
+          if (configuredDatabases.contains(databaseName) && hotAlignment != null && !hotAlignment) {
+            final ODatabaseDocumentTx db=new ODatabaseDocumentTx("local:" + dbPath);
+            db.drop();
+          }
+          if (!configuredDatabases.contains(databaseName)) {
             final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
             distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class);
             distrDatabase.configureDatabase(null,false);
             final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
-            final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
             OBuffer result=null;
             for (            Entry<String,OBuffer> r : results.entrySet())             if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
               result=r.getValue();
@@ -41,4 +46,5 @@ synchronized (installDatabaseLock) {
       }
     }
   }
+  setStatus(STATUS.ONLINE);
 }

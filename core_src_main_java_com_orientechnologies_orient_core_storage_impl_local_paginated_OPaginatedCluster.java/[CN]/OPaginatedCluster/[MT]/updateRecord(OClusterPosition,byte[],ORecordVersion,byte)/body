@@ -4,13 +4,14 @@
     acquireExclusiveLock();
     try {
       final OStorageTransaction transaction=storageLocal.getStorageTransaction();
-      byte[] fullEntryContent=readFullEntry(clusterPosition);
+      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+      int recordPosition=positionEntry.getRecordPosition();
+      long pageIndex=positionEntry.getPageIndex();
+      long pagePointer=createPagePointer(pageIndex,recordPosition);
+      byte[] fullEntryContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
       if (fullEntryContent == null)       return;
       content=compression.compress(content);
       int updatedContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
-      long pagePointer=clusterPosition.longValue();
-      int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
-      long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
       byte[] recordEntry;
       if (updatedContentLength <= fullEntryContent.length)       recordEntry=new byte[fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE];
  else {
@@ -93,7 +94,7 @@
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
         recordsSizeDiff+=addEntryResult.recordsSizeDiff;
-        long addedPagePointer=addEntryResult.pagePointer;
+        long addedPagePointer=createPagePointer(addEntryResult.pageIndex,addEntryResult.pagePosition);
         if (prevPageRecordPointer >= 0) {
           long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
           int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);

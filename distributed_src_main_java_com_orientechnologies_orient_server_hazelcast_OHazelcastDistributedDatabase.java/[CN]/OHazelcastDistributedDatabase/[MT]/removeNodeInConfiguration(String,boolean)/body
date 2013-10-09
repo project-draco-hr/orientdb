@@ -1,5 +1,4 @@
 {
-  manager.loadDatabaseConfiguration(databaseName,manager.getDistributedConfigFile(databaseName));
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
   if (!iForce && cfg.isHotAlignment())   return;
   boolean dirty=false;
@@ -13,6 +12,7 @@
           if (node.equals(iNode)) {
             ODistributedServerLog.info(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"removing node '%s' in partition: %s.%s.%d",iNode,databaseName,clusterName,p);
             partition.remove(n);
+            msgService.removeQueue(OHazelcastDistributedMessageService.getRequestQueueName(iNode,databaseName));
             dirty=true;
             break;
           }
@@ -22,7 +22,7 @@
   }
   if (dirty) {
     final ODocument doc=cfg.serialize();
+    manager.updateCachedDatabaseConfiguration(databaseName,doc);
     manager.getConfigurationMap().put(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + databaseName,doc);
-    manager.updateDatabaseConfiguration(databaseName,doc);
   }
 }

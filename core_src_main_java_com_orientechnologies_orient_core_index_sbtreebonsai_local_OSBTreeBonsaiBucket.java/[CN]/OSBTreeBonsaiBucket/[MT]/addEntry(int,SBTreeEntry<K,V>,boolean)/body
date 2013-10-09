@@ -8,7 +8,7 @@
     entrySize+=valueSize;
     checkEntreeSize(entrySize);
   }
- else   entrySize+=2 * OLongSerializer.LONG_SIZE;
+ else   entrySize+=2 * (OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE);
   int size=size();
   int freePointer=getIntValue(offset + FREE_POINTER_OFFSET);
   if (freePointer - entrySize < (size + 1) * OIntegerSerializer.INT_SIZE + POSITIONS_ARRAY_OFFSET)   return false;
@@ -29,10 +29,10 @@
     setBinaryValue(offset + freePointer,serializedValue);
   }
  else {
-    setLongValue(offset + freePointer,treeEntry.leftChild.getPageIndex());
-    freePointer+=OLongSerializer.LONG_SIZE;
-    setLongValue(offset + freePointer,treeEntry.rightChild.getPageIndex());
-    freePointer+=OLongSerializer.LONG_SIZE;
+    setBucketPointer(offset + freePointer,treeEntry.leftChild);
+    freePointer+=OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE;
+    setBucketPointer(offset + freePointer,treeEntry.rightChild);
+    freePointer+=OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE;
     byte[] serializedKey=new byte[keySize];
     keySerializer.serializeNative(treeEntry.key,serializedKey,0);
     setBinaryValue(offset + freePointer,serializedKey);
@@ -40,11 +40,11 @@
     if (updateNeighbors && size > 1) {
       if (index < size - 1) {
         final int nextEntryPosition=getIntValue(offset + POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE);
-        setLongValue(offset + nextEntryPosition,treeEntry.rightChild.getPageIndex());
+        setBucketPointer(offset + nextEntryPosition,treeEntry.rightChild);
       }
       if (index > 0) {
         final int prevEntryPosition=getIntValue(offset + POSITIONS_ARRAY_OFFSET + (index - 1) * OIntegerSerializer.INT_SIZE);
-        setLongValue(offset + prevEntryPosition + OLongSerializer.LONG_SIZE,treeEntry.leftChild.getPageIndex());
+        setBucketPointer(offset + prevEntryPosition + OLongSerializer.LONG_SIZE+ OIntegerSerializer.INT_SIZE,treeEntry.leftChild);
       }
     }
   }

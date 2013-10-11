@@ -3,14 +3,15 @@
   OStorageTransaction transaction=storage.getStorageTransaction();
   try {
     startDurableOperation(transaction);
-    diskCache.truncateFile(fileId);
+    final Queue<OBonsaiBucketPointer> subTreesToDelete=new LinkedList<OBonsaiBucketPointer>();
     OCacheEntry cacheEntry=diskCache.load(fileId,rootBucketPointer.getPageIndex(),false);
     OCachePointer rootPointer=cacheEntry.getCachePointer();
     rootPointer.acquireExclusiveLock();
     try {
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getTrackMode());
-      rootBucket.setKeySerializerId(keySerializer.getId());
-      rootBucket.setValueSerializerId(valueSerializer.getId());
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getTrackMode());
+      addChildrenToQueue(subTreesToDelete,rootBucket);
+      rootBucket.shrink(0);
+      rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getTrackMode());
       rootBucket.setTreeSize(0);
       logPageChanges(rootBucket,fileId,rootBucketPointer.getPageIndex(),true);
       cacheEntry.markDirty();
@@ -19,6 +20,7 @@
       rootPointer.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
+    recycleSubTrees(subTreesToDelete);
     endDurableOperation(transaction,false);
   }
  catch (  IOException e) {

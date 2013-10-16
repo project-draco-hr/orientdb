@@ -1,0 +1,30 @@
+{
+  long prevFreeListItem;
+  OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+  OCachePointer rootCachePointer=rootCacheEntry.getCachePointer();
+  rootCachePointer.acquireExclusiveLock();
+  OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCachePointer.getDataPointer(),keySerializer,valueSerializer,getTrackMode());
+  try {
+    prevFreeListItem=rootBucket.getValuesFreeListFirstIndex();
+    rootBucket.setValuesFreeListFirstIndex(pageIndex);
+    rootCacheEntry.markDirty();
+    logPageChanges(rootBucket,fileId,ROOT_INDEX,false);
+  }
+  finally {
+    rootCachePointer.releaseExclusiveLock();
+    diskCache.release(rootCacheEntry);
+  }
+  OCacheEntry valueEntry=diskCache.load(fileId,pageIndex,false);
+  OCachePointer valuePointer=valueEntry.getCachePointer();
+  valuePointer.acquireExclusiveLock();
+  try {
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(valuePointer.getDataPointer(),getTrackMode(),false);
+    valuePage.setNextFreeListPage(prevFreeListItem);
+    valueEntry.markDirty();
+    logPageChanges(valuePage,fileId,pageIndex,false);
+  }
+  finally {
+    valuePointer.releaseExclusiveLock();
+    diskCache.release(valueEntry);
+  }
+}

@@ -1,9 +1,20 @@
 {
   int entryPosition=getIntValue(POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE);
-  int entrySize=keySerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition);
+  int keySize=keySerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition);
+  int entrySize;
+  long linkValue=-1;
   if (isLeaf) {
-    if (valueSerializer.isFixedLength())     entrySize+=valueSerializer.getFixedLength();
- else     entrySize+=valueSerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition + entrySize);
+    if (valueSerializer.isFixedLength()) {
+      entrySize=keySize + valueSerializer.getFixedLength() + OByteSerializer.BYTE_SIZE;
+    }
+ else {
+      final boolean isLink=directMemory.getByte(pagePointer + entryPosition + keySize) > 0;
+      if (!isLink)       entrySize=keySize + valueSerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition + keySize+ OByteSerializer.BYTE_SIZE) + OByteSerializer.BYTE_SIZE;
+ else {
+        entrySize=keySize + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE;
+        linkValue=OLongSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition + keySize+ OByteSerializer.BYTE_SIZE);
+      }
+    }
   }
  else {
     throw new IllegalStateException("Remove is applies to leaf buckets only");
@@ -25,4 +36,5 @@
     if (currentEntryPosition < entryPosition)     setIntValue(currentPositionOffset,currentEntryPosition + entrySize);
     currentPositionOffset+=OIntegerSerializer.INT_SIZE;
   }
+  return linkValue;
 }

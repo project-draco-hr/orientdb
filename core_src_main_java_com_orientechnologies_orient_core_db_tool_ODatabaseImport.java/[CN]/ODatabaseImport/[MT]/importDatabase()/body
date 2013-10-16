@@ -1,9 +1,5 @@
 {
   try {
-    if (!(database.getStorage() instanceof OStorageLocalAbstract)) {
-      listener.onMessage("\nError ! Only local databases with local storage can be imported. Import is terminated !");
-      return this;
-    }
     listener.onMessage("\nStarted import of database '" + database.getURL() + "' from "+ fileName+ "...");
     long time=System.currentTimeMillis();
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
@@ -11,8 +7,10 @@
     database.getLevel2Cache().setEnable(false);
     database.setMVCC(false);
     database.setValidationEnabled(false);
-    exportImportHashTable.create(EXPORT_IMPORT_MAP_NAME,OLinkSerializer.INSTANCE,OLinkSerializer.INSTANCE,(OStorageLocalAbstract)database.getStorage());
     database.setStatus(STATUS.IMPORTING);
+    for (    OIndex index : database.getMetadata().getIndexManager().getIndexes()) {
+      indexesToRebuild.add(index.getName().toLowerCase());
+    }
     String tag;
     while (jsonReader.hasNext() && jsonReader.lastChar() != '}') {
       tag=jsonReader.readString(OJSONReader.FIELD_ASSIGNMENT);
@@ -23,8 +21,14 @@
  else       if (tag.equals("indexes"))       importIndexes();
  else       if (tag.equals("manualIndexes"))       importManualIndexes();
     }
+    listener.onMessage("\nRebuild of stale indexes...");
+    for (    String indexName : indexesToRebuild) {
+      listener.onMessage("\nStart rebuild index " + indexName);
+      database.command(new OCommandSQL("rebuild index " + indexName)).execute();
+      listener.onMessage("\nRebuild  of index " + indexName + " is completed.");
+    }
+    listener.onMessage("\nStale indexes were rebuilt...");
     database.getStorage().synch();
-    exportImportHashTable.close();
     database.setStatus(STATUS.OPEN);
     if (isDeleteRIDMapping())     removeExportImportRIDsMap();
     listener.onMessage("\n\nDatabase import completed in " + ((System.currentTimeMillis() - time)) + " ms");

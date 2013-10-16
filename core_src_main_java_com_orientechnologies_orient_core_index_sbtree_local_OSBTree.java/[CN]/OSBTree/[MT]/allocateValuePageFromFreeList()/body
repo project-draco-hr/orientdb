@@ -1,0 +1,43 @@
+{
+  OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+  OCachePointer rootCachePointer=rootCacheEntry.getCachePointer();
+  OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCachePointer.getDataPointer(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+  long freeListFirstIndex;
+  try {
+    freeListFirstIndex=rootBucket.getValuesFreeListFirstIndex();
+  }
+  finally {
+    diskCache.release(rootCacheEntry);
+  }
+  if (freeListFirstIndex >= 0) {
+    OCacheEntry freePageEntry=diskCache.load(fileId,freeListFirstIndex,false);
+    OCachePointer freePageCachePointer=freePageEntry.getCachePointer();
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(freePageCachePointer.getDataPointer(),getTrackMode(),false);
+    freePageCachePointer.acquireExclusiveLock();
+    try {
+      long nextFreeListIndex=valuePage.getNextFreeListPage();
+      rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+      rootCachePointer=rootCacheEntry.getCachePointer();
+      rootCachePointer.acquireExclusiveLock();
+      rootBucket=new OSBTreeBucket<K,V>(rootCachePointer.getDataPointer(),keySerializer,valueSerializer,getTrackMode());
+      try {
+        rootBucket.setValuesFreeListFirstIndex(nextFreeListIndex);
+        rootCacheEntry.markDirty();
+        logPageChanges(rootBucket,fileId,ROOT_INDEX,false);
+      }
+  finally {
+        rootCachePointer.releaseExclusiveLock();
+        diskCache.release(rootCacheEntry);
+      }
+      valuePage.setNextFreeListPage(-1);
+      freePageEntry.markDirty();
+      logPageChanges(valuePage,fileId,freePageEntry.getPageIndex(),false);
+    }
+  finally {
+      freePageCachePointer.releaseExclusiveLock();
+      diskCache.release(freePageEntry);
+    }
+    return freePageEntry.getPageIndex();
+  }
+  return -1;
+}

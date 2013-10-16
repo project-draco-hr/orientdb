@@ -1,4 +1,5 @@
 {
+  super.beforeExecute(iRequest,iResponse);
   final String[] urlParts=iRequest.url.substring(1).split("/");
   if (urlParts.length < 2)   throw new OHttpRequestException("Syntax error in URL. Expected is: <command>/<database>[/...]");
   iRequest.databaseName=urlParts[1];
@@ -16,11 +17,13 @@
  else {
     if (!currentSession.getDatabaseName().equals(iRequest.databaseName)) {
       OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s', but has been authenticated against the database '%s'",iRequest.sessionId,iRequest.databaseName,currentSession.getDatabaseName());
+      OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
       sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
       return false;
     }
  else     if (authenticationParts != null && !currentSession.getUserName().equals(authenticationParts.get(0))) {
       OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s' with user '%s', but has been authenticated with user '%s'",iRequest.sessionId,iRequest.databaseName,authenticationParts.get(0),currentSession.getUserName());
+      OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
       sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
       return false;
     }

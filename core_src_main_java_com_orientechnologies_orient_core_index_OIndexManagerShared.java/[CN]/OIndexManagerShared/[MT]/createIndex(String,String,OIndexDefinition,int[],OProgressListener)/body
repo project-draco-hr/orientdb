@@ -2,14 +2,26 @@
   if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot create a new index inside a transaction");
   final Character c=OSchemaShared.checkNameIfValid(iName);
   if (c != null)   throw new IllegalArgumentException("Invalid index name '" + iName + "'. Character '"+ c+ "' is invalid");
-  String alghorithm;
   ODatabase database=getDatabase();
   OStorage storage=database.getStorage();
+  final String alghorithm;
   if ((storage.getType().equals(OEngineLocal.NAME) || storage.getType().equals(OEngineLocalPaginated.NAME)) && useSBTree)   alghorithm=ODefaultIndexFactory.SBTREE_ALGORITHM;
  else   alghorithm=ODefaultIndexFactory.MVRBTREE_ALGORITHM;
+  final String valueContainerAlgorithm;
+  if (OClass.INDEX_TYPE.NOTUNIQUE.toString().equals(iType) || OClass.INDEX_TYPE.FULLTEXT.toString().equals(iType)) {
+    if (storage.getType().equals(OEngineLocalPaginated.NAME) && OGlobalConfiguration.INDEX_NOTUNIQUE_USE_SBTREE_CONTAINER_BY_DEFAULT.getValueAsBoolean()) {
+      valueContainerAlgorithm=ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER;
+    }
+ else {
+      valueContainerAlgorithm=ODefaultIndexFactory.MVRBTREE_VALUE_CONTAINER;
+    }
+  }
+ else {
+    valueContainerAlgorithm=ODefaultIndexFactory.NONE_VALUE_CONTAINER;
+  }
   acquireExclusiveLock();
   try {
-    final OIndexInternal<?> index=OIndexes.createIndex(getDatabase(),iType,alghorithm);
+    final OIndexInternal<?> index=OIndexes.createIndex(getDatabase(),iType,alghorithm,valueContainerAlgorithm);
     final String clusterName=indexDefinition != null && indexDefinition.getClassName() != null ? defaultClusterName : manualClusterName;
     if (iProgressListener == null)     iProgressListener=new OIndexRebuildOutputListener(index);
     Set<String> clustersToIndex=new HashSet<String>();

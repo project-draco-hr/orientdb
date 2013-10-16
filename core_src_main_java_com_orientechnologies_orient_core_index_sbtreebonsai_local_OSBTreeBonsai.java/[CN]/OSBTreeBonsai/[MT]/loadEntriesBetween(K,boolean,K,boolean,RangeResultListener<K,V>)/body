@@ -1,0 +1,57 @@
+{
+  acquireSharedLock();
+  try {
+    PartialSearchMode partialSearchModeFrom;
+    if (fromInclusive)     partialSearchModeFrom=PartialSearchMode.LOWEST_BOUNDARY;
+ else     partialSearchModeFrom=PartialSearchMode.HIGHEST_BOUNDARY;
+    BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom,partialSearchModeFrom);
+    OBonsaiBucketPointer bucketPointerFrom=bucketSearchResultFrom.getLastPathItem();
+    int indexFrom;
+    if (bucketSearchResultFrom.itemIndex >= 0) {
+      indexFrom=fromInclusive ? bucketSearchResultFrom.itemIndex : bucketSearchResultFrom.itemIndex + 1;
+    }
+ else {
+      indexFrom=-bucketSearchResultFrom.itemIndex - 1;
+    }
+    PartialSearchMode partialSearchModeTo;
+    if (toInclusive)     partialSearchModeTo=PartialSearchMode.HIGHEST_BOUNDARY;
+ else     partialSearchModeTo=PartialSearchMode.LOWEST_BOUNDARY;
+    BucketSearchResult bucketSearchResultTo=findBucket(keyTo,partialSearchModeTo);
+    OBonsaiBucketPointer bucketPointerTo=bucketSearchResultTo.getLastPathItem();
+    int indexTo;
+    if (bucketSearchResultTo.itemIndex >= 0) {
+      indexTo=toInclusive ? bucketSearchResultTo.itemIndex : bucketSearchResultTo.itemIndex - 1;
+    }
+ else {
+      indexTo=-bucketSearchResultTo.itemIndex - 2;
+    }
+    int startIndex=indexFrom;
+    int endIndex;
+    OBonsaiBucketPointer bucketPointer=bucketPointerFrom;
+    resultsLoop:     while (true) {
+      final OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+      final OCachePointer pointer=cacheEntry.getCachePointer();
+      try {
+        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        if (!bucketPointer.equals(bucketPointerTo))         endIndex=bucket.size() - 1;
+ else         endIndex=indexTo;
+        for (int i=startIndex; i <= endIndex; i++) {
+          if (!listener.addResult(bucket.getEntry(i)))           break resultsLoop;
+        }
+        if (bucketPointer.equals(bucketPointerTo))         break;
+        bucketPointer=bucket.getRightSibling();
+        if (bucketPointer.getPageIndex() < 0)         break;
+      }
+  finally {
+        diskCache.release(cacheEntry);
+      }
+      startIndex=0;
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OSBTreeException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ name);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

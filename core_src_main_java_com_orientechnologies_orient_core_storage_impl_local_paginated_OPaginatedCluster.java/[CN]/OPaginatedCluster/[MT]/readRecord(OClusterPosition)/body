@@ -1,9 +1,10 @@
 {
   acquireSharedLock();
   try {
-    long pagePointer=clusterPosition.longValue();
-    int recordPosition=(int)(pagePointer & RECORD_POSITION_MASK);
-    long pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
+    OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+    if (positionEntry == null)     return null;
+    int recordPosition=positionEntry.getRecordPosition();
+    long pageIndex=positionEntry.getPageIndex();
     if (diskCache.getFilledUpTo(fileId) <= pageIndex)     return null;
     ORecordVersion recordVersion=null;
     OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
@@ -17,7 +18,7 @@
   finally {
       diskCache.release(cacheEntry);
     }
-    byte[] fullContent=readFullEntry(clusterPosition);
+    byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
     if (fullContent == null)     return null;
     int fullContentPosition=0;
     byte recordType=fullContent[fullContentPosition];

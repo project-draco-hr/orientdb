@@ -1,6 +1,7 @@
 {
   if (!enabled)   return;
-  setStatus(STATUS.STARTING);
+  super.startup();
+  status=STATUS.STARTING;
   OLogManager.instance().info(this,"Starting distributed server '%s'...",getLocalNodeName());
   cachedClusterNodes.clear();
   try {
@@ -8,6 +9,7 @@
     nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
     timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
     cachedClusterNodes.put(getLocalNodeName(),hazelcastInstance.getCluster().getLocalMember());
+    membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
     OServer.registerServerInstance(getLocalNodeName(),serverInstance);
     final IMap<String,Object> configurationMap=getConfigurationMap();
     configurationMap.addEntryListener(this,true);
@@ -16,9 +18,10 @@
       if (memberName != null)       cachedClusterNodes.put(memberName,m);
     }
     messageService=new OHazelcastDistributedMessageService(this);
+    getConfigurationMap().put(CONFIG_NODE_PREFIX + getLocalNodeId(),getLocalNodeConfiguration());
+    installNewDatabases(true);
     loadDistributedDatabases();
     setStatus(STATUS.ONLINE);
-    super.startup();
   }
  catch (  FileNotFoundException e) {
     throw new OConfigurationException("Error on creating Hazelcast instance",e);

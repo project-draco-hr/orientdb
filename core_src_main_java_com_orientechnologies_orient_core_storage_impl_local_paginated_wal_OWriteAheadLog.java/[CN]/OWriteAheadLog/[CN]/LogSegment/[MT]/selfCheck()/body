@@ -72,7 +72,7 @@ synchronized (rndFile) {
     while (currentPage >= 0) {
       rndFile.seek(currentPage * OWALPage.PAGE_SIZE);
       rndFile.readFully(content);
-      long pointer=directMemory.allocate(content);
+      ODirectMemoryPointer pointer=new ODirectMemoryPointer(content);
       try {
         OWALPage page=new OWALPage(pointer,false);
         int pageOffset=findLastRecord(page,false);
@@ -80,7 +80,7 @@ synchronized (rndFile) {
           if (page.mergeWithNextPage(pageOffset)) {
             page.truncateTill(pageOffset);
             rndFile.seek(currentPage * OWALPage.PAGE_SIZE);
-            content=directMemory.get(pointer,OWALPage.PAGE_SIZE);
+            content=pointer.get(0,OWALPage.PAGE_SIZE);
             rndFile.write(content);
             if (page.isEmpty()) {
               OLogManager.instance().error(this,"%d WAL page has been broken and will be truncated.",currentPage);
@@ -95,7 +95,7 @@ synchronized (rndFile) {
  else         break;
       }
   finally {
-        directMemory.free(pointer);
+        pointer.free();
       }
     }
     rndFile.getFD().sync();

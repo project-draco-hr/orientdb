@@ -1,0 +1,26 @@
+{
+  listener.onMessage("\nRemoving all default non security classes");
+  OSchema schema=database.getMetadata().getSchema();
+  Collection<OClass> classes=schema.getClasses();
+  final AbstractList<String> classesSortedByInheritance=new ArrayList<String>();
+  for (  OClass dbClass : classes) {
+    classesSortedByInheritance.add(dbClass.getName());
+  }
+  for (  OClass dbClass : classes) {
+    OClass parentClass=dbClass.getSuperClass();
+    if (parentClass != null) {
+      classesSortedByInheritance.remove(dbClass.getName());
+      final int parentIndex=classesSortedByInheritance.indexOf(parentClass.getName());
+      classesSortedByInheritance.add(parentIndex,dbClass.getName());
+    }
+  }
+  for (  String className : classesSortedByInheritance) {
+    if (!className.equalsIgnoreCase(ORole.CLASS_NAME) && !className.equalsIgnoreCase(OUser.CLASS_NAME) && !className.equalsIgnoreCase(OSecurityShared.IDENTITY_CLASSNAME)) {
+      schema.dropClass(className);
+      listener.onMessage("\nClass " + className + " was removed.");
+    }
+  }
+  schema.save();
+  schema.reload();
+  listener.onMessage("\nRemoving all default non security classes ... DONE.");
+}

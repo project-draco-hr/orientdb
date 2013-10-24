@@ -1,24 +1,31 @@
 {
   ORuntimeResult group=null;
-  Object key=null;
-  if (groupedResult == null)   groupedResult=new LinkedHashMap<Object,ORuntimeResult>();
-  if (fieldValue != null) {
-    if (fieldValue.getClass().isArray()) {
-      final Object[] array=(Object[])fieldValue;
-      final StringBuilder keyArray=new StringBuilder();
-      for (      Object o : array) {
-        if (keyArray.length() > 0)         keyArray.append(",");
-        if (o != null)         keyArray.append(o instanceof OIdentifiable ? ((OIdentifiable)o).getIdentity().toString() : o.toString());
- else         keyArray.append("null");
+  final long projectionElapsed=(Long)context.getVariable("projectionElapsed",0l);
+  final long begin=System.currentTimeMillis();
+  try {
+    Object key=null;
+    if (groupedResult == null)     groupedResult=new LinkedHashMap<Object,ORuntimeResult>();
+    if (fieldValue != null) {
+      if (fieldValue.getClass().isArray()) {
+        final Object[] array=(Object[])fieldValue;
+        final StringBuilder keyArray=new StringBuilder();
+        for (        Object o : array) {
+          if (keyArray.length() > 0)           keyArray.append(",");
+          if (o != null)           keyArray.append(o instanceof OIdentifiable ? ((OIdentifiable)o).getIdentity().toString() : o.toString());
+ else           keyArray.append("null");
+        }
+        key=keyArray.toString();
       }
-      key=keyArray.toString();
+ else       key=fieldValue;
     }
- else     key=fieldValue;
+    group=groupedResult.get(key);
+    if (group == null) {
+      group=new ORuntimeResult(fieldValue,createProjectionFromDefinition(),resultCount,context);
+      groupedResult.put(key,group);
+    }
+    return group;
   }
-  group=groupedResult.get(key);
-  if (group == null) {
-    group=new ORuntimeResult(fieldValue,createProjectionFromDefinition(),resultCount,context);
-    groupedResult.put(key,group);
+  finally {
+    context.setVariable("projectionElapsed",projectionElapsed + (System.currentTimeMillis() - begin));
   }
-  return group;
 }

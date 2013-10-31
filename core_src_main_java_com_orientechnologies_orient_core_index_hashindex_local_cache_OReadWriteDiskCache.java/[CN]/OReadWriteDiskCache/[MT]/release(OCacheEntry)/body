@@ -1,10 +1,23 @@
 {
+  Future flushFuture=null;
 synchronized (syncObject) {
     if (cacheEntry != null)     cacheEntry.usagesCount--;
  else     throw new IllegalStateException("record should be released is already free!");
     if (cacheEntry.usagesCount == 0 && cacheEntry.isDirty) {
-      writeCache.store(cacheEntry.fileId,cacheEntry.pageIndex,cacheEntry.dataPointer);
+      flushFuture=writeCache.store(cacheEntry.fileId,cacheEntry.pageIndex,cacheEntry.dataPointer);
       cacheEntry.isDirty=false;
+    }
+  }
+  if (flushFuture != null) {
+    try {
+      flushFuture.get();
+    }
+ catch (    InterruptedException e) {
+      Thread.interrupted();
+      throw new OException("File flush was interrupted",e);
+    }
+catch (    Exception e) {
+      throw new OException("File flush was abnormally terminated",e);
     }
   }
 }

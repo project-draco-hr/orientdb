@@ -1,17 +1,36 @@
 {
-  final Class<?> type=OObjectSerializerHelper.getFieldType(iUserObject,iFieldName);
-  final Collection target;
-  if (type != null && Set.class.isAssignableFrom(type)) {
-    if (lazyLoading)     target=new OLazyObjectSet<Object>(iRootRecord,(Collection<Object>)iCollection).setFetchPlan(fetchPlan);
+  final Field f=OObjectEntitySerializer.getField(iFieldName,iUserObject.getClass());
+  final boolean customSerialization=OObjectEntitySerializer.isSerializedType(f);
+  final Class genericType=OReflectionHelper.getGenericMultivalueType(f);
+  Collection target;
+  if (iCollection instanceof ORecordLazyList || (iCollection instanceof OTrackedList<?> && !OReflectionHelper.isJavaType(genericType) && !customSerialization&& !genericType.isEnum())) {
+    target=new OObjectLazyList(iUserObject,(List<OIdentifiable>)iCollection,OObjectEntitySerializer.isCascadeDeleteField(iUserObject.getClass(),f.getName()));
+  }
+ else   if (iCollection instanceof ORecordLazySet || iCollection instanceof OMVRBTreeRIDSet || (iCollection instanceof OTrackedSet<?> && !OReflectionHelper.isJavaType(genericType) && !customSerialization&& !genericType.isEnum())) {
+    target=new OObjectLazySet(iUserObject,(Set)iCollection,OObjectEntitySerializer.isCascadeDeleteField(iUserObject.getClass(),f.getName()));
+  }
+ else   if (customSerialization) {
+    if (iCollection instanceof List<?>) {
+      target=new OObjectCustomSerializerList(OObjectEntitySerializer.getSerializedType(f),iRootRecord,(List<Object>)iCollection);
+    }
  else {
-      target=new HashSet();
+      target=new OObjectCustomSerializerSet(OObjectEntitySerializer.getSerializedType(f),iRootRecord,(Set<Object>)iCollection);
+    }
+  }
+ else   if (genericType.isEnum()) {
+    if (iCollection instanceof List<?>) {
+      target=new OObjectEnumLazyList(genericType,iRootRecord,(List<Object>)iCollection);
+    }
+ else {
+      target=new OObjectEnumLazySet(genericType,iRootRecord,(Set<Object>)iCollection);
     }
   }
  else {
-    final Collection<Object> list=(Collection<Object>)iCollection;
-    if (lazyLoading)     target=new OLazyObjectList<Object>(iRootRecord,list).setFetchPlan(fetchPlan);
- else {
+    if (iCollection instanceof List<?>) {
       target=new ArrayList();
+    }
+ else {
+      target=new HashSet();
     }
   }
   OObjectSerializerHelper.setFieldValue(iUserObject,iFieldName,target);

@@ -1,12 +1,15 @@
 {
   for (long pageIndex=0; pageIndex < MAX_LEVEL_SIZE; pageIndex++) {
-    final long pagePointer=loadPage(pageIndex,0);
+    final OCacheEntry cacheEntry=loadPageEntry(pageIndex,0);
+    final OCachePointer pagePointer=cacheEntry.getCachePointer();
+    pagePointer.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,pagePointer,directMemory,keySerializer,valueSerializer);
+      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,keyHashFunction);
     }
   finally {
-      markPageAsDirty(pageIndex,0);
-      releasePage(pageIndex,0);
+      pagePointer.releaseExclusiveLock();
+      cacheEntry.markDirty();
+      diskCache.release(cacheEntry);
     }
   }
   final long[] rootTree=new long[MAX_LEVEL_SIZE];

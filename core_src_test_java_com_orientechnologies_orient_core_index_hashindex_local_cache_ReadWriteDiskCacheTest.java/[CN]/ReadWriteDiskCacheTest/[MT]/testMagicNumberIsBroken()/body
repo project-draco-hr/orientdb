@@ -1,0 +1,27 @@
+{
+  long fileId=buffer.openFile(fileName);
+  OCacheEntry[] entries=new OCacheEntry[6];
+  for (int i=0; i < 6; i++) {
+    entries[i]=buffer.load(fileId,i,false);
+    entries[i].getCachePointer().acquireExclusiveLock();
+    entries[i].markDirty();
+    entries[i].getCachePointer().getDataPointer().set(systemOffset,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+    entries[i].getCachePointer().releaseExclusiveLock();
+    buffer.release(entries[i]);
+  }
+  buffer.flushBuffer();
+  byte[] brokenMagicNumber=new byte[OIntegerSerializer.INT_SIZE];
+  OIntegerSerializer.INSTANCE.serializeNative(23,brokenMagicNumber,0);
+  updateFilePage(2,0,brokenMagicNumber);
+  updateFilePage(4,0,brokenMagicNumber);
+  OPageDataVerificationError[] pageErrors=buffer.checkStoredPages(null);
+  Assert.assertEquals(2,pageErrors.length);
+  Assert.assertTrue(pageErrors[0].incorrectMagicNumber);
+  Assert.assertFalse(pageErrors[0].incorrectCheckSum);
+  Assert.assertEquals(2,pageErrors[0].pageIndex);
+  Assert.assertEquals("readWriteDiskCacheTest.tst",pageErrors[0].fileName);
+  Assert.assertTrue(pageErrors[1].incorrectMagicNumber);
+  Assert.assertFalse(pageErrors[1].incorrectCheckSum);
+  Assert.assertEquals(4,pageErrors[1].pageIndex);
+  Assert.assertEquals("readWriteDiskCacheTest.tst",pageErrors[1].fileName);
+}

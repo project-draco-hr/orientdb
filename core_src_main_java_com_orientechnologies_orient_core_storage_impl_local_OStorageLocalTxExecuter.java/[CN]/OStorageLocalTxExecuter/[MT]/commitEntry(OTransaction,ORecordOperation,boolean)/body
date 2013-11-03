@@ -6,8 +6,8 @@
   }
   final OCluster cluster=storage.getClusterById(rid.clusterId);
   final ODataLocal dataSegment=storage.getDataSegmentById(txEntry.dataSegmentId);
-  if (cluster.getName().equals(OMetadata.CLUSTER_INDEX_NAME) || cluster.getName().equals(OMetadata.CLUSTER_MANUAL_INDEX_NAME))   return;
-  if (!(cluster instanceof OClusterLocal || cluster instanceof OClusterLocalEH))   return;
+  if (cluster.getName().equals(OMetadataDefault.CLUSTER_INDEX_NAME) || cluster.getName().equals(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME))   return;
+  if (!(cluster instanceof OClusterLocal))   return;
   if (txEntry.getRecord() instanceof OTxListener)   ((OTxListener)txEntry.getRecord()).onEvent(txEntry,OTxListener.EVENT.BEFORE_COMMIT);
 switch (txEntry.type) {
 case ORecordOperation.LOADED:
@@ -21,16 +21,12 @@ case ORecordOperation.CREATED:
     }
     final ORecordId oldRID=rid.isNew() ? rid.copy() : rid;
     if (rid.isNew()) {
-      txEntry.getRecord().onBeforeIdentityChanged(rid);
       rid.clusterId=cluster.getId();
-    }
-    if (rid.isNew()) {
       final OPhysicalPosition ppos;
       if (iUseLog)       ppos=createRecord(iTx.getId(),dataSegment,cluster,rid,stream,txEntry.getRecord().getRecordVersion(),txEntry.getRecord().getRecordType());
  else       ppos=iTx.getDatabase().getStorage().createRecord(txEntry.dataSegmentId,rid,stream,OVersionFactory.instance().createVersion(),txEntry.getRecord().getRecordType(),(byte)0,null).getResult();
       rid.clusterPosition=ppos.clusterPosition;
       txEntry.getRecord().getRecordVersion().copyFrom(ppos.recordVersion);
-      txEntry.getRecord().onAfterIdentityChanged(txEntry.getRecord());
       iTx.updateIdentityAfterCommit(oldRID,rid);
     }
  else {

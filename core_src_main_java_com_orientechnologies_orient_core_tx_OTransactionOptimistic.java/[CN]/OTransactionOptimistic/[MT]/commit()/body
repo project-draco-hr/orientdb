@@ -1,7 +1,7 @@
 {
   checkTransaction();
   status=TXSTATUS.COMMITTING;
-  if (database.getStorage() instanceof OStorageProxy)   database.getStorage().commit(this);
+  if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED && !(database.getStorage() instanceof OStorageEmbedded))   database.getStorage().commit(this,null);
  else {
     final List<String> involvedIndexes=getInvolvedIndexes();
     if (involvedIndexes != null)     Collections.sort(involvedIndexes);
@@ -15,52 +15,74 @@
             index.acquireModificationLock();
             lockedIndexes.add(index);
           }
-          final Collection<? extends OIndex<?>> indexes=database.getMetadata().getIndexManager().getIndexes();
-          List<? extends OIndex<?>> indexesToLock=null;
-          if (indexes != null) {
-            indexesToLock=new ArrayList<OIndex<?>>(indexes);
-            Collections.sort(indexesToLock,new Comparator<OIndex<?>>(){
-              public int compare(              final OIndex<?> indexOne,              final OIndex<?> indexTwo){
-                return indexOne.getName().compareTo(indexTwo.getName());
+          if (!useSBTree) {
+            final Collection<? extends OIndex<?>> indexes=database.getMetadata().getIndexManager().getIndexes();
+            List<? extends OIndex<?>> indexesToLock=null;
+            if (indexes != null) {
+              indexesToLock=new ArrayList<OIndex<?>>(indexes);
+              Collections.sort(indexesToLock,new Comparator<OIndex<?>>(){
+                public int compare(                final OIndex<?> indexOne,                final OIndex<?> indexTwo){
+                  return indexOne.getName().compareTo(indexTwo.getName());
+                }
               }
-            }
 );
-          }
-          if (indexesToLock != null && !indexesToLock.isEmpty()) {
-            if (lockedIndexes == null)             lockedIndexes=new ArrayList<OIndexAbstract<?>>();
-            for (            OIndex<?> index : indexesToLock) {
-              for (              Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
-                final ORecord<?> record=entry.getValue().record.getRecord();
-                if (record instanceof ODocument) {
-                  ODocument doc=(ODocument)record;
-                  if (!lockedIndexes.contains(index.getInternal()) && doc.getSchemaClass() != null && index.getDefinition() != null && doc.getSchemaClass().isSubClassOf(index.getDefinition().getClassName())) {
-                    index.getInternal().acquireModificationLock();
-                    lockedIndexes.add((OIndexAbstract<?>)index.getInternal());
+            }
+            if (indexesToLock != null && !indexesToLock.isEmpty()) {
+              if (lockedIndexes == null)               lockedIndexes=new ArrayList<OIndexAbstract<?>>();
+              for (              OIndex<?> index : indexesToLock) {
+                for (                Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
+                  final ORecord<?> record=entry.getValue().record.getRecord();
+                  if (record instanceof ODocument) {
+                    ODocument doc=(ODocument)record;
+                    if (!lockedIndexes.contains(index.getInternal()) && doc.getSchemaClass() != null && index.getDefinition() != null && doc.getSchemaClass().isSubClassOf(index.getDefinition().getClassName())) {
+                      index.getInternal().acquireModificationLock();
+                      lockedIndexes.add((OIndexAbstract<?>)index.getInternal());
+                    }
                   }
                 }
               }
+              for (              OIndexAbstract<?> index : lockedIndexes)               index.acquireExclusiveLock();
             }
-            for (            OIndexAbstract<?> index : lockedIndexes)             index.acquireExclusiveLock();
           }
-          database.getStorage().callInLock(new Callable<Void>(){
-            public Void call() throws Exception {
-              database.getStorage().commit(OTransactionOptimistic.this);
+          final Map<String,OIndex> indexes=new HashMap<String,OIndex>();
+          for (          OIndex index : database.getMetadata().getIndexManager().getIndexes()) {
+            indexes.put(index.getName().toLowerCase(),index);
+          }
+          final Runnable callback=new Runnable(){
+            @Override public void run(){
               final ODocument indexEntries=getIndexChanges();
               if (indexEntries != null) {
                 for (                Entry<String,Object> indexEntry : indexEntries) {
-                  final OIndex<?> index=database.getMetadata().getIndexManager().getIndexInternal(indexEntry.getKey());
-                  index.commit((ODocument)indexEntry.getValue());
+                  final OIndex<?> index=indexes.get(indexEntry.getKey().toLowerCase());
+                  if (index == null) {
+                    OLogManager.instance().error(this,"Index with name " + indexEntry.getKey() + " was not found.");
+                    throw new OIndexException("Index with name " + indexEntry.getKey() + " was not found.");
+                  }
+ else                   index.commit((ODocument)indexEntry.getValue());
                 }
               }
-              return null;
             }
           }
+;
+          final String storageType=database.getStorage().getType();
+          if (storageType.equals(OEngineLocal.NAME) || storageType.equals(OEngineLocalPaginated.NAME))           database.getStorage().commit(OTransactionOptimistic.this,callback);
+ else {
+            database.getStorage().callInLock(new Callable<Object>(){
+              @Override public Object call() throws Exception {
+                database.getStorage().commit(OTransactionOptimistic.this,null);
+                callback.run();
+                return null;
+              }
+            }
 ,true);
+          }
           break;
         }
   finally {
           if (lockedIndexes != null) {
-            for (            OIndexAbstract<?> index : lockedIndexes)             index.releaseExclusiveLock();
+            if (!useSBTree) {
+              for (              OIndexAbstract<?> index : lockedIndexes)               index.releaseExclusiveLock();
+            }
             for (            OIndexAbstract<?> index : lockedIndexes)             index.releaseModificationLock();
           }
         }

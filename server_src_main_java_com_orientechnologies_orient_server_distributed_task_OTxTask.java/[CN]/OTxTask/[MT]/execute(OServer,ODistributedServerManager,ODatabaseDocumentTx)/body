@@ -1,0 +1,22 @@
+{
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"committing transaction against db=%s...",database.getName());
+  ODatabaseRecordThreadLocal.INSTANCE.set(database);
+  try {
+    database.begin();
+    for (    OAbstractRecordReplicatedTask task : tasks) {
+      task.execute(iServer,iManager,database);
+    }
+    database.commit();
+  }
+ catch (  ONeedRetryException e) {
+    return Boolean.FALSE;
+  }
+catch (  OTransactionException e) {
+    return Boolean.FALSE;
+  }
+catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on distirbuted transaction commit",e);
+    return Boolean.FALSE;
+  }
+  return Boolean.TRUE;
+}

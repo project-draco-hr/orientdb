@@ -2,6 +2,7 @@
   setCurrentDatabaseinThreadLocal();
   try {
     super.create();
+    sbTreeCollectionManager.startup();
     level1Cache.startup();
     getStorage().getConfiguration().update();
     if (!(getStorage() instanceof OStorageProxy)) {
@@ -12,10 +13,16 @@
       registerHook(new OClassIndexManager(),ORecordHook.HOOK_POSITION.LAST);
       registerHook(new OSchedulerTrigger(),ORecordHook.HOOK_POSITION.LAST);
     }
-    metadata=new OMetadata();
+    metadata=new OMetadataDefault();
     metadata.create();
     user=getMetadata().getSecurity().getUser(OUser.ADMIN);
     if (!metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))     metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
+    for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreate(getDatabaseOwner());
+    for (    ODatabaseListener listener : underlying.browseListeners())     try {
+      listener.onCreate(underlying);
+    }
+ catch (    Throwable t) {
+    }
   }
  catch (  Exception e) {
     throw new ODatabaseException("Cannot create database",e);

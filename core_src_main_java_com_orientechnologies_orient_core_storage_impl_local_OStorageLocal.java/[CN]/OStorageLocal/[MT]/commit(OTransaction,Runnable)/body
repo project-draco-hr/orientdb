@@ -1,0 +1,38 @@
+{
+  modificationLock.requestModificationLock();
+  try {
+    lock.acquireExclusiveLock();
+    try {
+      try {
+        startStorageTx(iTx);
+        txManager.clearLogEntries(iTx);
+        txManager.commitAllPendingRecords(iTx);
+        if (callback != null)         callback.run();
+        if (OGlobalConfiguration.TX_COMMIT_SYNCH.getValueAsBoolean())         synch();
+        endStorageTx();
+      }
+ catch (      Exception e) {
+        OLogManager.instance().debug(this,"Error during transaction commit, transaction will be rolled back (tx-id=%d)",e,iTx.getId());
+        rollback(iTx);
+        if (e instanceof OException)         throw ((OException)e);
+ else         throw new OStorageException("Error during transaction commit.",e);
+      }
+ finally {
+        try {
+          txManager.clearLogEntries(iTx);
+          if (writeAheadLog != null)           writeAheadLog.shrinkTill(writeAheadLog.end());
+        }
+ catch (        Exception e) {
+          OLogManager.instance().error(this,"Clear tx log entries failed",e);
+        }
+      }
+    }
+  finally {
+      transaction=null;
+      lock.releaseExclusiveLock();
+    }
+  }
+  finally {
+    modificationLock.releaseModificationLock();
+  }
+}

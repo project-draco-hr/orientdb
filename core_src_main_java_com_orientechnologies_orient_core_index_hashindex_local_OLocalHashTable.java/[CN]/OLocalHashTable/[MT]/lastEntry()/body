@@ -5,24 +5,26 @@
     long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
     int fileLevel=getFileLevel(bucketPointer);
     long pageIndex=getPageIndex(bucketPointer);
-    long pagePointer=loadPage(pageIndex,fileLevel);
+    OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+    OCachePointer pagePointer=cacheEntry.getCachePointer();
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer,directMemory,keySerializer,valueSerializer);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,keyHashFunction);
       while (bucket.size() == 0) {
         final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
         if (prevBucketPath == null)         return null;
-        releasePage(pageIndex,fileLevel);
+        diskCache.release(cacheEntry);
         final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
         fileLevel=getFileLevel(prevPointer);
         pageIndex=getPageIndex(prevPointer);
-        pagePointer=loadPage(pageIndex,fileLevel);
-        bucket=new OHashIndexBucket<K,V>(pagePointer,directMemory,keySerializer,valueSerializer);
+        cacheEntry=loadPageEntry(pageIndex,fileLevel);
+        pagePointer=cacheEntry.getCachePointer();
+        bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,keyHashFunction);
         bucketPath=prevBucketPath;
       }
       return bucket.getEntry(bucket.size() - 1);
     }
   finally {
-      releasePage(pageIndex,fileLevel);
+      diskCache.release(cacheEntry);
     }
   }
  catch (  IOException ioe) {

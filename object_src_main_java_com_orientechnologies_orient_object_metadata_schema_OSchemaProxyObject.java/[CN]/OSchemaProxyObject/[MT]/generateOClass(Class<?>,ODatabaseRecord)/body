@@ -1,0 +1,28 @@
+{
+  boolean reloadSchema=false;
+  for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
+    String iClassName=currentClass.getSimpleName();
+    currentClass=currentClass.getSuperclass();
+    if (currentClass == null || currentClass.equals(ODocument.class))     currentClass=Object.class;
+    if (ODatabaseRecordThreadLocal.INSTANCE.get() != null && !ODatabaseRecordThreadLocal.INSTANCE.get().isClosed() && !currentClass.equals(Object.class)) {
+      OClass oSuperClass;
+      OClass currentOClass=database.getMetadata().getSchema().getClass(iClassName);
+      if (!database.getMetadata().getSchema().existsClass(currentClass.getSimpleName())) {
+        oSuperClass=database.getMetadata().getSchema().createClass(currentClass.getSimpleName());
+        reloadSchema=true;
+      }
+ else {
+        oSuperClass=database.getMetadata().getSchema().getClass(currentClass.getSimpleName());
+        reloadSchema=true;
+      }
+      if (currentOClass.getSuperClass() == null || !currentOClass.getSuperClass().equals(oSuperClass)) {
+        currentOClass.setSuperClass(oSuperClass);
+        reloadSchema=true;
+      }
+    }
+  }
+  if (reloadSchema) {
+    database.getMetadata().getSchema().save();
+    database.getMetadata().getSchema().reload();
+  }
+}

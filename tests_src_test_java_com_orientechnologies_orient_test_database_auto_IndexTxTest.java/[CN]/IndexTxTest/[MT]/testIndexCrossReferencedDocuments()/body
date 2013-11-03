@@ -1,0 +1,25 @@
+{
+  database.begin();
+  final ODocument doc1=new ODocument("IndexTxTestClass");
+  final ODocument doc2=new ODocument("IndexTxTestClass");
+  doc1.save();
+  doc2.save();
+  doc1.field("ref",doc2.getIdentity().copy());
+  doc1.field("name","doc1");
+  doc2.field("ref",doc1.getIdentity().copy());
+  doc2.field("name","doc2");
+  doc1.save();
+  doc2.save();
+  database.commit();
+  Map<String,ORID> expectedResult=new HashMap<String,ORID>();
+  expectedResult.put("doc1",doc1.getIdentity());
+  expectedResult.put("doc2",doc2.getIdentity());
+  final List<ODocument> result=database.query(new OSQLSynchQuery<Object>("select from index:IndexTxTestIndex"));
+  for (  ODocument o : result) {
+    final String key=o.rawField("key");
+    final ORID expectedValue=expectedResult.get(key);
+    final ORID value=o.rawField("rid");
+    Assert.assertTrue(value.isPersistent());
+    Assert.assertEquals(value,expectedValue);
+  }
+}

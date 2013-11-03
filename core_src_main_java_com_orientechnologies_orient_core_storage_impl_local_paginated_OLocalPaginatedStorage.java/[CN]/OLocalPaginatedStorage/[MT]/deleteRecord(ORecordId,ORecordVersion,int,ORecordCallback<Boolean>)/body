@@ -1,6 +1,7 @@
 {
   checkOpeness();
-  final OLocalPaginatedCluster cluster=getClusterById(rid.clusterId);
+  final long timer=Orient.instance().getProfiler().startChrono();
+  final OCluster cluster=getClusterById(rid.clusterId);
   cluster.getExternalModificationLock().requestModificationLock();
   try {
     modificationLock.requestModificationLock();
@@ -13,7 +14,7 @@
           if (ppos == null)           return new OStorageOperationResult<Boolean>(false);
           if (version.getCounter() > -1 && !ppos.recordVersion.equals(version))           if (OFastConcurrentModificationException.enabled())           throw OFastConcurrentModificationException.instance();
  else           throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
-          cluster.deleteRecord(ppos.clusterPosition,transaction);
+          cluster.deleteRecord(ppos.clusterPosition);
           return new OStorageOperationResult<Boolean>(true);
         }
   finally {
@@ -33,6 +34,7 @@
   }
   finally {
     cluster.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
   }
   return new OStorageOperationResult<Boolean>(false);
 }

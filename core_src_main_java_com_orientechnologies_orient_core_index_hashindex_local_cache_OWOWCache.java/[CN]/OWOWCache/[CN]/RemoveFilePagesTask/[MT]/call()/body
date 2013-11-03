@@ -1,0 +1,31 @@
+{
+  final GroupKey firstKey=new GroupKey(fileId,0);
+  final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
+  NavigableMap<GroupKey,WriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
+  Iterator<Map.Entry<GroupKey,WriteGroup>> entryIterator=subMap.entrySet().iterator();
+  while (entryIterator.hasNext()) {
+    Map.Entry<GroupKey,WriteGroup> entry=entryIterator.next();
+    WriteGroup writeGroup=entry.getValue();
+    GroupKey groupKey=entry.getKey();
+    lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      for (      OCachePointer pagePointer : writeGroup.pages) {
+        if (pagePointer != null) {
+          pagePointer.acquireExclusiveLock();
+          try {
+            pagePointer.decrementReferrer();
+            cacheSize.decrementAndGet();
+          }
+  finally {
+            pagePointer.releaseExclusiveLock();
+          }
+        }
+      }
+      entryIterator.remove();
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+  return null;
+}

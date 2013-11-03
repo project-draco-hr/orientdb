@@ -1,0 +1,34 @@
+{
+  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   wrapped.commit(iTx,callback);
+ else {
+    try {
+      final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
+      if (!dConfig.isReplicationActive(null))       wrapped.commit(iTx,callback);
+ else {
+        final OTxTask txTask=new OTxTask();
+        for (        ORecordOperation op : iTx.getCurrentRecordEntries()) {
+          final OAbstractRecordReplicatedTask task;
+          final ORecordInternal<?> record=op.getRecord();
+switch (op.type) {
+case ORecordOperation.CREATED:
+            task=new OCreateRecordTask((ORecordId)op.record.getIdentity(),record.toStream(),record.getRecordVersion(),record.getRecordType());
+          break;
+case ORecordOperation.UPDATED:
+        task=new OUpdateRecordTask((ORecordId)op.record.getIdentity(),record.toStream(),record.getRecordVersion(),record.getRecordType());
+      break;
+case ORecordOperation.DELETED:
+    task=new ODeleteRecordTask((ORecordId)op.record.getIdentity(),record.getRecordVersion());
+  break;
+default :
+continue;
+}
+txTask.add(task);
+}
+dManager.sendRequest(getName(),null,txTask,EXECUTION_MODE.RESPONSE);
+}
+}
+ catch (Exception e) {
+handleDistributedException("Cannot route TX operation against distributed node",e);
+}
+}
+}

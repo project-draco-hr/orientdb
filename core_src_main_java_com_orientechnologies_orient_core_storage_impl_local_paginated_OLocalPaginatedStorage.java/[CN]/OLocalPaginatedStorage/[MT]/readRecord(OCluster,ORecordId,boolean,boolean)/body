@@ -1,14 +1,14 @@
 {
   checkOpeness();
   if (!rid.isPersistent())   throw new IllegalArgumentException("Cannot read record " + rid + " since the position is invalid in database '"+ name+ '\'');
-  final OLocalPaginatedCluster localPaginatedCluster=(OLocalPaginatedCluster)clusterSegment;
-  localPaginatedCluster.getExternalModificationLock().requestModificationLock();
+  final long timer=Orient.instance().getProfiler().startChrono();
+  clusterSegment.getExternalModificationLock().requestModificationLock();
   try {
     if (atomicLock)     lock.acquireSharedLock();
     try {
       lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
       try {
-        return localPaginatedCluster.readRecord(rid.clusterPosition);
+        return clusterSegment.readRecord(rid.clusterPosition);
       }
   finally {
         lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.SHARED);
@@ -23,6 +23,7 @@
     }
   }
   finally {
-    localPaginatedCluster.getExternalModificationLock().releaseModificationLock();
+    clusterSegment.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
   }
 }

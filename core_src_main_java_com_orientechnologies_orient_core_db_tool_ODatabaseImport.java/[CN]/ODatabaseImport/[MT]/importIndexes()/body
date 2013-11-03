@@ -1,6 +1,5 @@
 {
   listener.onMessage("\nImporting indexes ...");
-  database.load(new ORecordId(database.getStorage().getConfiguration().indexMgrRecordId)).clear().save();
   OIndexManagerProxy indexManager=database.getMetadata().getIndexManager();
   indexManager.reload();
   jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
@@ -19,17 +18,20 @@
  else       if (fieldName.equals("definition"))       indexDefinition=importIndexDefinition();
     }
     jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
-    listener.onMessage("\n- Index '" + indexName + "'...");
-    indexManager.dropIndex(indexName);
-    int[] clusterIdsToIndex=new int[clustersToIndex.size()];
-    int i=0;
-    for (    final String clusterName : clustersToIndex) {
-      clusterIdsToIndex[i]=database.getClusterIdByName(clusterName);
-      i++;
+    if (!indexName.equalsIgnoreCase(EXPORT_IMPORT_MAP_NAME)) {
+      listener.onMessage("\n- Index '" + indexName + "'...");
+      indexManager.dropIndex(indexName);
+      indexesToRebuild.remove(indexName.toLowerCase());
+      int[] clusterIdsToIndex=new int[clustersToIndex.size()];
+      int i=0;
+      for (      final String clusterName : clustersToIndex) {
+        clusterIdsToIndex[i]=database.getClusterIdByName(clusterName);
+        i++;
+      }
+      indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null);
+      n++;
+      listener.onMessage("OK");
     }
-    indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null);
-    n++;
-    listener.onMessage("OK");
   }
   listener.onMessage("\nDone. Created " + n + " indexes.");
   jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);

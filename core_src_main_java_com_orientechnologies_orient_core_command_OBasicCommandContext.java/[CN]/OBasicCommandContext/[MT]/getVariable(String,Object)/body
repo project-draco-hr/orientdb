@@ -1,0 +1,42 @@
+{
+  if (iName == null)   return iDefault;
+  Object result=null;
+  if (iName.startsWith("$"))   iName=iName.substring(1);
+  int pos=OStringSerializerHelper.getLowerIndexOf(iName,0,".","[");
+  String firstPart;
+  String lastPart;
+  if (pos > -1) {
+    firstPart=iName.substring(0,pos);
+    if (iName.charAt(pos) == '.')     pos++;
+    lastPart=iName.substring(pos);
+    if (firstPart.equalsIgnoreCase("PARENT") && parent != null) {
+      if (lastPart.startsWith("$"))       result=parent.getVariable(lastPart.substring(1));
+ else       result=ODocumentHelper.getFieldValue(parent,lastPart);
+      return result != null ? result : iDefault;
+    }
+ else     if (firstPart.equalsIgnoreCase("ROOT")) {
+      OCommandContext p=this;
+      while (p.getParent() != null)       p=p.getParent();
+      if (lastPart.startsWith("$"))       result=p.getVariable(lastPart.substring(1));
+ else       result=ODocumentHelper.getFieldValue(p,lastPart,this);
+      return result != null ? result : iDefault;
+    }
+  }
+ else {
+    firstPart=iName;
+    lastPart=null;
+  }
+  if (firstPart.equalsIgnoreCase("CONTEXT"))   result=getVariables();
+ else   if (firstPart.equalsIgnoreCase("PARENT"))   result=parent;
+ else   if (firstPart.equalsIgnoreCase("ROOT")) {
+    OCommandContext p=this;
+    while (p.getParent() != null)     p=p.getParent();
+    result=p;
+  }
+ else {
+    if (variables != null && variables.containsKey(firstPart))     result=variables.get(firstPart);
+ else     if (child != null)     result=child.getVariable(firstPart);
+  }
+  if (pos > -1)   result=ODocumentHelper.getFieldValue(result,lastPart,this);
+  return result != null ? result : iDefault;
+}

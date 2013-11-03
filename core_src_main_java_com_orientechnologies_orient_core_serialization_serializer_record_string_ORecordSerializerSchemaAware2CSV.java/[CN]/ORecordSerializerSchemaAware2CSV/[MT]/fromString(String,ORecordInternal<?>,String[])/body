@@ -11,29 +11,22 @@
  else   record.setClassNameIfExists(null);
   if (iFields != null && iFields.length == 1 && iFields[0].equals("@class"))   return iRecord;
   final List<String> fields=OStringSerializerHelper.smartSplit(iContent,OStringSerializerHelper.RECORD_SEPARATOR,true);
-  String field;
   String fieldName=null;
   String fieldValue;
-  OType type=null;
+  OType type;
   OClass linkedClass;
   OType linkedType;
   OProperty prop;
-  for (int i=0; i < fields.size(); ++i) {
-    field=fields.get(i).trim();
+  final List<String> fieldList=(iFields != null && iFields.length > 0) ? Arrays.asList(iFields) : null;
+  for (  String field : fields) {
+    field=field.trim();
     boolean uncertainType=false;
     try {
       pos=field.indexOf(FIELD_VALUE_SEPARATOR);
       if (pos > -1) {
         fieldName=field.substring(0,pos);
         if (record.containsField(fieldName))         continue;
-        if (iFields != null && iFields.length > 0) {
-          boolean found=false;
-          for (          String f : iFields)           if (f.equals(fieldName)) {
-            found=true;
-            break;
-          }
-          if (!found)           continue;
-        }
+        if (fieldList != null && !fieldList.contains(fieldName))         continue;
         fieldValue=field.length() > pos + 1 ? field.substring(pos + 1) : null;
         boolean setFieldType=false;
         prop=record.getSchemaClass() != null ? record.getSchemaClass().getProperty(fieldName) : null;
@@ -51,6 +44,9 @@
             if (fieldValue.length() > 1 && fieldValue.charAt(0) == '"' && fieldValue.charAt(fieldValue.length() - 1) == '"') {
               type=OType.STRING;
             }
+ else             if (fieldValue.startsWith(OStringSerializerHelper.LINKSET_PREFIX)) {
+              type=OType.LINKSET;
+            }
  else             if (fieldValue.charAt(0) == OStringSerializerHelper.LIST_BEGIN && fieldValue.charAt(fieldValue.length() - 1) == OStringSerializerHelper.LIST_END || fieldValue.charAt(0) == OStringSerializerHelper.SET_BEGIN && fieldValue.charAt(fieldValue.length() - 1) == OStringSerializerHelper.SET_END) {
               type=fieldValue.charAt(0) == OStringSerializerHelper.LIST_BEGIN ? OType.EMBEDDEDLIST : OType.EMBEDDEDSET;
               final String value=fieldValue.substring(1,fieldValue.length() - 1);
@@ -65,11 +61,6 @@
                   if (allLinks) {
                     type=fieldValue.charAt(0) == OStringSerializerHelper.LIST_BEGIN ? OType.LINKLIST : OType.LINKSET;
                     linkedType=OType.LINK;
-                    int classSeparatorPos=value.indexOf(OStringSerializerHelper.CLASS_SEPARATOR);
-                    if (classSeparatorPos > -1) {
-                      String className=value.substring(1,classSeparatorPos);
-                      if (className != null)                       linkedClass=ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata().getSchema().getClass(className);
-                    }
                   }
                 }
  else                 if (value.charAt(0) == OStringSerializerHelper.EMBEDDED_BEGIN) {

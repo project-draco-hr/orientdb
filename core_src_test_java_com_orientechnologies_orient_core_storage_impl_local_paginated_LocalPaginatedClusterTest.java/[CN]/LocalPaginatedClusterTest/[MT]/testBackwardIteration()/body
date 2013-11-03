@@ -1,24 +1,24 @@
 {
   final int records=10000;
   long seed=System.currentTimeMillis();
-  MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(seed);
+  MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(1381162033616L);
   System.out.println("testBackwardIteration seed : " + seed);
   NavigableMap<OClusterPosition,byte[]> positionRecordMap=new TreeMap<OClusterPosition,byte[]>();
   ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
   recordVersion.increment();
   recordVersion.increment();
   for (int i=0; i < records; i++) {
-    int recordSize=mersenneTwisterFast.nextInt(2 * OLocalPage.MAX_RECORD_SIZE) + 1;
+    int recordSize=mersenneTwisterFast.nextInt(2 * OClusterPage.MAX_RECORD_SIZE) + 1;
     byte[] record=new byte[recordSize];
     mersenneTwisterFast.nextBytes(record);
-    final OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,recordVersion,(byte)2,null);
+    final OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,recordVersion,(byte)2);
     positionRecordMap.put(physicalPosition.clusterPosition,record);
   }
   Iterator<OClusterPosition> positionIterator=positionRecordMap.keySet().iterator();
   while (positionIterator.hasNext()) {
     OClusterPosition clusterPosition=positionIterator.next();
     if (mersenneTwisterFast.nextBoolean()) {
-      Assert.assertTrue(paginatedCluster.deleteRecord(clusterPosition,null));
+      Assert.assertTrue(paginatedCluster.deleteRecord(clusterPosition));
       positionIterator.remove();
     }
   }
@@ -31,8 +31,8 @@
   while (positionIterator.hasNext()) {
     Assert.assertTrue(positions.length > 0);
     OClusterPosition testedPosition=positionIterator.next();
-    Assert.assertEquals(positions[0].clusterPosition,testedPosition);
-    OPhysicalPosition positionToFind=positions[0];
+    Assert.assertEquals(positions[positions.length - 1].clusterPosition,testedPosition);
+    OPhysicalPosition positionToFind=positions[positions.length - 1];
     positions=paginatedCluster.lowerPositions(positionToFind);
     counter++;
   }

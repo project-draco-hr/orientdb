@@ -1,23 +1,26 @@
 {
-  OLocalPaginatedStorage storage=mock(OLocalPaginatedStorage.class);
+  storage=mock(OLocalPaginatedStorage.class);
   OStorageConfiguration storageConfiguration=mock(OStorageConfiguration.class);
   storageConfiguration.clusters=new ArrayList<OStorageClusterConfiguration>();
   storageConfiguration.fileTemplate=new OStorageSegmentConfiguration();
-  when(storage.getStoragePath()).thenReturn(buildDirectory);
-  when(storage.getName()).thenReturn("localPaginatedClusterWithWALTest");
+  storageDir=buildDirectory + "/localPaginatedClusterWithWALTestOne";
+  when(storage.getStoragePath()).thenReturn(storageDir);
+  when(storage.getName()).thenReturn("localPaginatedClusterWithWALTestOne");
   File buildDir=new File(buildDirectory);
   if (!buildDir.exists())   buildDir.mkdirs();
+  File storageDirOneFile=new File(storageDir);
+  if (!storageDirOneFile.exists())   storageDirOneFile.mkdirs();
   writeAheadLog=new OWriteAheadLog(6000,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,storage);
-  ODirectMemory directMemory=ODirectMemoryFactory.INSTANCE.directMemory();
-  diskCache=new O2QCache(1024L * 1024 * 1024* 1024,15000,directMemory,writeAheadLog,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,storage,false);
-  OStorageVariableParser variableParser=new OStorageVariableParser(buildDirectory);
+  diskCache=new OReadWriteDiskCache(400L * 1024 * 1024* 1024,1648L * 1024 * 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,1000000,100,storage,null,false,false);
+  OStorageVariableParser variableParser=new OStorageVariableParser(storageDir);
+  when(storage.getStorageTransaction()).thenReturn(null);
   when(storage.getDiskCache()).thenReturn(diskCache);
   when(storage.getWALInstance()).thenReturn(writeAheadLog);
   when(storage.getVariableParser()).thenReturn(variableParser);
   when(storage.getConfiguration()).thenReturn(storageConfiguration);
   when(storage.getMode()).thenReturn("rw");
-  when(storageConfiguration.getDirectory()).thenReturn(buildDirectory);
-  paginatedCluster=new OLocalPaginatedCluster();
+  when(storageConfiguration.getDirectory()).thenReturn(storageDir);
+  paginatedCluster=new OPaginatedCluster();
   paginatedCluster.configure(storage,5,"localPaginatedClusterWithWALTest",buildDirectory,-1);
   paginatedCluster.create(-1);
 }

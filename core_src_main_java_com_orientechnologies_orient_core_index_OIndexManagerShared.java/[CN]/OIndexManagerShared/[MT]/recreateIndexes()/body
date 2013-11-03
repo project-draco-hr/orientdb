@@ -14,19 +14,19 @@
           newDb.open("admin","nopass");
           ODatabaseRecordThreadLocal.INSTANCE.set(newDb);
           try {
-            final int dataId=newDb.getStorage().getDataSegmentIdByName(OMetadata.DATASEGMENT_INDEX_NAME);
-            if (dataId > -1)             newDb.getStorage().dropDataSegment(OMetadata.DATASEGMENT_INDEX_NAME);
-            final int clusterId=newDb.getStorage().getClusterIdByName(OMetadata.CLUSTER_INDEX_NAME);
+            final int dataId=newDb.getStorage().getDataSegmentIdByName(OMetadataDefault.DATASEGMENT_INDEX_NAME);
+            if (dataId > -1)             newDb.getStorage().dropDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME);
+            final int clusterId=newDb.getStorage().getClusterIdByName(OMetadataDefault.CLUSTER_INDEX_NAME);
             if (clusterId > -1)             newDb.dropCluster(clusterId,false);
-            newDb.addDataSegment(OMetadata.DATASEGMENT_INDEX_NAME,null);
-            newDb.getStorage().addCluster(OClusterLocal.TYPE,OMetadata.CLUSTER_INDEX_NAME,null,OMetadata.DATASEGMENT_INDEX_NAME,true);
+            newDb.addDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME,null);
+            newDb.getStorage().addCluster(OClusterLocal.TYPE,OMetadataDefault.CLUSTER_INDEX_NAME,null,OMetadataDefault.DATASEGMENT_INDEX_NAME,true);
           }
  catch (          IllegalArgumentException ex) {
             OLogManager.instance().info(this,"Creating 'index' data-segment to store all the index content...");
-            newDb.addDataSegment(OMetadata.DATASEGMENT_INDEX_NAME,null);
-            final OCluster indexCluster=newDb.getStorage().getClusterById(newDb.getStorage().getClusterIdByName(OMetadata.CLUSTER_INDEX_NAME));
+            newDb.addDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME,null);
+            final OCluster indexCluster=newDb.getStorage().getClusterById(newDb.getStorage().getClusterIdByName(OMetadataDefault.CLUSTER_INDEX_NAME));
             try {
-              indexCluster.set(ATTRIBUTES.DATASEGMENT,OMetadata.DATASEGMENT_INDEX_NAME);
+              indexCluster.set(ATTRIBUTES.DATASEGMENT,OMetadataDefault.DATASEGMENT_INDEX_NAME);
               OLogManager.instance().info(this,"Data-segment 'index' create correctly. Indexes will store content into this data-segment");
             }
  catch (            IOException e) {
@@ -43,12 +43,14 @@
           for (          ODocument idx : idxs) {
             try {
               String indexType=idx.field(OIndexInternal.CONFIG_TYPE);
+              String algorithm=idx.field(OIndexInternal.ALGORITHM);
+              String valueContainerAlgorithm=idx.field(OIndexInternal.VALUE_CONTAINER_ALGORITHM);
               if (indexType == null) {
                 OLogManager.instance().error(this,"Index type is null, will process other record.");
                 errors++;
                 continue;
               }
-              final OIndexInternal<?> index=OIndexes.createIndex(newDb,indexType);
+              final OIndexInternal<?> index=OIndexes.createIndex(newDb,indexType,algorithm,valueContainerAlgorithm);
               OIndexInternal.IndexMetadata indexMetadata=index.loadMetadata(idx);
               OIndexDefinition indexDefinition=indexMetadata.getIndexDefinition();
               if (indexDefinition == null || !indexDefinition.isAutomatic()) {
@@ -99,7 +101,7 @@
           OLogManager.instance().info(this,"%d indexes were restored successfully, %d errors",ok,errors);
         }
  catch (        Exception e) {
-          OLogManager.instance().error(this,"Error when attempt to restore indexes after crash was performed.");
+          OLogManager.instance().error(this,"Error when attempt to restore indexes after crash was performed.",e);
         }
       }
     }
@@ -110,4 +112,5 @@
   finally {
     releaseExclusiveLock();
   }
+  if (OGlobalConfiguration.INDEX_SYNCHRONOUS_AUTO_REBUILD.getValueAsBoolean())   waitTillIndexRestore();
 }

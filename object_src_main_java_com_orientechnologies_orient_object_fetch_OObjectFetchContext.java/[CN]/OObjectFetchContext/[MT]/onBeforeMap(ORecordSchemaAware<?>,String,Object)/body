@@ -1,7 +1,18 @@
 {
-  final Map<Object,Object> map=(Map<Object,Object>)iRootRecord.field(iFieldName);
-  final Map<Object,Object> target;
-  if (lazyLoading)   target=new OLazyObjectMap<Object>(iRootRecord,map).setFetchPlan(fetchPlan);
+  final Map map=(Map)iRootRecord.field(iFieldName);
+  Map target=null;
+  final Field f=OObjectEntitySerializer.getField(iFieldName,iUserObject.getClass());
+  final boolean customSerialization=OObjectEntitySerializer.isSerializedType(f);
+  final Class genericType=OReflectionHelper.getGenericMultivalueType(f);
+  if (map instanceof ORecordLazyMap || (map instanceof OTrackedMap<?> && !OReflectionHelper.isJavaType(genericType) && !customSerialization&& !genericType.isEnum())) {
+    target=new OObjectLazyMap(iUserObject,(OTrackedMap<?>)map,OObjectEntitySerializer.isCascadeDeleteField(iUserObject.getClass(),f.getName()));
+  }
+ else   if (customSerialization) {
+    target=new OObjectCustomSerializerMap<TYPE>(OObjectEntitySerializer.getSerializedType(f),iRootRecord,(Map<Object,Object>)map);
+  }
+ else   if (genericType.isEnum()) {
+    target=new OObjectEnumLazyMap(genericType,iRootRecord,(Map<Object,Object>)map);
+  }
  else {
     target=new HashMap();
   }

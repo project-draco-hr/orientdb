@@ -1,0 +1,60 @@
+{
+  externalModificationLock.requestModificationLock();
+  try {
+    acquireExclusiveLock();
+    try {
+      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
+      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+      if (positionEntry == null)       return false;
+      long pageIndex=positionEntry.getPageIndex();
+      int recordPosition=positionEntry.getRecordPosition();
+      if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
+      final OClusterPage.TrackMode trackMode=getTrackMode();
+      long nextPagePointer=-1;
+      int removedContentSize=0;
+      do {
+        final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+        final OCachePointer pointer=cacheEntry.getCachePointer();
+        pointer.acquireExclusiveLock();
+        int initialFreePageIndex;
+        try {
+          final OClusterPage localPage=new OClusterPage(pointer.getDataPointer(),false,trackMode);
+          initialFreePageIndex=calculateFreePageIndex(localPage);
+          int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
+          if (recordPageOffset < 0) {
+            if (removedContentSize == 0)             return false;
+ else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+          }
+ else           if (removedContentSize == 0) {
+            startDurableOperation(transaction);
+          }
+          byte[] content=localPage.getBinaryValue(recordPageOffset,localPage.getRecordSize(recordPosition));
+          int initialFreeSpace=localPage.getFreeSpace();
+          localPage.deleteRecord(recordPosition);
+          removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
+          nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+          logPageChanges(localPage,fileId,pageIndex,false);
+          cacheEntry.markDirty();
+        }
+  finally {
+          pointer.releaseExclusiveLock();
+          diskCache.release(cacheEntry);
+        }
+        updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);
+        pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
+        recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
+      }
+ while (nextPagePointer >= 0);
+      updateClusterState(trackMode,-1,-removedContentSize);
+      clusterPositionMap.remove(clusterPosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
+      endDurableOperation(transaction,false);
+      return true;
+    }
+  finally {
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    externalModificationLock.releaseModificationLock();
+  }
+}

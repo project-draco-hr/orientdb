@@ -1,0 +1,27 @@
+{
+  final int changesSize=OIntegerSerializer.INSTANCE.deserializeNative(content,offset);
+  offset+=OIntegerSerializer.INT_SIZE;
+  changeUnits=new ArrayList<ChangeUnit>(changesSize);
+  int[] decompressResult;
+  for (int i=0; i < changesSize; i++) {
+    decompressResult=deserializeCompressedInteger(content,offset);
+    int pageOffset=decompressResult[0];
+    offset=decompressResult[1];
+    decompressResult=deserializeCompressedInteger(content,offset);
+    int dataLength=decompressResult[0];
+    offset=decompressResult[1];
+    boolean newValuesIsPresent=content[offset++] > 0;
+    byte[] newValues;
+    if (newValuesIsPresent) {
+      newValues=new byte[dataLength];
+      System.arraycopy(content,offset,newValues,0,dataLength);
+      offset+=dataLength;
+    }
+ else     newValues=null;
+    byte[] oldValues=new byte[dataLength];
+    System.arraycopy(content,offset,oldValues,0,dataLength);
+    offset+=dataLength;
+    changeUnits.add(new ChangeUnit(pageOffset,oldValues,newValues));
+  }
+  return offset;
+}

@@ -16,6 +16,7 @@
   if (!dbDir.exists() || !dbDir.isDirectory())   dbDir=dbDir.getParentFile();
   lock.acquireExclusiveLock();
   try {
+    if (diskCache != null)     diskCache.delete();
     for (int i=0; i < DELETE_MAX_RETRIES; ++i) {
       if (dbDir.exists() && dbDir.isDirectory()) {
         int notDeletedFiles=0;
@@ -41,8 +42,11 @@
     }
     throw new OStorageException("Cannot delete database '" + name + "' located in: "+ dbDir+ ". Database files seem locked");
   }
-  finally {
+ catch (  IOException ioe) {
+    throw new OStorageException("Cannot delete database '" + name + "' located in: "+ dbDir+ ".",ioe);
+  }
+ finally {
     lock.releaseExclusiveLock();
-    Orient.instance().getProfiler().stopChrono("db." + name + ".drop","Drop a local database",timer,"db.*.drop");
+    Orient.instance().getProfiler().stopChrono("db." + name + ".drop","Drop a database",timer,"db.*.drop");
   }
 }

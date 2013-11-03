@@ -1,23 +1,28 @@
 {
   acquireExclusiveLock();
   try {
+    key=keySerializer.prepocess(key,keyTypes);
     final long hashCode=keyHashFunction.hashCode(key);
     final BucketPath nodePath=getBucket(hashCode);
     final long bucketPointer=hashTree[nodePath.nodeIndex][nodePath.itemIndex + nodePath.hashMapOffset];
     final long pageIndex=getPageIndex(bucketPointer);
     final int fileLevel=getFileLevel(bucketPointer);
     final V removed;
-    long dataPointer=loadPage(pageIndex,fileLevel);
+    final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+    final OCachePointer dataPointer=cacheEntry.getCachePointer();
+    dataPointer.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer,directMemory,keySerializer,valueSerializer);
+      final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,keyHashFunction);
       final int positionIndex=bucket.getIndex(key);
       if (positionIndex < 0)       return null;
       removed=bucket.deleteEntry(positionIndex).value;
       size--;
-      if (!mergeBucketsAfterDeletion(nodePath,bucket))       markPageAsDirty(pageIndex,fileLevel);
+      mergeBucketsAfterDeletion(nodePath,bucket);
+      cacheEntry.markDirty();
     }
   finally {
-      releasePage(pageIndex,fileLevel);
+      dataPointer.releaseExclusiveLock();
+      diskCache.release(cacheEntry);
     }
     if (nodePath.parent != null) {
       final int hashMapSize=1 << nodePath.nodeLocalDepth;

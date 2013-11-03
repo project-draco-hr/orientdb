@@ -1,0 +1,44 @@
+{
+  OWriteAheadLog log=new OWriteAheadLog(4,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,storage);
+  OLogSequenceNumber lsn=log.begin();
+  List<OWALRecord> atomicUnit=new ArrayList<OWALRecord>();
+  boolean atomicChangeIsProcessed=false;
+  while (lsn != null) {
+    OWALRecord walRecord=log.read(lsn);
+    atomicUnit.add(walRecord);
+    if (!atomicChangeIsProcessed) {
+      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
+      atomicChangeIsProcessed=true;
+    }
+ else     if (walRecord instanceof OAtomicUnitEndRecord) {
+      atomicChangeIsProcessed=false;
+      for (      OWALRecord restoreRecord : atomicUnit) {
+        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord)         continue;
+        final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
+        final long fileId=updatePageRecord.getFileId();
+        final long pageIndex=updatePageRecord.getPageIndex();
+        if (!testDiskCache.isOpen(fileId))         testDiskCache.openFile(fileId);
+        final OCacheEntry cacheEntry=testDiskCache.load(fileId,pageIndex,true);
+        final OCachePointer cachePointer=cacheEntry.getCachePointer();
+        cachePointer.acquireExclusiveLock();
+        try {
+          ODurablePage durablePage=new ODurablePage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE);
+          durablePage.restoreChanges(updatePageRecord.getChanges());
+          durablePage.setLsn(updatePageRecord.getLsn());
+          cacheEntry.markDirty();
+        }
+  finally {
+          cachePointer.releaseExclusiveLock();
+          testDiskCache.release(cacheEntry);
+        }
+      }
+      atomicUnit.clear();
+    }
+ else {
+      Assert.assertTrue(walRecord instanceof OUpdatePageRecord);
+    }
+    lsn=log.next(lsn);
+  }
+  Assert.assertTrue(atomicUnit.isEmpty());
+  log.close();
+}

@@ -1,0 +1,25 @@
+{
+synchronized (syncObject) {
+    writeCache.close(fileId,flush);
+    final Set<Long> pageIndexes=filePages.get(fileId);
+    for (    Long pageIndex : pageIndexes) {
+      OCacheEntry cacheEntry=get(fileId,pageIndex,true);
+      if (cacheEntry == null)       cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
+      if (cacheEntry != null) {
+        if (cacheEntry.dataPointer != null) {
+          if (cacheEntry.usagesCount == 0) {
+            cacheEntry=remove(fileId,pageIndex);
+            if (cacheEntry == null)             cacheEntry=pinnedPages.remove(new PinnedPage(fileId,pageIndex));
+          }
+ else           throw new OStorageException("Page with index " + pageIndex + " for file with id "+ fileId+ " can not be freed because it is used.");
+          cacheEntry.dataPointer.decrementReferrer();
+          cacheEntry.dataPointer=null;
+        }
+      }
+ else {
+        throw new OStorageException("Page with index " + pageIndex + " for file with id "+ fileId+ " was not found in cache");
+      }
+    }
+    pageIndexes.clear();
+  }
+}

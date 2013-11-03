@@ -48,14 +48,17 @@
     }
  else {
       final Object right=compiledFilter.getRootCondition().getRight();
-      final Object keyValue=getIndexKey(index.getDefinition(),right);
+      Object keyValue=getIndexKey(index.getDefinition(),right);
       final Object res;
       if (index.getDefinition().getParamCount() == 1) {
+        final OType type=index.getDefinition().getTypes()[0];
+        keyValue=OType.convert(keyValue,type.getDefaultJavaType());
         res=index.get(keyValue);
       }
  else {
         final Object secondKey=getIndexKey(index.getDefinition(),right);
-        res=index.getValuesBetween(keyValue,secondKey);
+        if (keyValue instanceof OCompositeKey && secondKey instanceof OCompositeKey && ((OCompositeKey)keyValue).getKeys().size() == index.getDefinition().getParamCount() && ((OCompositeKey)secondKey).getKeys().size() == index.getDefinition().getParamCount())         res=index.get(keyValue);
+ else         res=index.getValuesBetween(keyValue,secondKey);
       }
       if (res != null)       if (res instanceof Collection<?>)       for (      final OIdentifiable r : (Collection<OIdentifiable>)res)       handleResult(createIndexEntryAsDocument(keyValue,r.getIdentity()),true);
  else       handleResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()),true);
@@ -76,7 +79,7 @@
       for (Iterator<Entry<Object,Object>> it=index.iterator(); it.hasNext(); ) {
         final Entry<Object,Object> current=it.next();
         if (current.getValue() instanceof Collection<?>) {
-          for (          OIdentifiable identifiable : ((OMVRBTreeRIDSet)current.getValue()))           if (!handleResult(createIndexEntryAsDocument(current.getKey(),identifiable.getIdentity()),true))           break;
+          for (          OIdentifiable identifiable : ((Set<OIdentifiable>)current.getValue()))           if (!handleResult(createIndexEntryAsDocument(current.getKey(),identifiable.getIdentity()),true))           break;
         }
  else         if (!handleResult(createIndexEntryAsDocument(current.getKey(),(OIdentifiable)current.getValue()),true))         break;
       }

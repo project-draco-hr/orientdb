@@ -14,20 +14,33 @@
     if (tx)     db.begin();
     for (    Map<Object,Object> operation : operations) {
       final String type=(String)operation.get("type");
-      Object record=operation.get("record");
-      ODocument doc;
-      if (record instanceof Map<?,?>)       doc=new ODocument((Map<String,Object>)record);
- else       doc=(ODocument)record;
       if (type.equals("c")) {
+        final ODocument doc=getRecord(operation);
         doc.save();
         executed++;
       }
  else       if (type.equals("u")) {
+        final ODocument doc=getRecord(operation);
         doc.save();
         executed++;
       }
  else       if (type.equals("d")) {
+        final ODocument doc=getRecord(operation);
         db.delete(doc.getIdentity());
+        executed++;
+      }
+ else       if (type.equals("cmd")) {
+        final String language=(String)operation.get("language");
+        final String command=(String)operation.get("command");
+        final OCommandRequestText cmd=(OCommandRequestText)OCommandManager.instance().getRequester(language);
+        cmd.setText(command);
+        db.command(cmd).execute();
+        executed++;
+      }
+ else       if (type.equals("script")) {
+        final String language=(String)operation.get("language");
+        final String script=(String)operation.get("script");
+        db.command(new OCommandScript(language,script)).execute();
         executed++;
       }
     }

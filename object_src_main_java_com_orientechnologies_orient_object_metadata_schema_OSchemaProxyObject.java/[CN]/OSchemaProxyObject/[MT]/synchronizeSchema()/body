@@ -1,0 +1,41 @@
+{
+  OObjectDatabaseTx database=((OObjectDatabaseTx)ODatabaseRecordThreadLocal.INSTANCE.get().getDatabaseOwner());
+  Collection<Class<?>> registeredEntities=database.getEntityManager().getRegisteredEntities();
+  boolean automaticSchemaGeneration=database.isAutomaticSchemaGeneration();
+  boolean reloadSchema=false;
+  for (  Class<?> iClass : registeredEntities) {
+    if (Proxy.class.isAssignableFrom(iClass) || iClass.isEnum() || OReflectionHelper.isJavaType(iClass)|| iClass.isAnonymousClass())     return;
+    if (!database.getMetadata().getSchema().existsClass(iClass.getSimpleName())) {
+      database.getMetadata().getSchema().createClass(iClass.getSimpleName());
+      reloadSchema=true;
+    }
+    for (Class<?> currentClass=iClass; currentClass != Object.class; ) {
+      if (automaticSchemaGeneration && !currentClass.equals(Object.class) && !currentClass.equals(ODocument.class)) {
+        ((OSchemaProxyObject)database.getMetadata().getSchema()).generateSchema(currentClass,database.getUnderlying());
+      }
+      String iClassName=currentClass.getSimpleName();
+      currentClass=currentClass.getSuperclass();
+      if (currentClass == null || currentClass.equals(ODocument.class))       currentClass=Object.class;
+      if (database != null && !database.isClosed() && !currentClass.equals(Object.class)) {
+        OClass oSuperClass;
+        OClass currentOClass=database.getMetadata().getSchema().getClass(iClassName);
+        if (!database.getMetadata().getSchema().existsClass(currentClass.getSimpleName())) {
+          oSuperClass=database.getMetadata().getSchema().createClass(currentClass.getSimpleName());
+          reloadSchema=true;
+        }
+ else {
+          oSuperClass=database.getMetadata().getSchema().getClass(currentClass.getSimpleName());
+          reloadSchema=true;
+        }
+        if (currentOClass.getSuperClass() == null || !currentOClass.getSuperClass().equals(oSuperClass)) {
+          currentOClass.setSuperClass(oSuperClass);
+          reloadSchema=true;
+        }
+      }
+    }
+  }
+  if (database != null && !database.isClosed() && reloadSchema) {
+    database.getMetadata().getSchema().save();
+    database.getMetadata().getSchema().reload();
+  }
+}

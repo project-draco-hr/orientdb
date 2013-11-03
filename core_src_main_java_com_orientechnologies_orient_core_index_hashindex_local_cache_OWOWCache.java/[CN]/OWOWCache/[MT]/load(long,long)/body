@@ -1,0 +1,23 @@
+{
+synchronized (syncObject) {
+    final GroupKey groupKey=new GroupKey(fileId,pageIndex >>> 4);
+    lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.SHARED);
+    try {
+      final WriteGroup writeGroup=writeGroups.get(groupKey);
+      OCachePointer pagePointer;
+      if (writeGroup == null) {
+        pagePointer=cacheFileContent(fileId,pageIndex);
+        pagePointer.incrementReferrer();
+        return pagePointer;
+      }
+      final int entryIndex=(int)(pageIndex & 15);
+      pagePointer=writeGroup.pages[entryIndex];
+      if (pagePointer == null)       pagePointer=cacheFileContent(fileId,pageIndex);
+      pagePointer.incrementReferrer();
+      return pagePointer;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),groupKey,OLockManager.LOCK.SHARED);
+    }
+  }
+}

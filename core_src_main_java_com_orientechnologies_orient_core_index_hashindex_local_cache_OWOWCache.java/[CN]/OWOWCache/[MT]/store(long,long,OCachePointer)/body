@@ -1,0 +1,35 @@
+{
+  Future future=null;
+synchronized (syncObject) {
+    final GroupKey groupKey=new GroupKey(fileId,pageIndex >>> 4);
+    lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      WriteGroup writeGroup=writeGroups.get(groupKey);
+      if (writeGroup == null) {
+        writeGroup=new WriteGroup(System.currentTimeMillis());
+        writeGroups.put(groupKey,writeGroup);
+      }
+      int entryIndex=(int)(pageIndex & 15);
+      if (writeGroup.pages[entryIndex] == null) {
+        dataPointer.incrementReferrer();
+        writeGroup.pages[entryIndex]=dataPointer;
+        cacheSize.incrementAndGet();
+      }
+ else {
+        if (!writeGroup.pages[entryIndex].equals(dataPointer)) {
+          writeGroup.pages[entryIndex].decrementReferrer();
+          dataPointer.incrementReferrer();
+          writeGroup.pages[entryIndex]=dataPointer;
+        }
+      }
+      writeGroup.recencyBit=true;
+    }
+  finally {
+      lockManager.releaseLock(Thread.currentThread(),groupKey,OLockManager.LOCK.EXCLUSIVE);
+    }
+    if (cacheSize.get() > cacheMaxSize) {
+      future=commitExecutor.submit(new PeriodicFlushTask());
+    }
+    return future;
+  }
+}

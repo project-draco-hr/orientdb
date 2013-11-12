@@ -1,7 +1,11 @@
 {
 synchronized (syncObject) {
     close(flush);
-    for (    LogSegment logSegment : logSegments)     if (!logSegment.delete(false))     OLogManager.instance().error(this,"Can not delete WAL segment %s for storage %s",logSegment.getPath(),storage.getName());
-    if (!masterRecordFile.delete())     OLogManager.instance().error(this,"Can not delete WAL state file for %s storage",storage.getName());
+    for (    LogSegment logSegment : logSegments)     logSegment.delete(false);
+    boolean deleted=masterRecordFile.delete();
+    while (!deleted) {
+      OMemoryWatchDog.freeMemoryForResourceCleanup(100);
+      deleted=!masterRecordFile.exists() || masterRecordFile.delete();
+    }
   }
 }

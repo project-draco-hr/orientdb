@@ -1,0 +1,25 @@
+{
+  OLogManager.instance().debug(this,"Running Connection Pool Evictor Service...");
+  lock();
+  try {
+    for (    Entry<String,Map<DB,Long>> pool : this.evictionMap.entrySet()) {
+      Map<DB,Long> poolDbs=pool.getValue();
+      Iterator<Entry<DB,Long>> iterator=poolDbs.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Entry<DB,Long> db=iterator.next();
+        if (System.currentTimeMillis() - db.getValue() >= this.minIdleTime) {
+          OResourcePool<String,DB> oResourcePool=pools.get(pool.getKey());
+          if (oResourcePool != null) {
+            OLogManager.instance().debug(this,"Closing idle pooled database '%s'...",db.getKey().getName());
+            ((ODatabasePooled)db.getKey()).forceClose();
+            oResourcePool.remove(db.getKey());
+            iterator.remove();
+          }
+        }
+      }
+    }
+  }
+  finally {
+    unlock();
+  }
+}

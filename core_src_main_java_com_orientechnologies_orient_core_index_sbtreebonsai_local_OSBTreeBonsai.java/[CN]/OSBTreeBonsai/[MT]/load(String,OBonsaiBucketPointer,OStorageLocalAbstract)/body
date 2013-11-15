@@ -8,12 +8,14 @@
     fileId=diskCache.openFile(name + dataFileExtension);
     OCacheEntry rootCacheEntry=diskCache.load(fileId,this.rootBucketPointer.getPageIndex(),false);
     OCachePointer rootPointer=rootCacheEntry.getCachePointer();
+    rootPointer.acquireSharedLock();
     try {
       OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
       keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.INSTANCE.getObjectSerializer(rootBucket.getKeySerializerId());
       valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.INSTANCE.getObjectSerializer(rootBucket.getValueSerializerId());
     }
   finally {
+      rootPointer.releaseSharedLock();
       diskCache.release(rootCacheEntry);
     }
     initDurableComponent(storageLocal);

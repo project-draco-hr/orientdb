@@ -45,20 +45,30 @@
             }
           }
           final Map<String,OIndex> indexes=new HashMap<String,OIndex>();
-          for (          OIndex index : database.getMetadata().getIndexManager().getIndexes()) {
-            indexes.put(index.getName().toLowerCase(),index);
-          }
+          for (          OIndex index : database.getMetadata().getIndexManager().getIndexes())           indexes.put(index.getName(),index);
           final Runnable callback=new Runnable(){
             @Override public void run(){
               final ODocument indexEntries=getIndexChanges();
               if (indexEntries != null) {
+                final Map<String,OIndexInternal<?>> indexesToCommit=new HashMap<String,OIndexInternal<?>>();
                 for (                Entry<String,Object> indexEntry : indexEntries) {
-                  final OIndex<?> index=indexes.get(indexEntry.getKey().toLowerCase());
+                  final OIndexInternal<?> index=indexes.get(indexEntry.getKey()).getInternal();
+                  indexesToCommit.put(index.getName(),index.getInternal());
+                }
+                for (                OIndexInternal<?> indexInternal : indexesToCommit.values())                 indexInternal.preCommit();
+                for (                Entry<String,Object> indexEntry : indexEntries) {
+                  final OIndexInternal<?> index=indexesToCommit.get(indexEntry.getKey()).getInternal();
                   if (index == null) {
                     OLogManager.instance().error(this,"Index with name " + indexEntry.getKey() + " was not found.");
                     throw new OIndexException("Index with name " + indexEntry.getKey() + " was not found.");
                   }
- else                   index.commit((ODocument)indexEntry.getValue());
+ else                   index.addTxOperation((ODocument)indexEntry.getValue());
+                }
+                try {
+                  for (                  OIndexInternal<?> indexInternal : indexesToCommit.values())                   indexInternal.commit();
+                }
+  finally {
+                  for (                  OIndexInternal<?> indexInternal : indexesToCommit.values())                   indexInternal.postCommit();
                 }
               }
             }

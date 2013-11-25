@@ -4,9 +4,11 @@
     this.storage=storageLocal;
     this.rootBucketPointer=rootBucketPointer;
     diskCache=storage.getDiskCache();
-    this.name=name;
-    fileId=diskCache.openFile(name + dataFileExtension);
-    OCacheEntry rootCacheEntry=diskCache.load(fileId,this.rootBucketPointer.getPageIndex(),false);
+    diskCache.openFile(fileId);
+    this.fileId=fileId;
+    final String fileName=diskCache.fileNameById(fileId);
+    this.name=fileName.substring(0,fileName.length() - dataFileExtension.length());
+    OCacheEntry rootCacheEntry=diskCache.load(this.fileId,this.rootBucketPointer.getPageIndex(),false);
     OCachePointer rootPointer=rootCacheEntry.getCachePointer();
     try {
       OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootPointer.getDataPointer(),this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
@@ -19,7 +21,7 @@
     initDurableComponent(storageLocal);
   }
  catch (  IOException e) {
-    throw new OSBTreeException("Exception during loading of sbtree " + name,e);
+    throw new OSBTreeException("Exception during loading of sbtree " + fileId,e);
   }
  finally {
     releaseExclusiveLock();

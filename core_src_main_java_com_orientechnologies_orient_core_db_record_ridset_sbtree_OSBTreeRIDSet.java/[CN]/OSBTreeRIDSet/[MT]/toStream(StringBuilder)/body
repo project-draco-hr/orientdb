@@ -3,10 +3,21 @@
   try {
     output.append(OStringSerializerHelper.LINKSET_PREFIX);
     final ODocument document=new ODocument();
-    document.field("rootIndex",getRootPointer().getPageIndex());
-    document.field("rootOffset",getRootPointer().getPageOffset());
+    if (rootPointer == null) {
+      final OSBTreeBonsai<OIdentifiable,Boolean> treeBonsai=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager().createSBTree();
+      try {
+        rootPointer=treeBonsai.getRootBucketPointer();
+      }
+  finally {
+        releaseTree();
+      }
+    }
+    document.field("rootIndex",rootPointer.getPageIndex());
+    document.field("rootOffset",rootPointer.getPageOffset());
     output.append(new String(document.toStream()));
     output.append(OStringSerializerHelper.SET_END);
+    ORecordSerializationContext context=ORecordSerializationContext.getContext();
+    context.push(new ORidSetUpdateSerializationOperation(addValues,removedValues,clear,rootPointer));
   }
   finally {
     PROFILER.stopChrono(PROFILER.getProcessMetric("mvrbtree.toStream"),"Serialize a MVRBTreeRID",timer);

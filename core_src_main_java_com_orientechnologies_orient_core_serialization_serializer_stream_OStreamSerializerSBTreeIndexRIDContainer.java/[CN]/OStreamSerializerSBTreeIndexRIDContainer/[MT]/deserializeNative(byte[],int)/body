@@ -1,3 +1,20 @@
 {
-  throw new UnsupportedOperationException("not implemented yet");
+  final long fileId=LONG_SERIALIZER.deserializeNative(stream,offset + FILE_ID_OFFSET);
+  if (BOOLEAN_SERIALIZER.deserializeNative(stream,offset + EMBEDDED_OFFSET)) {
+    final OIndexRIDContainerEmbedded underlying=new OIndexRIDContainerEmbedded();
+    final int size=INT_SERIALIZER.deserializeNative(stream,offset + EMBEDDED_SIZE_OFFSET);
+    int p=offset + EMBEDDED_VALUES_OFFSET;
+    for (int i=0; i < size; i++) {
+      underlying.add(LINK_SERIALIZER.deserializeNative(stream,p));
+      p+=RID_SIZE;
+    }
+    return new OIndexRIDContainer(fileId,underlying);
+  }
+ else {
+    final long pageIndex=LONG_SERIALIZER.deserializeNative(stream,offset + SBTREE_ROOTINDEX_OFFSET);
+    final int pageOffset=INT_SERIALIZER.deserializeNative(stream,offset + SBTREE_ROOTOFFSET_OFFSET);
+    final OBonsaiBucketPointer rootPointer=new OBonsaiBucketPointer(pageIndex,pageOffset);
+    final OIndexRIDContainerSBTree underlying=new OIndexRIDContainerSBTree(fileId,rootPointer);
+    return new OIndexRIDContainer(fileId,underlying);
+  }
 }

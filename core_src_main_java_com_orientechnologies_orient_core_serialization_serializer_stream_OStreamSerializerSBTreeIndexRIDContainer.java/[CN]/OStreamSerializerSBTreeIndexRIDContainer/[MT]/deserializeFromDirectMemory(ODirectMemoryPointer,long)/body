@@ -1,9 +1,20 @@
 {
-  final byte[] serializedSet=OBinaryTypeSerializer.INSTANCE.deserializeFromDirectMemory(pointer,offset);
-  final String s=OBinaryProtocol.bytes2string(serializedSet);
-  if (s.startsWith("<#@")) {
-    final OSBTreeIndexRIDContainer set=OSBTreeIndexRIDContainer.fromStream(s);
-    return set;
+  final long fileId=LONG_SERIALIZER.deserializeFromDirectMemory(pointer,offset + FILE_ID_OFFSET);
+  if (BOOLEAN_SERIALIZER.deserializeFromDirectMemory(pointer,offset + EMBEDDED_OFFSET)) {
+    final int size=INT_SERIALIZER.deserializeFromDirectMemory(pointer,offset + EMBEDDED_SIZE_OFFSET);
+    final Set<OIdentifiable> underlying=new HashSet<OIdentifiable>(Math.max((int)(size / .75f) + 1,16));
+    long p=offset + EMBEDDED_VALUES_OFFSET;
+    for (int i=0; i < size; i++) {
+      underlying.add(LINK_SERIALIZER.deserializeFromDirectMemory(pointer,p));
+      p+=RID_SIZE;
+    }
+    return new OIndexRIDContainer(fileId,underlying);
   }
-  return (OSBTreeIndexRIDContainer)FORMAT.embeddedCollectionFromStream(null,OType.EMBEDDEDSET,null,OType.LINK,s);
+ else {
+    final long pageIndex=LONG_SERIALIZER.deserializeFromDirectMemory(pointer,offset + SBTREE_ROOTINDEX_OFFSET);
+    final int pageOffset=INT_SERIALIZER.deserializeFromDirectMemory(pointer,offset + SBTREE_ROOTOFFSET_OFFSET);
+    final OBonsaiBucketPointer rootPointer=new OBonsaiBucketPointer(pageIndex,pageOffset);
+    final OIndexRIDContainerSBTree underlying=new OIndexRIDContainerSBTree(fileId,rootPointer);
+    return new OIndexRIDContainer(fileId,underlying);
+  }
 }

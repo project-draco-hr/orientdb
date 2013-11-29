@@ -1,15 +1,38 @@
 {
   if (modCount != extModCount)   throw new ConcurrentModificationException();
+  currentRemoved=false;
   if (currentCounter < currentFinalCounter) {
     currentCounter++;
     return currentValue;
   }
   if (nextChangedEntry != null && nextSBTreeEntry != null) {
-    if (nextChangedEntry.getKey().compareTo(nextSBTreeEntry.getKey()) <= 0)     nextChangedValue();
- else     nextSBTreeValue();
+    if (nextChangedEntry.getKey().compareTo(nextSBTreeEntry.getKey()) < 0) {
+      currentValue=nextChangedEntry.getKey();
+      currentFinalCounter=nextChangedEntry.getValue().intValue();
+      currentCounter=1;
+      nextChangedEntry=nextChangedNotRemovedEntry(changedValuesIterator);
+    }
+ else     if (nextChangedEntry.getKey().compareTo(nextSBTreeEntry.getKey()) >= 0) {
+      currentValue=nextSBTreeEntry.getKey();
+      currentFinalCounter=nextSBTreeEntry.getValue();
+      currentCounter=1;
+      nextSBTreeEntry=nextChangedNotRemovedSBTreeEntry(sbTreeIterator);
+      if (nextChangedEntry != null && nextChangedEntry.getKey().equals(currentValue))       nextChangedEntry=nextChangedNotRemovedEntry(changedValuesIterator);
+    }
   }
- else   if (nextChangedEntry != null)   nextChangedValue();
- else   if (nextSBTreeEntry != null)   nextSBTreeValue();
+ else   if (nextChangedEntry != null) {
+    currentValue=nextChangedEntry.getKey();
+    currentFinalCounter=nextChangedEntry.getValue().intValue();
+    currentCounter=1;
+    nextChangedEntry=nextChangedNotRemovedEntry(changedValuesIterator);
+  }
+ else   if (nextSBTreeEntry != null) {
+    currentValue=nextSBTreeEntry.getKey();
+    currentFinalCounter=nextSBTreeEntry.getValue();
+    currentCounter=1;
+    nextSBTreeEntry=nextChangedNotRemovedSBTreeEntry(sbTreeIterator);
+  }
  else   throw new NoSuchElementException();
+  if (convertToRecord)   return currentValue.getRecord();
   return currentValue;
 }

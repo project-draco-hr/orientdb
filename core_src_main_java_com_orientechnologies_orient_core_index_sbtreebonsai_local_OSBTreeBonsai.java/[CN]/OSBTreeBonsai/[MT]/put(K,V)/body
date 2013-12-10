@@ -1,8 +1,8 @@
 {
   acquireExclusiveLock();
-  final OStorageTransaction transaction=storage.getStorageTransaction();
   try {
-    startDurableOperation(transaction);
+    lockTillAtomicOperationCompletes();
+    startAtomicOperation();
     BucketSearchResult bucketSearchResult=findBucket(key);
     OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
     OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
@@ -33,10 +33,10 @@
     keyBucketPointer.releaseExclusiveLock();
     diskCache.release(keyBucketCacheEntry);
     if (!itemFound)     setSize(size() + 1);
-    endDurableOperation(transaction,false);
+    endAtomicOperation(false);
   }
  catch (  IOException e) {
-    rollback(transaction);
+    rollback();
     throw new OSBTreeException("Error during index update with key " + key + " and value "+ value,e);
   }
  finally {

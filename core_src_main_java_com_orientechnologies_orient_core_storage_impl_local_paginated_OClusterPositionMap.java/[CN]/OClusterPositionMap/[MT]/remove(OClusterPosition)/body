@@ -1,0 +1,33 @@
+{
+  acquireExclusiveLock();
+  try {
+    final long position=clusterPosition.longValue();
+    long pageIndex=position / OClusterPositionMapBucket.MAX_ENTRIES;
+    int index=(int)(position % OClusterPositionMapBucket.MAX_ENTRIES);
+    final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+    final OCachePointer cachePointer=cacheEntry.getCachePointer();
+    cachePointer.acquireExclusiveLock();
+    try {
+      startAtomicOperation();
+      final ODurablePage.TrackMode trackMode=getTrackMode();
+      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+      OClusterPositionMapBucket.PositionEntry positionEntry=bucket.remove(index);
+      if (positionEntry == null)       return null;
+      cacheEntry.markDirty();
+      logPageChanges(bucket,fileId,pageIndex,false);
+      endAtomicOperation(false);
+      return positionEntry;
+    }
+ catch (    Exception e) {
+      endAtomicOperation(true);
+      throw new OStorageException("Error during removal of mapping between logical and physical record position.",e);
+    }
+ finally {
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(cacheEntry);
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

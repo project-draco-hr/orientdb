@@ -11,20 +11,40 @@
     }
   }
 );
+  autoFreeCheckEveryMs=OGlobalConfiguration.MEMORY_AUTOFREE_CHECK_EVERY.getValueAsLong();
+  Orient.instance().getTimer().schedule(new TimerTask(){
+    @Override public void run(){
+      final long usedHeap=heapMemory.getUsed();
+      final long maxHeap=heapMemory.getMax();
+      final int usedMemoryPer=(int)(usedHeap * 100 / maxHeap);
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Checking if memory is lower than configured (%s): used %s of %s (%d%%)",OFileUtils.getSizeAsString(autoFreeHeapThreshold),OFileUtils.getSizeAsString(usedHeap),OFileUtils.getSizeAsString(maxHeap),usedMemoryPer);
+      if (!isMemoryAvailable()) synchronized (listeners) {
+        for (        ListenerWrapper listener : listeners.keySet()) {
+          try {
+            listener.listener.lowMemory(maxHeap - usedHeap,100 - usedMemoryPer);
+          }
+ catch (          Exception e) {
+            e.printStackTrace();
+          }
+        }
+      }
+    }
+  }
+,autoFreeCheckEveryMs,autoFreeCheckEveryMs);
   while (true) {
     try {
       monitorQueue.remove();
       if (Thread.interrupted())       break;
       alertTimes++;
-      long maxMemory=Runtime.getRuntime().maxMemory();
-      long freeMemory=Runtime.getRuntime().freeMemory();
-      int freeMemoryPer=(int)(freeMemory * 100 / maxMemory);
-      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Free memory is low %s of %s (%d%%), calling listeners to free memory...",OFileUtils.getSizeAsString(freeMemory),OFileUtils.getSizeAsString(maxMemory),freeMemoryPer);
+      final long usedHeap=heapMemory.getUsed();
+      final long maxHeap=heapMemory.getMax();
+      final int usedMemoryPer=(int)(usedHeap * 100 / maxHeap);
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Free memory is low %s of %s (%d%%), calling listeners to free memory...",OFileUtils.getSizeAsString(maxHeap - usedHeap),OFileUtils.getSizeAsString(maxHeap),100 - usedMemoryPer);
       final long timer=Orient.instance().getProfiler().startChrono();
 synchronized (listeners) {
         for (        ListenerWrapper listener : listeners.keySet()) {
           try {
-            listener.listener.memoryUsageLow(freeMemory,freeMemoryPer);
+            listener.listener.lowMemory(maxHeap - usedHeap,100 - usedMemoryPer);
           }
  catch (          Exception e) {
             e.printStackTrace();

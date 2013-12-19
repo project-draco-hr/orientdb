@@ -18,10 +18,12 @@
   for (; i < buffer.length; ++i) {
     final char c=buffer[i];
     if (stringBeginChar == ' ') {
-      if (iConsiderBraces)       if (c == LIST_BEGIN)       insideList++;
+      if (iConsiderBraces)       if (c == LIST_BEGIN) {
+        if (i < iMinPosSeparatorAreValid || !isCharPresent(c,iSeparator))         insideList++;
+      }
  else       if (c == LIST_END) {
-        if (!isCharPresent(c,iSeparator)) {
-          if (insideList == 0)           throw new OSerializationException("Found invalid " + LIST_END + " character. Ensure it is opened and closed correctly.");
+        if (i < iMinPosSeparatorAreValid || !isCharPresent(c,iSeparator)) {
+          if (insideList == 0)           throw new OSerializationException("Found invalid " + LIST_END + " character at position "+ i+ " of text "+ iSource+ ". Ensure it is opened and closed correctly.");
           insideList--;
         }
       }
@@ -29,15 +31,15 @@
         insideParenthesis++;
       }
  else       if (c == EMBEDDED_END) {
-        if (insideParenthesis == 0)         throw new OSerializationException("Found invalid " + EMBEDDED_END + " character. Ensure it is opened and closed correctly.");
+        if (insideParenthesis == 0)         throw new OSerializationException("Found invalid " + EMBEDDED_END + " character at position "+ i+ " of text "+ iSource+ ". Ensure it is opened and closed correctly.");
         insideParenthesis--;
       }
  else       if (c == MAP_BEGIN) {
         insideMap++;
       }
  else       if (c == MAP_END) {
-        if (!isCharPresent(c,iSeparator)) {
-          if (insideMap == 0)           throw new OSerializationException("Found invalid " + MAP_END + " character. Ensure it is opened and closed correctly.");
+        if (i < iMinPosSeparatorAreValid || !isCharPresent(c,iSeparator)) {
+          if (insideMap == 0)           throw new OSerializationException("Found invalid " + MAP_END + " character at position "+ i+ " of text "+ iSource+ ". Ensure it is opened and closed correctly.");
           insideMap--;
         }
       }
@@ -45,8 +47,8 @@
  else       if (insideLinkPart == 1 && c == ORID.SEPARATOR)       insideLinkPart=2;
  else       if (iConsiderSets)       if (c == SET_BEGIN)       insideSet++;
  else       if (c == SET_END) {
-        if (!isCharPresent(c,iSeparator)) {
-          if (insideSet == 0)           throw new OSerializationException("Found invalid " + SET_END + " character. Ensure it is opened and closed correctly.");
+        if (i < iMinPosSeparatorAreValid || !isCharPresent(c,iSeparator)) {
+          if (insideSet == 0)           throw new OSerializationException("Found invalid " + SET_END + " character at position "+ i+ " of text "+ iSource+ ". Ensure it is opened and closed correctly.");
           insideSet--;
         }
       }
@@ -55,12 +57,12 @@
         stringBeginChar=c;
       }
       if (insideParenthesis == 0 && insideList == 0 && insideSet == 0 && insideMap == 0 && insideLinkPart == 0) {
-        if (isCharPresent(c,iSeparator)) {
+        if (i > iMinPosSeparatorAreValid && isCharPresent(c,iSeparator)) {
           return beginIndex + i + 1;
         }
       }
       if (iJumpChars.length > 0) {
-        if (isCharPresent(c,iJumpChars))         continue;
+        if (i > iMinPosSeparatorAreValid && isCharPresent(c,iJumpChars))         continue;
       }
     }
  else {

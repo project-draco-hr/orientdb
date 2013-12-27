@@ -10,12 +10,21 @@
     String indexType=null;
     Set<String> clustersToIndex=new HashSet<String>();
     OIndexDefinition indexDefinition=null;
+    ODocument metadata=null;
     while (jsonReader.lastChar() != '}') {
       final String fieldName=jsonReader.readString(OJSONReader.FIELD_ASSIGNMENT);
       if (fieldName.equals("name"))       indexName=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
  else       if (fieldName.equals("type"))       indexType=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
  else       if (fieldName.equals("clustersToIndex"))       clustersToIndex=importClustersToIndex();
- else       if (fieldName.equals("definition"))       indexDefinition=importIndexDefinition();
+ else       if (fieldName.equals("definition")) {
+        indexDefinition=importIndexDefinition();
+        jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
+      }
+ else       if (fieldName.equals("metadata")) {
+        String jsonMetadata=jsonReader.readString(OJSONReader.END_OBJECT,true);
+        metadata=new ODocument().fromJSON(jsonMetadata);
+        jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
+      }
     }
     jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
     if (!indexName.equalsIgnoreCase(EXPORT_IMPORT_MAP_NAME)) {
@@ -28,7 +37,7 @@
         clusterIdsToIndex[i]=database.getClusterIdByName(clusterName);
         i++;
       }
-      indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null);
+      indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null,metadata);
       n++;
       listener.onMessage("OK");
     }

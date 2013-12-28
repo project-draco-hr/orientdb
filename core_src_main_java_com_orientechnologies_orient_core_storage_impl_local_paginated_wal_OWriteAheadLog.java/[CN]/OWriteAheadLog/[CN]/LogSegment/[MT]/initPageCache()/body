@@ -5,11 +5,18 @@ synchronized (rndFile) {
     rndFile.seek((pagesCount - 1) * OWALPage.PAGE_SIZE);
     byte[] content=new byte[OWALPage.PAGE_SIZE];
     rndFile.readFully(content);
-    flushId=OLongSerializer.INSTANCE.deserializeNative(content,OWALPage.FLUSH_ID_OFFSET);
-    ODirectMemoryPointer pointer=new ODirectMemoryPointer(content);
-    currentPage=new OWALPage(pointer,false);
-    filledUpTo=(pagesCount - 1) * OWALPage.PAGE_SIZE + currentPage.getFilledUpTo();
-    nextPositionToFlush=(pagesCount - 1) * OWALPage.PAGE_SIZE;
+    if (checkPageIntegrity(content)) {
+      ODirectMemoryPointer pointer=new ODirectMemoryPointer(content);
+      currentPage=new OWALPage(pointer,false);
+      filledUpTo=(pagesCount - 1) * OWALPage.PAGE_SIZE + currentPage.getFilledUpTo();
+      nextPositionToFlush=(pagesCount - 1) * OWALPage.PAGE_SIZE;
+    }
+ else {
+      ODirectMemoryPointer pointer=new ODirectMemoryPointer(OWALPage.PAGE_SIZE);
+      currentPage=new OWALPage(pointer,true);
+      filledUpTo=pagesCount * OWALPage.PAGE_SIZE + currentPage.getFilledUpTo();
+      nextPositionToFlush=pagesCount * OWALPage.PAGE_SIZE;
+    }
     pagesCache.add(currentPage);
   }
 }

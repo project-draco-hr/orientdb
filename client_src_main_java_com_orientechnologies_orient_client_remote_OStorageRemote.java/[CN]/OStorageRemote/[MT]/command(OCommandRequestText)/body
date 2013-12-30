@@ -7,8 +7,8 @@
   OChannelBinaryAsynchClient network=null;
   do {
     OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
+    final OCommandRequestText aquery=iCommand;
     try {
-      final OCommandRequestText aquery=iCommand;
       final boolean asynch=iCommand instanceof OCommandRequestAsynch && ((OCommandRequestAsynch)iCommand).isAsynchronous();
       try {
         network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
@@ -20,6 +20,7 @@
       }
       try {
         beginResponse(network);
+        boolean addNextRecord=true;
         if (asynch) {
           byte status;
           while ((status=network.readByte()) > 0) {
@@ -27,30 +28,24 @@
             if (record == null)             continue;
 switch (status) {
 case 1:
-              try {
-                if (!aquery.getResultListener().result(record)) {
-                  while (network.in.available() > 0)                   network.in.read();
-                  break;
-                }
+              if (addNextRecord) {
+                addNextRecord=aquery.getResultListener().result(record);
+                database.getLevel1Cache().updateRecord(record);
               }
- catch (              Throwable t) {
-                t.printStackTrace();
-              }
-            database.getLevel1Cache().updateRecord(record);
-          break;
+            break;
 case 2:
-        database.getLevel1Cache().updateRecord(record);
+          database.getLevel1Cache().updateRecord(record);
+      }
     }
   }
-}
  else {
-  final byte type=network.readByte();
+    final byte type=network.readByte();
 switch (type) {
 case 'n':
-    result=null;
-  break;
+      result=null;
+    break;
 case 'r':
-result=OChannelBinaryProtocol.readIdentifiable(network);
+  result=OChannelBinaryProtocol.readIdentifiable(network);
 if (result instanceof ORecord<?>) database.getLevel1Cache().updateRecord((ORecordInternal<?>)result);
 break;
 case 'l':
@@ -81,9 +76,6 @@ if (record != null && status == 2) database.getLevel1Cache().updateRecord(record
 break;
 }
   finally {
-if (aquery.getResultListener() != null) {
-aquery.getResultListener().end();
-}
 endResponse(network);
 }
 }
@@ -95,6 +87,9 @@ handleException(network,"Error on executing command: " + iCommand,e);
 }
  finally {
 OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=false;
+if (aquery.getResultListener() != null) {
+aquery.getResultListener().end();
+}
 }
 }
  while (true);

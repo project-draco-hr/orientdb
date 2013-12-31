@@ -1,0 +1,35 @@
+{
+  ODocument docOne=new ODocument();
+  docOne.save();
+  ODocument docTwo=new ODocument();
+  docTwo.save();
+  ODocument docThree=new ODocument();
+  docThree.save();
+  ODocument rootDoc=new ODocument();
+  OSBTreeRidBag ridBag=new OSBTreeRidBag();
+  rootDoc.field("ridBag",ridBag);
+  ridBag.add(docOne);
+  ridBag.add(docTwo);
+  rootDoc.save();
+  ODocument staleRooDoc=db.load(rootDoc.getIdentity());
+  OSBTreeRidBag staleRidBag=staleRooDoc.field("ridBag");
+  Iterator<OIdentifiable> iterator=staleRidBag.iterator();
+  iterator.next();
+  iterator.remove();
+  staleRidBag.add(docThree);
+  rootDoc.setDirty();
+  rootDoc.save();
+  try {
+    staleRooDoc.save();
+    Assert.fail();
+  }
+ catch (  OConcurrentModificationException e) {
+  }
+  rootDoc=db.load(rootDoc.getIdentity());
+  ridBag=rootDoc.field("ridBag");
+  Assert.assertEquals(ridBag.size(),2);
+  iterator=ridBag.iterator();
+  Assert.assertEquals(iterator.next(),docOne);
+  Assert.assertEquals(iterator.next(),docTwo);
+  Assert.assertTrue(!iterator.hasNext());
+}

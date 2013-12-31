@@ -14,10 +14,20 @@
         try {
           if (recordVersion.getCounter() > -1)           recordVersion.increment();
  else           recordVersion=OVersionFactory.instance().createVersion();
-          ppos=cluster.createRecord(content,recordVersion,recordType);
-          rid.clusterPosition=ppos.clusterPosition;
-          final ORecordSerializationContext context=ORecordSerializationContext.getContext();
-          if (context != null)           context.executeOperations(this);
+          atomicOperationsManager.startAtomicOperation();
+          try {
+            ppos=cluster.createRecord(content,recordVersion,recordType);
+            rid.clusterPosition=ppos.clusterPosition;
+            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+            if (context != null)             context.executeOperations(this);
+          }
+ catch (          RuntimeException e) {
+            atomicOperationsManager.endAtomicOperation(true);
+            throw e;
+          }
+ finally {
+            atomicOperationsManager.endAtomicOperation(false);
+          }
           if (callback != null)           callback.call(rid,ppos.clusterPosition);
           return new OStorageOperationResult<OPhysicalPosition>(ppos);
         }

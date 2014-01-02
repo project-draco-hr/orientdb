@@ -1,0 +1,25 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(URL);
+  db.open("admin","admin");
+  try {
+    ODocument document=new ODocument();
+    OSBTreeRidBag ridBag=new OSBTreeRidBag();
+    document.field("ridBag",ridBag);
+    document.save();
+    ridTreePerDocument.put(document.getIdentity(),new ConcurrentSkipListSet<ORID>());
+    while (true) {
+      final OClusterPosition position=lastClusterPosition.get();
+      if (position.compareTo(document.getIdentity().getClusterPosition()) < 0) {
+        if (lastClusterPosition.compareAndSet(position,document.getIdentity().getClusterPosition()))         break;
+      }
+ else       break;
+    }
+  }
+ catch (  RuntimeException e) {
+    e.printStackTrace();
+    throw e;
+  }
+ finally {
+    db.close();
+  }
+}

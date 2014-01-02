@@ -1,17 +1,21 @@
 {
-  latch.await();
-  int addedRecords=0;
+  final Random random=new Random();
+  long addedRecords=0;
+  int retries=0;
   ODatabaseDocumentTx db=new ODatabaseDocumentTx(URL);
   db.open("admin","admin");
-  db.declareIntent(new OIntentMassiveInsert());
+  final int defaultClusterId=db.getDefaultClusterId();
+  latch.await();
   try {
     while (cont) {
       List<ORID> ridsToAdd=new ArrayList<ORID>();
       for (int i=0; i < 10; i++) {
         ridsToAdd.add(new ORecordId(0,OClusterPositionFactory.INSTANCE.valueOf(positionCounter.incrementAndGet())));
       }
+      final long position=random.nextInt(lastClusterPosition.get().intValue());
+      final ORID orid=new ORecordId(defaultClusterId,OClusterPositionFactory.INSTANCE.valueOf(position));
       while (true) {
-        ODocument document=db.load(docContainerRid);
+        ODocument document=db.load(orid);
         document.setLazyLoad(false);
         OSBTreeRidBag ridBag=document.field("ridBag");
         for (        ORID rid : ridsToAdd)         ridBag.add(rid);
@@ -19,17 +23,23 @@
           document.save();
         }
  catch (        OConcurrentModificationException e) {
+          retries++;
           continue;
         }
         break;
       }
+      final ConcurrentSkipListSet<ORID> ridTree=ridTreePerDocument.get(orid);
       ridTree.addAll(ridsToAdd);
       addedRecords+=ridsToAdd.size();
     }
   }
-  finally {
+ catch (  RuntimeException e) {
+    e.printStackTrace();
+    throw e;
+  }
+ finally {
     db.close();
   }
-  System.out.println(RidAdder.class.getSimpleName() + ":" + id+ "-"+ addedRecords+ " were added.");
+  System.out.println(RidAdder.class.getSimpleName() + ":" + id+ "-"+ addedRecords+ " were added. retries : "+ retries);
   return null;
 }

@@ -1,0 +1,77 @@
+{
+  final ORidBag myBag=myFieldValue;
+  final ORidBag otherBag=otherFieldValue;
+  final int mySize=makeDbCall(iMyDb,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return myBag.size();
+    }
+  }
+);
+  final int otherSize=makeDbCall(iOtherDb,new ODbRelatedCall<Integer>(){
+    public Integer call(){
+      return otherBag.size();
+    }
+  }
+);
+  if (mySize != otherSize)   return false;
+  boolean oldMyAutoConvert;
+  boolean oldOtherAutoConvert;
+  oldMyAutoConvert=myBag.isAutoConvertToRecord();
+  myBag.setAutoConvertToRecord(false);
+  oldOtherAutoConvert=otherBag.isAutoConvertToRecord();
+  otherBag.setAutoConvertToRecord(false);
+  final ORidBag otherBagCopy=makeDbCall(iOtherDb,new ODbRelatedCall<ORidBag>(){
+    @Override public ORidBag call(){
+      final ORidBag otherRidBag=new ORidBag();
+      otherRidBag.setAutoConvertToRecord(false);
+      for (      OIdentifiable identifiable : otherBag)       otherRidBag.add(identifiable);
+      return otherRidBag;
+    }
+  }
+);
+  try {
+    final Iterator<OIdentifiable> myIterator=makeDbCall(iMyDb,new ODbRelatedCall<Iterator<OIdentifiable>>(){
+      public Iterator<OIdentifiable> call(){
+        return myBag.iterator();
+      }
+    }
+);
+    while (makeDbCall(iMyDb,new ODbRelatedCall<Boolean>(){
+      public Boolean call(){
+        return myIterator.hasNext();
+      }
+    }
+)) {
+      final OIdentifiable myIdentifiable=makeDbCall(iMyDb,new ODbRelatedCall<OIdentifiable>(){
+        @Override public OIdentifiable call(){
+          return myIterator.next();
+        }
+      }
+);
+      final ORID otherRid;
+      if (ridMapper != null) {
+        ORID convertedRid=ridMapper.map(myIdentifiable.getIdentity());
+        if (convertedRid != null)         otherRid=convertedRid;
+ else         otherRid=myIdentifiable.getIdentity();
+      }
+ else       otherRid=myIdentifiable.getIdentity();
+      makeDbCall(iOtherDb,new ODbRelatedCall<Object>(){
+        @Override public Object call(){
+          otherBagCopy.remove(otherRid);
+          return null;
+        }
+      }
+);
+    }
+    return makeDbCall(iOtherDb,new ODbRelatedCall<Boolean>(){
+      @Override public Boolean call(){
+        return otherBagCopy.isEmpty();
+      }
+    }
+);
+  }
+  finally {
+    myBag.setAutoConvertToRecord(oldMyAutoConvert);
+    otherBag.setAutoConvertToRecord(oldOtherAutoConvert);
+  }
+}

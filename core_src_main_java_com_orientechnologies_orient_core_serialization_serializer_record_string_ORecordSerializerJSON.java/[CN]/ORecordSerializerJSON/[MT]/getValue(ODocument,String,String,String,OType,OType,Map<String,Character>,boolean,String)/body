@@ -34,10 +34,27 @@
   }
  else   if (iFieldValue.startsWith("[") && iFieldValue.endsWith("]")) {
     final Collection<?> embeddedCollection;
-    if (iType == OType.LINKSET)     embeddedCollection=new OMVRBTreeRIDSet(iRecord);
- else     if (iType == OType.EMBEDDEDSET)     embeddedCollection=new OTrackedSet<Object>(iRecord);
- else     if (iType == OType.LINKLIST)     embeddedCollection=new ORecordLazyList(iRecord);
- else     embeddedCollection=new OTrackedList<Object>(iRecord);
+    final ORidBag ridBag;
+    if (iType == OType.LINKSET) {
+      embeddedCollection=new OMVRBTreeRIDSet(iRecord);
+      ridBag=null;
+    }
+ else     if (iType == OType.EMBEDDEDSET) {
+      embeddedCollection=new OTrackedSet<Object>(iRecord);
+      ridBag=null;
+    }
+ else     if (iType == OType.LINKLIST) {
+      embeddedCollection=new ORecordLazyList(iRecord);
+      ridBag=null;
+    }
+ else     if (iType == OType.LINKBAG) {
+      embeddedCollection=null;
+      ridBag=new ORidBag();
+    }
+ else {
+      embeddedCollection=new OTrackedList<Object>(iRecord);
+      ridBag=null;
+    }
     iFieldValue=iFieldValue.substring(1,iFieldValue.length() - 1);
     if (!iFieldValue.isEmpty()) {
       List<String> items=OStringSerializerHelper.smartSplit(iFieldValue,',');
@@ -46,15 +63,17 @@
         iFieldValue=item.trim();
         if (!(iLinkedType == OType.DATE || iLinkedType == OType.BYTE || iLinkedType == OType.INTEGER || iLinkedType == OType.LONG || iLinkedType == OType.DATETIME || iLinkedType == OType.DECIMAL || iLinkedType == OType.DOUBLE || iLinkedType == OType.FLOAT))         iFieldValueAsString=iFieldValue.length() >= 2 ? iFieldValue.substring(1,iFieldValue.length() - 1) : iFieldValue;
  else         iFieldValueAsString=iFieldValue;
-        collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,iLinkedType,null,iFieldTypes,iNoMap,iOptions);
+        if (ridBag != null)         collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,OType.LINK,null,iFieldTypes,iNoMap,iOptions);
+ else         collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,iLinkedType,null,iFieldTypes,iNoMap,iOptions);
         if (iType != null && iType.isLink()) {
         }
  else         if (collectionItem instanceof ODocument && iRecord instanceof ODocument)         ((ODocument)collectionItem).addOwner(iRecord);
         if (collectionItem instanceof String && ((String)collectionItem).length() == 0)         continue;
-        ((Collection<Object>)embeddedCollection).add(collectionItem);
+        if (embeddedCollection != null)         ((Collection<Object>)embeddedCollection).add(collectionItem);
+ else         ridBag.add((OIdentifiable)collectionItem);
       }
     }
-    return embeddedCollection;
+    return embeddedCollection != null ? embeddedCollection : ridBag;
   }
   if (iType == null)   if (iFieldValue.charAt(0) != '\"' && iFieldValue.charAt(0) != '\'') {
     if (iFieldValue.equalsIgnoreCase("false") || iFieldValue.equalsIgnoreCase("true"))     iType=OType.BOOLEAN;

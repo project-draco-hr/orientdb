@@ -10,8 +10,27 @@
       for (      Object o : ((OMultiCollectionIterator<?>)iToRemove))       set.add(o);
       iToRemove=set;
     }
-    if (iObject instanceof Collection<?>) {
-      final Collection<Object> coll=(Collection<Object>)iObject;
+    if (iObject instanceof Collection<?> || iObject instanceof OCollection<?>) {
+      final OCollection<Object> coll;
+      if (iObject instanceof Collection<?>) {
+        final Collection<Object> collection=(Collection<Object>)iObject;
+        coll=new OCollection<Object>(){
+          @Override public void add(          Object value){
+            collection.add(value);
+          }
+          @Override public void remove(          Object value){
+            collection.remove(value);
+          }
+          @Override public Iterator<Object> iterator(){
+            return collection.iterator();
+          }
+          @Override public int size(){
+            return collection.size();
+          }
+        }
+;
+      }
+ else       coll=(OCollection<Object>)iObject;
       if (iToRemove instanceof Collection<?>) {
         for (        Object o : (Collection<Object>)iToRemove) {
           if (isMultiValue(o))           remove(coll,o,iAllOccurrences);
@@ -31,13 +50,16 @@
  else       if (iToRemove instanceof Iterator<?>) {
         if (iToRemove instanceof OMultiCollectionIterator<?>)         ((OMultiCollectionIterator<?>)iToRemove).reset();
         if (iAllOccurrences) {
+          if (iObject instanceof OCollection)           throw new IllegalStateException("Mutable collection can not be used to remove all occurrences.");
+          final Collection<Object> collection=(Collection)iObject;
           OMultiCollectionIterator<?> it=(OMultiCollectionIterator<?>)iToRemove;
-          batchRemove(coll,it);
+          batchRemove(collection,it);
         }
  else {
-          for (Iterator<?> it=(Iterator<?>)iToRemove; it.hasNext(); ) {
+          Iterator<?> it=(Iterator<?>)iToRemove;
+          if (it.hasNext()) {
             final Object itemToRemove=it.next();
-            while (coll.remove(itemToRemove))             if (!iAllOccurrences)             break;
+            coll.remove(itemToRemove);
           }
         }
       }

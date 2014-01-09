@@ -5,31 +5,37 @@
   if (!rid.isValid())   return;
   checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_DELETE,getClusterNameById(rid.clusterId));
   setCurrentDatabaseinThreadLocal();
+  ORecordSerializationContext.pushContext();
   try {
-    ORecord<?> rec=iRecord.getRecord();
-    if (iCallTriggers && rec != null)     callbackHooks(TYPE.BEFORE_DELETE,rec);
-    final ORecordVersion realVersion=mvcc ? iVersion : OVersionFactory.instance().createUntrackedVersion();
-    final OStorageOperationResult<Boolean> operationResult;
     try {
-      if (prohibitTombstones)       operationResult=new OStorageOperationResult<Boolean>(underlying.cleanOutRecord(rid,realVersion,iRequired,(byte)iMode.ordinal()));
- else       operationResult=underlying.delete(rid,realVersion,iRequired,(byte)iMode.ordinal());
-      if (iCallTriggers) {
-        if (!operationResult.isMoved() && rec != null)         callbackHooks(TYPE.AFTER_DELETE,rec);
- else         if (rec != null)         callbackHooks(TYPE.DELETE_REPLICATED,rec);
+      ORecord<?> rec=iRecord.getRecord();
+      if (iCallTriggers && rec != null)       callbackHooks(TYPE.BEFORE_DELETE,rec);
+      final ORecordVersion realVersion=mvcc ? iVersion : OVersionFactory.instance().createUntrackedVersion();
+      final OStorageOperationResult<Boolean> operationResult;
+      try {
+        if (prohibitTombstones)         operationResult=new OStorageOperationResult<Boolean>(underlying.cleanOutRecord(rid,realVersion,iRequired,(byte)iMode.ordinal()));
+ else         operationResult=underlying.delete(rid,realVersion,iRequired,(byte)iMode.ordinal());
+        if (iCallTriggers) {
+          if (!operationResult.isMoved() && rec != null)           callbackHooks(TYPE.AFTER_DELETE,rec);
+ else           if (rec != null)           callbackHooks(TYPE.DELETE_REPLICATED,rec);
+        }
+      }
+ catch (      Throwable t) {
+        if (iCallTriggers)         callbackHooks(TYPE.DELETE_FAILED,rec);
+        throw t;
+      }
+      if (!operationResult.isMoved()) {
+        getLevel1Cache().deleteRecord(rid);
       }
     }
- catch (    Throwable t) {
-      if (iCallTriggers)       callbackHooks(TYPE.DELETE_FAILED,rec);
-      throw t;
+ catch (    OException e) {
+      throw e;
     }
-    if (!operationResult.isMoved()) {
-      getLevel1Cache().deleteRecord(rid);
+catch (    Throwable t) {
+      throw new ODatabaseException("Error on deleting record in cluster #" + iRecord.getIdentity().getClusterId(),t);
     }
   }
- catch (  OException e) {
-    throw e;
-  }
-catch (  Throwable t) {
-    throw new ODatabaseException("Error on deleting record in cluster #" + iRecord.getIdentity().getClusterId(),t);
+  finally {
+    ORecordSerializationContext.pullContext();
   }
 }

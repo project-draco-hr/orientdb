@@ -1,0 +1,40 @@
+{
+  if (walked.contains(document))   return;
+  walked.add(document);
+  boolean oldLazyLoad=document.isLazyLoad();
+  document.setLazyLoad(false);
+  final boolean updateMode=fieldWalker.updateMode();
+  final OClass clazz=document.getSchemaClass();
+  for (  String fieldName : document.fieldNames()) {
+    final OType concreteType=document.fieldType(fieldName);
+    OType fieldType=concreteType;
+    OType linkedType=null;
+    if (fieldType == null && clazz != null) {
+      OProperty property=clazz.getProperty(fieldName);
+      if (property != null) {
+        fieldType=property.getType();
+        linkedType=property.getLinkedType();
+      }
+    }
+    Object fieldValue=document.field(fieldName,fieldType);
+    Object newValue=fieldWalker.visitField(fieldType,linkedType,fieldValue);
+    boolean updated;
+    if (updateMode)     updated=updateFieldValueIfChanged(document,fieldName,fieldValue,newValue,concreteType);
+ else     updated=false;
+    if (!updated && fieldValue != null && !(OType.LINK.equals(fieldType) || OType.LINKBAG.equals(fieldType) || OType.LINKLIST.equals(fieldType)|| OType.LINKSET.equals(fieldType)|| (fieldValue instanceof ORecordLazyMultiValue))) {
+      if (fieldWalker.goDeeper(fieldType,linkedType,fieldValue)) {
+        if (fieldValue instanceof Map)         walkMap((Map)fieldValue,fieldType,fieldWalker,walked);
+ else         if (OMultiValue.isIterable(fieldValue))         walkIterable(OMultiValue.getMultiValueIterable(fieldValue),fieldType,fieldWalker,walked);
+ else         if (fieldValue instanceof ODocument) {
+          final ODocument doc=(ODocument)fieldValue;
+          if (OType.EMBEDDED.equals(fieldType) || doc.isEmbedded())           walkDocument((ODocument)fieldValue,fieldWalker);
+        }
+      }
+    }
+    if (!fieldWalker.goFurther(fieldType,linkedType,fieldValue,newValue)) {
+      document.setLazyLoad(oldLazyLoad);
+      return;
+    }
+  }
+  document.setLazyLoad(oldLazyLoad);
+}

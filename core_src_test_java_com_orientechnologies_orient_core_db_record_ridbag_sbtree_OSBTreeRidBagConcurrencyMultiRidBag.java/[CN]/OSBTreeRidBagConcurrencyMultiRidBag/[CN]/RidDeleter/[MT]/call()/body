@@ -1,0 +1,52 @@
+{
+  final Random random=new Random();
+  long deletedRecords=0;
+  int retries=0;
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(URL);
+  db.open("admin","admin");
+  final int defaultClusterId=db.getDefaultClusterId();
+  latch.await();
+  try {
+    while (cont) {
+      final long position=random.nextInt(lastClusterPosition.get().intValue());
+      final ORID orid=new ORecordId(defaultClusterId,OClusterPositionFactory.INSTANCE.valueOf(position));
+      while (true) {
+        ODocument document=db.load(orid);
+        document.setLazyLoad(false);
+        ORidBag ridBag=document.field("ridBag");
+        Iterator<OIdentifiable> iterator=ridBag.iterator();
+        List<ORID> ridsToDelete=new ArrayList<ORID>();
+        int counter=0;
+        while (iterator.hasNext()) {
+          OIdentifiable identifiable=iterator.next();
+          if (random.nextBoolean()) {
+            iterator.remove();
+            counter++;
+            ridsToDelete.add(identifiable.getIdentity());
+          }
+          if (counter >= 5)           break;
+        }
+        try {
+          document.save();
+        }
+ catch (        OConcurrentModificationException e) {
+          retries++;
+          continue;
+        }
+        final ConcurrentSkipListSet<ORID> ridTree=ridTreePerDocument.get(orid);
+        ridTree.removeAll(ridsToDelete);
+        deletedRecords+=ridsToDelete.size();
+        break;
+      }
+    }
+  }
+ catch (  RuntimeException e) {
+    e.printStackTrace();
+    throw e;
+  }
+ finally {
+    db.close();
+  }
+  System.out.println(RidDeleter.class.getSimpleName() + ":" + id+ "-"+ deletedRecords+ " were deleted. retries : "+ retries);
+  return null;
+}

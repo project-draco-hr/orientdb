@@ -1,0 +1,30 @@
+{
+  final Random random=new Random();
+  while (true) {
+    if (lastClusterPosition == null)     continue;
+    final long ts=System.currentTimeMillis();
+    final int position=random.nextInt(lastClusterPosition.intValue());
+    final ORID orid=new ORecordId(defaultClusterId,OClusterPositionFactory.INSTANCE.valueOf(position));
+    lockManager.acquireLock(this,orid,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      try {
+        final List<ORID> ridsToAdd=new ArrayList<ORID>(10);
+        for (int i=0; i < 10; i++)         ridsToAdd.add(new ORecordId(0,OClusterPositionFactory.INSTANCE.valueOf(positionCounter.incrementAndGet())));
+        ODatabaseDocumentTx base_db=ODatabaseDocumentPool.global().acquire(URL_BASE,"admin","admin");
+        addRids(orid,base_db,ridsToAdd,ts);
+        base_db.close();
+        ODatabaseDocumentTx test_db=ODatabaseDocumentPool.global().acquire(URL_TEST,"admin","admin");
+        test_db.open("admin","admin");
+        addRids(orid,test_db,ridsToAdd,ts);
+        test_db.close();
+      }
+ catch (      RuntimeException e) {
+        e.printStackTrace();
+        throw e;
+      }
+    }
+  finally {
+      lockManager.releaseLock(this,orid,OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+}

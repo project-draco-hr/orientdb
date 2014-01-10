@@ -1,0 +1,52 @@
+{
+  ORidBag ridBag=new ORidBag();
+  ODocument document=new ODocument();
+  document.field("ridBag",ridBag);
+  assertEmbedded(ridBag.isEmbedded());
+  for (int i=0; i < 10; i++) {
+    ODocument docToAdd=new ODocument();
+    docToAdd.save();
+    ridBag.add(docToAdd);
+  }
+  assertEmbedded(ridBag.isEmbedded());
+  document.save();
+  document.reload();
+  ridBag=document.field("ridBag");
+  Set<OIdentifiable> docs=Collections.newSetFromMap(new IdentityHashMap<OIdentifiable,Boolean>());
+  for (  OIdentifiable id : ridBag)   docs.add(id);
+  db.begin();
+  ridBag=document.field("ridBag");
+  assertEmbedded(ridBag.isEmbedded());
+  for (int i=0; i < 10; i++) {
+    ODocument docToAdd=new ODocument();
+    docToAdd.save();
+    docs.add(docToAdd);
+    ridBag.add(docToAdd);
+  }
+  assertEmbedded(ridBag.isEmbedded());
+  for (int i=0; i < 10; i++) {
+    ODocument docToAdd=new ODocument();
+    docs.add(docToAdd);
+    ridBag.add(docToAdd);
+  }
+  assertEmbedded(ridBag.isEmbedded());
+  for (  OIdentifiable identifiable : ridBag) {
+    Assert.assertTrue(docs.remove(identifiable));
+    ridBag.remove(identifiable);
+    Assert.assertEquals(ridBag.size(),docs.size());
+    int counter=0;
+    for (    OIdentifiable id : ridBag) {
+      Assert.assertTrue(docs.contains(id));
+      counter++;
+    }
+    Assert.assertEquals(counter,docs.size());
+    assertEmbedded(ridBag.isEmbedded());
+  }
+  document.save();
+  db.commit();
+  Assert.assertEquals(ridBag.size(),0);
+  document.reload();
+  ridBag=document.field("ridBag");
+  Assert.assertEquals(ridBag.size(),0);
+  Assert.assertEquals(docs.size(),0);
+}

@@ -1,0 +1,26 @@
+{
+  OBonsaiBucketPointer bucketPointer=rootBucketPointer;
+  final ArrayList<OBonsaiBucketPointer> path=new ArrayList<OBonsaiBucketPointer>();
+  while (true) {
+    path.add(bucketPointer);
+    final OCacheEntry bucketEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+    final OCachePointer pointer=bucketEntry.getCachePointer();
+    final OSBTreeBonsaiBucket.SBTreeEntry<K,V> entry;
+    try {
+      final OSBTreeBonsaiBucket<K,V> keyBucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+      final int index=keyBucket.find(key);
+      if (keyBucket.isLeaf())       return new BucketSearchResult(index,path);
+      if (index >= 0)       entry=keyBucket.getEntry(index);
+ else {
+        final int insertionIndex=-index - 1;
+        if (insertionIndex >= keyBucket.size())         entry=keyBucket.getEntry(insertionIndex - 1);
+ else         entry=keyBucket.getEntry(insertionIndex);
+      }
+    }
+  finally {
+      diskCache.release(bucketEntry);
+    }
+    if (comparator.compare(key,entry.key) >= 0)     bucketPointer=entry.rightChild;
+ else     bucketPointer=entry.leftChild;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  Random rnd=new Random();
+  final int levels=rnd.nextInt(2) + 1;
+  final List<Integer> amountOfAddedDocsPerLevel=new ArrayList<Integer>();
+  final List<Integer> amountOfAddedDocsAfterSavePerLevel=new ArrayList<Integer>();
+  final List<Integer> amountOfDeletedDocsPerLevel=new ArrayList<Integer>();
+  Map<LevelKey,List<OIdentifiable>> addedDocPerLevel=new HashMap<LevelKey,List<OIdentifiable>>();
+  for (int i=0; i < levels; i++) {
+    amountOfAddedDocsPerLevel.add(rnd.nextInt(5) + 10);
+    amountOfAddedDocsAfterSavePerLevel.add(rnd.nextInt(5) + 5);
+    amountOfDeletedDocsPerLevel.add(rnd.nextInt(5) + 5);
+  }
+  db.begin();
+  ODocument rootDoc=new ODocument();
+  createDocsForLevel(amountOfAddedDocsPerLevel,0,levels,addedDocPerLevel,rootDoc);
+  db.commit();
+  addedDocPerLevel=new HashMap<LevelKey,List<OIdentifiable>>(addedDocPerLevel);
+  rootDoc=db.load(rootDoc.getIdentity());
+  db.begin();
+  deleteDocsForLevel(amountOfDeletedDocsPerLevel,0,levels,rootDoc,rnd);
+  addDocsForLevel(amountOfAddedDocsAfterSavePerLevel,0,levels,rootDoc);
+  db.rollback();
+  rootDoc=db.load(rootDoc.getIdentity());
+  assertDocsAfterRollback(0,levels,addedDocPerLevel,rootDoc);
+}

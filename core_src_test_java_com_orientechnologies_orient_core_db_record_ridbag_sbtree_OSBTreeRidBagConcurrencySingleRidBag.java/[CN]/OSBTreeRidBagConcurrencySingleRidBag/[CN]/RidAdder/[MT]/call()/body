@@ -1,0 +1,35 @@
+{
+  latch.await();
+  int addedRecords=0;
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(URL);
+  db.open("admin","admin");
+  db.declareIntent(new OIntentMassiveInsert());
+  try {
+    while (cont) {
+      List<ORID> ridsToAdd=new ArrayList<ORID>();
+      for (int i=0; i < 10; i++) {
+        ridsToAdd.add(new ORecordId(0,OClusterPositionFactory.INSTANCE.valueOf(positionCounter.incrementAndGet())));
+      }
+      while (true) {
+        ODocument document=db.load(docContainerRid);
+        document.setLazyLoad(false);
+        ORidBag ridBag=document.field("ridBag");
+        for (        ORID rid : ridsToAdd)         ridBag.add(rid);
+        try {
+          document.save();
+        }
+ catch (        OConcurrentModificationException e) {
+          continue;
+        }
+        break;
+      }
+      ridTree.addAll(ridsToAdd);
+      addedRecords+=ridsToAdd.size();
+    }
+  }
+  finally {
+    db.close();
+  }
+  System.out.println(RidAdder.class.getSimpleName() + ":" + id+ "-"+ addedRecords+ " were added.");
+  return null;
+}

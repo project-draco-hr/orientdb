@@ -1,0 +1,30 @@
+{
+  ODatabaseDocumentTx base_db=new ODatabaseDocumentTx("plocal:" + buildDir + "/baseLocalPaginatedStorageLinkBagCrashRestore");
+  if (base_db.exists()) {
+    base_db.open("admin","admin");
+    base_db.drop();
+  }
+  base_db.create();
+  URL_BASE=base_db.getURL();
+  defaultClusterId=base_db.getDefaultClusterId();
+  base_db.close();
+  URL_TEST="remote:localhost:3500/testLocalPaginatedStorageLinkBagCrashRestore";
+  List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  futures.add(executorService.submit(new DocumentAdder()));
+  for (int i=0; i < 5; i++)   futures.add(executorService.submit(new RidAdder()));
+  for (int i=0; i < 5; i++)   futures.add(executorService.submit(new RidDeleter()));
+  Thread.sleep(5000);
+  long lastTs=System.currentTimeMillis();
+  System.out.println("Wait for process to destroy");
+  Process p=Runtime.getRuntime().exec("pkill -9 -f RemoteDBRunner");
+  p.waitFor();
+  process.waitFor();
+  System.out.println("Process was destroyed");
+  for (  Future<Void> future : futures)   try {
+    future.get();
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+  }
+  compareDocuments(lastTs);
+}

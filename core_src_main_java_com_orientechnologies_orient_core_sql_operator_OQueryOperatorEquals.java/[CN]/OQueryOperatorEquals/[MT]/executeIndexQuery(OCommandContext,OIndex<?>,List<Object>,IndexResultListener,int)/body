@@ -1,0 +1,38 @@
+{
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  final OIndexInternal<?> internalIndex=index.getInternal();
+  if (!internalIndex.canBeUsedInEqualityOperators())   return null;
+  final Object result;
+  if (indexDefinition.getParamCount() == 1) {
+    final Object key;
+    if (indexDefinition instanceof OIndexDefinitionMultiValue)     key=((OIndexDefinitionMultiValue)indexDefinition).createSingleValue(keyParams.get(0));
+ else     key=indexDefinition.createValue(keyParams);
+    if (key == null)     return null;
+    final Object indexResult;
+    indexResult=index.get(key);
+    result=convertIndexResult(indexResult);
+  }
+ else {
+    final OCompositeIndexDefinition compositeIndexDefinition=(OCompositeIndexDefinition)indexDefinition;
+    final Object keyOne=compositeIndexDefinition.createSingleValue(keyParams);
+    if (keyOne == null)     return null;
+    final Object keyTwo=compositeIndexDefinition.createSingleValue(keyParams);
+    if (internalIndex.hasRangeQuerySupport()) {
+      if (resultListener != null) {
+        index.getValuesBetween(keyOne,true,keyTwo,true,resultListener);
+        result=resultListener.getResult();
+      }
+ else       result=index.getValuesBetween(keyOne,true,keyTwo,true);
+    }
+ else {
+      if (indexDefinition.getParamCount() == keyParams.size()) {
+        final Object indexResult;
+        indexResult=index.get(keyOne);
+        result=convertIndexResult(indexResult);
+      }
+ else       return null;
+    }
+  }
+  updateProfiler(iContext,index,keyParams,indexDefinition);
+  return result;
+}

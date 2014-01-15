@@ -4,20 +4,21 @@
   try {
     if (!checkForClose(force))     return;
     status=STATUS.CLOSING;
-    makeFullCheckpoint();
+    if (!onDelete)     makeFullCheckpoint();
     if (writeAheadLog != null) {
       fuzzyCheckpointExecutor.shutdown();
       if (!fuzzyCheckpointExecutor.awaitTermination(OGlobalConfiguration.WAL_FUZZY_CHECKPOINT_SHUTDOWN_TIMEOUT.getValueAsInteger(),TimeUnit.SECONDS))       throw new OStorageException("Can not terminate fuzzy checkpoint task");
       checkpointExecutor.shutdown();
       if (!checkpointExecutor.awaitTermination(OGlobalConfiguration.WAL_FULL_CHECKPOINT_SHUTDOWN_TIMEOUT.getValueAsInteger(),TimeUnit.SECONDS))       throw new OStorageException("Can not terminate full checkpoint task");
     }
-    for (    OCluster cluster : clusters)     if (cluster != null)     cluster.close(flush);
+    for (    OCluster cluster : clusters)     if (cluster != null)     cluster.close(!onDelete);
     clusters=new OCluster[0];
     clusterMap.clear();
     if (configuration != null)     configuration.close();
     level2Cache.shutdown();
-    super.close(force);
-    diskCache.close();
+    super.close(force,onDelete);
+    if (!onDelete)     diskCache.close();
+ else     diskCache.delete();
     if (writeAheadLog != null)     writeAheadLog.delete();
     Orient.instance().unregisterStorage(this);
     status=STATUS.CLOSED;

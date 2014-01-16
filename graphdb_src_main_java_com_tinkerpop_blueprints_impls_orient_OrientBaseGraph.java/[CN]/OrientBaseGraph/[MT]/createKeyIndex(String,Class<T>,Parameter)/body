@@ -1,0 +1,25 @@
+{
+  if (elementClass == null)   throw ExceptionFactory.classForElementCannotBeNull();
+  executeOutsideTx(new OCallable<OClass,OrientBaseGraph>(){
+    @Override public OClass call(    final OrientBaseGraph g){
+      String indexType=OClass.INDEX_TYPE.NOTUNIQUE.name();
+      OType keyType=OType.STRING;
+      String className=null;
+      final String ancestorClassName=getClassName(elementClass);
+      for (      Parameter<?,?> p : indexParameters) {
+        if (p.getKey().equals("type"))         indexType=p.getValue().toString().toUpperCase();
+ else         if (p.getKey().equals("keytype"))         keyType=OType.valueOf(p.getValue().toString().toUpperCase());
+ else         if (p.getKey().equals("class"))         className=p.getValue().toString();
+      }
+      if (className == null)       className=ancestorClassName;
+      final ODatabaseDocumentTx db=getRawGraph();
+      final OSchema schema=db.getMetadata().getSchema();
+      final OClass cls=schema.getOrCreateClass(className,schema.getClass(ancestorClassName));
+      final OProperty property=cls.getProperty(key);
+      if (property != null)       keyType=property.getType();
+      db.getMetadata().getIndexManager().createIndex(className + "." + key,indexType,new OPropertyIndexDefinition(className,key,keyType),cls.getPolymorphicClusterIds(),null,null);
+      return null;
+    }
+  }
+,"create key index on '",elementClass.getSimpleName(),".",key,"'");
+}

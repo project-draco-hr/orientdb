@@ -1,0 +1,54 @@
+{
+  if (iVertex == null)   return;
+  final Object fieldValue=iVertexToRemove != null ? iVertex.field(iFieldName) : iVertex.removeField(iFieldName);
+  if (fieldValue == null)   return;
+  if (fieldValue instanceof OIdentifiable) {
+    if (iVertexToRemove != null) {
+      if (!fieldValue.equals(iVertexToRemove)) {
+        return;
+      }
+      iVertex.removeField(iFieldName);
+    }
+    if (iAlsoInverse)     removeInverseEdge(iVertex,iFieldName,iVertexToRemove,fieldValue,useVertexFieldsForEdgeLabels);
+    deleteEdgeIfAny((OIdentifiable)fieldValue);
+  }
+ else   if (fieldValue instanceof OMVRBTreeRIDSet) {
+    final OMVRBTreeRIDSet set=(OMVRBTreeRIDSet)fieldValue;
+    if (iVertexToRemove != null) {
+      if (!set.remove(iVertexToRemove)) {
+        boolean found=false;
+        for (OLazyIterator<OIdentifiable> it=set.iterator(false); it.hasNext(); ) {
+          final ODocument curr=it.next().getRecord();
+          if (iVertexToRemove.equals(curr)) {
+            it.remove();
+            if (iAlsoInverse)             removeInverseEdge(iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels);
+            found=true;
+            break;
+          }
+ else           if (curr.getSchemaClass().isSubClassOf(OrientEdge.CLASS_NAME)) {
+            if (curr.getSchemaClass().isSubClassOf(OrientEdge.CLASS_NAME)) {
+              final Direction direction=getConnectionDirection(iFieldName,useVertexFieldsForEdgeLabels);
+              if (iVertexToRemove.equals(OrientEdge.getConnection(curr,direction.opposite()))) {
+                it.remove();
+                if (iAlsoInverse)                 removeInverseEdge(iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels);
+                found=true;
+                break;
+              }
+            }
+          }
+        }
+        if (!found)         OLogManager.instance().warn(null,"[OrientVertex.removeEdges] edge %s not found in field %s",iVertexToRemove,iFieldName);
+      }
+      deleteEdgeIfAny(iVertexToRemove);
+    }
+ else {
+      for (OLazyIterator<OIdentifiable> it=set.iterator(false); it.hasNext(); ) {
+        final OIdentifiable edge=it.next();
+        if (iAlsoInverse)         removeInverseEdge(iVertex,iFieldName,null,edge,useVertexFieldsForEdgeLabels);
+        deleteEdgeIfAny(edge);
+      }
+    }
+    if (set.isEmpty())     iVertex.removeField(iFieldName);
+  }
+  iVertex.save();
+}

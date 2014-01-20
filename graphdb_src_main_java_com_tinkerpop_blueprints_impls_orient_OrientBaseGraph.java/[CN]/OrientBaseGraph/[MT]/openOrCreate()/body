@@ -1,0 +1,23 @@
+{
+  if (url == null)   throw new IllegalStateException("Database is closed");
+synchronized (this) {
+    OrientGraphContext context=threadContext.get();
+    if (context != null)     removeContext();
+    context=new OrientGraphContext();
+    threadContext.set(context);
+synchronized (contexts) {
+      contexts.add(context);
+    }
+    context.rawGraph=new ODatabaseDocumentTx(url);
+    if (url.startsWith("remote:") || context.rawGraph.exists()) {
+      context.rawGraph.open(username,password);
+      for (      OIndex<?> idx : context.rawGraph.getMetadata().getIndexManager().getIndexes()) {
+        ODocument metadata=idx.getMetadata();
+        if (metadata != null && metadata.field(OrientIndex.CONFIG_CLASSNAME) != null)         loadIndex(idx);
+      }
+    }
+ else     context.rawGraph.create();
+    checkForGraphSchema(context.rawGraph);
+    return context;
+  }
+}

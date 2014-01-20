@@ -1,0 +1,41 @@
+{
+  OChannelBinaryAsynchClient network=null;
+  lock.acquireExclusiveLock();
+  try {
+    networkPoolLock.lock();
+    try {
+      if (networkPool.size() > 0) {
+        try {
+          network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
+        }
+  finally {
+          endRequest(network);
+        }
+      }
+    }
+  finally {
+      networkPoolLock.unlock();
+    }
+    setSessionId(null,-1);
+    if (!checkForClose(iForce))     return;
+    networkPoolLock.lock();
+    try {
+      for (      OChannelBinaryAsynchClient n : new ArrayList<OChannelBinaryAsynchClient>(networkPool))       n.close();
+      networkPool.clear();
+    }
+  finally {
+      networkPoolLock.unlock();
+    }
+    level2Cache.shutdown();
+    super.close(iForce,onDelete);
+    status=STATUS.CLOSED;
+    Orient.instance().unregisterStorage(this);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().debug(this,"Error on closing remote connection: %s",network);
+    network.close();
+  }
+ finally {
+    lock.releaseExclusiveLock();
+  }
+}

@@ -1,0 +1,36 @@
+{
+  CountDownLatch endLatch=new CountDownLatch(threadCount);
+  this.threads=new TestExecutor[threadCount];
+  for (int i=0; i < threadCount; i++) {
+    this.threads[i]=new TestExecutor(i,endLatch,maxSleepTime,maxOpCount);
+    System.out.println("Starting thread id: " + i);
+    this.threads[i].seedData(initialCacheSize);
+    new Thread(this.threads[i]).start();
+  }
+  if (runtimeInMin > 0) {
+    try {
+      Thread.sleep(60000 * runtimeInMin);
+    }
+ catch (    InterruptedException e) {
+      e.printStackTrace();
+    }
+    int successfulThreadCount=0;
+    for (    TestExecutor thread : this.threads) {
+      if (!thread.isShutdown()) {
+        ++successfulThreadCount;
+        thread.shutdown();
+      }
+    }
+    Assert.assertEquals(threadCount,successfulThreadCount);
+  }
+  try {
+    endLatch.await();
+  }
+ catch (  InterruptedException e) {
+  }
+ finally {
+    if (!this.isValidData) {
+      Assert.fail(getFailureMessage());
+    }
+  }
+}

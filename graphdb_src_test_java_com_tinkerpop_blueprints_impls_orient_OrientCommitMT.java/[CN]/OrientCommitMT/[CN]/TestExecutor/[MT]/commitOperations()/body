@@ -1,0 +1,51 @@
+{
+  OrientGraph graph=new OrientGraph(DB_URL,DB_USER,DB_PASSWORD);
+  try {
+    List<TempCacheObject> tempCache=new ArrayList<TempCacheObject>();
+    try {
+      List<Operation> operations=generateOperations(this.maxOpCount);
+      System.out.println("ThreadId: " + this.threadId + " Operations to execute are: "+ operations);
+      System.out.println("ThreadId: " + this.threadId + " Beginning transaction.");
+      for (      Operation operation : operations) {
+        if (Operation.INSERT.equals(operation)) {
+          IdPair insertedNode=insertNewNode(graph);
+          ORID insertId=insertedNode.getOrid();
+          System.out.println("ThreadId: " + this.threadId + " Inserting "+ insertId);
+          tempCache.add(new TempCacheObject(operation,insertId,insertedNode.getCustomId()));
+        }
+ else         if (Operation.DELETE.equals(operation)) {
+          ORID deleteId=getRandomIdForThread();
+          if (deleteId != null) {
+            System.out.println("ThreadId: " + this.threadId + " Deleting "+ deleteId);
+            Integer customId=deleteExistingNode(deleteId,graph);
+            tempCache.add(new TempCacheObject(operation,deleteId,customId));
+          }
+ else {
+            System.out.println("ThreadId: " + this.threadId + " no ids in database for thread to delete.");
+          }
+        }
+      }
+      System.out.println("ThreadId: " + this.threadId + " Committing transaction. "+ tempCache);
+      graph.commit();
+      System.out.println("ThreadId: " + this.threadId + " transaction committed. "+ tempCache);
+    }
+ catch (    Exception e) {
+      graph.rollback();
+      tempCache.clear();
+      System.out.println("ThreadId: " + this.threadId + " Rolling back transaction due to "+ e.getClass().getSimpleName()+ " "+ e.getMessage());
+      e.printStackTrace(System.out);
+    }
+    updateCache(tempCache);
+    validateCustomIdsAgainstDatabase();
+    validateDatabase(this.cache);
+  }
+ catch (  Exception e) {
+    System.out.println("ThreadId: " + this.threadId + " threw a validation exception: "+ e.getMessage());
+    e.printStackTrace(System.out);
+    setFailureMessage(e.getMessage());
+    this.shutdown=true;
+  }
+ finally {
+    graph.shutdown();
+  }
+}

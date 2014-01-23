@@ -1,24 +1,31 @@
 {
+  doDeserialization();
   if (identifiable.getIdentity().isValid()) {
-    final OModifiableInteger counter=entries.get(identifiable);
-    if (counter == null)     return;
+    final IdentifiableContainer container=entries.get(identifiable.getIdentity());
+    if (container == null)     return;
+    final OModifiableInteger counter=container.getCounter();
     counter.decrement();
     if (counter.intValue() < 1) {
-      entries.remove(identifiable);
-      if (identifiable instanceof ORecord) {
-        ORecord record=(ORecord)identifiable;
+      entries.remove(identifiable.getIdentity());
+      if (container.getIdentifiable() instanceof ORecord) {
+        final ORecord record=(ORecord)container.getIdentifiable();
         record.removeIdentityChangeListener(this);
       }
     }
     size--;
+    contentWasChanged=true;
     fireCollectionChangedEvent(new OMultiValueChangeEvent<OIdentifiable,OIdentifiable>(OMultiValueChangeEvent.OChangeType.REMOVE,identifiable,null,identifiable));
   }
- else   if (newEntries.remove(identifiable) != null) {
-    size--;
-    if (identifiable instanceof ORecord) {
-      ORecord record=(ORecord)identifiable;
-      record.removeIdentityChangeListener(this);
+ else {
+    final OModifiableInteger counter=newEntries.remove(identifiable);
+    if (counter != null) {
+      size--;
+      contentWasChanged=true;
+      if (identifiable instanceof ORecord) {
+        final ORecord record=(ORecord)identifiable;
+        record.removeIdentityChangeListener(this);
+      }
+      fireCollectionChangedEvent(new OMultiValueChangeEvent<OIdentifiable,OIdentifiable>(OMultiValueChangeEvent.OChangeType.REMOVE,identifiable,null,identifiable));
     }
-    fireCollectionChangedEvent(new OMultiValueChangeEvent<OIdentifiable,OIdentifiable>(OMultiValueChangeEvent.OChangeType.REMOVE,identifiable,null,identifiable));
   }
 }

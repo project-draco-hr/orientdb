@@ -1,13 +1,25 @@
 {
   if (identifiable.getIdentity().isValid()) {
     final IdentifiableContainer container=entries.get(identifiable.getIdentity());
-    if (container == null)     entries.put(identifiable.getIdentity().copy(),new IdentifiableContainer(identifiable,new OModifiableInteger(1)));
+    if (container == null) {
+      entries.put(identifiable.getIdentity().copy(),new IdentifiableContainer(identifiable,new OModifiableInteger(1)));
+      if (identifiable instanceof ORecord) {
+        final ORecord record=(ORecord)identifiable;
+        record.addIdentityChangeListener(this);
+      }
+    }
  else     container.getCounter().increment();
   }
- else   newEntries.put(identifiable,new OModifiableInteger(1));
-  if (identifiable instanceof ORecord) {
-    final ORecord record=(ORecord)identifiable;
-    record.addIdentityChangeListener(this);
+ else {
+    final OModifiableInteger counter=newEntries.get(identifiable);
+    if (counter == null) {
+      if (identifiable instanceof ORecord) {
+        final ORecord record=(ORecord)identifiable;
+        record.addIdentityChangeListener(this);
+      }
+      newEntries.put(identifiable,new OModifiableInteger(1));
+    }
+ else     counter.increment();
   }
   size++;
   contentWasChanged=true;

@@ -1,30 +1,25 @@
 {
-  for (  OIdentifiable identifiable : entries.keySet()) {
-    if (identifiable instanceof ORecord) {
-      ORecord record=(ORecord)identifiable;
-      if (record.getIdentity().isNew() || record.isDirty()) {
-        record.save();
-      }
+  convertRecords2Links();
+  if (!deserialized) {
+    System.arraycopy(serializedContent,0,stream,offset,serializedContent.length);
+    if (contentWasChanged) {
+      OIntegerSerializer.INSTANCE.serialize(size,stream,offset);
+      offset+=serializedContent.length;
+    }
+ else {
+      offset+=serializedContent.length;
+      return offset;
     }
   }
-  for (  OIdentifiable identifiable : newEntries.keySet()) {
-    if (identifiable instanceof ORecord) {
-      ORecord record=(ORecord)identifiable;
-      record.removeIdentityChangeListener(this);
-      record.save();
-      record.addIdentityChangeListener(this);
-      entries.put(identifiable,new OModifiableInteger(1));
-    }
- else     entries.put(identifiable,new OModifiableInteger(1));
-  }
-  newEntries.clear();
-  OIntegerSerializer.INSTANCE.serialize(entries.size(),stream,offset);
-  offset+=OIntegerSerializer.INT_SIZE;
-  for (  Map.Entry<OIdentifiable,OModifiableInteger> entry : entries.entrySet()) {
-    OLinkSerializer.INSTANCE.serialize(entry.getKey(),stream,offset);
-    offset+=OLinkSerializer.RID_SIZE;
-    OIntegerSerializer.INSTANCE.serialize(entry.getValue().intValue(),stream,offset);
+ else {
+    OIntegerSerializer.INSTANCE.serialize(size,stream,offset);
     offset+=OIntegerSerializer.INT_SIZE;
+  }
+  for (  Object entry : entries) {
+    if (entry instanceof OIdentifiable) {
+      OLinkSerializer.INSTANCE.serialize((OIdentifiable)entry,stream,offset);
+      offset+=OLinkSerializer.RID_SIZE;
+    }
   }
   return offset;
 }

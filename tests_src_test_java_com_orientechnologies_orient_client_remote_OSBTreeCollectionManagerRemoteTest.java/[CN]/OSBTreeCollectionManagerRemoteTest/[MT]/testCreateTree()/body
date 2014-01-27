@@ -1,0 +1,22 @@
+{
+  OSBTreeCollectionManagerRemote remoteManager=new OSBTreeCollectionManagerRemote(networkSerializerMock);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbMock);
+  when(dbMock.getStorage()).thenReturn(storageMock);
+  when(storageMock.getUnderlying()).thenReturn(storageMock);
+  when(storageMock.beginRequest(eq(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI))).thenReturn(clientMock);
+  when(networkSerializerMock.readCollectionPointer(Mockito.<OChannelBinaryAsynchClient>any())).thenReturn(new OBonsaiCollectionPointer(EXPECTED_FILE_ID,EXPECTED_ROOT_POINTER));
+  OSBTreeBonsaiRemote<OIdentifiable,Integer> tree=remoteManager.createTree(EXPECTED_CLUSTER_ID);
+  assertNotNull(tree);
+  assertEquals(tree.getFileId(),EXPECTED_FILE_ID);
+  assertEquals(tree.getRootBucketPointer(),EXPECTED_ROOT_POINTER);
+  verify(dbMock).getStorage();
+  verifyNoMoreInteractions(dbMock);
+  verify(storageMock).getUnderlying();
+  verify(storageMock).beginRequest(eq(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI));
+  verify(clientMock).writeInt(eq(EXPECTED_CLUSTER_ID));
+  verify(storageMock).endRequest(same(clientMock));
+  verify(storageMock).beginResponse(same(clientMock));
+  verify(networkSerializerMock).readCollectionPointer(same(clientMock));
+  verify(storageMock).endResponse(same(clientMock));
+  verifyNoMoreInteractions(storageMock);
+}

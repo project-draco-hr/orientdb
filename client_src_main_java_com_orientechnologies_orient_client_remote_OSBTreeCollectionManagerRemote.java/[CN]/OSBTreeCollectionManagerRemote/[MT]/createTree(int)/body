@@ -1,4 +1,15 @@
 {
   OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
-  return new OSBTreeBonsaiRemote<OIdentifiable,Integer>(null);
+  try {
+    OChannelBinaryAsynchClient client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI);
+    client.writeInt(clusterId);
+    storage.endRequest(client);
+    storage.beginResponse(client);
+    OBonsaiCollectionPointer pointer=networkSerializer.readCollectionPointer(client);
+    storage.endResponse(client);
+    return new OSBTreeBonsaiRemote<OIdentifiable,Integer>(pointer);
+  }
+ catch (  IOException e) {
+    throw new ODatabaseException("Can't create sb-tree bonsai.",e);
+  }
 }

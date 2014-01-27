@@ -21,12 +21,18 @@ synchronized (installDatabaseLock) {
           final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
           distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class);
           distrDatabase.configureDatabase(null,false,false);
-          final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+          final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
           OBuffer result=null;
-          for (          Entry<String,OBuffer> r : results.entrySet())           if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
-            result=r.getValue();
-            ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
-            break;
+          for (          Entry<String,Object> r : results.entrySet()) {
+            if (r.getValue() instanceof Exception)             ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s",(Exception)r.getValue(),databaseName,dbPath);
+ else {
+              final OBuffer buffer=(OBuffer)r.getValue();
+              if (buffer.getBuffer() != null && buffer.getBuffer().length > 0) {
+                result=buffer;
+                ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
+                break;
+              }
+            }
           }
           if (result == null)           throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
           new File(dbPath).mkdirs();

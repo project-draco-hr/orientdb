@@ -24,7 +24,7 @@
           found=true;
           break;
         }
- else         if (curr.getSchemaClass().isSubClassOf(OrientEdge.CLASS_NAME)) {
+ else         if (curr.getSchemaClass().isSubClassOf(OrientEdgeType.CLASS_NAME)) {
           final Direction direction=getConnectionDirection(iFieldName,useVertexFieldsForEdgeLabels);
           if (iVertexToRemove.equals(OrientEdge.getConnection(curr,direction.opposite()))) {
             it.remove();
@@ -45,6 +45,39 @@
       }
     }
     if (bag.isEmpty())     iVertex.removeField(iFieldName);
+  }
+ else   if (fieldValue instanceof Collection) {
+    final Collection col=(Collection)fieldValue;
+    if (iVertexToRemove != null) {
+      boolean found=false;
+      for (Iterator<OIdentifiable> it=col.iterator(); it.hasNext(); ) {
+        final ODocument curr=it.next().getRecord();
+        if (iVertexToRemove.equals(curr)) {
+          it.remove();
+          if (iAlsoInverse)           removeInverseEdge(iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels);
+          found=true;
+          break;
+        }
+ else         if (curr.getSchemaClass().isSubClassOf(OrientEdgeType.CLASS_NAME)) {
+          final Direction direction=getConnectionDirection(iFieldName,useVertexFieldsForEdgeLabels);
+          if (iVertexToRemove.equals(OrientEdge.getConnection(curr,direction.opposite()))) {
+            it.remove();
+            if (iAlsoInverse)             removeInverseEdge(iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels);
+            found=true;
+            break;
+          }
+        }
+      }
+      if (!found)       OLogManager.instance().warn(null,"[OrientVertex.removeEdges] edge %s not found in field %s",iVertexToRemove,iFieldName);
+      deleteEdgeIfAny(iVertexToRemove);
+    }
+ else {
+      for (      final OIdentifiable edge : (Iterable<OIdentifiable>)col) {
+        if (iAlsoInverse)         removeInverseEdge(iVertex,iFieldName,null,edge,useVertexFieldsForEdgeLabels);
+        deleteEdgeIfAny(edge);
+      }
+    }
+    if (col.isEmpty())     iVertex.removeField(iFieldName);
   }
   iVertex.save();
 }

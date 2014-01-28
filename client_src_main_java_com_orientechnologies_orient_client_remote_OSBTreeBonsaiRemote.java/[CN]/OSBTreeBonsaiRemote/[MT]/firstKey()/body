@@ -1,3 +1,15 @@
 {
-  throw new UnsupportedOperationException("Not implemented yet.");
+  OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+  try {
+    OChannelBinaryAsynchClient client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_FIRST_KEY);
+    OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
+    storage.endRequest(client);
+    storage.beginResponse(client);
+    byte[] stream=client.readBytes();
+    storage.endResponse(client);
+    return keySerializer.deserialize(stream,0);
+  }
+ catch (  IOException e) {
+    throw new ODatabaseException("Can't get first key from sb-tree bonsai.",e);
+  }
 }

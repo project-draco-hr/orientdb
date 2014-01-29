@@ -22,9 +22,20 @@
       oldDelegate.requestDelete();
     }
   }
-  final byte[] stream=new byte[OByteSerializer.BYTE_SIZE + delegate.getSerializedSize()];
-  if (isEmbedded())   stream[0]=1;
-  delegate.serialize(stream,1);
+  uuid=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager().listenForChanges(this);
+  boolean hasUuid=uuid != null;
+  final int serializedSize=OByteSerializer.BYTE_SIZE + delegate.getSerializedSize() + ((hasUuid) ? OUUIDSerializer.UUID_SIZE : 0);
+  final byte[] stream=new byte[serializedSize];
+  byte configByte=0;
+  if (isEmbedded())   configByte|=1;
+  if (hasUuid)   configByte|=2;
+  stream[0]=configByte;
+  int offset=1;
+  if (hasUuid) {
+    OUUIDSerializer.INSTANCE.serialize(uuid,stream,offset);
+    offset+=OUUIDSerializer.UUID_SIZE;
+  }
+  delegate.serialize(stream,offset);
   output.append(OBase64Utils.encodeBytes(stream));
   return this;
 }

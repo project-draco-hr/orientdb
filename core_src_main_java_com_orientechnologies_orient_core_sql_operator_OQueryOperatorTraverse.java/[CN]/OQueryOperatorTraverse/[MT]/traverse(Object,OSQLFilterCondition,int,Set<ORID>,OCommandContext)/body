@@ -1,11 +1,8 @@
 {
   if (endDeepLevel > -1 && iLevel > endDeepLevel)   return false;
-  if (iTarget instanceof ORID) {
-    if (iEvaluatedRecords.contains(iTarget))     return false;
-    iTarget=new ODocument((ORID)iTarget);
-  }
- else   if (iTarget instanceof ODocument) {
-    if (iEvaluatedRecords.contains(((ODocument)iTarget).getIdentity()))     return false;
+  if (iTarget instanceof OIdentifiable) {
+    if (iEvaluatedRecords.contains(((OIdentifiable)iTarget).getIdentity()))     return false;
+    iTarget=((OIdentifiable)iTarget).getRecord();
   }
   if (iTarget instanceof ODocument) {
     final ODocument target=(ODocument)iTarget;
@@ -36,16 +33,22 @@
       if (traverse(o,iCondition,iLevel + 1,iEvaluatedRecords,iContext) == Boolean.TRUE)       return true;
     }
   }
- else   if (iTarget instanceof Collection<?>) {
-    final Collection<Object> collection=(Collection<Object>)iTarget;
-    for (    final Object o : collection) {
-      if (traverse(o,iCondition,iLevel + 1,iEvaluatedRecords,iContext) == Boolean.TRUE)       return true;
-    }
-  }
  else   if (iTarget instanceof Map<?,?>) {
     final Map<Object,Object> map=(Map<Object,Object>)iTarget;
     for (    final Object o : map.values()) {
       if (traverse(o,iCondition,iLevel + 1,iEvaluatedRecords,iContext) == Boolean.TRUE)       return true;
+    }
+  }
+ else   if (OMultiValue.isMultiValue(iTarget)) {
+    final Iterable<Object> collection=OMultiValue.getMultiValueIterable(iTarget);
+    for (    final Object o : collection) {
+      if (traverse(o,iCondition,iLevel + 1,iEvaluatedRecords,iContext) == Boolean.TRUE)       return true;
+    }
+  }
+ else   if (iTarget instanceof Iterator) {
+    final Iterator iterator=(Iterator)iTarget;
+    while (iterator.hasNext()) {
+      if (traverse(iterator.next(),iCondition,iLevel + 1,iEvaluatedRecords,iContext) == Boolean.TRUE)       return true;
     }
   }
   return false;

@@ -34,25 +34,38 @@ synchronized (installDatabaseLock) {
  else               if (value instanceof ODistributedDatabaseChunk) {
                 ODistributedDatabaseChunk chunk=(ODistributedDatabaseChunk)value;
                 final String fileName=System.getProperty("java.io.tmpdir") + "/orientdb/install_" + databaseName+ ".zip";
+                ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.NONE,"copying remote database '%s' to: %s",databaseName,fileName);
                 final File file=new File(fileName);
                 if (file.exists())                 file.delete();
+                FileOutputStream out=null;
                 try {
-                  final FileOutputStream out=new FileOutputStream(fileName,false);
-                  out.write(chunk.buffer);
-                  for (int chunkNum=1; !chunk.last; chunkNum++) {
+                  out=new FileOutputStream(fileName,false);
+                  long fileSize=writeDatabaseChunk(1,chunk,out);
+                  for (int chunkNum=2; !chunk.last; chunkNum++) {
                     distrDatabase.setWaitForTaskType(OCopyDatabaseChunkTask.class);
                     final Map<String,Object> result=(Map<String,Object>)sendRequest(databaseName,null,new OCopyDatabaseChunkTask(r.getKey(),chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
                     for (                    Entry<String,Object> res : result.entrySet()) {
                       if (res.getValue() instanceof Boolean)                       continue;
  else {
                         chunk=(ODistributedDatabaseChunk)res.getValue();
-                        out.write(chunk.buffer);
+                        fileSize+=writeDatabaseChunk(chunkNum,chunk,out);
                       }
                     }
                   }
+                  ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
                 }
  catch (                Exception e) {
                   ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
+                }
+ finally {
+                  try {
+                    if (out != null) {
+                      out.flush();
+                      out.close();
+                    }
+                  }
+ catch (                  IOException e) {
+                  }
                 }
                 installDatabase(distrDatabase,databaseName,dbPath,r.getKey(),fileName);
                 return;

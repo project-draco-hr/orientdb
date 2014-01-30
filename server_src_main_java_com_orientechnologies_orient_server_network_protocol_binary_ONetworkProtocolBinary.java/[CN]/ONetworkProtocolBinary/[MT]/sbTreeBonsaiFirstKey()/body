@@ -3,9 +3,16 @@
   OBonsaiCollectionPointer collectionPointer=OCollectionNetworkSerializer.INSTANCE.readCollectionPointer(channel);
   OSBTreeBonsai<OIdentifiable,Integer> tree=connection.database.getSbTreeCollectionManager().loadSBTree(collectionPointer);
   OIdentifiable result=tree.firstKey();
-  OBinarySerializer<OIdentifiable> keySerializer=tree.getKeySerializer();
-  byte[] stream=new byte[keySerializer.getObjectSize(result)];
-  keySerializer.serialize(result,stream,0);
+  final OBinarySerializer<? super OIdentifiable> keySerializer;
+  if (result == null) {
+    keySerializer=ONullSerializer.INSTANCE;
+  }
+ else {
+    keySerializer=tree.getKeySerializer();
+  }
+  byte[] stream=new byte[OByteSerializer.BYTE_SIZE + keySerializer.getObjectSize(result)];
+  OByteSerializer.INSTANCE.serialize(keySerializer.getId(),stream,0);
+  keySerializer.serialize(result,stream,OByteSerializer.BYTE_SIZE);
   beginResponse();
   try {
     sendOk(clientTxId);

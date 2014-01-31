@@ -1,0 +1,27 @@
+{
+  final OCompositeIndexDefinition compositeIndexDefinition=new OCompositeIndexDefinition();
+  compositeIndexDefinition.addIndex(new OPropertyIndexDefinition("testCollectionClass","fOne",OType.INTEGER));
+  compositeIndexDefinition.addIndex(new OPropertyRidBagIndexDefinition("testCollectionClass","fTwo"));
+  compositeIndexDefinition.addIndex(new OPropertyIndexDefinition("testCollectionClass","fThree",OType.INTEGER));
+  final ORidBag ridBag=new ORidBag();
+  final List<OMultiValueChangeEvent<OIdentifiable,OIdentifiable>> firedEvents=new ArrayList<OMultiValueChangeEvent<OIdentifiable,OIdentifiable>>();
+  ridBag.add(new ORecordId("#10:1"));
+  ridBag.add(new ORecordId("#10:2"));
+  ridBag.add(new ORecordId("#10:3"));
+  ridBag.remove(new ORecordId("#10:2"));
+  ridBag.addChangeListener(new OMultiValueChangeListener<OIdentifiable,OIdentifiable>(){
+    public void onAfterRecordChanged(    final OMultiValueChangeEvent<OIdentifiable,OIdentifiable> event){
+      firedEvents.add(event);
+    }
+  }
+);
+  ridBag.add(new ORecordId("#10:4"));
+  ridBag.remove(new ORecordId("#10:1"));
+  Map<OCompositeKey,Integer> keysToAdd=new HashMap<OCompositeKey,Integer>();
+  Map<OCompositeKey,Integer> keysToRemove=new HashMap<OCompositeKey,Integer>();
+  for (  OMultiValueChangeEvent<OIdentifiable,OIdentifiable> multiValueChangeEvent : firedEvents)   compositeIndexDefinition.processChangeEvent(multiValueChangeEvent,keysToAdd,keysToRemove,2,3);
+  Assert.assertEquals(keysToRemove.size(),1);
+  Assert.assertEquals(keysToAdd.size(),1);
+  Assert.assertTrue(keysToAdd.containsKey(new OCompositeKey(2,new ORecordId("#10:4"),3)));
+  Assert.assertTrue(keysToRemove.containsKey(new OCompositeKey(2,new ORecordId("#10:1"),3)));
+}

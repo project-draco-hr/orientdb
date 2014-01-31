@@ -5,11 +5,16 @@
     if (lock.tryLock()) {
       try {
         ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"deploying database %s...",databaseName);
-        final ByteArrayOutputStream out=new ByteArrayOutputStream();
-        database.backup(out,null,null);
-        final byte[] buffer=out.toByteArray();
-        ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"sending the compressed database %s over the network, total %s",databaseName,OFileUtils.getSizeAsString(buffer.length));
-        return new OBuffer(buffer);
+        final File f=new File(Orient.getTempPath() + "/backup_" + database.getName()+ ".zip");
+        if (f.exists())         f.delete();
+ else         f.getParentFile().mkdirs();
+        f.createNewFile();
+        ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"creating backup of database '%s' in directory: %s...",databaseName,f.getAbsolutePath());
+        database.backup(new FileOutputStream(f),null,null);
+        ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"sending the compressed database '%s' over the network to node '%s', size=%s...",databaseName,getNodeSource(),OFileUtils.getSizeAsString(f.length()));
+        final ODistributedDatabaseChunk chunk=new ODistributedDatabaseChunk(f,0,CHUNK_MAX_SIZE);
+        ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.OUT,"- transferring chunk #%d offset=%d size=%s...",1,0,OFileUtils.getSizeAsNumber(chunk.buffer.length));
+        return chunk;
       }
   finally {
         lock.unlock();
@@ -18,5 +23,5 @@
  else     ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.NONE,"skip deploying database %s because another node is doing it",databaseName);
   }
  else   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.NONE,"skip deploying database from the same node");
-  return new OBuffer(new byte[0]);
+  return Boolean.FALSE;
 }

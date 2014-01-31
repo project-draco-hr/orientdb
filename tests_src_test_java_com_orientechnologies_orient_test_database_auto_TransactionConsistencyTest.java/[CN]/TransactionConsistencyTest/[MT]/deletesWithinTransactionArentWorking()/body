@@ -1,22 +1,19 @@
 {
-  OGraphDatabase db=new OGraphDatabase(url);
-  db.open("admin","admin");
+  OrientGraph graph=new OrientGraph(url);
+  graph.setUseLightweightEdges(false);
   try {
-    if (db.getVertexType("Foo") == null)     db.createVertexType("Foo");
-    if (db.getVertexType("Bar") == null)     db.createVertexType("Bar");
-    if (db.getVertexType("Sees") == null)     db.createEdgeType("Sees");
-    db.begin(TXTYPE.OPTIMISTIC);
-    ODocument foo=db.createVertex("Foo").field("prop","test1").save();
-    ODocument bar=db.createVertex("Bar").field("prop","test1").save();
-    ODocument sees=db.createEdge(foo,bar,"Sees");
-    db.commit();
-    List<ODocument> foos=db.query(new OSQLSynchQuery("select * from Foo"));
+    if (graph.getVertexType("Foo") == null)     graph.createVertexType("Foo");
+    if (graph.getVertexType("Bar") == null)     graph.createVertexType("Bar");
+    if (graph.getVertexType("Sees") == null)     graph.createEdgeType("Sees");
+    ODocument foo=graph.addVertex("class:Foo","prop","test1").getRecord();
+    ODocument bar=graph.addVertex("class:Bar","prop","test1").getRecord();
+    ODocument sees=graph.addEdge(null,graph.getVertex(foo),graph.getVertex(bar),"Sees").getRecord();
+    graph.commit();
+    List<ODocument> foos=graph.getRawGraph().query(new OSQLSynchQuery("select * from Foo"));
     Assert.assertEquals(foos.size(),1);
-    db.begin(TXTYPE.OPTIMISTIC);
-    db.removeVertex(foos.get(0));
-    db.commit();
+    graph.removeVertex(graph.getVertex(foos.get(0)));
   }
   finally {
-    db.close();
+    graph.shutdown();
   }
 }

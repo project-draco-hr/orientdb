@@ -1,10 +1,5 @@
 {
 synchronized (cachedDatabaseConfiguration) {
-    final ODocument oldCfg=cachedDatabaseConfiguration.get(iDatabaseName);
-    if (oldCfg != null && (oldCfg == cfg || Arrays.equals(oldCfg.toStream(),cfg.toStream())))     return;
-    Integer oldVersion=cfg.field("version");
-    if (oldVersion == null)     oldVersion=0;
-    cfg.field("version",oldVersion.intValue() + 1);
     cachedDatabaseConfiguration.put(iDatabaseName,cfg);
     OLogManager.instance().info(this,"updated distributed configuration for database: %s:\n----------\n%s\n----------",iDatabaseName,cfg.toJSON("prettyPrint"));
     if (iSaveToDisk) {
@@ -12,7 +7,10 @@ synchronized (cachedDatabaseConfiguration) {
       try {
         File file=getDistributedConfigFile(iDatabaseName);
         OLogManager.instance().info(this,"Saving distributed configuration file for database '%s' to: %s",iDatabaseName,file);
-        if (!file.exists())         file.createNewFile();
+        if (!file.exists()) {
+          file.getParentFile().mkdirs();
+          file.createNewFile();
+        }
         f=new FileOutputStream(file);
         f.write(cfg.toJSON().getBytes());
         f.flush();
@@ -29,4 +27,5 @@ synchronized (cachedDatabaseConfiguration) {
       }
     }
   }
+  return true;
 }

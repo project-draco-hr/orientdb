@@ -5,41 +5,5 @@
   final ODistributedPartitioningStrategy strategy=manager.getPartitioningStrategy(cfg.getPartitionStrategy(clusterName));
   final ODistributedPartition partition=strategy.getPartition(manager,databaseName,clusterName);
   final Set<String> nodes=partition.getNodes();
-  if (nodes.isEmpty()) {
-    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.OUT,"No nodes configured for partition '%s.%s' request: %s",databaseName,clusterName,iRequest);
-    throw new ODistributedException("No nodes configured for partition '" + databaseName + "."+ clusterName+ "' request: "+ iRequest);
-  }
-  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
-  int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes);
-  iRequest.setSenderNodeName(manager.getLocalNodeName());
-  int availableNodes=0;
-  for (  String node : nodes) {
-    if (manager.isNodeAvailable(node))     availableNodes++;
- else {
-      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
-    }
-  }
-  final int queueSize=nodes.size();
-  int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : queueSize;
-  final boolean waitLocalNode=nodes.contains(manager.getLocalNodeName()) && cfg.isReadYourWrites(clusterName);
-  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize));
-  msgService.registerRequest(iRequest.getId(),currentResponseMgr);
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getTask());
-  final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
-  try {
-    requestLock.lock();
-    try {
-      for (      IQueue<ODistributedRequest> queue : reqQueues) {
-        queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
-      }
-    }
-  finally {
-      requestLock.unlock();
-    }
-    Orient.instance().getProfiler().updateCounter("distributed.replication." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.replication.*.msgSent");
-    return collectResponses(iRequest,currentResponseMgr);
-  }
- catch (  Throwable e) {
-    throw new ODistributedException("Error on sending distributed request against database '" + databaseName + (clusterName != null ? ":" + clusterName : "")+ "'",e);
-  }
+  return send2Nodes(iRequest,nodes);
 }

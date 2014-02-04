@@ -8,15 +8,18 @@ synchronized (this) {
 synchronized (contexts) {
       contexts.add(context);
     }
-    context.rawGraph=new ODatabaseDocumentTx(url);
-    if (url.startsWith("remote:") || context.rawGraph.exists()) {
-      context.rawGraph.open(username,password);
-      for (      OIndex<?> idx : context.rawGraph.getMetadata().getIndexManager().getIndexes()) {
-        ODocument metadata=idx.getMetadata();
-        if (metadata != null && metadata.field(OrientIndex.CONFIG_CLASSNAME) != null)         loadIndex(idx);
+    if (pool == null) {
+      context.rawGraph=new ODatabaseDocumentTx(url);
+      if (url.startsWith("remote:") || context.rawGraph.exists()) {
+        context.rawGraph.open(username,password);
+        loadManualIndexes(context);
       }
+ else       context.rawGraph.create();
     }
- else     context.rawGraph.create();
+ else {
+      context.rawGraph=pool.acquire();
+      loadManualIndexes(context);
+    }
     checkForGraphSchema(context.rawGraph);
     return context;
   }

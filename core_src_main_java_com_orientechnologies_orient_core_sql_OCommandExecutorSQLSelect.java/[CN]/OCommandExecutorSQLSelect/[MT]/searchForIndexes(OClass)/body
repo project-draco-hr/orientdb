@@ -33,7 +33,6 @@
           keyParams.add(searchResult.lastValue);
         }
       }
-      INDEX_OPERATION_TYPE opType=null;
       if (context.isRecordingMetrics()) {
         Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
         if (idxNames == null) {
@@ -45,31 +44,19 @@
         }
  else         idxNames.add(index.getName());
       }
-      if (projections != null && projections.size() == 1) {
-        final Object v=projections.values().iterator().next();
-        if (v instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)v).getFunction() instanceof OSQLFunctionCount) {
-          if (!(compiledFilter.getRootCondition().getLeft() instanceof OSQLFilterCondition || compiledFilter.getRootCondition().getRight() instanceof OSQLFilterCondition))           opType=INDEX_OPERATION_TYPE.COUNT;
-        }
-      }
-      if (opType == null)       opType=INDEX_OPERATION_TYPE.GET;
       OQueryOperator.IndexResultListener resultListener;
-      if (fetchLimit < 0 || opType == INDEX_OPERATION_TYPE.COUNT)       resultListener=null;
+      if (fetchLimit < 0)       resultListener=null;
  else       resultListener=new IndexResultListener();
       Object result;
       try {
-        result=operator.executeIndexQuery(context,index,opType,keyParams,resultListener,fetchLimit);
+        result=operator.executeIndexQuery(context,index,keyParams,resultListener,fetchLimit);
       }
  catch (      Exception e) {
         OLogManager.instance().error(this,"Error on using index %s in query '%s'. Probably you need to rebuild indexes. Now executing query using cluster scan",e,index.getName(),request != null && request.getText() != null ? request.getText() : "");
         return false;
       }
       if (result == null)       continue;
-      if (opType == INDEX_OPERATION_TYPE.COUNT) {
-        final String projName=projectionDefinition.keySet().iterator().next();
-        projectionDefinition.clear();
-        getProjectionGroup(null).applyValue(projName,result);
-      }
- else       fillSearchIndexResultSet(result);
+      fillSearchIndexResultSet(result);
       return true;
     }
   }

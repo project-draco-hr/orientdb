@@ -3,12 +3,12 @@
   try {
     acquireExclusiveLock();
     try {
-      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
       content=compression.compress(content);
       int grownContentSize=(int)(config.recordGrowFactor * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
       if (entryContentLength < OClusterPage.MAX_RECORD_SIZE) {
-        startDurableOperation(transaction);
+        startAtomicOperation();
+        lockTillAtomicOperationCompletes();
         byte[] entryContent=new byte[entryContentLength];
         int entryPosition=0;
         entryContent[entryPosition]=recordType;
@@ -23,12 +23,13 @@
         ODurablePage.TrackMode trackMode=getTrackMode();
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
         updateClusterState(trackMode,1,addEntryResult.recordsSizeDiff);
-        final OClusterPosition clusterPosition=clusterPositionMap.add(addEntryResult.pageIndex,addEntryResult.pagePosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-        endDurableOperation(transaction,false);
+        final OClusterPosition clusterPosition=clusterPositionMap.add(addEntryResult.pageIndex,addEntryResult.pagePosition);
+        endAtomicOperation(false);
         return createPhysicalPosition(recordType,clusterPosition,addEntryResult.recordVersion);
       }
  else {
-        startDurableOperation(transaction);
+        startAtomicOperation();
+        lockTillAtomicOperationCompletes();
         final OClusterPage.TrackMode trackMode=getTrackMode();
         int entrySize=grownContentSize + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
         int fullEntryPosition=0;
@@ -83,8 +84,8 @@
         }
  while (from < to);
         updateClusterState(trackMode,1,recordsSizeDiff);
-        OClusterPosition clusterPosition=clusterPositionMap.add(firstPageIndex,firstPagePosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-        endDurableOperation(transaction,false);
+        OClusterPosition clusterPosition=clusterPositionMap.add(firstPageIndex,firstPagePosition);
+        endAtomicOperation(false);
         return createPhysicalPosition(recordType,clusterPosition,version);
       }
     }

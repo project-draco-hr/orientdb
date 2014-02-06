@@ -1,0 +1,39 @@
+{
+  OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD.setValue(5);
+  OGlobalConfiguration.RID_BAG_SBTREEBONSAI_TO_EMBEDDED_THRESHOLD.setValue(7);
+  List<OIdentifiable> docsToAdd=new ArrayList<OIdentifiable>();
+  ODocument document=new ODocument();
+  ORidBag ridBag=new ORidBag();
+  document.field("ridBag",ridBag);
+  document.save();
+  for (int i=0; i < 10; i++) {
+    ODocument docToAdd=new ODocument();
+    docToAdd.save();
+    ridBag.add(docToAdd);
+    docsToAdd.add(docToAdd);
+  }
+  document.save();
+  Assert.assertEquals(docsToAdd.size(),10);
+  Assert.assertTrue(!ridBag.isEmbedded());
+  document=db.load(document.getIdentity());
+  ridBag=document.field("ridBag");
+  ODocument cmeDoc=db.load(document.getIdentity());
+  cmeDoc.field("v","v1");
+  cmeDoc.save();
+  for (int i=0; i < 4; i++) {
+    OIdentifiable docToRemove=docsToAdd.get(i);
+    ridBag.remove(docToRemove);
+  }
+  Assert.assertTrue(document.isDirty());
+  try {
+    document.save();
+    Assert.fail();
+  }
+ catch (  OConcurrentModificationException e) {
+  }
+  document=db.load(document.getIdentity());
+  ridBag=document.field("ridBag");
+  Assert.assertTrue(!ridBag.isEmbedded());
+  for (  OIdentifiable identifiable : ridBag)   Assert.assertTrue(docsToAdd.remove(identifiable));
+  Assert.assertTrue(docsToAdd.isEmpty());
+}

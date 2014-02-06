@@ -2,7 +2,19 @@
   setCurrentDatabaseinThreadLocal();
   try {
     super.open(iUserName,iUserPassword);
-    sbTreeCollectionManager.startup();
+    sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
+      @Override public OSBTreeCollectionManager call() throws Exception {
+        Class<? extends OSBTreeCollectionManager> managerClass=getStorage().getCollectionManagerClass();
+        if (managerClass == null) {
+          OLogManager.instance().warn(this,"Current implementation of storage does not support sbtree collections");
+          return null;
+        }
+ else {
+          return managerClass.newInstance();
+        }
+      }
+    }
+));
     level1Cache.startup();
     metadata=new OMetadataDefault();
     metadata.load();
@@ -27,6 +39,7 @@
       registerHook(new OFunctionTrigger(),ORecordHook.HOOK_POSITION.REGULAR);
       registerHook(new OClassIndexManager(),ORecordHook.HOOK_POSITION.LAST);
       registerHook(new OSchedulerTrigger(),ORecordHook.HOOK_POSITION.LAST);
+      registerHook(new ORidBagDeleteHook(),ORecordHook.HOOK_POSITION.LAST);
     }
  else     user=new OUser(iUserName,OUser.encryptPassword(iUserPassword)).addRole(new ORole("passthrough",null,ORole.ALLOW_MODES.ALLOW_ALL_BUT));
     checkSecurity(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);

@@ -1,0 +1,41 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(URL);
+  if (db.exists()) {
+    db.open("admin","admin");
+    db.drop();
+  }
+  db.create();
+  for (int i=0; i < 100; i++) {
+    ODocument document=new ODocument();
+    ORidBag ridBag=new ORidBag();
+    document.field("ridBag",ridBag);
+    document.save();
+    ridTreePerDocument.put(document.getIdentity(),new ConcurrentSkipListSet<ORID>());
+    lastClusterPosition.set(document.getIdentity().getClusterPosition());
+  }
+  final List<Future<?>> futures=new ArrayList<Future<?>>();
+  Random random=new Random();
+  for (int i=0; i < 5; i++)   addDocExecutor.scheduleAtFixedRate(new DocumentAdder(),random.nextInt(250),250,TimeUnit.MILLISECONDS);
+  for (int i=0; i < 5; i++)   futures.add(threadExecutor.submit(new RidAdder(i)));
+  for (int i=0; i < 5; i++)   futures.add(threadExecutor.submit(new RidDeleter(i)));
+  latch.countDown();
+  Thread.sleep(30 * 60000);
+  addDocExecutor.shutdown();
+  addDocExecutor.awaitTermination(30,TimeUnit.SECONDS);
+  Thread.sleep(30 * 60000);
+  cont=false;
+  for (  Future<?> future : futures)   future.get();
+  long amountOfRids=0;
+  for (  ORID rid : ridTreePerDocument.keySet()) {
+    ODocument document=db.load(rid);
+    document.setLazyLoad(false);
+    final ConcurrentSkipListSet<ORID> ridTree=ridTreePerDocument.get(rid);
+    final ORidBag ridBag=document.field("ridBag");
+    for (    OIdentifiable identifiable : ridBag)     Assert.assertTrue(ridTree.remove(identifiable.getIdentity()));
+    Assert.assertTrue(ridTree.isEmpty());
+    amountOfRids+=ridBag.size();
+  }
+  System.out.println("Total  records added :  " + db.countClusterElements(db.getDefaultClusterId()));
+  System.out.println("Total rids added : " + amountOfRids);
+  db.drop();
+}

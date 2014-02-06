@@ -3,7 +3,6 @@
   try {
     acquireExclusiveLock();
     try {
-      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
       if (positionEntry == null)       return false;
       long pageIndex=positionEntry.getPageIndex();
@@ -25,7 +24,8 @@
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0) {
-            startDurableOperation(transaction);
+            startAtomicOperation();
+            lockTillAtomicOperationCompletes();
           }
           byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
           int initialFreeSpace=localPage.getFreeSpace();
@@ -45,8 +45,8 @@
       }
  while (nextPagePointer >= 0);
       updateClusterState(trackMode,-1,-removedContentSize);
-      clusterPositionMap.remove(clusterPosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-      endDurableOperation(transaction,false);
+      clusterPositionMap.remove(clusterPosition);
+      endAtomicOperation(false);
       return true;
     }
   finally {

@@ -2,7 +2,19 @@
   setCurrentDatabaseinThreadLocal();
   try {
     super.create();
-    sbTreeCollectionManager.startup();
+    sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
+      @Override public OSBTreeCollectionManager call() throws Exception {
+        Class<? extends OSBTreeCollectionManager> managerClass=getStorage().getCollectionManagerClass();
+        if (managerClass == null) {
+          OLogManager.instance().warn(this,"Current implementation of storage does not support sbtree collections");
+          return null;
+        }
+ else {
+          return managerClass.newInstance();
+        }
+      }
+    }
+));
     level1Cache.startup();
     getStorage().getConfiguration().update();
     if (!(getStorage() instanceof OStorageProxy)) {
@@ -12,6 +24,7 @@
       registerHook(new OFunctionTrigger(),ORecordHook.HOOK_POSITION.REGULAR);
       registerHook(new OClassIndexManager(),ORecordHook.HOOK_POSITION.LAST);
       registerHook(new OSchedulerTrigger(),ORecordHook.HOOK_POSITION.LAST);
+      registerHook(new ORidBagDeleteHook(),ORecordHook.HOOK_POSITION.LAST);
     }
     metadata=new OMetadataDefault();
     metadata.create();

@@ -1,0 +1,30 @@
+{
+  final ODocument docOne=new ODocument();
+  docOne.save();
+  final ODocument docTwo=new ODocument();
+  docTwo.save();
+  try {
+    database.begin();
+    final ODocument document=new ODocument("RidBagIndexTestClass");
+    final ORidBag ridBag=new ORidBag();
+    ridBag.add(docOne);
+    ridBag.add(docTwo);
+    document.field("ridBag",ridBag);
+    document.save();
+    database.commit();
+  }
+ catch (  Exception e) {
+    database.rollback();
+    throw e;
+  }
+  List<ODocument> result=database.command(new OCommandSQL("select key, rid from index:ridBagIndex")).execute();
+  Assert.assertNotNull(result);
+  Assert.assertEquals(result.size(),2);
+  for (  ODocument d : result) {
+    Assert.assertTrue(d.containsField("key"));
+    Assert.assertTrue(d.containsField("rid"));
+    if (!d.field("key").equals(docOne.getIdentity()) && !d.field("key").equals(docTwo.getIdentity())) {
+      Assert.fail("Unknown key found: " + d.field("key"));
+    }
+  }
+}

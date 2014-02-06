@@ -57,8 +57,28 @@
     final OProperty prop=_clazz.getProperty(iFieldName);
     if (prop != null)     iFieldType=prop.getType();
   }
-  if (iPropertyValue != null)   if (iFieldType != null)   iPropertyValue=ODocumentHelper.convertField(this,iFieldName,iFieldType.getDefaultJavaType(),iPropertyValue);
- else   if (iPropertyValue instanceof Enum)   iPropertyValue=iPropertyValue.toString();
+  if (oldValue instanceof ORidBag) {
+    final ORidBag ridBag=(ORidBag)oldValue;
+    ridBag.setOwner(null);
+  }
+ else   if (oldValue instanceof ODocument) {
+    final ODocument doc=(ODocument)oldValue;
+    doc.removeOwner(this);
+  }
+  if (iPropertyValue != null) {
+    if (iFieldType != null) {
+      iPropertyValue=ODocumentHelper.convertField(this,iFieldName,iFieldType.getDefaultJavaType(),iPropertyValue);
+      if (iFieldType.equals(OType.EMBEDDED) && iPropertyValue instanceof ODocument) {
+        final ODocument embeddedDocument=(ODocument)iPropertyValue;
+        embeddedDocument.addOwner(this);
+      }
+    }
+ else     if (iPropertyValue instanceof Enum)     iPropertyValue=iPropertyValue.toString();
+    if (iPropertyValue instanceof ORidBag) {
+      final ORidBag ridBag=(ORidBag)iPropertyValue;
+      ridBag.setOwner(this);
+    }
+  }
   removeCollectionChangeListener(iFieldName);
   removeCollectionTimeLine(iFieldName);
   _fieldValues.put(iFieldName,iPropertyValue);

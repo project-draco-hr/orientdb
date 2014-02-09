@@ -19,9 +19,9 @@ synchronized (installDatabaseLock) {
  else             continue;
           }
           final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
-          distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class);
+          distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class,false);
           try {
-            distrDatabase.configureDatabase(null,false,false);
+            distrDatabase.configureDatabase(false,false);
             final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
             for (            Entry<String,Object> r : results.entrySet()) {
               final Object value=r.getValue();
@@ -42,7 +42,7 @@ synchronized (installDatabaseLock) {
                   out=new FileOutputStream(fileName,false);
                   long fileSize=writeDatabaseChunk(1,chunk,out);
                   for (int chunkNum=2; !chunk.last; chunkNum++) {
-                    distrDatabase.setWaitForTaskType(OCopyDatabaseChunkTask.class);
+                    distrDatabase.setWaitForTaskType(OCopyDatabaseChunkTask.class,true);
                     final Object result=sendRequest2Node(databaseName,r.getKey(),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
                     if (result instanceof Boolean)                     continue;
  else {
@@ -73,7 +73,7 @@ synchronized (installDatabaseLock) {
             throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
           }
   finally {
-            distrDatabase.setWaitForTaskType(null);
+            distrDatabase.setWaitForTaskType(null,false);
           }
         }
       }

@@ -9,13 +9,17 @@
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
   int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes);
   iRequest.setSenderNodeName(manager.getLocalNodeName());
-  int availableNodes=0;
-  for (  String node : nodes) {
-    if (manager.isNodeAvailable(node))     availableNodes++;
+  int availableNodes;
+  if (iRequest.getTask().isRequireNodeOnline()) {
+    availableNodes=0;
+    for (    String node : nodes) {
+      if (manager.isNodeAvailable(node,databaseName))       availableNodes++;
  else {
-      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
+        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
+      }
     }
   }
+ else   availableNodes=nodes.size();
   final int queueSize=nodes.size();
   int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : 1;
   if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION)   expectedSynchronousResponses=availableNodes;
@@ -38,6 +42,6 @@
     return collectResponses(iRequest,currentResponseMgr);
   }
  catch (  Throwable e) {
-    throw new ODistributedException("Error on sending distributed request against database '" + databaseName + (clusterName != null ? ":" + clusterName : "")+ "'",e);
+    throw new ODistributedException("Error on sending distributed request against database '" + databaseName + (clusterName != null ? ":" + clusterName : "")+ "' to nodes "+ nodes,e);
   }
 }

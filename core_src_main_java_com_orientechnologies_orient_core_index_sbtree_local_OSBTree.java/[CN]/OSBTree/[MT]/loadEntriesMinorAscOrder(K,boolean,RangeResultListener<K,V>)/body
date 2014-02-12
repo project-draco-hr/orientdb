@@ -1,0 +1,40 @@
+{
+  final BucketSearchResult firstItem=firstItem();
+  if (firstItem == null)   return;
+  key=keySerializer.preprocess(key,(Object[])keyTypes);
+  final PartialSearchMode partialSearchMode;
+  if (inclusive)   partialSearchMode=PartialSearchMode.HIGHEST_BOUNDARY;
+ else   partialSearchMode=PartialSearchMode.LOWEST_BOUNDARY;
+  BucketSearchResult bucketSearchResult=findBucket(key,partialSearchMode);
+  long endPageIndex=bucketSearchResult.getLastPathItem();
+  int endIndex;
+  if (bucketSearchResult.itemIndex >= 0) {
+    endIndex=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex - 1;
+  }
+ else {
+    endIndex=-bucketSearchResult.itemIndex - 2;
+  }
+  long pageIndex=firstItem.getLastPathItem();
+  resultsLoop:   while (true) {
+    long nextPageIndex=-1;
+    OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+    final OCachePointer pointer=cacheEntry.getCachePointer();
+    try {
+      OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(pointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+      final int start=0;
+      final int end;
+      if (pageIndex != endPageIndex)       end=bucket.size() - 1;
+ else       end=endIndex;
+      for (int i=start; i <= end; i++) {
+        if (!listener.addResult(convertToMapEntry(bucket.getEntry(i))))         break resultsLoop;
+      }
+      if (pageIndex == endPageIndex)       break;
+      if (bucket.getRightSibling() >= 0)       nextPageIndex=bucket.getRightSibling();
+ else       break;
+    }
+  finally {
+      diskCache.release(cacheEntry);
+    }
+    pageIndex=nextPageIndex;
+  }
+}

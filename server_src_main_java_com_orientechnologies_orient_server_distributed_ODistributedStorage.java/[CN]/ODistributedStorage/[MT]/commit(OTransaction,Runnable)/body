@@ -13,17 +13,42 @@ case ORecordOperation.CREATED:
             task=new OCreateRecordTask((ORecordId)op.record.getIdentity(),record.toStream(),record.getRecordVersion(),record.getRecordType());
           break;
 case ORecordOperation.UPDATED:
-        task=new OUpdateRecordTask((ORecordId)op.record.getIdentity(),record.toStream(),record.getRecordVersion(),record.getRecordType());
-      break;
+{
+          final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord((ORecordId)record.getIdentity(),null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+          task=new OUpdateRecordTask((ORecordId)op.record.getIdentity(),previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+          break;
+        }
 case ORecordOperation.DELETED:
-    task=new ODeleteRecordTask((ORecordId)op.record.getIdentity(),record.getRecordVersion());
-  break;
+      task=new ODeleteRecordTask((ORecordId)op.record.getIdentity(),record.getRecordVersion());
+    break;
 default :
-continue;
+  continue;
 }
 txTask.add(task);
 }
-dManager.sendRequest(getName(),null,txTask,EXECUTION_MODE.RESPONSE);
+final Object result=dManager.sendRequest(getName(),null,txTask,EXECUTION_MODE.RESPONSE);
+if (result instanceof List<?>) {
+final List<Object> list=(List<Object>)result;
+for (int i=0; i < txTask.getTasks().size(); ++i) {
+final Object o=list.get(i);
+final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
+if (task instanceof OCreateRecordTask) {
+  final OCreateRecordTask t=(OCreateRecordTask)task;
+  t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
+  t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+}
+ else if (task instanceof OUpdateRecordTask) {
+  final OUpdateRecordTask t=(OUpdateRecordTask)task;
+  t.getVersion().copyFrom((ORecordVersion)o);
+}
+ else if (task instanceof ODeleteRecordTask) {
+}
+}
+}
+ else {
+if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error");
+throw new OTransactionException("Error on committing distributed transaction");
+}
 }
 }
  catch (Exception e) {

@@ -19,30 +19,61 @@ synchronized (installDatabaseLock) {
  else             continue;
           }
           final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
-          distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class);
-          distrDatabase.configureDatabase(null,false,false);
-          final Map<String,OBuffer> results=(Map<String,OBuffer>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
-          OBuffer result=null;
-          for (          Entry<String,OBuffer> r : results.entrySet())           if (r.getValue().getBuffer() != null && r.getValue().getBuffer().length > 0) {
-            result=r.getValue();
-            ODistributedServerLog.warn(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"installing database %s in %s...",databaseName,dbPath);
-            break;
-          }
-          if (result == null)           throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
-          new File(dbPath).mkdirs();
-          final ODatabaseDocumentTx db=new ODatabaseDocumentTx("local:" + dbPath);
-          final ByteArrayInputStream in=new ByteArrayInputStream(result.getBuffer());
+          distrDatabase.setWaitForTaskType(ODeployDatabaseTask.class,false);
           try {
-            db.restore(in,null,null);
-            in.close();
-            db.close();
-            Orient.instance().unregisterStorageByName(db.getName());
-            ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"installed database %s in %s, setting it online...",databaseName,dbPath);
-            distrDatabase.setOnline();
-            ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"database %s is online",databaseName);
+            distrDatabase.configureDatabase(false,false);
+            final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+            for (            Entry<String,Object> r : results.entrySet()) {
+              final Object value=r.getValue();
+              if (value instanceof Boolean) {
+                continue;
+              }
+ else               if (value instanceof Exception) {
+                ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s",(Exception)value,databaseName,dbPath);
+              }
+ else               if (value instanceof ODistributedDatabaseChunk) {
+                ODistributedDatabaseChunk chunk=(ODistributedDatabaseChunk)value;
+                final String fileName=Orient.getTempPath() + "install_" + databaseName+ ".zip";
+                ODistributedServerLog.info(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"copying remote database '%s' to: %s",databaseName,fileName);
+                final File file=new File(fileName);
+                if (file.exists())                 file.delete();
+                FileOutputStream out=null;
+                try {
+                  out=new FileOutputStream(fileName,false);
+                  long fileSize=writeDatabaseChunk(1,chunk,out);
+                  for (int chunkNum=2; !chunk.last; chunkNum++) {
+                    distrDatabase.setWaitForTaskType(OCopyDatabaseChunkTask.class,true);
+                    final Object result=sendRequest2Node(databaseName,r.getKey(),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
+                    if (result instanceof Boolean)                     continue;
+ else {
+                      chunk=(ODistributedDatabaseChunk)result;
+                      fileSize+=writeDatabaseChunk(chunkNum,chunk,out);
+                    }
+                  }
+                  ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
+                }
+ catch (                Exception e) {
+                  ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
+                }
+ finally {
+                  try {
+                    if (out != null) {
+                      out.flush();
+                      out.close();
+                    }
+                  }
+ catch (                  IOException e) {
+                  }
+                }
+                installDatabase(distrDatabase,databaseName,dbPath,r.getKey(),fileName);
+                return;
+              }
+ else               throw new IllegalArgumentException("Type " + value + " not supported");
+            }
+            throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
           }
- catch (          IOException e) {
-            ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.IN,"error on copying database '%s' on local server",e,databaseName);
+  finally {
+            distrDatabase.setWaitForTaskType(null,false);
           }
         }
       }

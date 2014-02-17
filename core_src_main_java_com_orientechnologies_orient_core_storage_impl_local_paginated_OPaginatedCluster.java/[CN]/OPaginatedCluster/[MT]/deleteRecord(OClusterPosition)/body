@@ -3,7 +3,6 @@
   try {
     acquireExclusiveLock();
     try {
-      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
       if (positionEntry == null)       return false;
       long pageIndex=positionEntry.getPageIndex();
@@ -20,15 +19,15 @@
         try {
           final OClusterPage localPage=new OClusterPage(pointer.getDataPointer(),false,trackMode);
           initialFreePageIndex=calculateFreePageIndex(localPage);
-          int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
-          if (recordPageOffset < 0) {
+          if (localPage.isDeleted(recordPosition)) {
             if (removedContentSize == 0)             return false;
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0) {
-            startDurableOperation(transaction);
+            startAtomicOperation();
+            lockTillAtomicOperationCompletes();
           }
-          byte[] content=localPage.getBinaryValue(recordPageOffset,localPage.getRecordSize(recordPosition));
+          byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
           int initialFreeSpace=localPage.getFreeSpace();
           localPage.deleteRecord(recordPosition);
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
@@ -46,8 +45,8 @@
       }
  while (nextPagePointer >= 0);
       updateClusterState(trackMode,-1,-removedContentSize);
-      clusterPositionMap.remove(clusterPosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-      endDurableOperation(transaction,false);
+      clusterPositionMap.remove(clusterPosition);
+      endAtomicOperation(false);
       return true;
     }
   finally {

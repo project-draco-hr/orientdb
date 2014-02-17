@@ -1,10 +1,11 @@
 {
+  if (deletedRecords.get(iRecordId) != null)   throw new ORecordNotFoundException("Record " + iRecordId + " was not found");
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
-    final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
-    if (!dConfig.isReplicationActive(clusterName))     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
-    final Object result=dManager.sendRequest(getName(),clusterName,new OUpdateRecordTask(iRecordId,iContent,iVersion,iRecordType),EXECUTION_MODE.RESPONSE);
+    if (!dManager.getDatabaseConfiguration(getName()).isReplicationActive(clusterName))     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
+    final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(iRecordId,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+    final Object result=dManager.sendRequest(getName(),clusterName,new OUpdateRecordTask(iRecordId,previousContent.getResult().getBuffer(),previousContent.getResult().version,iContent,iVersion),EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);
     return new OStorageOperationResult<ORecordVersion>((ORecordVersion)result);

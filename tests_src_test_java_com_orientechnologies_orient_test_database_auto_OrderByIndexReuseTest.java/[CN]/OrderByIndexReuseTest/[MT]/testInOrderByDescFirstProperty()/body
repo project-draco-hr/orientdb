@@ -1,0 +1,15 @@
+{
+  final String query="select from OrderByIndexReuse where firstProp in [10, 2, 43, 21, 45, 47, 11, 12] order by firstProp desc limit 3";
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),3);
+  ODocument document=result.get(0);
+  Assert.assertEquals((int)document.<Integer>field("firstProp"),47);
+  document=result.get(1);
+  Assert.assertEquals((int)document.<Integer>field("firstProp"),47);
+  document=result.get(2);
+  Assert.assertEquals((int)document.<Integer>field("firstProp"),45);
+  final ODocument explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Boolean>field("fullySortedByIndex"));
+  Assert.assertTrue(explain.<Boolean>field("indexIsUsedInOrderBy"));
+  Assert.assertEquals(explain.<Set>field("involvedIndexes").toArray(),new String[]{"OrderByIndexReuseIndexFirstPropNotUnique"});
+}

@@ -17,6 +17,8 @@
  else     if (param.name.equalsIgnoreCase("db.include") && param.value.trim().length() > 0)     for (    String db : param.value.split(","))     includeDatabases.add(db);
  else     if (param.name.equalsIgnoreCase("db.exclude") && param.value.trim().length() > 0)     for (    String db : param.value.split(","))     excludeDatabases.add(db);
  else     if (param.name.equalsIgnoreCase("target.fileName"))     targetFileName=param.value;
+ else     if (param.name.equalsIgnoreCase("buffer"))     bufferSize=Integer.parseInt(param.value);
+ else     if (param.name.equalsIgnoreCase("compressionLevel"))     compressionLevel=Integer.parseInt(param.value);
   }
   if (delay <= 0)   throw new OConfigurationException("Cannot find mandatory parameter 'delay'");
   if (!targetDirectory.endsWith("/"))   targetDirectory+="/";
@@ -54,7 +56,12 @@
             db.setProperty(ODatabase.OPTIONS.SECURITY.toString(),Boolean.FALSE);
             db.open("admin","aaa");
             final long begin=System.currentTimeMillis();
-            db.backup(new FileOutputStream(exportFilePath),null,null);
+            db.backup(new FileOutputStream(exportFilePath),null,null,new OCommandOutputListener(){
+              @Override public void onMessage(              String iText){
+                OLogManager.instance().info(this,iText);
+              }
+            }
+,compressionLevel,bufferSize);
             OLogManager.instance().info(this,"[OAutomaticBackup] - Backup of database '" + dbName.getValue() + "' completed in "+ (System.currentTimeMillis() - begin)+ "ms");
             ok++;
           }

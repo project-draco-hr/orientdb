@@ -1,54 +1,13 @@
 {
   acquireSharedLock();
   try {
-    LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
-    long bucketIndex=ROOT_INDEX;
-    OCacheEntry cacheEntry=diskCache.load(fileId,bucketIndex,false);
-    OCachePointer cachePointer=cacheEntry.getCachePointer();
-    int itemIndex=0;
-    OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cachePointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+    final BucketSearchResult searchResult=firstItem();
+    if (searchResult == null)     return null;
+    final OCacheEntry cacheEntry=diskCache.load(fileId,searchResult.getLastPathItem(),false);
     try {
-      while (true) {
-        if (!bucket.isLeaf()) {
-          if (bucket.isEmpty() || itemIndex > bucket.size()) {
-            if (!path.isEmpty()) {
-              PagePathItemUnit pagePathItemUnit=path.removeLast();
-              bucketIndex=pagePathItemUnit.pageIndex;
-              itemIndex=pagePathItemUnit.itemIndex + 1;
-            }
- else             return null;
-          }
- else {
-            path.add(new PagePathItemUnit(bucketIndex,itemIndex));
-            if (itemIndex < bucket.size()) {
-              OSBTreeBucket.SBTreeEntry<K,V> entry=bucket.getEntry(itemIndex);
-              bucketIndex=entry.leftChild;
-            }
- else {
-              OSBTreeBucket.SBTreeEntry<K,V> entry=bucket.getEntry(itemIndex - 1);
-              bucketIndex=entry.rightChild;
-            }
-            itemIndex=0;
-          }
-        }
- else {
-          if (bucket.isEmpty()) {
-            if (!path.isEmpty()) {
-              PagePathItemUnit pagePathItemUnit=path.removeLast();
-              bucketIndex=pagePathItemUnit.pageIndex;
-              itemIndex=pagePathItemUnit.itemIndex + 1;
-            }
- else             return null;
-          }
- else {
-            return bucket.getKey(0);
-          }
-        }
-        diskCache.release(cacheEntry);
-        cacheEntry=diskCache.load(fileId,bucketIndex,false);
-        cachePointer=cacheEntry.getCachePointer();
-        bucket=new OSBTreeBucket<K,V>(cachePointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
-      }
+      OCachePointer cachePointer=cacheEntry.getCachePointer();
+      OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cachePointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+      return bucket.getKey(searchResult.itemIndex);
     }
   finally {
       diskCache.release(cacheEntry);

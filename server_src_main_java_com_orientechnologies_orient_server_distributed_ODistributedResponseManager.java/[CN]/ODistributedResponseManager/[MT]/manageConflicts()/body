@@ -1,32 +1,33 @@
 {
-  if (quorum == 0)   return;
-  if (responseGroups.size() == 1)   return;
+  if (request.getTask().getQuorumType() == OAbstractRemoteTask.QUORUM_TYPE.NONE)   return;
   final int bestResponsesGroupIndex=getBestResponsesGroup();
   final List<ODistributedResponse> bestResponsesGroup=responseGroups.get(bestResponsesGroupIndex);
   final int maxCoherentResponses=bestResponsesGroup.size();
   final int conflicts=getExpectedResponses() - maxCoherentResponses;
-  if (maxCoherentResponses >= quorum) {
-    for (    List<ODistributedResponse> responseGroup : responseGroups) {
-      if (responseGroup != bestResponsesGroup && responseGroup.size() == maxCoherentResponses) {
-        final List<String> a=new ArrayList<String>();
-        for (        ODistributedResponse r : bestResponsesGroup)         a.add(r.getExecutorNodeName());
-        final List<String> b=new ArrayList<String>();
-        for (        ODistributedResponse r : responseGroup)         b.add(r.getExecutorNodeName());
-        ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected possible split brain network where 2 groups of servers A%s and B%s have different contents. Cannot decide who is the winner even if the quorum (%d) has been reached. Request: %s",a,b,quorum,request);
-        return;
-      }
-    }
-    final ODistributedResponse goodResponse=bestResponsesGroup.get(0);
+  if (isMinimumQuorumReached(true)) {
+    if (responseGroups.size() == 1)     return;
+    if (checkNoWinnerCase(bestResponsesGroup))     return;
     ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected %d conflicts, but the quorum (%d) has been reached. Fixing remote records. Request: %s",conflicts,quorum,request);
-    for (    List<ODistributedResponse> responseGroup : responseGroups) {
-      if (responseGroup != bestResponsesGroup) {
-        for (        ODistributedResponse r : responseGroup) {
-          ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"fixing response for request=%s in server %s to be: %s",request,r.getExecutorNodeName(),goodResponse);
-          final OAbstractRemoteTask fixRequest=((OAbstractReplicatedTask)request.getTask()).getFixTask(request,r,goodResponse);
-          dManager.sendRequest2Node(request.getDatabaseName(),r.getExecutorNodeName(),fixRequest);
-        }
-      }
-    }
+    fixNodesInConflict(bestResponsesGroup);
   }
- else   ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected %d conflicts where the quorum (%d) has not been reached, cannot guarantee coherency against this resources: %s",conflicts,quorum,request);
+ else {
+    ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"detected %d node(s) in timeout or in conflict and quorum (%d) has not been reached, rolling back changes for request: %s",conflicts,quorum,request);
+    undoRequest();
+    final StringBuilder msg=new StringBuilder();
+    msg.append("Quorum " + getQuorum() + " not reached for request="+ request+ ". Servers in timeout/conflict are:");
+    final List<ODistributedResponse> res=getConflictResponses();
+    if (res.isEmpty())     msg.append(" no server in conflict");
+ else {
+      for (      ODistributedResponse r : res) {
+        msg.append("\n- ");
+        msg.append(r.getExecutorNodeName());
+        msg.append(": ");
+        msg.append(r.getPayload());
+      }
+      msg.append("\n");
+    }
+    msg.append(". Received: ");
+    msg.append(responses);
+    throw new ODistributedException(msg.toString());
+  }
 }

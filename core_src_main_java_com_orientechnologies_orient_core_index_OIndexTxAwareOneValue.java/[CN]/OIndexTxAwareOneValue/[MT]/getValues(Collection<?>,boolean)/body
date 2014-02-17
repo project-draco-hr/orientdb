@@ -1,0 +1,23 @@
+{
+  final OTransactionIndexChanges indexChanges=database.getTransaction().getIndexChanges(delegate.getName());
+  if (indexChanges == null)   return super.getValues(iKeys,ascSortOrder);
+  final Comparator<Object> comparator;
+  if (ascSortOrder)   comparator=ODefaultComparator.INSTANCE;
+ else   comparator=Collections.reverseOrder(ODefaultComparator.INSTANCE);
+  final TreeMap<Object,OIdentifiable> result=new TreeMap<Object,OIdentifiable>(comparator);
+  final Collection<?> keys=new ArrayList<Object>(iKeys);
+  final Set<Object> keysToRemove=new HashSet<Object>();
+  final Map<Object,OIdentifiable> keyValueEntries=new HashMap<Object,OIdentifiable>();
+  for (  final Object key : keys) {
+    if (indexChanges.cleared)     keysToRemove.add(key);
+    keyValueEntries.put(key,null);
+  }
+  final Map<Object,OIdentifiable> keyResult=filterIndexChanges(indexChanges,keyValueEntries,keysToRemove);
+  for (  Map.Entry<Object,OIdentifiable> keyResultEntry : keyResult.entrySet())   result.put(keyResultEntry.getKey(),keyResultEntry.getValue().getIdentity());
+  keys.removeAll(keysToRemove);
+  if (!keys.isEmpty()) {
+    final Collection<ODocument> entries=super.getEntries(keys);
+    for (    ODocument entry : entries)     result.put(entry.field("key"),entry.<OIdentifiable>field("rid",OType.LINK));
+  }
+  return result.values();
+}

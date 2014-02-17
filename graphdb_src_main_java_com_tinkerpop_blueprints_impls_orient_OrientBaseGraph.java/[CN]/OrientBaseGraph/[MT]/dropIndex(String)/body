@@ -1,0 +1,24 @@
+{
+  executeOutsideTx(new OCallable<Object,OrientBaseGraph>(){
+    @Override public Object call(    OrientBaseGraph g){
+      try {
+        String recordMapIndexName=null;
+synchronized (contexts) {
+          for (          OrientGraphContext ctx : contexts) {
+            OrientIndex<?> index=ctx.manualIndices.remove(indexName);
+            if (recordMapIndexName == null && index != null)             recordMapIndexName=index.getUnderlying().getConfiguration().field(OrientIndex.CONFIG_RECORD_MAP_NAME);
+          }
+        }
+        getRawGraph().getMetadata().getIndexManager().dropIndex(indexName);
+        if (recordMapIndexName != null)         getRawGraph().getMetadata().getIndexManager().dropIndex(recordMapIndexName);
+        saveIndexConfiguration();
+        return null;
+      }
+ catch (      Exception e) {
+        g.rollback();
+        throw new RuntimeException(e.getMessage(),e);
+      }
+    }
+  }
+,"drop index '",indexName,"'");
+}

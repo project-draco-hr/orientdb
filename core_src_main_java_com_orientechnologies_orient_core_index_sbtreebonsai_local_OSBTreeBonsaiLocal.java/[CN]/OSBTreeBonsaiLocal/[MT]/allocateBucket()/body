@@ -1,0 +1,35 @@
+{
+  final OCacheEntry sysCacheEntry=diskCache.load(fileId,SYS_BUCKET.getPageIndex(),false);
+  final OCachePointer cachePointer=sysCacheEntry.getCachePointer();
+  cachePointer.acquireExclusiveLock();
+  try {
+    final OSysBucket sysBucket=new OSysBucket(cachePointer.getDataPointer(),getTrackMode());
+    if ((1.0 * sysBucket.freeListLength()) / (diskCache.getFilledUpTo(fileId) * PAGE_SIZE / OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES) >= freeSpaceReuseTrigger) {
+      final AllocationResult allocationResult=reuseBucketFromFreeList(sysBucket);
+      sysCacheEntry.markDirty();
+      return allocationResult;
+    }
+ else {
+      final OBonsaiBucketPointer freeSpacePointer=sysBucket.getFreeSpacePointer();
+      if (freeSpacePointer.getPageOffset() + OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES > PAGE_SIZE) {
+        final OCacheEntry cacheEntry=diskCache.allocateNewPage(fileId);
+        final long pageIndex=cacheEntry.getPageIndex();
+        sysBucket.setFreeSpacePointer(new OBonsaiBucketPointer(pageIndex,OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES));
+        logPageChanges(sysBucket,fileId,SYS_BUCKET.getPageIndex(),false);
+        sysCacheEntry.markDirty();
+        return new AllocationResult(new OBonsaiBucketPointer(pageIndex,0),cacheEntry,true);
+      }
+ else {
+        sysBucket.setFreeSpacePointer(new OBonsaiBucketPointer(freeSpacePointer.getPageIndex(),freeSpacePointer.getPageOffset() + OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES));
+        final OCacheEntry cacheEntry=diskCache.load(fileId,freeSpacePointer.getPageIndex(),false);
+        logPageChanges(sysBucket,fileId,SYS_BUCKET.getPageIndex(),false);
+        sysCacheEntry.markDirty();
+        return new AllocationResult(freeSpacePointer,cacheEntry,false);
+      }
+    }
+  }
+  finally {
+    cachePointer.releaseExclusiveLock();
+    diskCache.release(sysCacheEntry);
+  }
+}

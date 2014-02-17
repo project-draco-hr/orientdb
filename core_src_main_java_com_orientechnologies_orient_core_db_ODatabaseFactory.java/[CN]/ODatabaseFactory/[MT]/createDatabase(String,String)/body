@@ -1,4 +1,24 @@
 {
-  if ("graph".equals(iType))   return new OGraphDatabase(url);
- else   return new ODatabaseDocumentTx(url);
+  if (iType.equals("graph"))   return new ODatabaseDocumentTx(url){
+    @Override public <THISDB extends ODatabase>THISDB create(){
+      final THISDB db=super.create();
+      checkSchema();
+      return db;
+    }
+    private void checkSchema(){
+      getMetadata().getSchema().getOrCreateClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
+      OClass vertexBaseClass=getMetadata().getSchema().getClass("V");
+      OClass edgeBaseClass=getMetadata().getSchema().getClass("E");
+      if (vertexBaseClass == null) {
+        vertexBaseClass=getMetadata().getSchema().createClass("V");
+        vertexBaseClass.setOverSize(2);
+      }
+      if (edgeBaseClass == null) {
+        edgeBaseClass=getMetadata().getSchema().createClass("E");
+        edgeBaseClass.setShortName("E");
+      }
+    }
+  }
+;
+  return new ODatabaseDocumentTx(url);
 }

@@ -1,0 +1,39 @@
+{
+  final String queueName=OHazelcastDistributedMessageService.getRequestQueueName(manager.getLocalNodeName(),databaseName);
+  final IQueue<ODistributedRequest> requestQueue=msgService.getQueue(queueName);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
+  final IMap<Object,Object> undoMap=restoreMessagesBeforeFailure(iRestoreMessages);
+  restoringMessages=msgService.checkForPendingMessages(requestQueue,queueName,iUnqueuePendingMessages);
+  listenerThread=new Thread(new Runnable(){
+    @Override public void run(){
+      Thread.currentThread().setName("OrientDB Node Request " + queueName);
+      while (!Thread.interrupted()) {
+        if (restoringMessages && requestQueue.isEmpty()) {
+          restoringMessages=false;
+          setOnline();
+        }
+        String senderNode=null;
+        ODistributedRequest message=null;
+        try {
+          message=readRequest(requestQueue);
+          undoMap.put(databaseName,message);
+          if (message != null) {
+            senderNode=message.getSenderNodeName();
+            onMessage(message);
+          }
+          undoMap.remove(databaseName);
+        }
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        Throwable e) {
+          ODistributedServerLog.error(this,getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getTask() : "-");
+        }
+      }
+    }
+  }
+);
+  listenerThread.start();
+  return this;
+}

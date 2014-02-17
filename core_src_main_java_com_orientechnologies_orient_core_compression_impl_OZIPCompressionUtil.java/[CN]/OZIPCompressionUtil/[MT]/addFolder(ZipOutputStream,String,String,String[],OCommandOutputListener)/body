@@ -1,0 +1,41 @@
+{
+  int total=0;
+  File f=new File(folderName);
+  if (f.exists()) {
+    if (f.isDirectory()) {
+      File f2[]=f.listFiles();
+      for (int i=0; i < f2.length; i++) {
+        total+=addFolder(zos,f2[i].getAbsolutePath(),baseFolderName,iSkipFileExtensions,iOutput);
+      }
+    }
+ else {
+      String entryName=folderName.substring(baseFolderName.length() + 1,folderName.length());
+      if (iSkipFileExtensions != null)       for (      String skip : iSkipFileExtensions)       if (entryName.endsWith(skip))       return 0;
+      final long begin=System.currentTimeMillis();
+      if (iOutput != null)       iOutput.onMessage("\n- Compressing file " + entryName + "...");
+      ZipEntry ze=new ZipEntry(entryName);
+      zos.putNextEntry(ze);
+      try {
+        FileInputStream in=new FileInputStream(folderName);
+        try {
+          OIOUtils.copyStream(in,zos,-1);
+        }
+  finally {
+          in.close();
+        }
+      }
+  finally {
+        zos.closeEntry();
+      }
+      if (iOutput != null) {
+        final long ratio=100 - (ze.getCompressedSize() * 100 / ze.getSize());
+        iOutput.onMessage("ok size=" + OFileUtils.getSizeAsString(ze.getSize()) + " compressedSize="+ ze.getCompressedSize()+ " ratio="+ ratio+ "%% elapsed="+ OIOUtils.getTimeAsString(System.currentTimeMillis() - begin)+ "");
+      }
+      total++;
+    }
+  }
+ else {
+    throw new IllegalArgumentException("Directory " + folderName + " not found");
+  }
+  return total;
+}

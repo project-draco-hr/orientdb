@@ -1,28 +1,9 @@
 {
-  final String localNode=manager.getLocalNodeName();
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-  for (  String clusterName : cfg.getClusterNames()) {
-    final List<List<String>> partitions=cfg.getPartitions(clusterName);
-    if (partitions != null)     for (    List<String> partition : partitions) {
-      for (      String node : partition)       if (node.equals(localNode))       return;
-    }
-  }
-  boolean dirty=false;
-  for (  String clusterName : cfg.getClusterNames()) {
-    final List<List<String>> partitions=cfg.getPartitions(clusterName);
-    if (partitions != null)     for (int p=0; p < partitions.size(); ++p) {
-      List<String> partition=partitions.get(p);
-      for (      String node : partition)       if (node.equalsIgnoreCase(ODistributedConfiguration.NEW_NODE_TAG)) {
-        ODistributedServerLog.info(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: %s.%s.%d",localNode,databaseName,clusterName,p);
-        partition.add(localNode);
-        dirty=true;
-        break;
-      }
-    }
-  }
-  if (dirty) {
-    final ODocument doc=cfg.serialize();
-    manager.updateCachedDatabaseConfiguration(databaseName,doc);
-    manager.getConfigurationMap().put(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + databaseName,doc);
+  final List<String> foundPartition=cfg.addNewNodeInPartitions(manager.getLocalNodeName());
+  if (foundPartition != null) {
+    manager.getConfigurationMap().put(OHazelcastPlugin.CONFIG_STATUS_PREFIX + manager.getLocalNodeName() + "."+ databaseName,false);
+    ODistributedServerLog.info(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: db=%s %s",manager.getLocalNodeName(),databaseName,foundPartition);
+    manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
   }
 }

@@ -1,0 +1,24 @@
+{
+  final boolean committed;
+  final ODatabaseDocumentTx raw=getRawGraph();
+  if (raw.getTransaction().isActive()) {
+    if (settings.warnOnForceClosingTx && OLogManager.instance().isWarnEnabled()) {
+      final StringBuilder msg=new StringBuilder();
+      for (      String s : iOperationStrings)       msg.append(s);
+      OLogManager.instance().warn(this,"Committing the active transaction to %s. To avoid this behavior do it outside the transaction",msg.toString());
+    }
+    raw.commit();
+    committed=true;
+  }
+ else   committed=false;
+  try {
+    return iCallable.call(this);
+  }
+ catch (  Exception e) {
+    if (e instanceof RuntimeException)     throw (RuntimeException)e;
+ else     throw new OException(e);
+  }
+ finally {
+    if (committed)     autoStartTransaction();
+  }
+}

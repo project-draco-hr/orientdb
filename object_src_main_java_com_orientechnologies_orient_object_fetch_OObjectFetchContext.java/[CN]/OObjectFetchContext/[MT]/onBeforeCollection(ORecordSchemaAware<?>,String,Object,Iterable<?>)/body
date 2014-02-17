@@ -1,0 +1,38 @@
+{
+  if (iterable instanceof ORidBag)   throw new IllegalStateException(OType.LINKBAG.name() + " can not be directly mapped to any Java collection.");
+  final Field f=OObjectEntitySerializer.getField(iFieldName,iUserObject.getClass());
+  final boolean customSerialization=OObjectEntitySerializer.isSerializedType(f);
+  final Class genericType=OReflectionHelper.getGenericMultivalueType(f);
+  Collection target;
+  if (iterable instanceof ORecordLazyList || (iterable instanceof OTrackedList<?> && !OReflectionHelper.isJavaType(genericType) && !customSerialization&& !genericType.isEnum())) {
+    target=new OObjectLazyList(iUserObject,(List<OIdentifiable>)iterable,OObjectEntitySerializer.isCascadeDeleteField(iUserObject.getClass(),f.getName()));
+  }
+ else   if (iterable instanceof ORecordLazySet || iterable instanceof OMVRBTreeRIDSet || (iterable instanceof OTrackedSet<?> && !OReflectionHelper.isJavaType(genericType) && !customSerialization&& !genericType.isEnum())) {
+    target=new OObjectLazySet(iUserObject,(Set)iterable,OObjectEntitySerializer.isCascadeDeleteField(iUserObject.getClass(),f.getName()));
+  }
+ else   if (customSerialization) {
+    if (iterable instanceof List<?>) {
+      target=new OObjectCustomSerializerList(OObjectEntitySerializer.getSerializedType(f),iRootRecord,(List<Object>)iterable);
+    }
+ else {
+      target=new OObjectCustomSerializerSet(OObjectEntitySerializer.getSerializedType(f),iRootRecord,(Set<Object>)iterable);
+    }
+  }
+ else   if (genericType.isEnum()) {
+    if (iterable instanceof List<?>) {
+      target=new OObjectEnumLazyList(genericType,iRootRecord,(List<Object>)iterable);
+    }
+ else {
+      target=new OObjectEnumLazySet(genericType,iRootRecord,(Set<Object>)iterable);
+    }
+  }
+ else {
+    if (iterable instanceof List<?>) {
+      target=new ArrayList();
+    }
+ else {
+      target=new HashSet();
+    }
+  }
+  OObjectSerializerHelper.setFieldValue(iUserObject,iFieldName,target);
+}

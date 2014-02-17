@@ -2,30 +2,32 @@
   OClass vehicleClass=database.createVertexType("GraphVehicle");
   database.createVertexType("GraphCar",vehicleClass);
   database.createVertexType("GraphMotocycle","GraphVehicle");
-  ODocument carNode=(ODocument)database.createVertex("GraphCar").field("brand","Hyundai").field("model","Coupe").field("year",2003).save();
-  ODocument motoNode=(ODocument)database.createVertex("GraphMotocycle").field("brand","Yamaha").field("model","X-City 250").field("year",2009).save();
-  database.createEdge(carNode,motoNode).save();
-  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from GraphVehicle"));
+  ODocument carNode=database.addVertex("class:GraphCar","brand","Hyundai","model","Coupe","year",2003).getRecord();
+  ODocument motoNode=database.addVertex("class:GraphMotocycle","brand","Yamaha","model","X-City 250","year",2009).getRecord();
+  database.commit();
+  database.addEdge(null,database.getVertex(carNode),database.getVertex(motoNode),"E").save();
+  List<ODocument> result=database.getRawGraph().query(new OSQLSynchQuery<ODocument>("select from GraphVehicle"));
   Assert.assertEquals(result.size(),2);
   for (  ODocument v : result) {
     Assert.assertTrue(v.getSchemaClass().isSubClassOf(vehicleClass));
   }
-  database.close();
-  database.open("admin","admin");
-  database.getMetadata().getSchema().reload();
-  result=database.query(new OSQLSynchQuery<ODocument>("select from GraphVehicle"));
+  database.shutdown();
+  database=new OrientGraph(url);
+  database.setUseLightweightEdges(false);
+  database.getRawGraph().getMetadata().getSchema().reload();
+  result=database.getRawGraph().query(new OSQLSynchQuery<ODocument>("select from GraphVehicle"));
   Assert.assertEquals(result.size(),2);
-  ODocument edge1=null;
-  ODocument edge2=null;
+  Edge edge1=null;
+  Edge edge2=null;
   for (  ODocument v : result) {
     Assert.assertTrue(v.getSchemaClass().isSubClassOf("GraphVehicle"));
     if (v.getClassName().equals("GraphCar")) {
-      Assert.assertEquals(database.getOutEdges(v).size(),1);
-      edge1=(ODocument)database.getOutEdges(v).iterator().next();
+      Assert.assertEquals(database.getVertex(v).countEdges(Direction.OUT),1);
+      edge1=database.getVertex(v).getEdges(Direction.OUT).iterator().next();
     }
  else {
-      Assert.assertEquals(database.getInEdges(v).size(),1);
-      edge2=(ODocument)database.getInEdges(v).iterator().next();
+      Assert.assertEquals(database.getVertex(v).countEdges(Direction.IN),1);
+      edge2=database.getVertex(v).getEdges(Direction.IN).iterator().next();
     }
   }
   Assert.assertEquals(edge1,edge2);

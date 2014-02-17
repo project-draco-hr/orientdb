@@ -10,8 +10,13 @@
   if (OStringParser.startsWithIgnoreCase(subjectName,OCommandExecutorSQLAbstract.INDEX_PREFIX)) {
     indexName=subjectName.substring(OCommandExecutorSQLAbstract.INDEX_PREFIX.length());
     if (!parserIsEnded()) {
-      parserNextWord(true);
-      if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE))       compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition()),getContext(),KEYWORD_WHERE);
+      while (!parserIsEnded()) {
+        final String word=parserGetLastWord();
+        if (word.equals(KEYWORD_LOCK))         lockStrategy=parseLock();
+ else         if (word.equals(KEYWORD_RETURN))         returning=parseReturn();
+ else         if (word.equalsIgnoreCase(KEYWORD_WHERE))         compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition()),getContext(),KEYWORD_WHERE);
+        parserNextWord(true);
+      }
     }
  else     parserSetCurrentPosition(-1);
   }
@@ -20,6 +25,17 @@
     query=database.command(new OSQLAsynchQuery<ODocument>(subjectName.substring(1,subjectName.length() - 1),this));
   }
  else {
+    parserNextWord(true);
+    while (!parserIsEnded()) {
+      final String word=parserGetLastWord();
+      if (word.equals(KEYWORD_LOCK))       lockStrategy=parseLock();
+ else       if (word.equals(KEYWORD_RETURN))       returning=parseReturn();
+ else {
+        parserGoBack();
+        break;
+      }
+      parserNextWord(true);
+    }
     final String condition=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetCurrentPosition()) : "";
     query=database.command(new OSQLAsynchQuery<ODocument>("select from " + subjectName + condition,this));
   }

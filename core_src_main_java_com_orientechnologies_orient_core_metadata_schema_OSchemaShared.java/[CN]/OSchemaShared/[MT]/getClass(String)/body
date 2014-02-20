@@ -1,29 +1,32 @@
 {
   if (iClassName == null)   return null;
   OClass cls;
-  cls=getDatabase().getStorage().callInLock(new Callable<OClass>(){
-    @Override public OClass call() throws Exception {
-      return classes.get(iClassName.toLowerCase());
-    }
+  rwLock.readLock().lock();
+  try {
+    cls=classes.get(iClassName.toLowerCase());
+    if (cls != null)     return cls;
   }
-,false);
-  if (cls == null && getDatabase().getDatabaseOwner() instanceof ODatabaseObject) {
-    cls=getDatabase().getStorage().callInLock(new Callable<OClass>(){
-      @Override public OClass call() throws Exception {
-        OClass cls=classes.get(iClassName.toLowerCase());
-        if (cls == null) {
-          final ODatabase ownerDb=getDatabase().getDatabaseOwner();
-          if (ownerDb instanceof ODatabaseObject) {
-            final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
-            if (javaClass != null) {
-              cls=cascadeCreate(javaClass);
-            }
+  finally {
+    rwLock.readLock().unlock();
+  }
+  if (getDatabase().getDatabaseOwner() instanceof ODatabaseObject) {
+    rwLock.writeLock().lock();
+    try {
+      cls=classes.get(iClassName.toLowerCase());
+      if (cls == null) {
+        final ODatabase ownerDb=getDatabase().getDatabaseOwner();
+        if (ownerDb instanceof ODatabaseObject) {
+          final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
+          if (javaClass != null) {
+            cls=cascadeCreate(javaClass);
           }
         }
-        return cls;
       }
+      return cls;
     }
-,true);
+  finally {
+      rwLock.writeLock().unlock();
+    }
   }
-  return cls;
+  return null;
 }

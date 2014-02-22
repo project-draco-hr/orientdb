@@ -1,0 +1,29 @@
+{
+  if (cachedClusterNodes.size() <= 1)   return;
+  int maxQSize=0;
+  int secondMaxQSize=0;
+  int availableNodes=0;
+  for (  Map.Entry<String,Member> entry : cachedClusterNodes.entrySet()) {
+    final String nodeName=entry.getKey();
+    if (isNodeAvailable(nodeName,iDatabaseName)) {
+      availableNodes++;
+      final IQueue q=getMessageService().getQueue(OHazelcastDistributedMessageService.getRequestQueueName(nodeName,iDatabaseName));
+      if (q != null) {
+        final int qSize=q.size();
+        if (qSize > maxQSize) {
+          secondMaxQSize=maxQSize;
+          maxQSize=qSize;
+        }
+      }
+    }
+  }
+  if (availableNodes <= 1)   return;
+  final long msgDelta=maxQSize - secondMaxQSize;
+  if (msgDelta > 100) {
+    try {
+      Thread.sleep((msgDelta - 100) * 10);
+    }
+ catch (    InterruptedException e) {
+    }
+  }
+}

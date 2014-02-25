@@ -15,7 +15,7 @@
     for (    String node : nodes) {
       if (manager.isNodeAvailable(node,databaseName))       availableNodes++;
  else {
-        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip listening of response because node '%s' is not online",node);
+        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip expected response from node '%s' for request %d because it's not online",node,iRequest.getId());
       }
     }
   }
@@ -25,12 +25,13 @@
   if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION)   expectedSynchronousResponses=availableNodes;
   final boolean waitLocalNode=nodes.contains(manager.getLocalNodeName()) && cfg.isReadYourWrites(clusterName);
   final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize));
-  msgService.registerRequest(iRequest.getId(),currentResponseMgr);
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"request %s",iRequest.getTask());
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"sending request %s",iRequest.getTask());
   final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
   try {
     requestLock.lock();
     try {
+      iRequest.assignId();
+      msgService.registerRequest(iRequest.getId(),currentResponseMgr);
       for (      IQueue<ODistributedRequest> queue : reqQueues) {
         queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
       }
@@ -38,6 +39,7 @@
   finally {
       requestLock.unlock();
     }
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"sent request %s",iRequest.getTask());
     Orient.instance().getProfiler().updateCounter("distributed.replication." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.replication.*.msgSent");
     return waitForResponse(iRequest,currentResponseMgr);
   }

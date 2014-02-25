@@ -3,19 +3,19 @@
   super.startup();
   status=NODE_STATUS.STARTING;
   OLogManager.instance().info(this,"Starting distributed server '%s'...",getLocalNodeName());
-  cachedClusterNodes.clear();
+  activeNodes.clear();
   try {
     hazelcastInstance=Hazelcast.newHazelcastInstance(new FileSystemXmlConfig(hazelcastConfigFile));
     nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
     timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
-    cachedClusterNodes.put(getLocalNodeName(),hazelcastInstance.getCluster().getLocalMember());
+    activeNodes.put(getLocalNodeName(),hazelcastInstance.getCluster().getLocalMember());
     membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
     OServer.registerServerInstance(getLocalNodeName(),serverInstance);
     final IMap<String,Object> configurationMap=getConfigurationMap();
     configurationMap.addEntryListener(this,true);
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
       final String memberName=getNodeName(m);
-      if (memberName != null)       cachedClusterNodes.put(memberName,m);
+      if (memberName != null)       activeNodes.put(memberName,m);
     }
     messageService=new OHazelcastDistributedMessageService(this);
     getConfigurationMap().put(CONFIG_NODE_PREFIX + getLocalNodeId(),getLocalNodeConfiguration());

@@ -1,19 +1,13 @@
 {
-  ODistributedRequest req=null;
-  if (waitForTaskType == null && !skippedMessages.isEmpty()) {
-    req=skippedMessages.remove(0);
-    if (req != null)     ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.NONE,"pop buffered request %s",req);
-  }
-  if (req == null)   req=requestQueue.take();
-  while (waitForTaskType != null) {
+  ODistributedRequest req=requestQueue.take();
+  while (waitForMessageId.get() > -1) {
     if (req != null) {
-      if (req.getTask().getClass().equals(waitForTaskType)) {
-        waitForTaskType=null;
+      if (req.getId() >= waitForMessageId.get()) {
+        waitForMessageId.set(-1);
         return req;
       }
  else {
-        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.IN,"skip request because the node is not online yet, request=%s sourceNode=%s",req,req.getSenderNodeName());
-        if (saveSkippedMessages)         skippedMessages.add(req);
+        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.IN,"discarded request %d because waiting for %d request=%s sourceNode=%s",req.getId(),waitForMessageId,req,req.getSenderNodeName());
         req=requestQueue.take();
       }
     }

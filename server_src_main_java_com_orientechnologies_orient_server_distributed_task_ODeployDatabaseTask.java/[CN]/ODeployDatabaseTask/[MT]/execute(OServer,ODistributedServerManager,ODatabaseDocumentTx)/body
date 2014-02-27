@@ -4,6 +4,10 @@
     final Lock lock=iManager.getLock(databaseName);
     if (lock.tryLock()) {
       try {
+        while (database.getStorage().getLastOperationId() >= iManager.getMessageService().getLastMessageId()) {
+          ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"pausing deploy of database %s until all pending operations are completed...",databaseName);
+          Thread.sleep(300);
+        }
         iManager.setDatabaseStatus(databaseName,ODistributedServerManager.DB_STATUS.SYNCHRONIZING);
         try {
           ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"deploying database %s...",databaseName);

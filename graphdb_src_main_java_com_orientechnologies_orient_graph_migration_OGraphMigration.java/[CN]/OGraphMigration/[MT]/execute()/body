@@ -1,0 +1,38 @@
+{
+  List<ODocument> vertexes=database.query(new OSQLSynchQuery<ODocument>("select from V"));
+  for (  ODocument vertex : vertexes) {
+    for (    String fieldName : vertex.fieldNames()) {
+      if (fieldName.startsWith(OrientVertex.CONNECTION_IN_PREFIX) || fieldName.startsWith(OrientVertex.CONNECTION_OUT_PREFIX)) {
+        Object oldValue=vertex.field(fieldName);
+        if (oldValue instanceof OMVRBTreeRIDSet) {
+          OMVRBTreeRIDSet oldTree=(OMVRBTreeRIDSet)oldValue;
+          ORidBag bag=new ORidBag();
+          bag.addAll(oldTree);
+          vertex.field(fieldName,bag);
+        }
+      }
+    }
+    vertex.save();
+  }
+  final OIndexManager indexManager=database.getMetadata().getIndexManager();
+  boolean indexWasMigrated=false;
+  for (  OIndex index : indexManager.getIndexes()) {
+    final ODocument config=index.getConfiguration();
+    ODocument metadata=index.getMetadata();
+    if (config.field(OrientIndex.CONFIG_CLASSNAME) != null && metadata == null) {
+      final OIndex<OIdentifiable> recordKeyValueIndex=(OIndex<OIdentifiable>)database.getMetadata().getIndexManager().createIndex("__@recordmap@___" + index.getName(),OClass.INDEX_TYPE.DICTIONARY.toString(),new OSimpleKeyIndexDefinition(OType.LINK,OType.STRING),null,null,null);
+      final Iterator<Map.Entry<Object,Collection<OIdentifiable>>> iterator=index.iterator();
+      while (iterator.hasNext()) {
+        final Map.Entry<Object,Collection<OIdentifiable>> entry=iterator.next();
+        final String keyTemp=entry.getKey().toString();
+        for (        OIdentifiable identifiable : entry.getValue())         recordKeyValueIndex.put(new OCompositeKey(identifiable.getIdentity(),keyTemp),identifiable.getIdentity());
+      }
+      metadata=new ODocument();
+      metadata.field(OrientIndex.CONFIG_CLASSNAME,config.field(OrientIndex.CONFIG_CLASSNAME));
+      metadata.field(OrientIndex.CONFIG_RECORD_MAP_NAME,recordKeyValueIndex.getName());
+      config.field("metadata",metadata);
+      indexWasMigrated=true;
+    }
+  }
+  if (indexWasMigrated)   indexManager.save();
+}

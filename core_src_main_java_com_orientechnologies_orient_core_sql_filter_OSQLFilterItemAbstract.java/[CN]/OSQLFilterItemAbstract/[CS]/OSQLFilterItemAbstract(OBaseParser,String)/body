@@ -2,14 +2,14 @@
   final List<String> parts=OStringSerializerHelper.smartSplit(iText,new char[]{'.','['},new boolean[]{false,true,true},0,-1,false,true,false,false,new char[]{});
   setRoot(iQueryToParse,parts.get(0));
   if (parts.size() > 1) {
-    operationsChain=new ArrayList<OPair<OSQLMethod,Object[]>>();
+    operationsChain=new ArrayList<OPair<OSQLMethodRuntime,Object[]>>();
     for (int i=1; i < parts.size(); ++i) {
       final String part=parts.get(i);
       final int pindex=part.indexOf('(');
-      if (part.charAt(0) == '[')       operationsChain.add(new OPair<OSQLMethod,Object[]>(OSQLHelper.getMethodByName(OSQLFunctionMultiValue.NAME),new Object[]{part}));
+      if (part.charAt(0) == '[')       operationsChain.add(new OPair<OSQLMethodRuntime,Object[]>(new OSQLMethodRuntime(OSQLEngine.getMethod(OSQLMethodMultiValue.NAME)),new Object[]{part}));
  else       if (pindex > -1) {
         final String methodName=part.substring(0,pindex).trim().toLowerCase(Locale.ENGLISH);
-        OSQLMethod method=OSQLHelper.getMethodByName(methodName);
+        OSQLMethod method=OSQLEngine.getMethod(methodName);
         final Object[] arguments;
         if (method != null) {
           if (method.getMaxParams() == -1 || method.getMaxParams() > 0) {
@@ -20,7 +20,7 @@
         }
  else {
           final OSQLFunction f=OSQLEngine.getInstance().getFunction(methodName);
-          if (f == null)           throw new OQueryParsingException(iQueryToParse.parserText,"Syntax error: function or field operator not recognized between the supported ones: " + Arrays.toString(OSQLHelper.getAllMethodNames()),0);
+          if (f == null)           throw new OQueryParsingException(iQueryToParse.parserText,"Syntax error: function or field operator not recognized between the supported ones: " + OSQLEngine.getMethodNames(),0);
           if (f.getMaxParams() == -1 || f.getMaxParams() > 0) {
             arguments=OStringSerializerHelper.getParameters(part).toArray();
             if (arguments.length + 1 < f.getMinParams() || (f.getMaxParams() > -1 && arguments.length + 1 > f.getMaxParams()))             throw new OQueryParsingException(iQueryToParse.parserText,"Syntax error: function '" + f.getName() + "' needs "+ (f.getMinParams() == f.getMaxParams() ? f.getMinParams() : f.getMinParams() + "-" + f.getMaxParams())+ " argument(s) while has been received "+ arguments.length,0);
@@ -28,10 +28,11 @@
  else           arguments=null;
           method=new OSQLMethodFunctionDelegate(f);
         }
-        operationsChain.add(new OPair<OSQLMethod,Object[]>(method,arguments));
+        final OSQLMethodRuntime runtimeMethod=new OSQLMethodRuntime(method);
+        operationsChain.add(new OPair<OSQLMethodRuntime,Object[]>(runtimeMethod,arguments));
       }
  else {
-        operationsChain.add(new OPair<OSQLMethod,Object[]>(OSQLHelper.getMethodByName(OSQLMethodField.NAME),new Object[]{part}));
+        operationsChain.add(new OPair<OSQLMethodRuntime,Object[]>(new OSQLMethodRuntime(OSQLEngine.getMethod(OSQLMethodField.NAME)),new Object[]{part}));
       }
     }
   }

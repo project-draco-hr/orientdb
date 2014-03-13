@@ -1,17 +1,26 @@
 {
   if (currentTx.isActive()) {
-    for (    ODatabaseListener listener : underlying.browseListeners())     try {
-      listener.onBeforeTxRollback(underlying);
+    if (currentTx.amountOfNestedTxs() > 1) {
+      currentTx.rollback();
+      return this;
     }
- catch (    Throwable t) {
-      OLogManager.instance().error(this,"Error before tx rollback",t);
+    try {
+      for (      ODatabaseListener listener : underlying.browseListeners())       try {
+        listener.onBeforeTxRollback(underlying);
+      }
+ catch (      Throwable t) {
+        OLogManager.instance().error(this,"Error before tx rollback",t);
+      }
+      currentTx.rollback();
+      for (      ODatabaseListener listener : underlying.browseListeners())       try {
+        listener.onAfterTxRollback(underlying);
+      }
+ catch (      Throwable t) {
+        OLogManager.instance().error(this,"Error after tx rollback",t);
+      }
     }
-    currentTx.rollback();
-    for (    ODatabaseListener listener : underlying.browseListeners())     try {
-      listener.onAfterTxRollback(underlying);
-    }
- catch (    Throwable t) {
-      OLogManager.instance().error(this,"Error after tx rollback",t);
+  finally {
+      currentTx.close();
     }
   }
   return this;

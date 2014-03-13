@@ -1,0 +1,26 @@
+{
+  checkTransaction();
+  txStartCounter+=commitLevelDiff;
+  status=TXSTATUS.ROLLBACKING;
+  if (!force && txStartCounter > 0) {
+    OLogManager.instance().info(this,"Nested transaction was closed but transaction itself was scheduled for rollback.");
+    return;
+  }
+  if (txStartCounter < 0)   throw new OTransactionException("Transaction was rolled back more times than it was started.");
+  database.getStorage().callInLock(new Callable<Void>(){
+    public Void call() throws Exception {
+      database.getStorage().rollback(OTransactionOptimistic.this);
+      return null;
+    }
+  }
+,true);
+  database.getLevel1Cache().clear();
+  for (  ORecordOperation v : recordEntries.values())   v.getRecord().unload();
+  for (  ORecordOperation v : allEntries.values())   v.getRecord().unload();
+  indexEntries.clear();
+  temp2persistent.clear();
+  allEntries.clear();
+  recordIndexOperations.clear();
+  recordEntries.clear();
+  status=TXSTATUS.ROLLED_BACK;
+}

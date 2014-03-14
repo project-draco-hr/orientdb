@@ -1,19 +1,20 @@
 {
-  ODatabaseFlat db=new ODatabaseFlat(url);
-  db.open("admin","admin");
-  ORecordFlat record=new ORecordFlat(db);
-  record.value("This is the first version").save();
+  if (database.getClusterIdByName("binary") == -1)   database.addCluster("binary",OStorage.CLUSTER_TYPE.PHYSICAL);
+  ORecordBytes record=new ORecordBytes("This is the first version".getBytes());
+  record.save();
   try {
-    db.begin();
+    database.begin();
     record.load();
     int v1=record.getRecordVersion().getCounter();
-    record.value("This is the second version").save();
-    db.commit();
+    record.setDirty();
+    record.fromStream("This is the second version".getBytes());
+    record.save();
+    database.commit();
     record.reload();
     Assert.assertEquals(record.getRecordVersion().getCounter(),v1 + 1);
-    Assert.assertTrue(record.value().contains("second"));
+    Assert.assertTrue(new String(record.toStream()).contains("second"));
   }
   finally {
-    db.close();
+    database.close();
   }
 }

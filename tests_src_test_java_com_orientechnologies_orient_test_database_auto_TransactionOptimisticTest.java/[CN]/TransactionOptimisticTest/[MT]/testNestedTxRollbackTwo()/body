@@ -1,0 +1,30 @@
+{
+  final OSchema schema=database.getMetadata().getSchema();
+  if (!schema.existsClass("NestedTxRollbackTwo"))   schema.createClass("NestedTxRollbackTwo");
+  database.begin();
+  try {
+    final ODocument externalDocOne=new ODocument("NestedTxRollbackTwo");
+    externalDocOne.field("v","val1");
+    externalDocOne.save();
+    database.begin();
+    final ODocument externalDocTwo=new ODocument("NestedTxRollbackTwo");
+    externalDocTwo.field("v","val2");
+    externalDocTwo.save();
+    database.rollback();
+    database.begin();
+    final ODocument externalDocFour=new ODocument("NestedTxRollbackTwo");
+    externalDocFour.field("v","val4");
+    externalDocFour.save();
+    database.commit();
+    final ODocument externalDocThree=new ODocument("NestedTxRollbackTwo");
+    externalDocThree.field("v","val3");
+    externalDocThree.save();
+    database.commit();
+    Assert.fail();
+  }
+ catch (  ORollbackException e) {
+    database.rollback();
+  }
+  Assert.assertTrue(!database.getTransaction().isActive());
+  Assert.assertEquals(database.countClass("NestedTxRollbackTwo"),0);
+}

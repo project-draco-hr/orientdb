@@ -1,7 +1,7 @@
 {
-  ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
-  db.open("admin","admin");
-  db.begin();
+  final OSchema schema=database.getMetadata().getSchema();
+  if (!schema.existsClass("Profile"))   schema.createClass("Profile");
+  database.begin();
   ODocument kim=new ODocument("Profile").field("name","Kim").field("surname","Bauer");
   ODocument teri=new ODocument("Profile").field("name","Teri").field("surname","Bauer");
   ODocument jack=new ODocument("Profile").field("name","Jack").field("surname","Bauer");
@@ -9,11 +9,10 @@
   ((HashSet<ODocument>)kim.field("following",new HashSet<ODocument>()).field("following")).add(teri);
   ((HashSet<ODocument>)teri.field("following",new HashSet<ODocument>()).field("following")).add(jack);
   jack.save();
-  db.commit();
-  System.out.println("Kim indexed: " + db.getMetadata().getSchema().getClass("Profile").getProperty("name").getIndex().get("Kim"));
-  db.close();
-  db.open("admin","admin");
-  ODocument loadedJack=db.load(jack.getIdentity());
+  database.commit();
+  database.close();
+  database.open("admin","admin");
+  ODocument loadedJack=database.load(jack.getIdentity());
   Assert.assertEquals(loadedJack.field("name"),"Jack");
   Collection<ODocument> jackFollowings=loadedJack.field("following");
   Assert.assertNotNull(jackFollowings);
@@ -29,5 +28,5 @@
   Assert.assertNotNull(teriFollowings);
   Assert.assertEquals(teriFollowings.size(),1);
   Assert.assertEquals(teriFollowings.iterator().next().field("name"),"Jack");
-  db.close();
+  database.close();
 }

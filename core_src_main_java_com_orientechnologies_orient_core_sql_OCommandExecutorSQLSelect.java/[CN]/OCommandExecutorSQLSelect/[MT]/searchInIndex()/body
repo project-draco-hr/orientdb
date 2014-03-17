@@ -7,7 +7,7 @@
     final OQueryOperator indexOperator=compiledFilter.getRootCondition().getOperator();
     if (indexOperator instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesBetween(getIndexKey(index.getDefinition(),values[0]),getIndexKey(index.getDefinition(),values[2]));
+      final Collection<ODocument> entries=index.getEntriesBetween(getIndexKey(index.getDefinition(),values[0],context),getIndexKey(index.getDefinition(),values[2],context));
       for (      final OIdentifiable r : entries) {
         final boolean continueResultParsing=handleResult(r,false);
         if (!continueResultParsing)         break;
@@ -15,22 +15,22 @@
     }
  else     if (indexOperator instanceof OQueryOperatorMajor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),false);
+      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value,context),false);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMajorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),true);
+      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value,context),true);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMinor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),false);
+      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value,context),false);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorMinorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),true);
+      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value,context),true);
       parseIndexSearchResult(entries);
     }
  else     if (indexOperator instanceof OQueryOperatorIn) {
@@ -40,7 +40,7 @@
         if (index.getDefinition() instanceof OCompositeIndexDefinition) {
           throw new OCommandExecutionException("Operator IN not supported yet.");
         }
-        val=getIndexKey(index.getDefinition(),val);
+        val=getIndexKey(index.getDefinition(),val,context);
         values.add(val);
       }
       final Collection<ODocument> entries=index.getEntries(values);
@@ -48,7 +48,8 @@
     }
  else {
       final Object right=compiledFilter.getRootCondition().getRight();
-      Object keyValue=getIndexKey(index.getDefinition(),right);
+      Object keyValue=getIndexKey(index.getDefinition(),right,context);
+      if (keyValue == null)       return;
       final Object res;
       if (index.getDefinition().getParamCount() == 1) {
         final OType type=index.getDefinition().getTypes()[0];
@@ -56,7 +57,7 @@
         res=index.get(keyValue);
       }
  else {
-        final Object secondKey=getIndexKey(index.getDefinition(),right);
+        final Object secondKey=getIndexKey(index.getDefinition(),right,context);
         if (keyValue instanceof OCompositeKey && secondKey instanceof OCompositeKey && ((OCompositeKey)keyValue).getKeys().size() == index.getDefinition().getParamCount() && ((OCompositeKey)secondKey).getKeys().size() == index.getDefinition().getParamCount())         res=index.get(keyValue);
  else         res=index.getValuesBetween(keyValue,secondKey,true);
       }

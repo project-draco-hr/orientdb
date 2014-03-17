@@ -1,0 +1,17 @@
+{
+  final String query="select from OrderByIndexReuse order by secondProp desc, thirdProp desc offset 10 limit 4";
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),4);
+  for (int i=0; i < 4; i++) {
+    final ODocument document=result.get(i);
+    Assert.assertEquals(document.field("secondProp"),45 - i / 2);
+    int thirdPropertyIndex;
+    if (i % 2 == 0)     thirdPropertyIndex=document.<Integer>field("secondProp") * 2 + 1;
+ else     thirdPropertyIndex=document.<Integer>field("secondProp") * 2;
+    Assert.assertEquals(document.field("thirdProp"),"prop" + thirdPropertyIndex);
+  }
+  final ODocument explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Boolean>field("fullySortedByIndex"));
+  Assert.assertTrue(explain.<Boolean>field("indexIsUsedInOrderBy"));
+  Assert.assertEquals(explain.<Set>field("involvedIndexes").toArray(),new String[]{"OrderByIndexReuseIndexSecondThirdProp"});
+}

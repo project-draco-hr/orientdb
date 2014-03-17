@@ -1,0 +1,22 @@
+{
+  final OTransactionIndexChanges indexChanges=database.getTransaction().getIndexChanges(delegate.getName());
+  if (indexChanges == null)   return delegate.getLastKey();
+  Object indexLastKey;
+  if (indexChanges.cleared)   indexLastKey=null;
+ else   indexLastKey=delegate.getLastKey();
+  Object lastKey=indexChanges.getLastKey();
+  while (true) {
+    OTransactionIndexChangesPerKey changesPerKey=indexChanges.getChangesPerKey(lastKey);
+    for (    OTransactionIndexEntry indexEntry : changesPerKey.entries) {
+      if (indexEntry.operation.equals(OPERATION.REMOVE))       lastKey=null;
+ else       lastKey=changesPerKey.key;
+    }
+    if (changesPerKey.key.equals(indexLastKey))     indexLastKey=lastKey;
+    if (lastKey != null) {
+      if (indexLastKey != null && ((Comparable)indexLastKey).compareTo(lastKey) > 0)       return indexLastKey;
+      return lastKey;
+    }
+    lastKey=indexChanges.getLowerKey(changesPerKey.key);
+    if (lastKey == null)     return indexLastKey;
+  }
+}

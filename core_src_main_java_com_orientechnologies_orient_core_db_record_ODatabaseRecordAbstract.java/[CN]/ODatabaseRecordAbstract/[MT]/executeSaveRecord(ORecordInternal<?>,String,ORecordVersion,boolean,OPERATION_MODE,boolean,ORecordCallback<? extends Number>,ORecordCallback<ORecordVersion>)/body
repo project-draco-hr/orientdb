@@ -19,34 +19,17 @@
       if (isNew)       record.onBeforeIdentityChanged(rid);
  else       if (stream == null || stream.length == 0)       return (RET)record;
       if (isNew && rid.clusterId < 0)       rid.clusterId=iClusterName != null ? getClusterIdByName(iClusterName) : getDefaultClusterId();
-      if (rid.clusterId > -1) {
-        if (iClusterName == null)         iClusterName=getClusterNameById(rid.clusterId);
-        if (getStorageVersions().classesAreDetectedByClusterId() && isNew && record instanceof ORecordSchemaAwareAbstract) {
-          final ORecordSchemaAwareAbstract recordSchemaAware=(ORecordSchemaAwareAbstract)record;
-          final OClass recordClass=recordSchemaAware.getSchemaClass();
-          final OClass clusterIdClass=metadata.getSchema().getClassByClusterId(rid.clusterId);
-          if (recordClass == null && clusterIdClass != null || clusterIdClass == null && recordClass != null || (recordClass != null && !recordClass.equals(clusterIdClass)))           throw new OSchemaException("Record saved into cluster " + iClusterName + " should be saved with class "+ clusterIdClass+ " but saved with class "+ recordClass);
-        }
-      }
-      if (wasNew)       checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
- else       checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
+      if (rid.clusterId > -1 && iClusterName == null)       iClusterName=getClusterNameById(rid.clusterId);
+      checkRecordClass(record,iClusterName,rid,isNew);
+      final int permission;
+      if (wasNew)       permission=ORole.PERMISSION_CREATE;
+ else       permission=ORole.PERMISSION_UPDATE;
+      checkSecurity(ODatabaseSecurityResources.CLUSTER,permission,iClusterName);
       if (stream != null && stream.length > 0) {
-        if (iCallTriggers)         if (wasNew) {
-          if (callbackHooks(TYPE.BEFORE_CREATE,record) == RESULT.RECORD_CHANGED) {
-            record.unsetDirty();
-            record.setDirty();
-            ORecordSerializationContext.pullContext();
-            ORecordSerializationContext.pushContext();
-            stream=record.toStream();
-          }
-        }
- else {
-          if (callbackHooks(TYPE.BEFORE_UPDATE,record) == RESULT.RECORD_CHANGED) {
-            record.unsetDirty();
-            record.setDirty();
-            ORecordSerializationContext.pullContext();
-            ORecordSerializationContext.pushContext();
-            stream=record.toStream();
+        if (iCallTriggers) {
+          final TYPE triggerType=wasNew ? TYPE.BEFORE_CREATE : TYPE.BEFORE_UPDATE;
+          if (callbackHooks(triggerType,record) == RESULT.RECORD_CHANGED) {
+            stream=updateStream(record);
           }
         }
       }
@@ -59,11 +42,8 @@
         if (isNew) {
           ((ORecordId)record.getIdentity()).copyFrom(rid);
           record.onAfterIdentityChanged(record);
-          record.fill(rid,version,stream,stream == null || stream.length == 0);
         }
- else {
-          record.fill(rid,version,stream,stream == null || stream.length == 0);
-        }
+        record.fill(rid,version,stream,stream == null || stream.length == 0);
         if (iCallTriggers && stream != null && stream.length > 0) {
           if (!operationResult.isMoved()) {
             callbackHooks(wasNew ? TYPE.AFTER_CREATE : TYPE.AFTER_UPDATE,record);

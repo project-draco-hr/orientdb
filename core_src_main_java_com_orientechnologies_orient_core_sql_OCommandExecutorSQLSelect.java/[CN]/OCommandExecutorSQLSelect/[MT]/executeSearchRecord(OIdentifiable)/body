@@ -4,22 +4,22 @@
   final OStorage.LOCKING_STRATEGY lockingStrategy=context.getVariable("$locking") != null ? (OStorage.LOCKING_STRATEGY)context.getVariable("$locking") : OStorage.LOCKING_STRATEGY.DEFAULT;
   ORecordInternal<?> record=null;
   try {
-    record=id instanceof ORecordInternal<?> ? (ORecordInternal<?>)id : getDatabase().load(id.getIdentity(),null,false,false,lockingStrategy);
+    if (id instanceof ORecordInternal<?>) {
+      record=(ORecordInternal<?>)id;
+      if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK)       ((OStorageEmbedded)getDatabase().getStorage()).acquireWriteLock(record.getIdentity());
+ else       if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK)       ((OStorageEmbedded)getDatabase().getStorage()).acquireReadLock(record.getIdentity());
+    }
+ else     record=getDatabase().load(id.getIdentity(),null,false,false,lockingStrategy);
     context.updateMetric("recordReads",+1);
     if (record == null || record.getRecordType() != ODocument.RECORD_TYPE)     return true;
     context.updateMetric("documentReads",+1);
     if (filter(record))     if (!handleResult(record,true))     return false;
   }
   finally {
-    if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK) {
-      if (record != null) {
-        try {
-          ((OStorageEmbedded)getDatabase().getStorage()).releaseWriteLock(record.getIdentity());
-        }
- catch (        OLockException e) {
-        }
-      }
+    if (record != null)     if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK) {
+      ((OStorageEmbedded)getDatabase().getStorage()).releaseWriteLock(record.getIdentity());
     }
+ else     if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK)     ((OStorageEmbedded)getDatabase().getStorage()).releaseReadLock(record.getIdentity());
   }
   return true;
 }

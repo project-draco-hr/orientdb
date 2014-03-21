@@ -1,0 +1,26 @@
+{
+  final OSchema schema=database.getMetadata().getSchema();
+  if (!schema.existsClass("MassiveRecordsHide")) {
+    schema.createClass("MassiveRecordsHide");
+  }
+  final List<ORID> docs=new ArrayList<ORID>();
+  for (int i=0; i < 100; i++) {
+    final ODocument document=new ODocument("MassiveRecordsHide");
+    document.field("index",i);
+    document.save();
+    docs.add(document.getIdentity());
+  }
+  List<ORID> ridsToRemove=new ArrayList<ORID>();
+  for (int i=0; i < 100; i+=2) {
+    final ODocument document=database.load(docs.get(i));
+    document.hide();
+    ridsToRemove.add(docs.get(i));
+  }
+  for (  ORID ridToRemove : ridsToRemove)   docs.remove(ridToRemove);
+  final List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from MassiveRecordsHide"));
+  Assert.assertEquals(result.size(),50);
+  for (  ODocument resultDoc : result) {
+    Assert.assertTrue(docs.remove(resultDoc.getIdentity()));
+  }
+  Assert.assertTrue(docs.isEmpty());
+}

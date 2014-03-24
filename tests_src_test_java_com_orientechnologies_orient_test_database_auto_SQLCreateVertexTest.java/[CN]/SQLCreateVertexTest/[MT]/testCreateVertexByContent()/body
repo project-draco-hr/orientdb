@@ -1,0 +1,21 @@
+{
+  OrientGraph graph=new OrientGraph(database,false);
+  graph.shutdown();
+  database.open("admin","admin");
+  OSchema schema=database.getMetadata().getSchema();
+  if (!schema.existsClass("CreateVertexByContent")) {
+    OClass vClass=schema.createClass("CreateVertexByContent",schema.getClass("V"));
+    vClass.createProperty("message",OType.STRING);
+  }
+  database.command(new OCommandSQL("create vertex CreateVertexByContent content { \"message\": \"(:\"}")).execute();
+  database.command(new OCommandSQL("create vertex CreateVertexByContent content { \"message\": \"\\\"?????, ?????...???\\\"\"}")).execute();
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from CreateVertexByContent"));
+  Assert.assertEquals(result.size(),2);
+  List<String> messages=new ArrayList<String>();
+  messages.add("\"?????, ?????...???\"");
+  messages.add("(:");
+  for (  ODocument document : result) {
+    Assert.assertTrue(messages.remove(document.<String>field("message")));
+  }
+  Assert.assertEquals(messages.size(),0);
+}

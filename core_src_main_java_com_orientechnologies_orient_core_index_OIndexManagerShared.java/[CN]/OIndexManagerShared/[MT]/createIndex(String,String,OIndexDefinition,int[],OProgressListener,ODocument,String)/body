@@ -18,10 +18,11 @@
  else {
     valueContainerAlgorithm=ODefaultIndexFactory.NONE_VALUE_CONTAINER;
   }
+  final OIndexInternal<?> index;
   acquireExclusiveLock();
   try {
     if (indexes.containsKey(iName.toLowerCase()))     throw new OIndexException("Index with name " + iName.toLowerCase() + " already exists.");
-    final OIndexInternal<?> index=OIndexes.createIndex(getDatabase(),iType,algorithm,valueContainerAlgorithm);
+    index=OIndexes.createIndex(getDatabase(),iType,algorithm,valueContainerAlgorithm);
     final String clusterName=indexDefinition != null && indexDefinition.getClassName() != null ? defaultClusterName : manualClusterName;
     if (iProgressListener == null)     iProgressListener=new OIndexRebuildOutputListener(index);
     Set<String> clustersToIndex=new HashSet<String>();
@@ -40,9 +41,10 @@
     }
     setDirty();
     save();
-    return index;
   }
   finally {
     releaseExclusiveLock();
   }
+  if (OGlobalConfiguration.INDEX_FLUSH_AFTER_CREATE.getValueAsBoolean())   storage.synch();
+  return index;
 }

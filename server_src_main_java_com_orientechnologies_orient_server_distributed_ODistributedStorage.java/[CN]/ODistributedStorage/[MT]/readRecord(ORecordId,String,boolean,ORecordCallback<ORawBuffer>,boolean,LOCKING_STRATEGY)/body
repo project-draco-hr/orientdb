@@ -1,4 +1,5 @@
 {
+  if (deletedRecords.get(iRecordId) != null)   throw new ORecordNotFoundException("Record " + iRecordId + " was not found");
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones,LOCKING_STRATEGY.DEFAULT);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
@@ -7,7 +8,7 @@
     final ODistributedPartitioningStrategy strategy=dManager.getPartitioningStrategy(dConfig.getPartitionStrategy(clusterName));
     final ODistributedPartition partition=strategy.getPartition(dManager,getName(),clusterName);
     if (partition.getNodes().contains(dManager.getLocalNodeName()))     return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback,loadTombstones,LOCKING_STRATEGY.DEFAULT);
-    final Object result=dManager.sendRequest(getName(),clusterName,new OReadRecordTask(iRecordId),EXECUTION_MODE.RESPONSE);
+    final Object result=sendRequest(getName(),clusterName,new OReadRecordTask(iRecordId),EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed READ_RECORD",(Throwable)result);
     return new OStorageOperationResult<ORawBuffer>((ORawBuffer)result);

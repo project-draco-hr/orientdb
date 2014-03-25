@@ -2,11 +2,11 @@
   final OrientGraphContext context=getContext(true);
   return executeOutsideTx(new OCallable<Index<T>,OrientBaseGraph>(){
     public Index<T> call(    final OrientBaseGraph g){
-synchronized (contexts) {
-        if (context.manualIndices.containsKey(indexName))         throw ExceptionFactory.indexAlreadyExists(indexName);
+synchronized (manualIndexLock) {
+        final ODatabaseDocumentTx database=context.rawGraph;
+        final OIndexManager indexManager=database.getMetadata().getIndexManager();
+        if (indexManager.getIndex(indexName) != null)         throw ExceptionFactory.indexAlreadyExists(indexName);
         final OrientIndex<? extends OrientElement> index=new OrientIndex<OrientElement>(g,indexName,indexClass,null);
-        for (        OrientGraphContext ctx : contexts)         ctx.manualIndices.put(index.getIndexName(),index);
-        context.manualIndices.put(index.getIndexName(),index);
         saveIndexConfiguration();
         return (Index<T>)index;
       }

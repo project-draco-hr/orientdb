@@ -58,7 +58,6 @@
                 if (index.loadFromConfiguration(idx)) {
                   addIndexInternal(index);
                   setDirty();
-                  save();
                   ok++;
                 }
  else {
@@ -74,7 +73,7 @@
                 String type=indexMetadata.getType();
                 if (indexName != null && indexDefinition != null && clusters != null && !clusters.isEmpty() && type != null) {
                   OLogManager.instance().info(this,"Start creation of index %s",indexName);
-                  if (algorithm.equals(ODefaultIndexFactory.SBTREE_ALGORITHM) || indexType.endsWith("HASH_INDEX"))                   index.deleteWithoutIndexLoad(indexName);
+                  if (ODefaultIndexFactory.SBTREE_ALGORITHM.equals(algorithm) || indexType.endsWith("HASH_INDEX"))                   index.deleteWithoutIndexLoad(indexName);
                   index.create(indexName,indexDefinition,defaultClusterName,clusters,false,new OIndexRebuildOutputListener(index));
                   index.setRebuildingFlag();
                   addIndexInternal(index);
@@ -82,7 +81,6 @@
                   index.rebuild(new OIndexRebuildOutputListener(index));
                   index.flush();
                   setDirty();
-                  save();
                   ok++;
                   OLogManager.instance().info(this,"Rebuild of %s index was successfully finished.",indexName);
                 }
@@ -97,6 +95,9 @@
               errors++;
             }
           }
+          save();
+          final OStorage storage=newDb.getStorage();
+          if (OGlobalConfiguration.INDEX_FLUSH_AFTER_CREATE.getValueAsBoolean())           storage.synch();
           rebuildCompleted=true;
           OLogManager.instance().info(this,"%d indexes were restored successfully, %d errors",ok,errors);
         }

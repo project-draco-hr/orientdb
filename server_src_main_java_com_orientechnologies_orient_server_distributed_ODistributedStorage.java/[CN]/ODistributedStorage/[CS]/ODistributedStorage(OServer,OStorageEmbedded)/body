@@ -2,4 +2,26 @@
   this.serverInstance=iServer;
   this.dManager=iServer.getDistributedManager();
   this.wrapped=wrapped;
+  purgeDeletedRecordsTask=new TimerTask(){
+    @Override public void run(){
+      final long now=System.currentTimeMillis();
+      for (Iterator<Map.Entry<ORecordId,OPair<Long,ORecordVersion>>> it=deletedRecords.entrySet().iterator(); it.hasNext(); ) {
+        final Map.Entry<ORecordId,OPair<Long,ORecordVersion>> entry=it.next();
+        try {
+          final ORecordId rid=entry.getKey();
+          final long time=entry.getValue().getKey();
+          final ORecordVersion version=entry.getValue().getValue();
+          if (now - time > (OGlobalConfiguration.DISTRIBUTED_ASYNCH_RESPONSES_TIMEOUT.getValueAsLong() * 2)) {
+            final OStorageOperationResult<Boolean> result=wrapped.deleteRecord(rid,version,0,null);
+            if (result == null || !result.getResult())             OLogManager.instance().error(this,"Error on deleting record %s v.%s",rid,version);
+          }
+        }
+  finally {
+          it.remove();
+        }
+      }
+    }
+  }
+;
+  Orient.instance().getTimer().schedule(purgeDeletedRecordsTask,OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong());
 }

@@ -16,11 +16,17 @@
     if (!existingFieldNames.contains(fieldName.toLowerCase()))     throw new OIndexException("Index with name : '" + name + "' cannot be created on class : '"+ this.name+ "' because field: '"+ fieldName+ "' is absent in class definition.");
   }
   final OIndexDefinition indexDefinition=OIndexDefinitionFactory.createIndexDefinition(this,Arrays.asList(fields),extractFieldTypes(fields));
-  if (fields.length == 1) {
-    final OProperty p=getProperty(fields[0]);
+  OCollate collate=null;
+  for (  String field : fields) {
+    final OProperty p=getProperty(field);
     if (p != null) {
-      indexDefinition.setCollate(p.getCollate());
+      if (collate == null)       collate=p.getCollate();
+ else       if (!collate.equals(p.getCollate())) {
+        collate=null;
+        break;
+      }
     }
   }
+  if (collate != null && !(collate instanceof ODefaultCollate))   indexDefinition.setCollate(collate);
   return getDatabase().getMetadata().getIndexManager().createIndex(name,type,indexDefinition,polymorphicClusterIds,progressListener,metadata);
 }

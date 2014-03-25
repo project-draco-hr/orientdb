@@ -3,10 +3,14 @@
   ODatabaseRecordThreadLocal.INSTANCE.set(database);
   try {
     database.begin();
-    for (    OAbstractRecordReplicatedTask task : tasks) {
-      task.execute(iServer,iManager,database);
-    }
+    final List<Object> results=new ArrayList<Object>();
+    for (    OAbstractRecordReplicatedTask task : tasks)     results.add(task.execute(iServer,iManager,database));
     database.commit();
+    for (int i=0; i < results.size(); ++i) {
+      final Object o=results.get(i);
+      if (o instanceof ORecord<?>)       results.set(i,new OPlaceholder((ORecord<?>)o));
+    }
+    return results;
   }
  catch (  ONeedRetryException e) {
     return Boolean.FALSE;
@@ -15,8 +19,7 @@ catch (  OTransactionException e) {
     return Boolean.FALSE;
   }
 catch (  Exception e) {
-    OLogManager.instance().error(this,"Error on distirbuted transaction commit",e);
+    OLogManager.instance().error(this,"Error on distributed transaction commit",e);
     return Boolean.FALSE;
   }
-  return Boolean.TRUE;
 }

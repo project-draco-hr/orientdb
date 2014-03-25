@@ -1,0 +1,40 @@
+{
+  final ExecutorService executorService=Executors.newSingleThreadExecutor();
+  final Callable<Void> assertEmptyRecord=new Callable<Void>(){
+    @Override public Void call() throws Exception {
+      final ODatabaseDocumentTx db=new ODatabaseDocumentTx(database.getURL());
+      db.open("admin","admin");
+      try {
+        Assert.assertEquals(db.countClass("NestedTxClass"),0);
+      }
+  finally {
+        db.close();
+      }
+      return null;
+    }
+  }
+;
+  final OSchema schema=database.getMetadata().getSchema();
+  if (!schema.existsClass("NestedTxClass"))   schema.createClass("NestedTxClass");
+  database.begin();
+  final ODocument externalDocOne=new ODocument("NestedTxClass");
+  externalDocOne.field("v","val1");
+  externalDocOne.save();
+  Future assertFuture=executorService.submit(assertEmptyRecord);
+  assertFuture.get();
+  database.begin();
+  final ODocument externalDocTwo=new ODocument("NestedTxClass");
+  externalDocTwo.field("v","val2");
+  externalDocTwo.save();
+  assertFuture=executorService.submit(assertEmptyRecord);
+  assertFuture.get();
+  database.commit();
+  assertFuture=executorService.submit(assertEmptyRecord);
+  assertFuture.get();
+  final ODocument externalDocThree=new ODocument("NestedTxClass");
+  externalDocThree.field("v","val3");
+  externalDocThree.save();
+  database.commit();
+  Assert.assertTrue(!database.getTransaction().isActive());
+  Assert.assertEquals(database.countClass("NestedTxClass"),3);
+}

@@ -1,0 +1,27 @@
+{
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  final OIndexInternal<?> internalIndex=index.getInternal();
+  if (!internalIndex.canBeUsedInEqualityOperators())   return false;
+  if (indexDefinition.getParamCount() == 1) {
+    final Object inKeyValue=keyParams.get(0);
+    final List<Object> inParams;
+    if (inKeyValue instanceof List<?>)     inParams=(List<Object>)inKeyValue;
+ else     if (inKeyValue instanceof OSQLFilterItem)     inParams=(List<Object>)((OSQLFilterItem)inKeyValue).getValue(null,null,iContext);
+ else     throw new IllegalArgumentException("Key '" + inKeyValue + "' is not valid");
+    final List<Object> inKeys=new ArrayList<Object>();
+    boolean containsNotCompatibleKey=false;
+    for (    final Object keyValue : inParams) {
+      final Object key=indexDefinition.createValue(OSQLHelper.getValue(keyValue));
+      if (key == null) {
+        containsNotCompatibleKey=true;
+        break;
+      }
+      inKeys.add(key);
+    }
+    if (containsNotCompatibleKey)     return false;
+    index.getValues(inKeys,ascSortOrder,resultListener);
+  }
+ else   return false;
+  updateProfiler(iContext,internalIndex,keyParams,indexDefinition);
+  return true;
+}

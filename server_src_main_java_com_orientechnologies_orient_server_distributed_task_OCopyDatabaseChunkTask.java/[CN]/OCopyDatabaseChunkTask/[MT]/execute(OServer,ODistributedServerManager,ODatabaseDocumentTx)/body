@@ -1,32 +1,7 @@
 {
-  ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"writing database %s in chunk to disk size=%d...",database.getName(),chunkContent.length);
-  final File f=new File("importDatabase/" + database.getName());
-  final FileOutputStream out=new FileOutputStream(f,true);
-  try {
-    final ByteArrayInputStream in=new ByteArrayInputStream(chunkContent);
-    try {
-      OIOUtils.copyStream(in,out,chunkContent.length);
-    }
-  finally {
-      in.close();
-    }
-  }
-  finally {
-    out.close();
-  }
-  if (lastChunk)   try {
-    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"importing database %s...",database.getName());
-    final ODatabaseImport importDb=new ODatabaseImport(database,f.getAbsolutePath(),null);
-    try {
-      importDb.importDatabase();
-    }
-  finally {
-      ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"database %s imported correctly",database.getName());
-      importDb.close();
-    }
-  }
-  finally {
-    OFileUtils.deleteRecursively(new File("importDatabase"));
-  }
-  return Boolean.TRUE;
+  final File f=new File(fileName);
+  if (!f.exists())   throw new IllegalArgumentException("File name '" + fileName + "' not found");
+  final ODistributedDatabaseChunk result=new ODistributedDatabaseChunk(0,f,offset,ODeployDatabaseTask.CHUNK_MAX_SIZE);
+  ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.OUT,"- transferring chunk #%d offset=%d size=%s...",chunkNum,result.offset,OFileUtils.getSizeAsNumber(result.buffer.length));
+  return result;
 }

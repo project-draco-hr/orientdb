@@ -13,6 +13,16 @@
   }
   query.setUseCache(false);
   query.setContext(context);
+  if (!returning.equalsIgnoreCase("COUNT"))   allUpdatedRecords=new ArrayList<ORecord<?>>();
+  if (lockStrategy.equals("RECORD"))   query.getContext().setVariable("$locking",OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK);
   getDatabase().query(query,queryArgs);
-  return recordCount;
+  if (upsertMode && recordCount == 0) {
+    final ODocument doc=subjectName != null ? new ODocument(subjectName) : new ODocument();
+    final String suspendedLockStrategy=lockStrategy;
+    lockStrategy="NONE";
+    result(doc);
+    lockStrategy=suspendedLockStrategy;
+  }
+  if (returning.equalsIgnoreCase("COUNT"))   return recordCount;
+ else   return allUpdatedRecords;
 }

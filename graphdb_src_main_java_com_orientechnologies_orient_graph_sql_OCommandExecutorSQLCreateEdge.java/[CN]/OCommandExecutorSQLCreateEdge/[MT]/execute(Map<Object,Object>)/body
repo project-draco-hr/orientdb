@@ -20,16 +20,31 @@
           if (fields != null)           for (          Entry<String,Object> f : fields.entrySet()) {
             if (f.getValue() instanceof OSQLFunctionRuntime)             fields.put(f.getKey(),((OSQLFunctionRuntime)f.getValue()).getValue(to,null,context));
           }
-          final OrientEdge edge=fromVertex.addEdge(null,toVertex,clsName,clusterName,fields);
-          if (fields != null && !fields.isEmpty()) {
-            if (!edge.getRecord().getIdentity().isValid())             edge.convertToDocument();
-            OSQLHelper.bindParameters(edge.getRecord(),fields,new OCommandParameters(iArgs),context);
+          OrientEdge edge=null;
+          for (int r=0; r < retry; ++r) {
+            try {
+              edge=fromVertex.addEdge(null,toVertex,clsName,clusterName,fields);
+              if (fields != null && !fields.isEmpty()) {
+                if (!edge.getRecord().getIdentity().isValid())                 edge.convertToDocument();
+                OSQLHelper.bindParameters(edge.getRecord(),fields,new OCommandParameters(iArgs),context);
+              }
+              if (content != null) {
+                if (!edge.getRecord().getIdentity().isValid())                 edge.convertToDocument();
+                edge.getRecord().merge(content,true,false);
+              }
+              edge.save(clusterName);
+              break;
+            }
+ catch (            OConcurrentModificationException e) {
+              if (wait > 0)               try {
+                Thread.sleep(wait);
+              }
+ catch (              InterruptedException e1) {
+              }
+              fromVertex.getRecord().reload(null,true);
+              toVertex.getRecord().reload(null,true);
+            }
           }
-          if (content != null) {
-            if (!edge.getRecord().getIdentity().isValid())             edge.convertToDocument();
-            edge.getRecord().merge(content,true,false);
-          }
-          edge.save(clusterName);
           edges.add(edge);
         }
       }

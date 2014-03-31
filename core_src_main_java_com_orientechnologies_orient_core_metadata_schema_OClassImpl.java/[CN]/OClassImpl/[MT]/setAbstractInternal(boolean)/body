@@ -1,12 +1,16 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
   if (iAbstract) {
-    if (defaultClusterId > -1) {
-      final ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    if (defaultClusterId != NOT_EXISTENT_CLUSTER_ID) {
       if (count() > 0)       throw new IllegalStateException("Cannot set the class as abstract because contains records.");
-      if (name.toLowerCase().equals(db.getClusterNameById(defaultClusterId))) {
-        if (ODatabaseRecordThreadLocal.INSTANCE.get().getClusterRecordSizeById(defaultClusterId) == 0)         ODatabaseRecordThreadLocal.INSTANCE.get().dropCluster(defaultClusterId,true);
+      tryDropCluster(defaultClusterId);
+      for (      int clusterId : getClusterIds()) {
+        tryDropCluster(clusterId);
+        removePolymorphicClusterId(clusterId);
+        owner.removeClusterForClass(clusterId,this);
       }
+      setClusterIds(new int[]{NOT_EXISTENT_CLUSTER_ID});
+      defaultClusterId=NOT_EXISTENT_CLUSTER_ID;
     }
   }
  else {

@@ -1,6 +1,9 @@
 {
   if (inVertex == null)   throw new IllegalArgumentException("destination vertex is null");
-  graph.autoStartTransaction();
+  if (graph != null) {
+    setCurrentGraphInThreadLocal();
+    graph.autoStartTransaction();
+  }
   final ODocument outDocument=getRecord();
   final ODocument inDocument=((OrientVertex)inVertex).getRecord();
   final OrientEdge edge;
@@ -8,9 +11,8 @@
   OIdentifiable from;
   label=OrientBaseGraph.encodeClassName(label);
   if (label == null && iClassName != null)   label=OrientBaseGraph.encodeClassName(iClassName);
-  final boolean useVertexFieldsForEdgeLabels=graph.isUseVertexFieldsForEdgeLabels();
-  final String outFieldName=getConnectionFieldName(Direction.OUT,label,useVertexFieldsForEdgeLabels);
-  final String inFieldName=getConnectionFieldName(Direction.IN,label,useVertexFieldsForEdgeLabels);
+  final String outFieldName=getConnectionFieldName(Direction.OUT,label,settings.useVertexFieldsForEdgeLabels);
+  final String inFieldName=getConnectionFieldName(Direction.IN,label,settings.useVertexFieldsForEdgeLabels);
   if (label == null)   throw ExceptionFactory.edgeLabelCanNotBeNull();
   if (canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
     from=rawElement;
@@ -19,19 +21,21 @@
   }
  else {
     edge=new OrientEdge(graph,label,fields);
-    if (graph.isKeepInMemoryReferences())     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
+    if (settings.keepInMemoryReferences)     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
  else     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
     from=(OIdentifiable)edge.getRecord();
     to=(OIdentifiable)edge.getRecord();
   }
-  if (graph.isKeepInMemoryReferences()) {
+  if (settings.keepInMemoryReferences) {
     from=from.getIdentity();
     to=to.getIdentity();
   }
   createLink(outDocument,to,outFieldName);
   createLink(inDocument,from,inFieldName);
-  edge.save(iClusterName);
-  inDocument.save();
-  outDocument.save();
+  if (graph != null) {
+    edge.save(iClusterName);
+    inDocument.save();
+    outDocument.save();
+  }
   return edge;
 }

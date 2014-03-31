@@ -1,0 +1,28 @@
+{
+  final OAbstractRemoteTask.QUORUM_TYPE quorumType=iRequest.getTask().getQuorumType();
+  final int queueSize=nodes.size();
+  int quorum=0;
+switch (quorumType) {
+case NONE:
+    quorum=0;
+  break;
+case READ:
+quorum=cfg.getReadQuorum(clusterName);
+break;
+case WRITE:
+quorum=cfg.getWriteQuorum(clusterName);
+break;
+case ALL:
+quorum=queueSize;
+break;
+}
+if (quorum > queueSize) {
+final boolean failureAvailableNodesLessQuorum=cfg.getFailureAvailableNodesLessQuorum(clusterName);
+if (failureAvailableNodesLessQuorum) throw new ODistributedException("Quorum cannot be reached because it is major than available nodes and 'failureAvailableNodesLessQuorum' settings is true");
+ else {
+ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"quorum less then available nodes, downgrade quorum to %d",queueSize);
+quorum=queueSize;
+}
+}
+return quorum;
+}

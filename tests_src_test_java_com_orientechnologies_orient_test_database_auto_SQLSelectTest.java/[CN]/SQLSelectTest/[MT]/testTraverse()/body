@@ -1,29 +1,31 @@
 {
-  OGraphDatabase db1=new OGraphDatabase(url);
-  db1=db1.open("admin","admin");
-  OClass oc=db1.getVertexType("vertexA");
-  if (oc == null)   oc=db1.createVertexType("vertexA");
+  OrientGraph graph=new OrientGraph(url);
+  graph.setAutoStartTx(false);
+  graph.commit();
+  OClass oc=graph.getVertexType("vertexA");
+  if (oc == null)   oc=graph.createVertexType("vertexA");
   if (!oc.existsProperty("name"))   oc.createProperty("name",OType.STRING);
   if (oc.getClassIndex("vertexA_name_idx") == null)   oc.createIndex("vertexA_name_idx",OClass.INDEX_TYPE.UNIQUE,"name");
-  OClass ocb=db1.getVertexType("vertexB");
-  if (ocb == null)   ocb=db1.createVertexType("vertexB");
+  OClass ocb=graph.getVertexType("vertexB");
+  if (ocb == null)   ocb=graph.createVertexType("vertexB");
   ocb.createProperty("name",OType.STRING);
   ocb.createProperty("map",OType.EMBEDDEDMAP);
   ocb.createIndex("vertexB_name_idx",OClass.INDEX_TYPE.UNIQUE,"name");
-  ODocument docA=db1.createVertex("vertexA");
+  graph.setAutoStartTx(true);
+  ODocument docA=graph.addVertex("class:vertexA").getRecord();
   docA.field("name","valueA");
   docA.save();
   Map<String,String> map=new HashMap<String,String>();
   map.put("key","value");
-  createAndLink(db1,"valueB1",map,docA);
-  createAndLink(db1,"valueB2",map,docA);
+  createAndLink(graph,"valueB1",map,docA);
+  createAndLink(graph,"valueB2",map,docA);
   StringBuilder sb=new StringBuilder("select from vertexB");
   sb.append(" where any() traverse(0, -1) (@class = '");
   sb.append("vertexA");
   sb.append("' AND name = 'valueA')");
-  List<ODocument> recordDocs=executeQuery(sb.toString(),db1);
+  List<ODocument> recordDocs=executeQuery(sb.toString(),graph.getRawGraph());
   for (  ODocument doc : recordDocs) {
     System.out.println(doc);
   }
-  db1.close();
+  graph.shutdown();
 }

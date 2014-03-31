@@ -1,0 +1,38 @@
+{
+  if (!ascSortOrder)   throw new IllegalStateException("Descending sort order is not supported.");
+  acquireSharedLock();
+  try {
+    BucketSearchResult bucketSearchResult=findBucket(key);
+    OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
+    int index;
+    if (bucketSearchResult.itemIndex >= 0) {
+      index=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex + 1;
+    }
+ else {
+      index=-bucketSearchResult.itemIndex - 1;
+    }
+    do {
+      final OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+      final OCachePointer pointer=cacheEntry.getCachePointer();
+      try {
+        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        int bucketSize=bucket.size();
+        for (int i=index; i < bucketSize; i++) {
+          if (!listener.addResult(bucket.getEntry(i)))           return;
+        }
+        bucketPointer=bucket.getRightSibling();
+        index=0;
+      }
+  finally {
+        diskCache.release(cacheEntry);
+      }
+    }
+ while (bucketPointer.getPageIndex() >= 0);
+  }
+ catch (  IOException ioe) {
+    throw new OSBTreeException("Error during fetch of major values for key " + key + " in sbtree "+ name);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

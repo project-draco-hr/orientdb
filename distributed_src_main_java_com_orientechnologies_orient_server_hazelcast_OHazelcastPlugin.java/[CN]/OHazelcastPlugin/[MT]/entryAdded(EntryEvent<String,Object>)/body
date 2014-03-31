@@ -3,13 +3,16 @@
   if (key.startsWith(CONFIG_NODE_PREFIX)) {
     if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember())) {
       final ODocument cfg=(ODocument)iEvent.getValue();
-      cachedClusterNodes.put((String)cfg.field("name"),(Member)iEvent.getMember());
-      ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),cachedClusterNodes.size());
+      activeNodes.put((String)cfg.field("name"),(Member)iEvent.getMember());
+      ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
       installNewDatabases(false);
     }
   }
  else   if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
-    saveDatabaseConfiguration(key.substring(CONFIG_DATABASE_PREFIX.length()),(ODocument)iEvent.getValue());
+    updateCachedDatabaseConfiguration(key.substring(CONFIG_DATABASE_PREFIX.length()),(ODocument)iEvent.getValue(),true,false);
     OClientConnectionManager.instance().pushDistribCfg2Clients(getClusterConfiguration());
+  }
+ else   if (key.startsWith(CONFIG_DBSTATUS_PREFIX)) {
+    ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"received added status %s=%s",key.substring(CONFIG_DBSTATUS_PREFIX.length()),iEvent.getValue());
   }
 }

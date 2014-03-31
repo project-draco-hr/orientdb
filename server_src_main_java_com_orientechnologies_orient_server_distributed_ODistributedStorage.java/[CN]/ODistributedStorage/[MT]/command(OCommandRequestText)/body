@@ -1,7 +1,6 @@
 {
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.command(iCommand);
-  final ODistributedConfiguration dConfig=dManager.getDatabaseConfiguration(getName());
-  if (!dConfig.isReplicationActive(null))   return wrapped.command(iCommand);
+  if (!dManager.getDatabaseConfiguration(getName()).isReplicationActive(null))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
@@ -11,7 +10,7 @@
   if (!distribute)   return wrapped.executeCommand(iCommand,executor);
   try {
     final OAbstractRemoteTask task=new OSQLCommandTask(iCommand.getText());
-    final Object result=dManager.sendRequest(getName(),null,task,EXECUTION_MODE.RESPONSE);
+    final Object result=sendRequest(getName(),null,task,EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);
     return result;

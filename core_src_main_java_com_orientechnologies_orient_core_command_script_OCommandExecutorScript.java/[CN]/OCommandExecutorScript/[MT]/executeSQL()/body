@@ -1,34 +1,10 @@
 {
   ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   if (db != null && !(db instanceof ODatabaseRecordTx))   db=db.getUnderlying();
-  final BufferedReader reader=new BufferedReader(new StringReader(parserText));
-  String lastCommand="";
-  Object lastResult=null;
   try {
-    while ((lastCommand=reader.readLine()) != null) {
-      lastCommand=lastCommand.trim();
-      if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"let ")) {
-        final int equalsPos=lastCommand.indexOf('=');
-        final String variable=lastCommand.substring("let ".length(),equalsPos).trim();
-        final String cmd=lastCommand.substring(equalsPos + 1).trim();
-        lastResult=db.command(new OCommandSQL(cmd).setContext(getContext())).execute();
-        getContext().setVariable(variable,lastResult);
-      }
- else       if (lastCommand.equalsIgnoreCase("begin"))       db.begin();
- else       if (lastCommand.equalsIgnoreCase("commit"))       db.commit();
- else       if (lastCommand.equalsIgnoreCase("rollback"))       db.rollback();
- else       if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"return ")) {
-        final String variable=lastCommand.substring("return ".length()).trim();
-        if (variable.equalsIgnoreCase("NULL"))         lastResult=null;
- else         if (variable.startsWith("$"))         lastResult=getContext().getVariable(variable);
- else         lastResult=variable;
-        break;
-      }
- else       lastResult=db.command(new OCommandSQL(lastCommand).setContext(getContext())).execute();
-    }
+    return executeSQLScript(db,parserText);
   }
  catch (  IOException e) {
-    throw new OCommandExecutionException("Error on executing command: " + lastCommand,e);
+    throw new OCommandExecutionException("Error on executing command: " + parserText,e);
   }
-  return lastResult;
 }

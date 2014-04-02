@@ -3,9 +3,9 @@
   key=getCollatingValue(key);
   modificationLock.requestModificationLock();
   try {
-    acquireExclusiveLock();
+    checkForKeyType(key);
+    acquireSharedLock();
     try {
-      checkForKeyType(key);
       Set<OIdentifiable> values=indexEngine.get(key);
       if (values == null) {
         if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
@@ -17,12 +17,14 @@
         }
       }
       if (!iSingleValue.getIdentity().isValid())       ((ORecord<?>)iSingleValue).save();
-      values.add(iSingleValue.getIdentity());
-      indexEngine.put(key,values);
+synchronized (values) {
+        values.add(iSingleValue.getIdentity());
+        indexEngine.put(key,values);
+      }
       return this;
     }
   finally {
-      releaseExclusiveLock();
+      releaseSharedLock();
     }
   }
   finally {

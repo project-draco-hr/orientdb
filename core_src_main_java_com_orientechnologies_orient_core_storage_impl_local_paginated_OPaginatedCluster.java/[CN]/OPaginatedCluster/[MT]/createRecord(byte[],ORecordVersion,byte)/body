@@ -6,6 +6,7 @@
       content=compression.compress(content);
       int grownContentSize=(int)(config.recordGrowFactor * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
+      if (useCRC32)       entryContentLength+=OIntegerSerializer.INT_SIZE;
       if (entryContentLength < OClusterPage.MAX_RECORD_SIZE) {
         startAtomicOperation();
         lockTillAtomicOperationCompletes();
@@ -17,6 +18,12 @@
         entryPosition+=OIntegerSerializer.INT_SIZE;
         System.arraycopy(content,0,entryContent,entryPosition,content.length);
         entryPosition+=grownContentSize;
+        if (useCRC32) {
+          CRC32 crc32=new CRC32();
+          crc32.update(entryContent,0,entryPosition);
+          OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),entryContent,entryPosition);
+          entryPosition+=OIntegerSerializer.INT_SIZE;
+        }
         entryContent[entryPosition]=1;
         entryPosition++;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
@@ -32,6 +39,7 @@
         lockTillAtomicOperationCompletes();
         final OClusterPage.TrackMode trackMode=getTrackMode();
         int entrySize=grownContentSize + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
+        if (useCRC32)         entrySize+=OIntegerSerializer.INT_SIZE;
         int fullEntryPosition=0;
         byte[] fullEntry=new byte[entrySize];
         fullEntry[fullEntryPosition]=recordType;
@@ -39,6 +47,12 @@
         OIntegerSerializer.INSTANCE.serializeNative(content.length,fullEntry,fullEntryPosition);
         fullEntryPosition+=OIntegerSerializer.INT_SIZE;
         System.arraycopy(content,0,fullEntry,fullEntryPosition,content.length);
+        fullEntryPosition+=grownContentSize;
+        if (useCRC32) {
+          CRC32 crc32=new CRC32();
+          crc32.update(fullEntry,0,fullEntryPosition);
+          OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),fullEntry,fullEntryPosition);
+        }
         long prevPageRecordPointer=-1;
         long firstPageIndex=-1;
         int firstPagePosition=-1;

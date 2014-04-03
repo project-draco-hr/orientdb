@@ -19,6 +19,13 @@
     }
     byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
     if (fullContent == null)     return null;
+    if (useCRC32) {
+      CRC32 crc32=new CRC32();
+      final int crcPosition=fullContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE- OIntegerSerializer.INT_SIZE;
+      crc32.update(fullContent,0,crcPosition);
+      final int crc=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,crcPosition);
+      if (crc != (int)crc32.getValue())       throw new OStorageException("Content of record for cluster with id " + id + " and position "+ clusterPosition+ " is broken.");
+    }
     int fullContentPosition=0;
     byte recordType=fullContent[fullContentPosition];
     fullContentPosition++;

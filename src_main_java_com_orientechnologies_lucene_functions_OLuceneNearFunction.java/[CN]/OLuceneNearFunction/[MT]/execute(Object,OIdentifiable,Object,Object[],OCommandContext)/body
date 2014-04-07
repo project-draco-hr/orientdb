@@ -1,0 +1,22 @@
+{
+  String clazz=(String)iParams[0];
+  String latField=(String)iParams[1];
+  String lngField=(String)iParams[2];
+  ODatabaseRecord databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
+  Set<OIndex<?>> indexes=databaseRecord.getMetadata().getSchema().getClass(clazz).getInvolvedIndexes(latField,lngField);
+  for (  OIndex i : indexes) {
+    if (OClass.INDEX_TYPE.SPATIAL.toString().equals(i.getInternal().getType())) {
+      List<Object> params=new ArrayList<Object>();
+      params.add(iParams[3]);
+      params.add(iParams[4]);
+      double distance=iParams.length > 5 ? ((Number)iParams[5]).doubleValue() : 0;
+      Object ret=i.get(new OSpatialCompositeKey(params).setMaxDistance(distance));
+      if (ret instanceof Collection) {
+        if (context == null)         context=new HashSet<Object>();
+        context.addAll((Collection<?>)ret);
+      }
+      return ret;
+    }
+  }
+  return null;
+}

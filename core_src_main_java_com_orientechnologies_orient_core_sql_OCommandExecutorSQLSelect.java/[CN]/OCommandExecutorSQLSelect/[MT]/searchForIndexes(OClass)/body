@@ -93,22 +93,44 @@
         }
  else         idxNames.add(index.getName());
       }
-      boolean result;
+      OIndexCursor cursor;
       final boolean indexIsUsedInOrderBy=canBeUsedByOrderBy(index) && !(index.getInternal() instanceof OChainedIndexProxy);
       try {
         boolean ascSortOrder;
         if (indexIsUsedInOrderBy)         ascSortOrder=orderedFields.get(0).getValue().equals(KEYWORD_ASC);
  else         ascSortOrder=true;
         if (indexIsUsedInOrderBy)         fullySortedByIndex=indexDefinition.getFields().size() >= orderedFields.size();
-        final IndexResultListener resultListener=new IndexResultListener();
-        result=operator.executeIndexQuery(context,index,keyParams,ascSortOrder,resultListener);
+        cursor=operator.executeIndexQuery(context,index,keyParams,ascSortOrder);
       }
  catch (      Exception e) {
         OLogManager.instance().error(this,"Error on using index %s in query '%s'. Probably you need to rebuild indexes. Now executing query using cluster scan",e,index.getName(),request != null && request.getText() != null ? request.getText() : "");
         fullySortedByIndex=false;
         return false;
       }
-      if (!result)       continue;
+      if (cursor == null)       continue;
+      int needsToFetch;
+      if (fetchLimit > 0)       needsToFetch=fetchLimit + skip;
+ else       needsToFetch=-1;
+      Map.Entry<Object,OIdentifiable> entryRecord=cursor.next(needsToFetch);
+      if (needsToFetch > 0)       needsToFetch--;
+      while (entryRecord != null) {
+        final OIdentifiable identifiable=entryRecord.getValue();
+        final ORecord record=identifiable.getRecord();
+        if (record instanceof ORecordSchemaAware<?>) {
+          final ORecordSchemaAware<?> recordSchemaAware=(ORecordSchemaAware<?>)record;
+          final Map<OClass,String> targetClasses=parsedTarget.getTargetClasses();
+          if ((targetClasses != null) && (!targetClasses.isEmpty())) {
+            for (            OClass targetClass : targetClasses.keySet()) {
+              if (!targetClass.isSuperClassOf(recordSchemaAware.getSchemaClass()))               return true;
+            }
+          }
+        }
+        if (compiledFilter == null || evaluateRecord(record)) {
+          if (!handleResult(record,true))           break;
+        }
+        entryRecord=cursor.next(needsToFetch);
+        if (needsToFetch > 0)         needsToFetch--;
+      }
       if (context.isRecordingMetrics()) {
         context.setVariable("indexIsUsedInOrderBy",indexIsUsedInOrderBy);
         context.setVariable("fullySortedByIndex",fullySortedByIndex);

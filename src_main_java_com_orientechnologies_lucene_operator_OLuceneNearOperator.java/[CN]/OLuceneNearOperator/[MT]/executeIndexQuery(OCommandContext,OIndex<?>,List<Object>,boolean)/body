@@ -1,0 +1,24 @@
+{
+  OIndexCursor cursor;
+  OIndexDefinition definition=index.getDefinition();
+  int idxSize=definition.getFields().size();
+  int paramsSize=keyParams.size();
+  double distance=0;
+  Object spatial=iContext.getVariable("spatial");
+  if (spatial != null) {
+    if (spatial instanceof Number) {
+      distance=((Double)OType.convert(spatial,Double.class)).doubleValue();
+    }
+ else     if (spatial instanceof Map) {
+      Map<String,Object> params=(Map<String,Object>)spatial;
+      Object dst=params.get("maxDistance");
+      if (dst != null && dst instanceof Number) {
+        distance=((Double)OType.convert(dst,Double.class)).doubleValue();
+      }
+    }
+  }
+  Object indexResult=index.get(new OSpatialCompositeKey(keyParams).setMaxDistance(distance));
+  if (indexResult == null || indexResult instanceof OIdentifiable)   cursor=new OIndexCursor.OIndexCursorSingleValue((OIdentifiable)indexResult,new OSpatialCompositeKey(keyParams));
+ else   cursor=new OIndexCursor.OIndexCursorCollectionValue(((Collection<OIdentifiable>)indexResult).iterator(),new OSpatialCompositeKey(keyParams));
+  return cursor;
+}

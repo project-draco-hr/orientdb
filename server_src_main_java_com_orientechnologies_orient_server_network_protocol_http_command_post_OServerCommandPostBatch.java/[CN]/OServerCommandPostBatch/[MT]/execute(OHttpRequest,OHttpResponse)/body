@@ -3,7 +3,7 @@
   iRequest.data.commandInfo="Execute multiple requests in one shot";
   ODatabaseDocumentTx db=null;
   ODocument batch=null;
-  int executed=0;
+  Object lastResult=null;
   try {
     db=getProfiledDatabaseInstance(iRequest);
     batch=new ODocument().fromJSON(iRequest.content);
@@ -23,25 +23,24 @@
       if (type.equals("c")) {
         final ODocument doc=getRecord(operation);
         doc.save();
-        executed++;
+        lastResult=doc;
       }
  else       if (type.equals("u")) {
         final ODocument doc=getRecord(operation);
         doc.save();
-        executed++;
+        lastResult=doc;
       }
  else       if (type.equals("d")) {
         final ODocument doc=getRecord(operation);
         db.delete(doc.getIdentity());
-        executed++;
+        lastResult=doc.getIdentity();
       }
  else       if (type.equals("cmd")) {
         final String language=(String)operation.get("language");
         final String command=(String)operation.get("command");
         final OCommandRequestText cmd=(OCommandRequestText)OCommandManager.instance().getRequester(language);
         cmd.setText(command);
-        db.command(cmd).execute();
-        executed++;
+        lastResult=db.command(cmd).execute();
       }
  else       if (type.equals("script")) {
         final String language=(String)operation.get("language");
@@ -51,14 +50,13 @@
           int i=0;
           for (          Object o : OMultiValue.getMultiValueIterable(script)) {
             if (o != null) {
-              if (i > 0)               text.append("\n");
+              if (i++ > 0)               text.append("\n");
               text.append(o.toString());
             }
           }
         }
  else         text.append(script);
-        db.command(new OCommandScript(language,text.toString())).execute();
-        executed++;
+        lastResult=db.command(new OCommandScript(language,text.toString())).execute();
       }
     }
     if (tx)     db.commit();
@@ -66,6 +64,6 @@
   finally {
     if (db != null)     db.close();
   }
-  iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,executed,null,true);
+  iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,lastResult,null,true);
   return false;
 }

@@ -1,0 +1,48 @@
+{
+  if (iCondition.getLeft() instanceof Collection) {
+    OIndexSearchResult lastResult=null;
+    Collection left=(Collection)iCondition.getLeft();
+    int i=0;
+    for (    Object obj : left) {
+      if (obj instanceof OSQLFilterItemField) {
+        OSQLFilterItemField item=(OSQLFilterItemField)obj;
+        Object value=null;
+        if (iCondition.getRight() instanceof Collection) {
+          List<Object> right=(List<Object>)iCondition.getRight();
+          value=right.get(i);
+        }
+ else {
+          value=iCondition.getRight();
+        }
+        if (lastResult == null) {
+          lastResult=new OIndexSearchResult(iCondition.getOperator(),item.getFieldChain(),value);
+        }
+ else {
+          lastResult=lastResult.merge(new OIndexSearchResult(iCondition.getOperator(),item.getFieldChain(),value));
+        }
+      }
+ else       if (obj instanceof OSQLFilterItemVariable) {
+        OSQLFilterItemVariable item=(OSQLFilterItemVariable)obj;
+        Object value=null;
+        if (iCondition.getRight() instanceof Collection) {
+          List<Object> right=(List<Object>)iCondition.getRight();
+          value=right.get(i);
+        }
+ else {
+          value=iCondition.getRight();
+        }
+        context.setVariable(item.toString(),value);
+      }
+      i++;
+    }
+    if (lastResult != null && OLuceneOperatorUtil.checkIndexExistence(iSchemaClass,lastResult))     iIndexSearchResults.add(lastResult);
+    return lastResult;
+  }
+ else {
+    OIndexSearchResult result=OLuceneOperatorUtil.createIndexedProperty(iCondition,iCondition.getLeft());
+    if (result == null)     result=OLuceneOperatorUtil.createIndexedProperty(iCondition,iCondition.getRight());
+    if (result == null)     return null;
+    if (OLuceneOperatorUtil.checkIndexExistence(iSchemaClass,result))     iIndexSearchResults.add(result);
+    return result;
+  }
+}

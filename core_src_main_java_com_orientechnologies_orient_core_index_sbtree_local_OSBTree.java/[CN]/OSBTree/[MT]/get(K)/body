@@ -1,21 +1,37 @@
 {
-  if (key == null)   return null;
   if (keySerializer == null)   throw new OIndexException("keySerializer for index " + this.getName() + " is null. Please rebuild the index before to use it.");
   acquireSharedLock();
   try {
-    key=keySerializer.preprocess(key,(Object[])keyTypes);
-    BucketSearchResult bucketSearchResult=findBucket(key);
-    if (bucketSearchResult.itemIndex < 0)     return null;
-    long pageIndex=bucketSearchResult.getLastPathItem();
-    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,pageIndex,false);
-    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
-    try {
-      OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
-      OSBTreeBucket.SBTreeEntry<K,V> treeEntry=keyBucket.getEntry(bucketSearchResult.itemIndex);
-      return readValue(treeEntry.value);
-    }
+    checkNullSupport(key);
+    if (key != null) {
+      key=keySerializer.preprocess(key,(Object[])keyTypes);
+      BucketSearchResult bucketSearchResult=findBucket(key);
+      if (bucketSearchResult.itemIndex < 0)       return null;
+      long pageIndex=bucketSearchResult.getLastPathItem();
+      OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,pageIndex,false);
+      OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
+      try {
+        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+        OSBTreeBucket.SBTreeEntry<K,V> treeEntry=keyBucket.getEntry(bucketSearchResult.itemIndex);
+        return readValue(treeEntry.value);
+      }
   finally {
-      diskCache.release(keyBucketCacheEntry);
+        diskCache.release(keyBucketCacheEntry);
+      }
+    }
+ else {
+      if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
+      final OCacheEntry nullBucketCacheEntry=diskCache.load(nullBucketFileId,0,false);
+      final OCachePointer nullBucketPointer=nullBucketCacheEntry.getCachePointer();
+      try {
+        final ONullBucket<V> nullBucket=new ONullBucket<V>(nullBucketPointer.getDataPointer(),ODurablePage.TrackMode.NONE,valueSerializer);
+        final OSBTreeValue<V> treeValue=nullBucket.getValue();
+        if (treeValue == null)         return null;
+        return readValue(treeValue);
+      }
+  finally {
+        diskCache.release(nullBucketCacheEntry);
+      }
     }
   }
  catch (  IOException e) {

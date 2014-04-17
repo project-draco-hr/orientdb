@@ -1,0 +1,47 @@
+{
+  List<OIndexAbstract<?>> lockedIndexes=null;
+  final List<String> involvedIndexes=getInvolvedIndexes();
+  if (involvedIndexes != null)   Collections.sort(involvedIndexes);
+  try {
+    if (involvedIndexes != null)     for (    String indexName : involvedIndexes) {
+      final OIndexAbstract<?> index=(OIndexAbstract<?>)database.getMetadata().getIndexManager().getIndexInternal(indexName);
+      if (lockedIndexes == null)       lockedIndexes=new ArrayList<OIndexAbstract<?>>();
+      index.acquireModificationLock();
+      lockedIndexes.add(index);
+    }
+    if (!useSBTree) {
+      final Collection<? extends OIndex<?>> indexes=database.getMetadata().getIndexManager().getIndexes();
+      List<? extends OIndex<?>> indexesToLock=null;
+      if (indexes != null) {
+        indexesToLock=new ArrayList<OIndex<?>>(indexes);
+        Collections.sort(indexesToLock,new Comparator<OIndex<?>>(){
+          public int compare(          final OIndex<?> indexOne,          final OIndex<?> indexTwo){
+            return indexOne.getName().compareTo(indexTwo.getName());
+          }
+        }
+);
+      }
+      if (indexesToLock != null && !indexesToLock.isEmpty()) {
+        if (lockedIndexes == null)         lockedIndexes=new ArrayList<OIndexAbstract<?>>();
+        for (        OIndex<?> index : indexesToLock) {
+          for (          Entry<ORID,ORecordOperation> entry : recordEntries.entrySet()) {
+            final ORecord<?> record=entry.getValue().record.getRecord();
+            if (record instanceof ODocument) {
+              ODocument doc=(ODocument)record;
+              if (!lockedIndexes.contains(index.getInternal()) && doc.getSchemaClass() != null && index.getDefinition() != null && doc.getSchemaClass().isSubClassOf(index.getDefinition().getClassName())) {
+                index.getInternal().acquireModificationLock();
+                lockedIndexes.add((OIndexAbstract<?>)index.getInternal());
+              }
+            }
+          }
+        }
+        for (        OIndexAbstract<?> index : lockedIndexes)         index.acquireExclusiveLock();
+      }
+    }
+    return lockedIndexes;
+  }
+ catch (  RuntimeException e) {
+    releaseIndexLocks(lockedIndexes);
+    throw e;
+  }
+}

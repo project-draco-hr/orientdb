@@ -13,10 +13,9 @@
     final String[] fields=OStringParser.getWords(iFieldValueAsString,":,",true);
     if (fields == null || fields.length == 0)     return new HashMap<String,Object>();
     if (iNoMap || hasTypeField(fields)) {
-      final ORecordInternal<?> recordInternal=fromString(iFieldValue,new ODocument(),null,iOptions,false);
-      if (iType != null && iType.isLink()) {
-      }
- else       if (recordInternal instanceof ODocument)       ((ODocument)recordInternal).addOwner(iRecord);
+      boolean shouldReload=new ORecordId(OStringSerializerHelper.getStringContent(getFieldValue("@rid",fields))).isTemporary();
+      final ORecordInternal<?> recordInternal=fromString(iFieldValue,new ODocument(),null,iOptions,shouldReload);
+      if ((iType == null || !iType.isLink()) && recordInternal instanceof ODocument)       ((ODocument)recordInternal).addOwner(iRecord);
       return recordInternal;
     }
  else {
@@ -65,9 +64,7 @@
  else         iFieldValueAsString=iFieldValue;
         if (ridBag != null)         collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,OType.LINK,null,iFieldTypes,iNoMap,iOptions);
  else         collectionItem=getValue(iRecord,null,iFieldValue,iFieldValueAsString,iLinkedType,null,iFieldTypes,iNoMap,iOptions);
-        if (iType != null && iType.isLink()) {
-        }
- else         if (collectionItem instanceof ODocument && iRecord instanceof ODocument)         ((ODocument)collectionItem).addOwner(iRecord);
+        if ((iType == null || !iType.isLink()) && collectionItem instanceof ODocument && iRecord instanceof ODocument)         ((ODocument)collectionItem).addOwner(iRecord);
         if (collectionItem instanceof String && ((String)collectionItem).length() == 0)         continue;
         if (embeddedCollection != null)         ((Collection<Object>)embeddedCollection).add(collectionItem);
  else         ridBag.add((OIdentifiable)collectionItem);
@@ -87,7 +84,7 @@
         if (iFieldValue.charAt(0) == ORID.PREFIX && iFieldValue.contains(":"))         iType=OType.LINK;
  else         if (OStringSerializerHelper.contains(iFieldValue,'.')) {
           final Double v=new Double(OStringSerializerHelper.getStringContent(iFieldValue));
-          if (v.doubleValue() > 0) {
+          if (v > 0) {
             if (v.compareTo(MAX_FLOAT) <= 0)             return v.floatValue();
           }
  else           if (v.compareTo(MIN_FLOAT) >= 0)           return v.floatValue();
@@ -95,7 +92,7 @@
         }
  else {
           final Long v=new Long(OStringSerializerHelper.getStringContent(iFieldValue));
-          if (v.longValue() > 0) {
+          if (v > 0) {
             if (v.compareTo(MAX_INT) <= 0)             return v.intValue();
           }
  else           if (v.compareTo(MIN_INT) >= 0)           return v.intValue();
@@ -114,12 +111,11 @@
           iType=OType.LINK;
         }
       }
- catch (      Exception e) {
+ catch (      Exception ignored) {
       }
     }
     if (iFieldTypes != null) {
-      Character c=null;
-      c=iFieldTypes.get(iFieldName);
+      Character c=iFieldTypes.get(iFieldName);
       if (c != null)       iType=ORecordSerializerStringAbstract.getType(iFieldValueAsString,c);
     }
     if (iType == null) {

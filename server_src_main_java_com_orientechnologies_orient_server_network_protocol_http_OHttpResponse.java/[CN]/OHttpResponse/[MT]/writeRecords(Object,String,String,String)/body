@@ -1,14 +1,15 @@
 {
   if (iRecords == null)   return;
+  final Iterator<Object> it=OMultiValue.getMultiValueIterator(iRecords);
   if (accept != null && accept.contains("text/csv")) {
     sendStream(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,"data.csv",new OCallable<Void,OChunkedResponse>(){
       @Override public Void call(      final OChunkedResponse iArgument){
         final LinkedHashSet<String> colNames=new LinkedHashSet<String>();
         final List<ODocument> records=new ArrayList<ODocument>();
-        while (iRecords.hasNext()) {
-          final OIdentifiable r=iRecords.next();
-          if (r != null) {
-            final ORecord<?> rec=r.getRecord();
+        while (it.hasNext()) {
+          final Object r=it.next();
+          if (r != null && r instanceof OIdentifiable) {
+            final ORecord<?> rec=((OIdentifiable)r).getRecord();
             if (rec != null) {
               if (rec instanceof ODocument) {
                 final ODocument doc=(ODocument)rec;
@@ -54,7 +55,7 @@
     json.beginObject();
     final String format=iFetchPlan != null ? iFormat + ",fetchPlan:" + iFetchPlan : iFormat;
     json.beginCollection(-1,true,"result");
-    formatMultiValue(iRecords,buffer,format);
+    formatMultiValue(it,buffer,format);
     json.endCollection(-1,true);
     json.endObject();
     send(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,buffer.toString(),null);

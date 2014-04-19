@@ -1,11 +1,12 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+  StringBuilder cmd=null;
   final String key=iClassName.toLowerCase();
-  rwLock.writeLock().lock();
+  rwLock.readLock().lock();
   try {
     if (classes.containsKey(key))     throw new OSchemaException("Class " + iClassName + " already exists in current database");
     checkClustersAreAbsent(iClusterIds);
-    final StringBuilder cmd=new StringBuilder("create class ");
+    cmd=new StringBuilder("create class ");
     cmd.append(iClassName);
     if (iSuperClass != null) {
       cmd.append(" extends ");
@@ -22,9 +23,15 @@
         }
       }
     }
-    getDatabase().command(new OCommandSQL(cmd.toString())).execute();
+  }
+  finally {
+    rwLock.readLock().unlock();
+  }
+  getDatabase().command(new OCommandSQL(cmd.toString())).execute();
+  rwLock.writeLock().lock();
+  try {
     if (classes.containsKey(key))     return classes.get(key);
- else     createClassInternal(iClassName,iSuperClass,iClusterIds);
+    createClassInternal(iClassName,iSuperClass,iClusterIds);
     OClass cls=classes.get(key);
     addClusterClassMap(cls);
     return cls;

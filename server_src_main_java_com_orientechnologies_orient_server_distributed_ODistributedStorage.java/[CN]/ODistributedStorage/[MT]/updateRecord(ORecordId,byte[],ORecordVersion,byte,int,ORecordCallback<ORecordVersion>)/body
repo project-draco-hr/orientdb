@@ -3,8 +3,9 @@
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
-    if (!dManager.getDatabaseConfiguration(getName()).isReplicationActive(clusterName))     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
-    final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(iRecordId,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+    final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+    if (!dbCfg.isReplicationActive(clusterName) && dbCfg.getPartitioningConfiguration(clusterName) == null)     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
+    final OStorageOperationResult<ORawBuffer> previousContent=readRecord(iRecordId,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
     final Object result=sendRequest(getName(),clusterName,new OUpdateRecordTask(iRecordId,previousContent.getResult().getBuffer(),previousContent.getResult().version,iContent,iVersion),EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);

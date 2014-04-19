@@ -2,7 +2,8 @@
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
-    if (!dManager.getDatabaseConfiguration(getName()).isReplicationActive(clusterName))     return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
+    final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+    if (!dbCfg.isReplicationActive(clusterName) && dbCfg.getPartitioningConfiguration(clusterName) == null)     return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
     final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(iRecordId,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
     final Object result=sendRequest(getName(),clusterName,new ODeleteRecordTask(iRecordId,iVersion),EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;

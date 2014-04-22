@@ -5,21 +5,33 @@
     ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.OUT,"No nodes configured for partition '%s.%s' request: %s",databaseName,clusterName,iRequest);
     throw new ODistributedException("No nodes configured for partition '" + databaseName + "."+ clusterName+ "' request: "+ iRequest);
   }
-  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
+  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
   int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes);
   iRequest.setSenderNodeName(manager.getLocalNodeName());
+  final int maxOfflineMessages=cfg.getOfflineMsgQueueSize();
   int availableNodes;
   if (iRequest.getTask().isRequireNodeOnline()) {
     availableNodes=0;
-    for (    String node : nodes) {
-      if (manager.isNodeAvailable(node,databaseName))       availableNodes++;
+    for (int i=0; i < nodes.size(); ++i) {
+      final String node=nodes.get(i);
+      if (reqQueues[i] != null && manager.isNodeAvailable(node,databaseName))       availableNodes++;
  else {
-        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip expected response from node '%s' for request %s because it's not online",node,iRequest);
+        if (reqQueues[i] != null && maxOfflineMessages > 0 && reqQueues[i].size() > maxOfflineMessages) {
+          final ODistributedServerManager.DB_STATUS dbStatus=manager.getDatabaseStatus(node,databaseName);
+          if (dbStatus == null || dbStatus == ODistributedServerManager.DB_STATUS.OFFLINE) {
+            ODistributedServerLog.warn(this,getLocalNodeName(),node,DIRECTION.OUT,"reached threshold on offlineQueueSize (%d) for node '%s' database '%s': remove the req queue",maxOfflineMessages,node,databaseName);
+            msgService.removeQueue(OHazelcastDistributedMessageService.getRequestQueueName(node,databaseName));
+          }
+        }
+        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip expected response from node '%s' for request %s because it's not online (queue=%s)",node,iRequest,reqQueues[i] != null);
       }
     }
   }
- else   availableNodes=nodes.size();
+ else {
+    availableNodes=0;
+    for (    IQueue<ODistributedRequest> q : reqQueues)     if (q != null)     availableNodes++;
+  }
   final int queueSize=nodes.size();
   int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : 1;
   if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION)   expectedSynchronousResponses=availableNodes;
@@ -33,7 +45,7 @@
       iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
       msgService.registerRequest(iRequest.getId(),currentResponseMgr);
       for (      IQueue<ODistributedRequest> queue : reqQueues) {
-        queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
+        if (queue != null)         queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
       }
     }
   finally {

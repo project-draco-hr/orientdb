@@ -1,0 +1,27 @@
+{
+  final OTransactionIndexChanges indexChanges=database.getTransaction().getIndexChanges(delegate.getName());
+  if (indexChanges == null)   return super.iterateEntries(keys,ascSortOrder);
+  final List<Object> sortedKeys=new ArrayList<Object>(keys);
+  if (ascSortOrder)   Collections.sort(sortedKeys,ODefaultComparator.INSTANCE);
+ else   Collections.sort(sortedKeys,Collections.reverseOrder(ODefaultComparator.INSTANCE));
+  final OIndexCursor txCursor=new OIndexCursor(){
+    private Iterator<Object> keysIterator=sortedKeys.iterator();
+    @Override public Map.Entry<Object,OIdentifiable> next(    int prefetchSize){
+      if (keysIterator == null)       return null;
+      Map.Entry<Object,OIdentifiable> entry=null;
+      while (entry == null && keysIterator.hasNext()) {
+        final Object key=keysIterator.next();
+        entry=calculateTxIndexEntry(key,null,indexChanges);
+      }
+      if (entry == null) {
+        keysIterator=null;
+        return null;
+      }
+      return entry;
+    }
+  }
+;
+  if (indexChanges.cleared)   return txCursor;
+  final OIndexCursor backedCursor=super.iterateEntries(keys,ascSortOrder);
+  return new OIndexTxCursor(txCursor,backedCursor,ascSortOrder,indexChanges);
+}

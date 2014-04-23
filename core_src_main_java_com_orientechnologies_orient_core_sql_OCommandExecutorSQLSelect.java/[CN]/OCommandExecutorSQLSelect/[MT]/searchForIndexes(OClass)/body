@@ -10,7 +10,6 @@
     for (    OIndex<?> index : indexes) {
       if (canBeUsedByOrderBy(index)) {
         final boolean ascSortOrder=orderedFields.get(0).getValue().equals(KEYWORD_ASC);
-        final OIndex.IndexValuesResultListener resultListener=new IndexResultListener();
         if (ascSortOrder) {
           final Object firstKey=index.getFirstKey();
           if (firstKey == null)           return false;
@@ -25,7 +24,8 @@
             }
             idxNames.add(index.getName());
           }
-          index.getValuesMajor(firstKey,true,true,resultListener);
+          final OIndexCursor cursor=index.iterateEntriesMajor(firstKey,true,true);
+          fetchValuesFromIndexCursor(cursor,false);
         }
  else {
           final Object lastKey=index.getLastKey();
@@ -41,7 +41,8 @@
             }
             idxNames.add(index.getName());
           }
-          index.getValuesMinor(lastKey,true,false,resultListener);
+          final OIndexCursor cursor=index.iterateEntriesMinor(lastKey,true,false);
+          fetchValuesFromIndexCursor(cursor,false);
         }
         return true;
       }
@@ -108,40 +109,17 @@
         return false;
       }
       if (cursor == null)       continue;
-      int needsToFetch;
-      if (fetchLimit > 0)       needsToFetch=fetchLimit + skip;
- else       needsToFetch=-1;
-      Map.Entry<Object,OIdentifiable> entryRecord=cursor.next(needsToFetch);
-      if (needsToFetch > 0)       needsToFetch--;
-      while (entryRecord != null) {
-        final OIdentifiable identifiable=entryRecord.getValue();
-        final ORecord record=identifiable.getRecord();
-        if (record instanceof ORecordSchemaAware<?>) {
-          final ORecordSchemaAware<?> recordSchemaAware=(ORecordSchemaAware<?>)record;
-          final Map<OClass,String> targetClasses=parsedTarget.getTargetClasses();
-          if ((targetClasses != null) && (!targetClasses.isEmpty())) {
-            for (            OClass targetClass : targetClasses.keySet()) {
-              if (!targetClass.isSuperClassOf(recordSchemaAware.getSchemaClass()))               return true;
-            }
-          }
+      final List<String> indexInvolvedFields=searchResult.getInvolvedFields();
+      final List<String> whereInvolvedFields=compiledFilter.getInvolvedFields();
+      boolean evaluateRecords=true;
+      if (indexInvolvedFields.size() == whereInvolvedFields.size()) {
+        evaluateRecords=false;
+        for (        String f : indexInvolvedFields)         if (!whereInvolvedFields.contains(f)) {
+          evaluateRecords=true;
+          break;
         }
-        final List<String> indexInvolvedFields=searchResult.getInvolvedFields();
-        context.setVariable("involvedFields",indexInvolvedFields);
-        final List<String> whereInvolvedFields=compiledFilter.getInvolvedFields();
-        boolean evaluateRecords=true;
-        if (indexInvolvedFields.size() == whereInvolvedFields.size()) {
-          evaluateRecords=false;
-          for (          String f : indexInvolvedFields)           if (!whereInvolvedFields.contains(f)) {
-            evaluateRecords=true;
-            break;
-          }
-        }
-        if (compiledFilter == null || !evaluateRecords || evaluateRecord(record)) {
-          if (!handleResult(record,true))           break;
-        }
-        entryRecord=cursor.next(needsToFetch);
-        if (needsToFetch > 0)         needsToFetch--;
       }
+      fetchValuesFromIndexCursor(cursor,evaluateRecords);
       if (context.isRecordingMetrics()) {
         context.setVariable("indexIsUsedInOrderBy",indexIsUsedInOrderBy);
         context.setVariable("fullySortedByIndex",fullySortedByIndex);

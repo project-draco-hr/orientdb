@@ -1,0 +1,54 @@
+{
+  final String databaseName=iRequest.getDatabaseName();
+  final String clusterName=iRequest.getClusterName();
+  if (nodes.isEmpty()) {
+    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.OUT,"No nodes configured for partition '%s.%s' request: %s",databaseName,clusterName,iRequest);
+    throw new ODistributedException("No nodes configured for partition '" + databaseName + "."+ clusterName+ "' request: "+ iRequest);
+  }
+  final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
+  final IQueue<ODistributedRequest>[] reqQueues=getRequestQueues(databaseName,nodes);
+  int quorum=calculateQuorum(iRequest,clusterName,cfg,nodes);
+  iRequest.setSenderNodeName(manager.getLocalNodeName());
+  final int maxOfflineMessages=cfg.getOfflineMsgQueueSize();
+  int availableNodes;
+  if (iRequest.getTask().isRequireNodeOnline()) {
+    availableNodes=0;
+    for (int i=0; i < nodes.size(); ++i) {
+      final String node=nodes.get(i);
+      if (reqQueues[i] != null && manager.isNodeAvailable(node,databaseName))       availableNodes++;
+ else {
+        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip expected response from node '%s' for request %s because it's not online (queue=%s)",node,iRequest,reqQueues[i] != null);
+      }
+    }
+  }
+ else {
+    availableNodes=0;
+    for (    IQueue<ODistributedRequest> q : reqQueues)     if (q != null)     availableNodes++;
+  }
+  final int queueSize=nodes.size();
+  int expectedSynchronousResponses=quorum > 0 ? Math.min(quorum,availableNodes) : 1;
+  if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION)   expectedSynchronousResponses=availableNodes;
+  final boolean waitLocalNode=nodes.contains(manager.getLocalNodeName()) && cfg.isReadYourWrites(clusterName);
+  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,nodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize));
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"sending request %s",iRequest.getTask());
+  final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
+  try {
+    requestLock.lock();
+    try {
+      iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
+      msgService.registerRequest(iRequest.getId(),currentResponseMgr);
+      for (      IQueue<ODistributedRequest> queue : reqQueues) {
+        if (queue != null)         queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
+      }
+    }
+  finally {
+      requestLock.unlock();
+    }
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"sent request %s",iRequest.getTask());
+    Orient.instance().getProfiler().updateCounter("distributed.replication." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.replication.*.msgSent");
+    return waitForResponse(iRequest,currentResponseMgr);
+  }
+ catch (  Throwable e) {
+    throw new ODistributedException("Error on sending distributed request against database '" + databaseName + (clusterName != null ? ":" + clusterName : "")+ "' to nodes "+ nodes,e);
+  }
+}

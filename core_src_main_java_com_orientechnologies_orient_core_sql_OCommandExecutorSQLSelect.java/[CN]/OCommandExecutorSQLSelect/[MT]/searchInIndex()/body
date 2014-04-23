@@ -15,48 +15,28 @@
     final OQueryOperator indexOperator=compiledFilter.getRootCondition().getOperator();
     if (indexOperator instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
-      index.getEntriesBetween(getIndexKey(index.getDefinition(),values[0],context),getIndexKey(index.getDefinition(),values[2],context),true,ascOrder,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      final OIndexCursor cursor=index.iterateEntriesBetween(getIndexKey(index.getDefinition(),values[0],context),true,getIndexKey(index.getDefinition(),values[2],context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMajor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      index.getEntriesMajor(getIndexKey(index.getDefinition(),value,context),false,ascOrder,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      final OIndexCursor cursor=index.iterateEntriesMajor(getIndexKey(index.getDefinition(),value,context),false,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMajorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      index.getEntriesMajor(getIndexKey(index.getDefinition(),value,context),true,ascOrder,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      final OIndexCursor cursor=index.iterateEntriesMajor(getIndexKey(index.getDefinition(),value,context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMinor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      index.getEntriesMinor(getIndexKey(index.getDefinition(),value,context),false,ascOrder,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      OIndexCursor cursor=index.iterateEntriesMinor(getIndexKey(index.getDefinition(),value,context),false,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMinorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      index.getEntriesMinor(getIndexKey(index.getDefinition(),value,context),true,ascOrder,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      OIndexCursor cursor=index.iterateEntriesMinor(getIndexKey(index.getDefinition(),value,context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorIn) {
       final List<Object> origValues=(List<Object>)compiledFilter.getRootCondition().getRight();
@@ -68,12 +48,8 @@
         val=getIndexKey(index.getDefinition(),val,context);
         values.add(val);
       }
-      index.getEntries(values,new OIndex.IndexEntriesResultListener(){
-        @Override public boolean addResult(        ODocument entry){
-          return handleResult(entry,false);
-        }
-      }
-);
+      OIndexCursor cursor=index.iterateEntries(values,true);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else {
       final Object right=compiledFilter.getRootCondition().getRight();
@@ -89,13 +65,8 @@
         final Object secondKey=getIndexKey(index.getDefinition(),right,context);
         if (keyValue instanceof OCompositeKey && secondKey instanceof OCompositeKey && ((OCompositeKey)keyValue).getKeys().size() == index.getDefinition().getParamCount() && ((OCompositeKey)secondKey).getKeys().size() == index.getDefinition().getParamCount())         res=index.get(keyValue);
  else {
-          final Object key=keyValue;
-          index.getValuesBetween(keyValue,true,secondKey,true,true,new OIndex.IndexValuesResultListener(){
-            @Override public boolean addResult(            OIdentifiable value){
-              return handleResult(createIndexEntryAsDocument(key,value.getIdentity()),false);
-            }
-          }
-);
+          OIndexCursor cursor=index.iterateEntriesBetween(keyValue,true,secondKey,true,true);
+          fetchEntriesFromIndexCursor(cursor);
           return;
         }
       }
@@ -118,22 +89,14 @@
       if (ascOrder) {
         final Object firstKey=index.getFirstKey();
         if (firstKey == null)         return;
-        index.getEntriesMajor(firstKey,true,true,new OIndex.IndexEntriesResultListener(){
-          @Override public boolean addResult(          ODocument entry){
-            return handleResult(entry,false);
-          }
-        }
-);
+        final OIndexCursor cursor=index.iterateEntriesMajor(firstKey,true,true);
+        fetchEntriesFromIndexCursor(cursor);
       }
  else {
         final Object lastKey=index.getLastKey();
         if (lastKey == null)         return;
-        index.getEntriesMinor(lastKey,true,false,new OIndex.IndexEntriesResultListener(){
-          @Override public boolean addResult(          ODocument entry){
-            return handleResult(entry,false);
-          }
-        }
-);
+        final OIndexCursor cursor=index.iterateEntriesMinor(lastKey,true,false);
+        fetchEntriesFromIndexCursor(cursor);
       }
     }
   finally {

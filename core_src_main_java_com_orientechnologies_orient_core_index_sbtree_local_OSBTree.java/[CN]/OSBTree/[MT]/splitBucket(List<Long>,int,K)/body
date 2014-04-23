@@ -1,2 +1,27 @@
 {
+  long pageIndex=path.get(path.size() - 1);
+  OCacheEntry bucketEntry=diskCache.load(fileId,pageIndex,false);
+  OCachePointer bucketPointer=bucketEntry.getCachePointer();
+  bucketPointer.acquireExclusiveLock();
+  try {
+    OSBTreeBucket<K,V> bucketToSplit=new OSBTreeBucket<K,V>(bucketPointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,getTrackMode());
+    final boolean splitLeaf=bucketToSplit.isLeaf();
+    final int bucketSize=bucketToSplit.size();
+    int indexToSplit=bucketSize >>> 1;
+    final K separationKey=bucketToSplit.getKey(indexToSplit);
+    final List<OSBTreeBucket.SBTreeEntry<K,V>> rightEntries=new ArrayList<OSBTreeBucket.SBTreeEntry<K,V>>(indexToSplit);
+    final int startRightIndex=splitLeaf ? indexToSplit : indexToSplit + 1;
+    for (int i=startRightIndex; i < bucketSize; i++)     rightEntries.add(bucketToSplit.getEntry(i));
+    if (pageIndex != ROOT_INDEX) {
+      return splitNonRootBucket(path,keyIndex,keyToInsert,pageIndex,bucketToSplit,splitLeaf,indexToSplit,separationKey,rightEntries);
+    }
+ else {
+      return splitRootBucket(path,keyIndex,keyToInsert,pageIndex,bucketPointer,bucketToSplit,splitLeaf,indexToSplit,separationKey,rightEntries);
+    }
+  }
+  finally {
+    bucketEntry.markDirty();
+    bucketPointer.releaseExclusiveLock();
+    diskCache.release(bucketEntry);
+  }
 }

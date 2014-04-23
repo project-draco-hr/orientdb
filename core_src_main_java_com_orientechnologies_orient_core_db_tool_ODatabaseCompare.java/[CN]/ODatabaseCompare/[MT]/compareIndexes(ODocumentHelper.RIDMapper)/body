@@ -164,39 +164,29 @@
       ++differences;
     }
     if (((compareEntriesForAutomaticIndexes && !indexOne.getType().equals("DICTIONARY")) || !indexOne.isAutomatic())) {
-      final Iterator<Map.Entry<Object,Object>> indexIteratorOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Iterator<Map.Entry<Object,Object>>>(){
-        public Iterator<Map.Entry<Object,Object>> call(){
-          return indexOne.iterator();
+      final OIndexKeyCursor indexKeyCursorOne=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<OIndexKeyCursor>(){
+        public OIndexKeyCursor call(){
+          return indexOne.keyCursor();
         }
       }
 );
-      while (makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Boolean>(){
-        public Boolean call(){
-          return indexIteratorOne.hasNext();
+      Object key=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
+        @Override public Object call(){
+          return indexKeyCursorOne.next(-1);
         }
       }
-)) {
-        final Map.Entry<Object,Object> indexOneEntry=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Map.Entry<Object,Object>>(){
-          public Map.Entry<Object,Object> call(){
-            return indexIteratorOne.next();
-          }
-        }
 );
-        final Object key=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
-          public Object call(){
-            return indexOneEntry.getKey();
-          }
-        }
-);
+      while (key != null) {
+        final Object indexKey=key;
         Object indexOneValue=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
           public Object call(){
-            return indexOneEntry.getValue();
+            return indexOne.get(indexKey);
           }
         }
 );
         final Object indexTwoValue=makeDbCall(databaseDocumentTxTwo,new ODbRelatedCall<Object>(){
           public Object call(){
-            return indexTwo.get(key);
+            return indexTwo.get(indexKey);
           }
         }
 );
@@ -228,6 +218,12 @@
           ok=false;
           reportIndexDiff(indexOne,key,indexOneValue,indexTwoValue);
         }
+        key=makeDbCall(databaseDocumentTxOne,new ODbRelatedCall<Object>(){
+          @Override public Object call(){
+            return indexKeyCursorOne.next(-1);
+          }
+        }
+);
       }
     }
   }

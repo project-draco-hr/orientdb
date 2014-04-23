@@ -26,11 +26,13 @@
     if (config.field(OrientIndex.CONFIG_CLASSNAME) != null && metadata == null) {
       if (commandOutputListener != null)       commandOutputListener.onMessage("Index " + index.getName() + " uses out of dated index format and will be updated.");
       final OIndex<OIdentifiable> recordKeyValueIndex=(OIndex<OIdentifiable>)database.getMetadata().getIndexManager().createIndex("__@recordmap@___" + index.getName(),OClass.INDEX_TYPE.DICTIONARY.toString(),new OSimpleKeyIndexDefinition(OType.LINK,OType.STRING),null,null,null);
-      final Iterator<Map.Entry<Object,Collection<OIdentifiable>>> iterator=index.iterator();
-      while (iterator.hasNext()) {
-        final Map.Entry<Object,Collection<OIdentifiable>> entry=iterator.next();
+      OIndexCursor cursor=index.cursor();
+      Map.Entry<Object,OIdentifiable> entry=cursor.next(-1);
+      while (entry != null) {
         final String keyTemp=entry.getKey().toString();
-        for (        OIdentifiable identifiable : entry.getValue())         recordKeyValueIndex.put(new OCompositeKey(identifiable.getIdentity(),keyTemp),identifiable.getIdentity());
+        final OIdentifiable identifiable=entry.getValue();
+        recordKeyValueIndex.put(new OCompositeKey(identifiable.getIdentity(),keyTemp),identifiable.getIdentity());
+        entry=cursor.next(-1);
       }
       metadata=new ODocument();
       metadata.field(OrientIndex.CONFIG_CLASSNAME,config.field(OrientIndex.CONFIG_CLASSNAME));

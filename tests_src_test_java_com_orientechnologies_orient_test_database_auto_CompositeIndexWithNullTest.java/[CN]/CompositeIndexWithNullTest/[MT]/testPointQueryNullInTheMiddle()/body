@@ -14,7 +14,7 @@
     document.field("prop3",i);
     document.save();
   }
-  final String query="select from compositeIndexNullPointQueryNullInTheMiddleClass where prop1 = 1";
+  String query="select from compositeIndexNullPointQueryNullInTheMiddleClass where prop1 = 1";
   List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>(query));
   Assert.assertEquals(result.size(),10);
   for (int k=0; k < 10; k++) {
@@ -22,5 +22,19 @@
     Assert.assertEquals(document.field("prop1"),1);
   }
   ODocument explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Set<String>>field("involvedIndexes").contains("compositeIndexNullPointQueryNullInTheMiddleIndex"));
+  query="select from compositeIndexNullPointQueryNullInTheMiddleClass where prop1 = 1 and prop2 is null";
+  result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),5);
+  for (  ODocument document : result) {
+    Assert.assertEquals(document.field("prop1"),1);
+    Assert.assertNull(document.field("prop2"));
+  }
+  explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Set<String>>field("involvedIndexes").contains("compositeIndexNullPointQueryNullInTheMiddleIndex"));
+  query="select from compositeIndexNullPointQueryNullInTheMiddleClass where prop1 = 1 and prop2 is null and prop3 = 13";
+  result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),1);
+  explain=database.command(new OCommandSQL("explain " + query)).execute();
   Assert.assertTrue(explain.<Set<String>>field("involvedIndexes").contains("compositeIndexNullPointQueryNullInTheMiddleIndex"));
 }

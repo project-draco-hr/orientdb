@@ -10,40 +10,34 @@
     for (    OIndex<?> index : indexes) {
       if (canBeUsedByOrderBy(index)) {
         final boolean ascSortOrder=orderedFields.get(0).getValue().equals(KEYWORD_ASC);
+        final Object key;
         if (ascSortOrder) {
-          final Object firstKey=index.getFirstKey();
-          if (firstKey == null)           return false;
-          fullySortedByIndex=true;
-          if (context.isRecordingMetrics()) {
-            context.setVariable("indexIsUsedInOrderBy",true);
-            context.setVariable("fullySortedByIndex",fullySortedByIndex);
-            Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
-            if (idxNames == null) {
-              idxNames=new HashSet<String>();
-              context.setVariable("involvedIndexes",idxNames);
-            }
-            idxNames.add(index.getName());
+          key=index.getFirstKey();
+        }
+ else {
+          key=index.getLastKey();
+        }
+        if (key == null)         return false;
+        fullySortedByIndex=true;
+        if (context.isRecordingMetrics()) {
+          context.setVariable("indexIsUsedInOrderBy",true);
+          context.setVariable("fullySortedByIndex",fullySortedByIndex);
+          Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
+          if (idxNames == null) {
+            idxNames=new HashSet<String>();
+            context.setVariable("involvedIndexes",idxNames);
           }
-          final OIndexCursor cursor=index.iterateEntriesMajor(firstKey,true,true);
+          idxNames.add(index.getName());
+        }
+        final OIndexCursor cursor;
+        if (ascSortOrder) {
+          cursor=index.iterateEntriesMajor(key,true,true);
           fetchValuesFromIndexCursor(cursor,false);
         }
  else {
-          final Object lastKey=index.getLastKey();
-          if (lastKey == null)           return false;
-          fullySortedByIndex=true;
-          if (context.isRecordingMetrics()) {
-            context.setVariable("indexIsUsedInOrderBy",true);
-            context.setVariable("fullySortedByIndex",fullySortedByIndex);
-            Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
-            if (idxNames == null) {
-              idxNames=new HashSet<String>();
-              context.setVariable("involvedIndexes",idxNames);
-            }
-            idxNames.add(index.getName());
-          }
-          final OIndexCursor cursor=index.iterateEntriesMinor(lastKey,true,false);
-          fetchValuesFromIndexCursor(cursor,false);
+          cursor=index.iterateEntriesMinor(key,true,false);
         }
+        fetchValuesFromIndexCursor(cursor,false);
         return true;
       }
     }

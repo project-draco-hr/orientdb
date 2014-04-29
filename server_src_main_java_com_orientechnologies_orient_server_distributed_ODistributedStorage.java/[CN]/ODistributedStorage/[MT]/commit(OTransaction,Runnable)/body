@@ -3,44 +3,46 @@
  else {
     try {
       final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-      if (!dbCfg.isReplicationActive(null) && dbCfg.getPartitioningConfiguration(null) == null)       wrapped.commit(iTx,callback);
+      if (!dbCfg.isReplicationActive(null))       wrapped.commit(iTx,callback);
  else {
         final OTxTask txTask=new OTxTask();
+        final Set<String> involvedClusters=new HashSet<String>();
         for (        ORecordOperation op : iTx.getCurrentRecordEntries()) {
           final OAbstractRecordReplicatedTask task;
           final ORecordInternal<?> record=op.getRecord();
+          final ORecordId rid=(ORecordId)op.record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-            task=new OCreateRecordTask((ORecordId)op.record.getIdentity(),record.toStream(),record.getRecordVersion(),record.getRecordType());
+            task=new OCreateRecordTask(rid,record.toStream(),record.getRecordVersion(),record.getRecordType());
           break;
 case ORecordOperation.UPDATED:
-{
-          final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord((ORecordId)record.getIdentity(),null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-          task=new OUpdateRecordTask((ORecordId)op.record.getIdentity(),previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
-          break;
-        }
-case ORecordOperation.DELETED:
-      task=new ODeleteRecordTask((ORecordId)op.record.getIdentity(),record.getRecordVersion());
+        final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+      task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
     break;
+case ORecordOperation.DELETED:
+  task=new ODeleteRecordTask(rid,record.getRecordVersion());
+break;
 default :
-  continue;
+continue;
 }
+involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
 }
-final Object result=sendRequest(getName(),null,txTask,EXECUTION_MODE.RESPONSE);
+final Collection<String> nodes=dbCfg.getServers(involvedClusters);
+final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
 if (result instanceof List<?>) {
 final List<Object> list=(List<Object>)result;
 for (int i=0; i < txTask.getTasks().size(); ++i) {
 final Object o=list.get(i);
 final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
 if (task instanceof OCreateRecordTask) {
-  final OCreateRecordTask t=(OCreateRecordTask)task;
-  t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
-  t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+final OCreateRecordTask t=(OCreateRecordTask)task;
+t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
+t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
 }
  else if (task instanceof OUpdateRecordTask) {
-  final OUpdateRecordTask t=(OUpdateRecordTask)task;
-  t.getVersion().copyFrom((ORecordVersion)o);
+final OUpdateRecordTask t=(OUpdateRecordTask)task;
+t.getVersion().copyFrom((ORecordVersion)o);
 }
  else if (task instanceof ODeleteRecordTask) {
 }

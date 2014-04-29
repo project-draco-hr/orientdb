@@ -1,17 +1,29 @@
 {
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.command(iCommand);
   final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-  if (!dbCfg.isReplicationActive(null) && dbCfg.getPartitioningConfiguration(null) == null)   return wrapped.command(iCommand);
+  if (!dbCfg.isReplicationActive(null))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
   final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
-  boolean distribute=false;
-  if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED)   if (exec instanceof OCommandDistributedReplicateRequest)   distribute=((OCommandDistributedReplicateRequest)exec).isReplicated();
-  if (!distribute)   return wrapped.executeCommand(iCommand,executor);
   try {
     final OAbstractRemoteTask task=new OSQLCommandTask(iCommand);
-    final Object result=sendRequest(getName(),null,task,EXECUTION_MODE.RESPONSE);
+    Object result;
+    boolean replicated=false;
+    if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED) {
+      if (exec instanceof OCommandDistributedReplicateRequest)       replicated=((OCommandDistributedReplicateRequest)exec).isReplicated();
+    }
+    final Collection<String> involvedClusters=exec.getInvolvedClusters();
+    final Collection<String> nodes;
+    if (replicated) {
+      nodes=dbCfg.getServers(involvedClusters);
+      result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+    }
+ else {
+      nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
+      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && !dManager.isNodeAvailable(dManager.getLocalNodeName(),getName()))       return wrapped.command(iCommand);
+      result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+    }
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);
     return result;

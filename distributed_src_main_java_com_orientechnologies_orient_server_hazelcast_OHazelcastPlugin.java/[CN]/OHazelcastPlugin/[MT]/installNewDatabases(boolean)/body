@@ -26,7 +26,9 @@ synchronized (installDatabaseLock) {
           }
           final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
           distrDatabase.configureDatabase(false,false);
-          final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+          final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
+          final Collection<String> nodes=cfg.getServers();
+          final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,nodes,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
           for (          Entry<String,Object> r : results.entrySet()) {
             final Object value=r.getValue();
             if (value instanceof Boolean) {
@@ -52,9 +54,10 @@ synchronized (installDatabaseLock) {
               FileOutputStream out=null;
               try {
                 out=new FileOutputStream(fileName,false);
+                final OSingleItemSet<String> nodeNames=new OSingleItemSet<String>(r.getKey());
                 long fileSize=writeDatabaseChunk(1,chunk,out);
                 for (int chunkNum=2; !chunk.last; chunkNum++) {
-                  final Object result=sendRequest2Node(databaseName,r.getKey(),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
+                  final Object result=sendRequest(databaseName,null,nodeNames,new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
                   if (result instanceof Boolean)                   continue;
  else {
                     chunk=(ODistributedDatabaseChunk)result;

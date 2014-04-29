@@ -4,9 +4,10 @@
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
     final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-    if (!dbCfg.isReplicationActive(clusterName) && dbCfg.getPartitioningConfiguration(clusterName) == null)     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
+    if (!dbCfg.isReplicationActive(clusterName) && dbCfg.getServers(clusterName) == null)     return wrapped.updateRecord(iRecordId,iContent,iVersion,iRecordType,iMode,iCallback);
     final OStorageOperationResult<ORawBuffer> previousContent=readRecord(iRecordId,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-    final Object result=sendRequest(getName(),clusterName,new OUpdateRecordTask(iRecordId,previousContent.getResult().getBuffer(),previousContent.getResult().version,iContent,iVersion),EXECUTION_MODE.RESPONSE);
+    final Collection<String> nodes=dbCfg.getServers(clusterName);
+    final Object result=dManager.sendRequest(getName(),new OSingleItemSet<String>(clusterName),nodes,new OUpdateRecordTask(iRecordId,previousContent.getResult().getBuffer(),previousContent.getResult().version,iContent,iVersion),EXECUTION_MODE.RESPONSE);
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed UPDATE_RECORD",(Throwable)result);
     return new OStorageOperationResult<ORecordVersion>((ORecordVersion)result);

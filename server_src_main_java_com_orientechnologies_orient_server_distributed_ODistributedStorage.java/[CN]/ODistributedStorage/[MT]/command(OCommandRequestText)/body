@@ -7,7 +7,7 @@
   executor.parse(iCommand);
   final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
   try {
-    final OAbstractRemoteTask task=new OSQLCommandTask(iCommand);
+    final OSQLCommandTask task=new OSQLCommandTask(iCommand);
     Object result;
     boolean replicated=false;
     if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED) {
@@ -16,10 +16,12 @@
     final Collection<String> involvedClusters=exec.getInvolvedClusters();
     final Collection<String> nodes;
     if (replicated) {
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
       nodes=dbCfg.getServers(involvedClusters);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
     }
  else {
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.MERGE);
       nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
       if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && !dManager.isNodeAvailable(dManager.getLocalNodeName(),getName()))       return wrapped.command(iCommand);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);

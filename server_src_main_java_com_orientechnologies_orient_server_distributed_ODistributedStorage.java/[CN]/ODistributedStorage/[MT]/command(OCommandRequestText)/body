@@ -23,19 +23,55 @@
  else {
       task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.UNION);
       nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
-      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && !dManager.isNodeAvailable(dManager.getLocalNodeName(),getName()))       return wrapped.command(iCommand);
+      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()))       return wrapped.command(iCommand);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
       if (result instanceof Map) {
         if (executor instanceof OCommandExecutorSQLDelegate && ((OCommandExecutorSQLDelegate)executor).getDelegate() instanceof OCommandExecutorSQLSelect) {
           final OCommandExecutorSQLSelect cmd=(OCommandExecutorSQLSelect)((OCommandExecutorSQLDelegate)executor).getDelegate();
-          final Map<String,Object> proj=cmd.getProjections();
           if (((Map<String,Object>)result).size() == 1)           result=((Map<String,Object>)result).values().iterator().next();
  else {
-            final Set<Object> set=new HashSet<Object>();
-            for (            Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
-              set.addAll((Collection<?>)entry.getValue());
+            if (cmd.isAnyFunctionAggregates()) {
+              final Map<String,Object> proj=cmd.getProjections();
+              final List<Object> list=new ArrayList<Object>();
+              final ODocument doc=new ODocument();
+              list.add(doc);
+              for (              Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                final List<Object> resultSet=(List<Object>)entry.getValue();
+                for (                Object r : resultSet) {
+                  if (r instanceof ODocument) {
+                    final ODocument d=(ODocument)r;
+                    for (                    Map.Entry<String,Object> p : proj.entrySet()) {
+                      if (!(p.getValue() instanceof OSQLFunctionRuntime))                       doc.field(p.getKey(),p.getValue());
+                    }
+                  }
+                }
+              }
+              final List<Object> toMerge=new ArrayList<Object>();
+              for (              Map.Entry<String,Object> p : proj.entrySet()) {
+                if (p.getValue() instanceof OSQLFunctionRuntime) {
+                  final OSQLFunctionRuntime f=(OSQLFunctionRuntime)p.getValue();
+                  toMerge.clear();
+                  for (                  Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                    final List<Object> resultSet=(List<Object>)entry.getValue();
+                    for (                    Object r : resultSet) {
+                      if (r instanceof ODocument) {
+                        final ODocument d=(ODocument)r;
+                        toMerge.add(d.rawField(p.getKey()));
+                      }
+                    }
+                  }
+                  doc.field(p.getKey(),f.getFunction().mergeDistributedResult(toMerge));
+                }
+              }
+              result=list;
             }
-            result=new ArrayList<Object>(set);
+ else {
+              final Set<Object> set=new HashSet<Object>();
+              for (              Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                set.addAll((Collection<?>)entry.getValue());
+              }
+              result=new ArrayList<Object>(set);
+            }
           }
         }
       }

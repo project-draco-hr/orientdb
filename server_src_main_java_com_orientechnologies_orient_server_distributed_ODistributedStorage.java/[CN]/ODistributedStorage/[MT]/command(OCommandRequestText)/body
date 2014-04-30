@@ -21,10 +21,24 @@
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
     }
  else {
-      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.MERGE);
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.UNION);
       nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
       if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && !dManager.isNodeAvailable(dManager.getLocalNodeName(),getName()))       return wrapped.command(iCommand);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+      if (result instanceof Map) {
+        if (executor instanceof OCommandExecutorSQLDelegate && ((OCommandExecutorSQLDelegate)executor).getDelegate() instanceof OCommandExecutorSQLSelect) {
+          final OCommandExecutorSQLSelect cmd=(OCommandExecutorSQLSelect)((OCommandExecutorSQLDelegate)executor).getDelegate();
+          final Map<String,Object> proj=cmd.getProjections();
+          if (((Map<String,Object>)result).size() == 1)           result=((Map<String,Object>)result).values().iterator().next();
+ else {
+            final Set<Object> set=new HashSet<Object>();
+            for (            Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+              set.addAll((Collection<?>)entry.getValue());
+            }
+            result=new ArrayList<Object>(set);
+          }
+        }
+      }
     }
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);

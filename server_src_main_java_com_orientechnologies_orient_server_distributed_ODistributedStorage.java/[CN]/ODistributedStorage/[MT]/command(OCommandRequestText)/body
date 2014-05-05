@@ -1,17 +1,90 @@
 {
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.command(iCommand);
   final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-  if (!dbCfg.isReplicationActive(null) && dbCfg.getPartitioningConfiguration(null) == null)   return wrapped.command(iCommand);
+  if (!dbCfg.isReplicationActive(null))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
   final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
-  boolean distribute=false;
-  if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED)   if (exec instanceof OCommandDistributedReplicateRequest)   distribute=((OCommandDistributedReplicateRequest)exec).isReplicated();
-  if (!distribute)   return wrapped.executeCommand(iCommand,executor);
   try {
-    final OAbstractRemoteTask task=new OSQLCommandTask(iCommand);
-    final Object result=sendRequest(getName(),null,task,EXECUTION_MODE.RESPONSE);
+    final OSQLCommandTask task=new OSQLCommandTask(iCommand);
+    Object result;
+    boolean replicated=false;
+    if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED) {
+      if (exec instanceof OCommandDistributedReplicateRequest)       replicated=((OCommandDistributedReplicateRequest)exec).isReplicated();
+    }
+    final Collection<String> involvedClusters=exec.getInvolvedClusters();
+    final Collection<String> nodes;
+    if (replicated) {
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
+      nodes=dbCfg.getServers(involvedClusters);
+      result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+    }
+ else {
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.UNION);
+      nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
+      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()))       return wrapped.command(iCommand);
+      result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+      if (result instanceof Map) {
+        if (executor instanceof OCommandExecutorSQLDelegate && ((OCommandExecutorSQLDelegate)executor).getDelegate() instanceof OCommandExecutorSQLSelect) {
+          final OCommandExecutorSQLSelect cmd=(OCommandExecutorSQLSelect)((OCommandExecutorSQLDelegate)executor).getDelegate();
+          if (((Map<String,Object>)result).size() == 1)           result=((Map<String,Object>)result).values().iterator().next();
+ else {
+            if (cmd.isAnyFunctionAggregates()) {
+              final Map<String,Object> proj=cmd.getProjections();
+              final List<Object> list=new ArrayList<Object>();
+              final ODocument doc=new ODocument();
+              list.add(doc);
+              boolean hasNonAggregates=false;
+              for (              Map.Entry<String,Object> p : proj.entrySet()) {
+                if (!(p.getValue() instanceof OSQLFunctionRuntime)) {
+                  hasNonAggregates=true;
+                  break;
+                }
+              }
+              if (hasNonAggregates) {
+                for (                Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                  final List<Object> resultSet=(List<Object>)entry.getValue();
+                  for (                  Object r : resultSet) {
+                    if (r instanceof ODocument) {
+                      final ODocument d=(ODocument)r;
+                      for (                      Map.Entry<String,Object> p : proj.entrySet()) {
+                        if (!(p.getValue() instanceof OSQLFunctionRuntime))                         doc.field(p.getKey(),p.getValue());
+                      }
+                    }
+                  }
+                }
+              }
+              final List<Object> toMerge=new ArrayList<Object>();
+              for (              Map.Entry<String,Object> p : proj.entrySet()) {
+                if (p.getValue() instanceof OSQLFunctionRuntime) {
+                  final OSQLFunctionRuntime f=(OSQLFunctionRuntime)p.getValue();
+                  toMerge.clear();
+                  for (                  Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                    final List<Object> resultSet=(List<Object>)entry.getValue();
+                    for (                    Object r : resultSet) {
+                      if (r instanceof ODocument) {
+                        final ODocument d=(ODocument)r;
+                        toMerge.add(d.rawField(p.getKey()));
+                      }
+                    }
+                  }
+                  doc.field(p.getKey(),f.getFunction().mergeDistributedResult(toMerge));
+                }
+              }
+              result=list;
+            }
+ else {
+              final Set<Object> set=new HashSet<Object>();
+              for (              Map.Entry<String,Object> entry : ((Map<String,Object>)result).entrySet()) {
+                set.addAll((Collection<?>)entry.getValue());
+              }
+              result=new ArrayList<Object>(set);
+            }
+          }
+        }
+      }
+    }
     if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
  else     if (result instanceof Throwable)     throw new ODistributedException("Error on execution distributed COMMAND",(Throwable)result);
     return result;

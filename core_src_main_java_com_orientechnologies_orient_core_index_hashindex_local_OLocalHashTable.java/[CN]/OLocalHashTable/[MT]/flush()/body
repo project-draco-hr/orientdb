@@ -2,9 +2,18 @@
   acquireExclusiveLock();
   try {
     saveState();
-    metadataStore.synch();
+    diskCache.loadPinnedPage(hashStateEntry);
+    try {
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry.getCachePointer().getDataPointer(),ODurablePage.TrackMode.NONE,false);
+        if (!metadataPage.isRemoved(i))         diskCache.flushFile(metadataPage.getFileId(i));
+      }
+    }
+  finally {
+      diskCache.release(hashStateEntry);
+    }
+    diskCache.flushFile(fileStateId);
     treeStateStore.synch();
-    for (int i=0; i < filesMetadata.length; i++)     if (filesMetadata[i] != null)     diskCache.flushFile(fileLevelIds[i]);
     if (nullKeyIsSupported)     diskCache.flushFile(nullBucketFileId);
   }
  catch (  IOException e) {

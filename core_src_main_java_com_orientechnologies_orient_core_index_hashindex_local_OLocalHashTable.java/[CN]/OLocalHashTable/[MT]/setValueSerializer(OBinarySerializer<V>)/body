@@ -1,3 +1,24 @@
 {
-  this.valueSerializer=valueSerializer;
+  acquireExclusiveLock();
+  try {
+    this.valueSerializer=valueSerializer;
+    diskCache.loadPinnedPage(hashStateEntry);
+    OCachePointer cachePointer=hashStateEntry.getCachePointer();
+    cachePointer.acquireExclusiveLock();
+    try {
+      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+      metadataPage.setValueSerializerId(valueSerializer.getId());
+      hashStateEntry.markDirty();
+    }
+  finally {
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(hashStateEntry);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Can not set serializer for index values",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

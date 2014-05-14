@@ -7,16 +7,24 @@
     this.diskCache=storage.getDiskCache();
     if (this.diskCache == null)     throw new IllegalStateException("Disk cache was not initialized on storage level");
     this.name=name;
-    this.keySerializer=keySerializer;
-    this.valueSerializer=valueSerializer;
     initStores(metadataConfigurationFileExtension,treeStateFileExtension);
-    metadataStore.create(-1);
     treeStateStore.create(-1);
-    metadataStore.setRecordsCount(size);
-    treeStateStore.setHashTreeSize(hashTreeSize);
-    treeStateStore.setHashTreeTombstone(hashTreeTombstone);
-    treeStateStore.setBucketTombstonePointer(bucketTombstonePointer);
-    filesMetadata[0]=createFileMetadata(0);
+    fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
+    hashStateEntry=diskCache.allocateNewPage(fileStateId);
+    diskCache.pinPage(hashStateEntry);
+    final OCachePointer cachePointer=hashStateEntry.getCachePointer();
+    cachePointer.acquireExclusiveLock();
+    try {
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,true);
+      createFileMetadata(0,page);
+      hashStateEntry.markDirty();
+    }
+  finally {
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(hashStateEntry);
+    }
+    setKeySerializer(keySerializer);
+    setValueSerializer(valueSerializer);
     initHashTreeState();
     if (nullKeyIsSupported)     nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
   }

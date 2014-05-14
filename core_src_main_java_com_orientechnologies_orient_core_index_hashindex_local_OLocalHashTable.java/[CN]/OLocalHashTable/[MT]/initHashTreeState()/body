@@ -18,7 +18,18 @@
   hashTree[0]=rootTree;
   nodesMetadata=new OHashTreeNodeMetadata[1];
   nodesMetadata[0]=new OHashTreeNodeMetadata((byte)0,(byte)0,(byte)MAX_LEVEL_DEPTH);
-  filesMetadata[0].setBucketsCount(MAX_LEVEL_SIZE);
-  size=0;
-  hashTreeSize=1;
+  diskCache.loadPinnedPage(hashStateEntry);
+  OCachePointer hashStatePointer=hashStateEntry.getCachePointer();
+  hashStatePointer.acquireExclusiveLock();
+  try {
+    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStatePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+    metadataPage.setBucketsCount(0,MAX_LEVEL_SIZE);
+    metadataPage.setRecordsCount(0);
+    metadataPage.setHashTreeSize(1);
+    hashStateEntry.markDirty();
+  }
+  finally {
+    hashStatePointer.releaseExclusiveLock();
+    diskCache.release(hashStateEntry);
+  }
 }

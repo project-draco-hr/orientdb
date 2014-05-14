@@ -1,18 +1,34 @@
 {
-  if (nodeIndex == hashTreeSize - 1) {
-    hashTree[nodeIndex]=null;
-    nodesMetadata[nodeIndex]=null;
-    hashTreeSize--;
-    return;
-  }
-  if (hashTreeTombstone > -1) {
-    final long[] tombstone=new long[]{hashTreeTombstone};
-    hashTree[nodeIndex]=tombstone;
-    hashTreeTombstone=nodeIndex;
-  }
+  diskCache.loadPinnedPage(hashStateEntry);
+  final OCachePointer cachePointer=hashStateEntry.getCachePointer();
+  cachePointer.acquireExclusiveLock();
+  try {
+    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+    int hashTreeSize=metadataPage.getHashTreeSize();
+    if (nodeIndex == hashTreeSize - 1) {
+      hashTree[nodeIndex]=null;
+      nodesMetadata[nodeIndex]=null;
+      hashTreeSize--;
+      metadataPage.setHashTreeSize(hashTreeSize);
+      hashStateEntry.markDirty();
+      return;
+    }
+    int hashTreeTombstone=metadataPage.getHashTreeTombstone();
+    if (hashTreeTombstone > -1) {
+      final long[] tombstone=new long[]{hashTreeTombstone};
+      hashTree[nodeIndex]=tombstone;
+      hashTreeTombstone=nodeIndex;
+    }
  else {
-    hashTree[nodeIndex]=null;
-    hashTreeTombstone=nodeIndex;
+      hashTree[nodeIndex]=null;
+      hashTreeTombstone=nodeIndex;
+    }
+    metadataPage.setHashTreeTombstone(hashTreeTombstone);
+    hashStateEntry.markDirty();
+    nodesMetadata[nodeIndex]=null;
   }
-  nodesMetadata[nodeIndex]=null;
+  finally {
+    cachePointer.releaseExclusiveLock();
+    diskCache.release(hashStateEntry);
+  }
 }

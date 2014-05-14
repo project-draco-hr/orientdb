@@ -1,11 +1,24 @@
 {
   acquireExclusiveLock();
   try {
-    for (int i=0; i < filesMetadata.length; i++) {
-      if (filesMetadata[i] != null)       diskCache.truncateFile(fileLevelIds[i]);
+    diskCache.loadPinnedPage(hashStateEntry);
+    OCachePointer stateCachePointer=hashStateEntry.getCachePointer();
+    stateCachePointer.acquireExclusiveLock();
+    try {
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(stateCachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        if (!page.isRemoved(i)) {
+          diskCache.truncateFile(page.getFileId(i));
+          page.setBucketsCount(i,0);
+          page.setTombstoneIndex(i,-1);
+        }
+      }
+      hashStateEntry.markDirty();
     }
-    bucketTombstonePointer=-1;
-    metadataStore.truncate();
+  finally {
+      stateCachePointer.releaseExclusiveLock();
+      diskCache.release(hashStateEntry);
+    }
     treeStateStore.truncate();
     if (nullKeyIsSupported)     diskCache.truncateFile(nullBucketFileId);
     initHashTreeState();

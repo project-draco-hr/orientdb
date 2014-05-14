@@ -2,6 +2,7 @@
   acquireExclusiveLock();
   try {
     checkNullSupport(key);
+    int sizeDiff=0;
     if (key != null) {
       key=keySerializer.preprocess(key,(Object[])keyTypes);
       final long hashCode=keyHashFunction.hashCode(key);
@@ -18,7 +19,7 @@
         final int positionIndex=bucket.getIndex(hashCode,key);
         if (positionIndex < 0)         return null;
         removed=bucket.deleteEntry(positionIndex).value;
-        size--;
+        sizeDiff--;
         mergeBucketsAfterDeletion(nodePath,bucket);
         cacheEntry.markDirty();
       }
@@ -32,6 +33,7 @@
         final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(node,hashMapSize);
         if (allMapsContainSameBucket)         mergeNodeToParent(node,nodePath);
       }
+      changeSize(sizeDiff);
       return removed;
     }
  else {
@@ -45,13 +47,14 @@
         removed=nullBucket.getValue();
         if (removed != null) {
           nullBucket.removeValue();
-          size--;
+          sizeDiff--;
         }
       }
   finally {
         cachePointer.releaseExclusiveLock();
         diskCache.release(cacheEntry);
       }
+      changeSize(sizeDiff);
       return removed;
     }
   }

@@ -1,0 +1,41 @@
+{
+  acquireExclusiveLock();
+  try {
+    diskCache.loadPinnedPage(firstEntry);
+    final OCachePointer firstPagePointer=firstEntry.getCachePointer();
+    firstPagePointer.acquireExclusiveLock();
+    try {
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstPagePointer.getDataPointer(),ODurablePage.TrackMode.NONE,firstEntry);
+      if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
+        firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
+        firstPage.setTombstone(nodeIndex);
+      }
+ else {
+        final int pageIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) / ODirectoryPage.NODES_PER_PAGE;
+        final int localNodeIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) % ODirectoryPage.NODES_PER_PAGE;
+        final OCacheEntry cacheEntry=entries.get(pageIndex);
+        diskCache.loadPinnedPage(cacheEntry);
+        OCachePointer cachePointer=cacheEntry.getCachePointer();
+        cachePointer.acquireExclusiveLock();
+        try {
+          ODirectoryPage page=new ODirectoryPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,cacheEntry);
+          page.setPointer(localNodeIndex,0,firstPage.getTombstone());
+          firstPage.setTombstone(nodeIndex);
+          cacheEntry.markDirty();
+        }
+  finally {
+          cachePointer.releaseExclusiveLock();
+          diskCache.release(cacheEntry);
+        }
+      }
+      firstEntry.markDirty();
+    }
+  finally {
+      firstPagePointer.releaseExclusiveLock();
+      diskCache.release(firstEntry);
+    }
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+}

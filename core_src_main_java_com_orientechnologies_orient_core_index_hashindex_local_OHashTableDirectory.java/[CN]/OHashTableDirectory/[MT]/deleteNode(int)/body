@@ -1,5 +1,6 @@
 {
   acquireExclusiveLock();
+  startAtomicOperation();
   try {
     diskCache.loadPinnedPage(firstEntry);
     final OCachePointer firstPagePointer=firstEntry.getCachePointer();
@@ -22,6 +23,7 @@
           page.setPointer(localNodeIndex,0,firstPage.getTombstone());
           firstPage.setTombstone(nodeIndex);
           cacheEntry.markDirty();
+          logPageChanges(page,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
   finally {
           cachePointer.releaseExclusiveLock();
@@ -29,13 +31,23 @@
         }
       }
       firstEntry.markDirty();
+      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
       firstPagePointer.releaseExclusiveLock();
       diskCache.release(firstEntry);
     }
+    endAtomicOperation(false);
   }
-  finally {
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+ finally {
     releaseExclusiveLock();
   }
 }

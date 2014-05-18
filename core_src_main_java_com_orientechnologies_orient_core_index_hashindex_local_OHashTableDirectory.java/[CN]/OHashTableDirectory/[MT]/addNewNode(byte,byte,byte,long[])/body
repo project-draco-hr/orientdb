@@ -1,12 +1,13 @@
 {
   int nodeIndex;
   acquireExclusiveLock();
+  startAtomicOperation();
   try {
     diskCache.loadPinnedPage(firstEntry);
     final OCachePointer firstPagePointer=firstEntry.getCachePointer();
     firstPagePointer.acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstPagePointer.getDataPointer(),ODurablePage.TrackMode.NONE,firstEntry);
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstPagePointer.getDataPointer(),getTrackMode(),firstEntry);
       final int tombstone=firstPage.getTombstone();
       if (tombstone >= 0)       nodeIndex=tombstone;
  else {
@@ -24,11 +25,13 @@
  else {
         final int pageIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) / ODirectoryPage.NODES_PER_PAGE;
         final int localLevel=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) % ODirectoryPage.NODES_PER_PAGE;
+        boolean newPage=false;
         while (entries.size() <= pageIndex) {
           OCacheEntry cacheEntry=diskCache.load(fileId,entries.size() + 1,true);
           diskCache.pinPage(cacheEntry);
           diskCache.release(cacheEntry);
           entries.add(cacheEntry);
+          newPage=true;
         }
         OCacheEntry cacheEntry=entries.get(pageIndex);
         diskCache.loadPinnedPage(cacheEntry);
@@ -42,6 +45,7 @@
           if (tombstone >= 0)           firstPage.setTombstone((int)page.getPointer(localLevel,0));
           for (int i=0; i < newNode.length; i++)           page.setPointer(localLevel,i,newNode[i]);
           cacheEntry.markDirty();
+          logPageChanges(page,cacheEntry.getFileId(),firstEntry.getPageIndex(),newPage);
         }
   finally {
           cachePointer.releaseExclusiveLock();
@@ -49,13 +53,23 @@
         }
       }
       firstEntry.markDirty();
+      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
       firstPagePointer.releaseExclusiveLock();
       diskCache.release(firstEntry);
     }
+    endAtomicOperation(false);
   }
-  finally {
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+ finally {
     releaseExclusiveLock();
   }
   return nodeIndex;

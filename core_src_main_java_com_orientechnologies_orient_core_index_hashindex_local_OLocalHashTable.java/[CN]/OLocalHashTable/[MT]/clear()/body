@@ -1,11 +1,12 @@
 {
   acquireExclusiveLock();
   try {
+    startAtomicOperation();
     diskCache.loadPinnedPage(hashStateEntry);
     OCachePointer stateCachePointer=hashStateEntry.getCachePointer();
     stateCachePointer.acquireExclusiveLock();
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(stateCachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(stateCachePointer.getDataPointer(),getTrackMode(),false);
       for (int i=0; i < HASH_CODE_SIZE; i++) {
         if (!page.isRemoved(i)) {
           diskCache.truncateFile(page.getFileId(i));
@@ -14,6 +15,7 @@
         }
       }
       hashStateEntry.markDirty();
+      logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
     }
   finally {
       stateCachePointer.releaseExclusiveLock();
@@ -21,9 +23,15 @@
     }
     if (nullKeyIsSupported)     diskCache.truncateFile(nullBucketFileId);
     initHashTreeState();
+    endAtomicOperation(false);
   }
  catch (  IOException e) {
+    rollback();
     throw new OIndexException("Error during hash table clear",e);
+  }
+catch (  RuntimeException e) {
+    rollback();
+    throw e;
   }
  finally {
     releaseExclusiveLock();

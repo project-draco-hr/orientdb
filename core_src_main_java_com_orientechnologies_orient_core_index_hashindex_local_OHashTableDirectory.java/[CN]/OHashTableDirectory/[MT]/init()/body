@@ -1,17 +1,30 @@
 {
-  firstEntry=diskCache.load(fileId,0,true);
-  diskCache.pinPage(firstEntry);
-  final OCachePointer cachePointer=firstEntry.getCachePointer();
-  cachePointer.acquireExclusiveLock();
+  startAtomicOperation();
   try {
-    ODirectoryFirstPage firstPage=new ODirectoryFirstPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,firstEntry);
-    firstPage.setTreeSize(0);
-    firstPage.setTombstone(-1);
-    firstEntry.markDirty();
-  }
+    firstEntry=diskCache.load(fileId,0,true);
+    diskCache.pinPage(firstEntry);
+    final OCachePointer cachePointer=firstEntry.getCachePointer();
+    cachePointer.acquireExclusiveLock();
+    try {
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(cachePointer.getDataPointer(),getTrackMode(),firstEntry);
+      firstPage.setTreeSize(0);
+      firstPage.setTombstone(-1);
+      firstEntry.markDirty();
+      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),true);
+    }
   finally {
-    cachePointer.releaseExclusiveLock();
-    diskCache.release(firstEntry);
+      cachePointer.releaseExclusiveLock();
+      diskCache.release(firstEntry);
+    }
+    entries=new ArrayList<OCacheEntry>();
+    endAtomicOperation(false);
   }
-  entries=new ArrayList<OCacheEntry>();
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
 }

@@ -7,26 +7,40 @@
     this.diskCache=storage.getDiskCache();
     if (this.diskCache == null)     throw new IllegalStateException("Disk cache was not initialized on storage level");
     this.name=name;
-    initStores(metadataConfigurationFileExtension,treeStateFileExtension);
-    treeStateStore.create(-1);
+    init(storage.getAtomicOperationsManager(),storage.getWALInstance());
+    this.directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
     fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
-    hashStateEntry=diskCache.allocateNewPage(fileStateId);
-    diskCache.pinPage(hashStateEntry);
-    final OCachePointer cachePointer=hashStateEntry.getCachePointer();
-    cachePointer.acquireExclusiveLock();
+    startAtomicOperation();
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,true);
-      createFileMetadata(0,page);
-      hashStateEntry.markDirty();
-    }
+      directory.create();
+      hashStateEntry=diskCache.allocateNewPage(fileStateId);
+      diskCache.pinPage(hashStateEntry);
+      final OCachePointer cachePointer=hashStateEntry.getCachePointer();
+      cachePointer.acquireExclusiveLock();
+      try {
+        OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),getTrackMode(),true);
+        createFileMetadata(0,page);
+        hashStateEntry.markDirty();
+        logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),true);
+      }
   finally {
-      cachePointer.releaseExclusiveLock();
-      diskCache.release(hashStateEntry);
+        cachePointer.releaseExclusiveLock();
+        diskCache.release(hashStateEntry);
+      }
+      setKeySerializer(keySerializer);
+      setValueSerializer(valueSerializer);
+      initHashTreeState();
+      if (nullKeyIsSupported)       nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
+      endAtomicOperation(false);
     }
-    setKeySerializer(keySerializer);
-    setValueSerializer(valueSerializer);
-    initHashTreeState();
-    if (nullKeyIsSupported)     nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
+ catch (    IOException e) {
+      endAtomicOperation(true);
+      throw e;
+    }
+catch (    RuntimeException e) {
+      endAtomicOperation(true);
+      throw e;
+    }
   }
  catch (  IOException e) {
     throw new OIndexException("Error during local hash table creation.",e);

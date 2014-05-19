@@ -1,15 +1,19 @@
 {
   acquireExclusiveLock();
   try {
+    startAtomicOperation();
     checkNullSupport(key);
     key=keySerializer.preprocess(key,(Object[])keyTypes);
     doPut(key,value);
+    endAtomicOperation(false);
   }
- catch (  OIndexMaximumLimitReachedException e) {
-    OLogManager.instance().warn(this,"Key " + key + " is too large to fit in index and will be skipped",e);
-  }
-catch (  IOException e) {
+ catch (  IOException e) {
+    rollback();
     throw new OIndexException("Error during index update",e);
+  }
+catch (  RuntimeException e) {
+    rollback();
+    throw e;
   }
  finally {
     releaseExclusiveLock();

@@ -6,22 +6,15 @@
     this.nullKeyIsSupported=nullKeyIsSupported;
     diskCache=storage.getDiskCache();
     this.name=name;
-    initStores(metadataConfigurationFileExtension,treeStateFileExtension);
+    init(storage.getAtomicOperationsManager(),storage.getWALInstance());
     fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
     hashStateEntry=diskCache.load(fileStateId,0,true);
+    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+    directory.open();
     diskCache.pinPage(hashStateEntry);
     final OCachePointer cachePointer=hashStateEntry.getCachePointer();
     try {
       OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
-      treeStateStore.open();
-      final int arraySize;
-      final int hashTreeSize=page.getHashTreeSize();
-      int bitsCount=Integer.bitCount(hashTreeSize);
-      if (bitsCount == 1)       arraySize=hashTreeSize;
- else       arraySize=Integer.highestOneBit(hashTreeSize) << 1;
-      OHashIndexTreeStateStore.TreeState treeState=treeStateStore.loadTreeState(arraySize);
-      hashTree=treeState.getHashTree();
-      nodesMetadata=treeState.getHashTreeNodeMetadata();
       keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getKeySerializerId());
       valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getValueSerializerId());
       for (int i=0; i < HASH_CODE_SIZE; i++)       if (!page.isRemoved(i))       diskCache.openFile(page.getFileId(i));

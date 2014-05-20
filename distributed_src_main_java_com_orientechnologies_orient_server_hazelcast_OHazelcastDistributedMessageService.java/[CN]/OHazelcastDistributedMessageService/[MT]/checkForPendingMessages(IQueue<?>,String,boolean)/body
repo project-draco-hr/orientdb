@@ -3,7 +3,24 @@
   if (queueSize > 0) {
     if (!iUnqueuePendingMessages) {
       ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"found %d previous messages in queue %s, clearing them...",queueSize,iQueueName);
-      iQueue.clear();
+      while (!iQueue.isEmpty()) {
+        try {
+          final Object msg=iQueue.poll();
+          if (msg != null) {
+            if (msg instanceof ODistributedRequest) {
+              ODistributedRequest req=(ODistributedRequest)iQueue.take();
+              ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"- discarding request %s task %s...",req,req.getTask());
+            }
+ else             if (msg instanceof ODistributedResponse) {
+              ODistributedResponse resp=(ODistributedResponse)iQueue.take();
+              ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"- discarding response to request %d task %s...",resp.getRequestId(),resp.getPayload());
+            }
+ else             ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"- discarding message %s...",msg);
+          }
+        }
+ catch (        InterruptedException e) {
+        }
+      }
     }
  else {
       ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"found %d previous messages in queue %s, aligning the database...",queueSize,iQueueName);

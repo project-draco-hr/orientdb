@@ -4,39 +4,34 @@
   final Character wrongCharacter=checkNameIfValid(iClassName);
   if (wrongCharacter != null)   throw new OSchemaException("Found invalid class name. Character '" + wrongCharacter + "' cannot be used in class name.");
   final ODatabaseRecord database=getDatabase();
-  rwLock.writeLock().lock();
-  try {
-    checkClustersAreAbsent(iClusterIds);
-    final int[] clusterIds;
-    if (iClusterIds == null || iClusterIds.length == 0) {
-      final int minimumClusters=database.getStorage().getConfiguration().getMinimumClusters();
-      clusterIds=new int[minimumClusters];
-      if (minimumClusters <= 1)       clusterIds[0]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName,null,null);
- else       for (int i=0; i < minimumClusters; ++i) {
-        clusterIds[i]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName + "_" + i,null,null);
-      }
+  checkClustersAreAbsent(iClusterIds);
+  final int[] clusterIds;
+  if (iClusterIds == null || iClusterIds.length == 0) {
+    final int minimumClusters=database.getStorage().getConfiguration().getMinimumClusters();
+    clusterIds=new int[minimumClusters];
+    if (minimumClusters <= 1)     clusterIds[0]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName,null,null);
+ else     for (int i=0; i < minimumClusters; ++i) {
+      clusterIds[i]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName + "_" + i,null,null);
     }
- else     clusterIds=iClusterIds;
-    database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
-    final String key=iClassName.toLowerCase();
-    if (classes.containsKey(key))     throw new OSchemaException("Class " + iClassName + " already exists in current database");
-    final OClassImpl cls=new OClassImpl(this,iClassName,clusterIds);
-    classes.put(key,cls);
-    if (cls.getShortName() != null)     classes.put(cls.getShortName().toLowerCase(),cls);
-    if (superClass != null) {
-      cls.setSuperClassInternal(superClass);
-      if (!(getDatabase().getStorage() instanceof OStorageProxy)) {
-        final int[] clustersToIndex=superClass.getPolymorphicClusterIds();
-        final String[] clusterNames=new String[clustersToIndex.length];
-        for (int i=0; i < clustersToIndex.length; i++)         clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
-        for (        OIndex<?> index : superClass.getIndexes())         for (        String clusterName : clusterNames)         if (clusterName != null)         database.getMetadata().getIndexManager().addClusterToIndex(clusterName,index.getName());
-      }
+  }
+ else   clusterIds=iClusterIds;
+  database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+  final String key=iClassName.toLowerCase();
+  if (classes.containsKey(key))   throw new OSchemaException("Class " + iClassName + " already exists in current database");
+  OClassImpl cls=new OClassImpl(this,iClassName,clusterIds);
+  final OClass prevClass=classes.putIfAbsent(key,cls);
+  if (prevClass != null)   cls=(OClassImpl)prevClass;
+  if (cls.getShortName() != null)   classes.putIfAbsent(cls.getShortName().toLowerCase(),cls);
+  if (superClass != null) {
+    cls.setSuperClassInternal(superClass);
+    if (!(getDatabase().getStorage() instanceof OStorageProxy)) {
+      final int[] clustersToIndex=superClass.getPolymorphicClusterIds();
+      final String[] clusterNames=new String[clustersToIndex.length];
+      for (int i=0; i < clustersToIndex.length; i++)       clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
+      for (      OIndex<?> index : superClass.getIndexes())       for (      String clusterName : clusterNames)       if (clusterName != null)       database.getMetadata().getIndexManager().addClusterToIndex(clusterName,index.getName());
     }
-    addClusterClassMap(cls);
-    saveInternal();
-    return cls;
   }
-  finally {
-    rwLock.writeLock().unlock();
-  }
+  addClusterClassMap(cls);
+  saveInternal();
+  return cls;
 }

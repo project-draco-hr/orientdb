@@ -18,7 +18,10 @@
       try {
         final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,getTrackMode());
         final int positionIndex=bucket.getIndex(hashCode,key);
-        if (positionIndex < 0)         return null;
+        if (positionIndex < 0) {
+          endAtomicOperation(false);
+          return null;
+        }
         removed=bucket.deleteEntry(positionIndex).value;
         sizeDiff--;
         mergeBucketsAfterDeletion(nodePath,bucket);
@@ -45,11 +48,13 @@
       OCachePointer cachePointer=cacheEntry.getCachePointer();
       cachePointer.acquireExclusiveLock();
       try {
-        final ONullBucket<V> nullBucket=new ONullBucket<V>(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,valueSerializer,false);
+        final ONullBucket<V> nullBucket=new ONullBucket<V>(cachePointer.getDataPointer(),getTrackMode(),valueSerializer,false);
         removed=nullBucket.getValue();
         if (removed != null) {
           nullBucket.removeValue();
           sizeDiff--;
+          cacheEntry.markDirty();
+          logPageChanges(nullBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
       }
   finally {

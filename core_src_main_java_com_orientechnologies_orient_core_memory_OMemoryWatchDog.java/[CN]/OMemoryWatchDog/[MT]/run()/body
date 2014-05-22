@@ -34,26 +34,28 @@
 ,autoFreeCheckEveryMs,autoFreeCheckEveryMs);
   while (true) {
     try {
-      monitorQueue.remove();
+      final Reference<?> res=monitorQueue.remove(CHECK_TIMEOUT);
       if (Thread.interrupted())       break;
-      alertTimes++;
-      MemoryUsage heapMemory=memBean.getHeapMemoryUsage();
-      final long usedHeap=heapMemory.getUsed();
-      final long maxHeap=heapMemory.getMax();
-      final int usedMemoryPer=(int)(usedHeap * 100 / maxHeap);
-      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Free memory is low %s of %s (%d%%), calling listeners to free memory...",OFileUtils.getSizeAsString(maxHeap - usedHeap),OFileUtils.getSizeAsString(maxHeap),100 - usedMemoryPer);
-      final long timer=Orient.instance().getProfiler().startChrono();
+      if (res != null) {
+        alertTimes++;
+        MemoryUsage heapMemory=memBean.getHeapMemoryUsage();
+        final long usedHeap=heapMemory.getUsed();
+        final long maxHeap=heapMemory.getMax();
+        final int usedMemoryPer=(int)(usedHeap * 100 / maxHeap);
+        if (OLogManager.instance().isDebugEnabled())         OLogManager.instance().debug(this,"Free memory is low %s of %s (%d%%), calling listeners to free memory...",OFileUtils.getSizeAsString(maxHeap - usedHeap),OFileUtils.getSizeAsString(maxHeap),100 - usedMemoryPer);
+        final long timer=Orient.instance().getProfiler().startChrono();
 synchronized (listeners) {
-        for (        ListenerWrapper listener : listeners.keySet()) {
-          try {
-            listener.listener.lowMemory(maxHeap - usedHeap,100 - usedMemoryPer);
-          }
- catch (          Exception e) {
-            e.printStackTrace();
+          for (          ListenerWrapper listener : listeners.keySet()) {
+            try {
+              listener.listener.lowMemory(maxHeap - usedHeap,100 - usedMemoryPer);
+            }
+ catch (            Exception e) {
+              e.printStackTrace();
+            }
           }
         }
+        Orient.instance().getProfiler().stopChrono("OMemoryWatchDog.freeResources","WatchDog free resources",timer);
       }
-      Orient.instance().getProfiler().stopChrono("OMemoryWatchDog.freeResources","WatchDog free resources",timer);
     }
  catch (    InterruptedException e) {
       break;

@@ -3,9 +3,9 @@
  else   if (exception instanceof OException)   throw (OException)exception;
  else   if (!(exception instanceof IOException))   throw new OStorageException(message,exception);
   if (status != STATUS.OPEN)   return;
-  OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.socket.getLocalSocketAddress(),exception);
+  OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception);
   try {
-    iNetwork.close();
+    engine.getConnectionManager().remove(iNetwork);
   }
  catch (  Exception e) {
   }
@@ -23,7 +23,7 @@ synchronized (clusterConfiguration) {
     }
   }
   for (int retry=0; retry < currentMaxRetry; ++retry) {
-    if (currentRetryDelay > 0)     try {
+    if (retry > 0 && currentRetryDelay > 0)     try {
       Thread.sleep(currentRetryDelay);
     }
  catch (    InterruptedException e) {
@@ -33,7 +33,6 @@ synchronized (clusterConfiguration) {
     try {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + (retry + 1) + "/"+ currentMaxRetry+ "...");
       setSessionId(null,-1);
-      if (createConnectionPool() == 0)       break;
       openRemoteDatabase();
       OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries: no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1);
       return;

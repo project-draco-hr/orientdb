@@ -1,11 +1,11 @@
 {
-  final StringBuilder commandBuffer=new StringBuilder();
   try {
     while (commandStream.hasNext()) {
       String commandLine=commandStream.nextCommand();
       if (commandLine.isEmpty())       continue;
       if (isComment(commandLine))       continue;
       if (isCollectingCommands(commandLine)) {
+        out.println("[Started multi-line command. Type just 'end' to finish and execute]");
         commandBuffer.append(commandLine);
         commandLine=null;
       }
@@ -27,18 +27,20 @@
         }
         final RESULT status=execute(commandLine);
         commandLine=null;
-        if (status == RESULT.EXIT || status == RESULT.ERROR && iBatchMode)         return false;
+        if (status == RESULT.EXIT || (status == RESULT.ERROR && !Boolean.parseBoolean(properties.get("ignoreErrors"))) && iBatchMode)         return false;
       }
     }
-    if (commandBuffer.length() > 0) {
-      if (iBatchMode) {
-        out.println();
-        out.print(getPrompt());
-        out.print(commandBuffer);
-        out.println();
+    if (commandBuffer.length() == 0) {
+      if (commandBuffer.length() > 0) {
+        if (iBatchMode) {
+          out.println();
+          out.print(getPrompt());
+          out.print(commandBuffer);
+          out.println();
+        }
+        final RESULT status=execute(commandBuffer.toString());
+        if (status == RESULT.EXIT || (status == RESULT.ERROR && !Boolean.parseBoolean(properties.get("ignoreErrors"))) && iBatchMode)         return false;
       }
-      final RESULT status=execute(commandBuffer.toString());
-      if (status == RESULT.EXIT || status == RESULT.ERROR && iBatchMode)       return false;
     }
   }
   finally {

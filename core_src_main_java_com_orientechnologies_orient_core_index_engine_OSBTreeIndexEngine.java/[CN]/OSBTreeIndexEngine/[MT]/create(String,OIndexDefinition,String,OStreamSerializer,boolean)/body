@@ -1,32 +1,15 @@
 {
   acquireExclusiveLock();
   try {
-    final OBinarySerializer keySerializer;
-    if (indexDefinition != null) {
-      if (indexDefinition instanceof ORuntimeKeyIndexDefinition) {
-        sbTree=new OSBTree<Object,V>(DATA_FILE_EXTENSION,1,OGlobalConfiguration.INDEX_DURABLE_IN_NON_TX_MODE.getValueAsBoolean());
-        keySerializer=((ORuntimeKeyIndexDefinition)indexDefinition).getSerializer();
-      }
- else {
-        if (indexDefinition.getTypes().length > 1) {
-          keySerializer=OCompositeKeySerializer.INSTANCE;
-        }
- else {
-          keySerializer=OBinarySerializerFactory.getInstance().getObjectSerializer(indexDefinition.getTypes()[0]);
-        }
-        sbTree=new OSBTree<Object,V>(DATA_FILE_EXTENSION,indexDefinition.getTypes().length,OGlobalConfiguration.INDEX_DURABLE_IN_NON_TX_MODE.getValueAsBoolean());
-      }
-    }
- else {
-      sbTree=new OSBTree<Object,V>(DATA_FILE_EXTENSION,1,OGlobalConfiguration.INDEX_DURABLE_IN_NON_TX_MODE.getValueAsBoolean());
-      keySerializer=new OSimpleKeySerializer();
-    }
+    final OBinarySerializer keySerializer=determineKeySerializer(indexDefinition);
+    final int keySize=determineKeySize(indexDefinition);
+    sbTree=new OSBTree<Object,V>(DATA_FILE_EXTENSION,keySize,OGlobalConfiguration.INDEX_DURABLE_IN_NON_TX_MODE.getValueAsBoolean(),NULL_BUCKET_FILE_EXTENSION);
     final ORecordBytes identityRecord=new ORecordBytes();
     ODatabaseRecord database=getDatabase();
     final OStorageLocalAbstract storageLocalAbstract=(OStorageLocalAbstract)database.getStorage().getUnderlying();
     database.save(identityRecord,clusterIndexName);
     identity=identityRecord.getIdentity();
-    sbTree.create(indexName,keySerializer,(OBinarySerializer<V>)valueSerializer,indexDefinition != null ? indexDefinition.getTypes() : null,storageLocalAbstract);
+    sbTree.create(indexName,keySerializer,(OBinarySerializer<V>)valueSerializer,indexDefinition != null ? indexDefinition.getTypes() : null,storageLocalAbstract,indexDefinition != null && !indexDefinition.isNullValuesIgnored());
   }
   finally {
     releaseExclusiveLock();

@@ -1,0 +1,38 @@
+{
+  final OResultSet result=(OResultSet)getResult();
+  final ODatabaseRecord db=getDatabase();
+  if (limit > -1) {
+    if (result != null)     result.setLimit(limit);
+  }
+  final int cores=Runtime.getRuntime().availableProcessors();
+  OLogManager.instance().warn(this,"Parallel query against %d threads",cores);
+  final ThreadPoolExecutor workers=Orient.instance().getWorkers();
+  executing=true;
+  final List<Future<?>> jobs=new ArrayList<Future<?>>();
+  while (executing && iTarget.hasNext()) {
+    final OIdentifiable next=iTarget.next();
+    if (next == null)     break;
+    final Runnable job=new Runnable(){
+      @Override public void run(){
+        ODatabaseRecordThreadLocal.INSTANCE.set(db);
+        if (!executeSearchRecord(next,true))         executing=false;
+      }
+    }
+;
+    jobs.add(workers.submit(job));
+  }
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"Parallel query '%s' split in %d jobs, waiting for completion...",parserText,jobs.size());
+  int processed=0;
+  int total=jobs.size();
+  try {
+    for (    Future<?> j : jobs) {
+      j.get();
+      processed++;
+      if (OLogManager.instance().isDebugEnabled())       if (processed % (total / 10) == 0)       OLogManager.instance().debug(this,"Executed %d/%d",processed,total);
+    }
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on executing parallel query: %s",e,parserText);
+  }
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"Parallel query '%s' completed",parserText);
+}

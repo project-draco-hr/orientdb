@@ -3,38 +3,37 @@
   try {
     if (!active)     return this;
     active=false;
-    if (memoryWatchDog != null) {
-      memoryWatchDog.interrupt();
-      try {
-        memoryWatchDog.join();
-      }
- catch (      InterruptedException e) {
-      }
-    }
-    if (shutdownHook != null) {
-      shutdownHook.cancel();
-      shutdownHook=null;
-    }
+    workers.shutdown();
     OLogManager.instance().debug(this,"Orient Engine is shutting down...");
     for (    OOrientListener l : browseListeners()) {
       if (l != null)       l.onShutdown();
     }
+    closeAllStorages();
     for (    OEngine engine : engines.values())     engine.shutdown();
     engines.clear();
     if (databaseFactory != null)     databaseFactory.shutdown();
-    if (storages != null) {
-      final List<OStorage> storagesCopy=new ArrayList<OStorage>(storages.values());
-      for (      OStorage stg : storagesCopy) {
-        OLogManager.instance().info(this,"Shutting down storage: " + stg.getName() + "...");
-        stg.close(true,false);
-      }
+    if (shutdownHook != null) {
+      shutdownHook.cancel();
+      shutdownHook=null;
     }
     if (OMMapManagerLocator.getInstance() != null)     OMMapManagerLocator.getInstance().shutdown();
     if (threadGroup != null)     threadGroup.interrupt();
     resetListeners();
     timer.purge();
     profiler.shutdown();
-    OLogManager.instance().info(this,"Orient Engine shutdown complete\n");
+    if (memoryWatchDog != null) {
+      memoryWatchDog.sendShutdown();
+      try {
+        memoryWatchDog.join();
+      }
+ catch (      InterruptedException e) {
+      }
+ finally {
+        memoryWatchDog=null;
+      }
+    }
+    OLogManager.instance().info(this,"OrientDB Engine shutdown complete");
+    OLogManager.instance().flush();
   }
   finally {
     getLock().unlock();

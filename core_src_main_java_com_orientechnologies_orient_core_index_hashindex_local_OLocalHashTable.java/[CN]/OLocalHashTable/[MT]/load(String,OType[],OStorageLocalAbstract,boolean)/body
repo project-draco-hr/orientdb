@@ -1,0 +1,33 @@
+{
+  acquireExclusiveLock();
+  try {
+    this.storage=storageLocal;
+    this.keyTypes=keyTypes;
+    this.nullKeyIsSupported=nullKeyIsSupported;
+    diskCache=storage.getDiskCache();
+    this.name=name;
+    init(storage.getAtomicOperationsManager(),storage.getWALInstance());
+    fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
+    hashStateEntry=diskCache.load(fileStateId,0,true);
+    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+    directory.open();
+    diskCache.pinPage(hashStateEntry);
+    final OCachePointer cachePointer=hashStateEntry.getCachePointer();
+    try {
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,false);
+      keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getKeySerializerId());
+      valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getValueSerializerId());
+      for (int i=0; i < HASH_CODE_SIZE; i++)       if (!page.isRemoved(i))       diskCache.openFile(page.getFileId(i));
+    }
+  finally {
+      diskCache.release(hashStateEntry);
+    }
+    if (nullKeyIsSupported)     nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during hash table loading",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

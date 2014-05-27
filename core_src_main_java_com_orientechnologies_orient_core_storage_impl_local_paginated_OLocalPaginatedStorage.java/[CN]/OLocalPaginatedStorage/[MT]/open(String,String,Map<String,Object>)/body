@@ -1,12 +1,20 @@
 {
+  addUser();
+  if (status != STATUS.CLOSED)   return;
   lock.acquireExclusiveLock();
   try {
-    addUser();
-    if (status != STATUS.CLOSED)     return;
     if (!exists())     throw new OStorageException("Cannot open the storage '" + name + "' because it does not exist in path: "+ url);
     configuration.load();
     componentsFactory=new OCurrentStorageComponentsFactory(configuration);
     initWal();
+    if (configuration.binaryFormatVersion >= 11) {
+      if (dirtyFlag.exits())       dirtyFlag.open();
+ else {
+        dirtyFlag.create();
+        dirtyFlag.makeDirty();
+      }
+    }
+ else     dirtyFlag.create();
     status=STATUS.OPEN;
     int pos;
     addDefaultClusters();
@@ -16,25 +24,25 @@
         pos=createClusterFromConfig(clusterConfig);
         try {
           if (pos == -1) {
-            clusters[i].open();
+            clusters.get(i).open();
           }
  else {
             if (clusterConfig.getName().equals(CLUSTER_DEFAULT_NAME))             defaultClusterId=pos;
-            clusters[pos].open();
+            clusters.get(pos).open();
           }
         }
  catch (        FileNotFoundException e) {
-          OLogManager.instance().warn(this,"Error on loading cluster '" + clusters[i].getName() + "' ("+ i+ "): file not found. It will be excluded from current database '"+ getName()+ "'.");
-          clusterMap.remove(clusters[i].getName());
-          clusters[i]=null;
+          OLogManager.instance().warn(this,"Error on loading cluster '" + clusters.get(i).getName() + "' ("+ i+ "): file not found. It will be excluded from current database '"+ getName()+ "'.");
+          clusterMap.remove(clusters.get(i).getName().toLowerCase());
+          setCluster(i,null);
         }
       }
  else {
-        clusters=Arrays.copyOf(clusters,clusters.length + 1);
-        clusters[i]=null;
+        setCluster(i,null);
       }
     }
     restoreIfNeeded();
+    dirtyFlag.clearDirty();
   }
  catch (  Exception e) {
     close(true,false);

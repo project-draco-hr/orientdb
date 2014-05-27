@@ -1,0 +1,42 @@
+{
+  try {
+    network.writeRID(rid);
+    network.writeByte((byte)mode);
+  }
+  finally {
+    endRequest(network);
+  }
+switch (mode) {
+case 0:
+    try {
+      beginResponse(network);
+      return network.readByte() == 1;
+    }
+  finally {
+      endResponse(network);
+    }
+case 1:
+  if (callback != null) {
+    final int sessionId=getSessionId();
+    Callable<Object> response=new Callable<Object>(){
+      public Object call() throws Exception {
+        Boolean result;
+        try {
+          OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
+          beginResponse(network);
+          result=network.readByte() == 1;
+        }
+  finally {
+          endResponse(network);
+          OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
+        }
+        callback.call(rid,result);
+        return null;
+      }
+    }
+;
+    asynchExecutor.submit(new FutureTask<Object>(response));
+  }
+}
+return false;
+}

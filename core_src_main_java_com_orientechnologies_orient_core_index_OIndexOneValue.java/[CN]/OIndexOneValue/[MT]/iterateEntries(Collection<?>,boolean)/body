@@ -1,0 +1,42 @@
+{
+  checkForRebuild();
+  final List<Object> sortedKeys=new ArrayList<Object>(keys);
+  final Comparator<Object> comparator;
+  if (ascSortOrder)   comparator=ODefaultComparator.INSTANCE;
+ else   comparator=Collections.reverseOrder(ODefaultComparator.INSTANCE);
+  Collections.sort(sortedKeys,comparator);
+  return new OIndexAbstractCursor(){
+    private Iterator<?> keysIterator=sortedKeys.iterator();
+    @Override public Map.Entry<Object,OIdentifiable> nextEntry(){
+      OIdentifiable result=null;
+      Object key=null;
+      while (keysIterator.hasNext() && result == null) {
+        key=keysIterator.next();
+        key=getCollatingValue(key);
+        acquireSharedLock();
+        try {
+          result=indexEngine.get(key);
+        }
+  finally {
+          releaseSharedLock();
+        }
+      }
+      if (result == null)       return null;
+      final Object resultKey=key;
+      final OIdentifiable resultValue=result;
+      return new Map.Entry<Object,OIdentifiable>(){
+        @Override public Object getKey(){
+          return resultKey;
+        }
+        @Override public OIdentifiable getValue(){
+          return resultValue;
+        }
+        @Override public OIdentifiable setValue(        OIdentifiable value){
+          throw new UnsupportedOperationException("setValue");
+        }
+      }
+;
+    }
+  }
+;
+}

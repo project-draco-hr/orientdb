@@ -3,7 +3,7 @@
   try {
     super.open(iUserName,iUserPassword);
     componentsFactory=getStorage().getComponentsFactory();
-    sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
+    final OSBTreeCollectionManager sbTreeCM=getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
       @Override public OSBTreeCollectionManager call() throws Exception {
         Class<? extends OSBTreeCollectionManager> managerClass=getStorage().getCollectionManagerClass();
         if (managerClass == null) {
@@ -15,13 +15,21 @@
         }
       }
     }
-));
+);
+    sbTreeCollectionManager=sbTreeCM != null ? new OSBTreeCollectionManagerProxy(this,sbTreeCM) : null;
     level1Cache.startup();
     metadata=new OMetadataDefault();
     metadata.load();
     recordFormat=DEF_RECORD_FORMAT;
     if (!(getStorage() instanceof OStorageProxy)) {
-      user=getMetadata().getSecurity().authenticate(iUserName,iUserPassword);
+      if (metadata.getIndexManager().autoRecreateIndexesAfterCrash()) {
+        metadata.getIndexManager().recreateIndexes();
+        metadata.getSecurity().uncacheUsersAndRoles();
+        setCurrentDatabaseinThreadLocal();
+        user=null;
+      }
+      installHooks();
+      user=metadata.getSecurity().authenticate(iUserName,iUserPassword);
       if (user != null) {
         final Set<ORole> roles=user.getRoles();
         if (roles == null || roles.isEmpty() || roles.iterator().next() == null) {
@@ -34,12 +42,10 @@
           }
         }
       }
-      installHooks();
     }
  else     user=new OUser(iUserName,OUser.encryptPassword(iUserPassword)).addRole(new ORole("passthrough",null,ORole.ALLOW_MODES.ALLOW_ALL_BUT));
     checkSecurity(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);
     if (!metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))     metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
-    if (metadata.getIndexManager().autoRecreateIndexesAfterCrash())     metadata.getIndexManager().recreateIndexes();
   }
  catch (  OException e) {
     close();

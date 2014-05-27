@@ -1,16 +1,6 @@
 {
-  Map<K,ResourceHolder<V>> resourceHolderMap=activeResources.get();
-  if (resourceHolderMap == null) {
-    resourceHolderMap=new HashMap<K,ResourceHolder<V>>();
-    activeResources.set(resourceHolderMap);
-  }
-  final ResourceHolder<V> holder=resourceHolderMap.get(iKey);
-  if (holder != null) {
-    holder.counter++;
-    return holder.resource;
-  }
   try {
-    if (!sem.tryAcquire(iMaxWaitMillis,TimeUnit.MILLISECONDS))     throw new OLockException("Not more resources available in pool. Requested resource: " + iKey);
+    if (!sem.tryAcquire(maxWaitMillis,TimeUnit.MILLISECONDS))     throw new OLockException("No more resources available in pool. Requested resource: " + key);
   }
  catch (  InterruptedException e) {
     Thread.currentThread().interrupt();
@@ -20,25 +10,23 @@
   do {
     res=resources.poll();
     if (res != null) {
-      if (listener.reuseResource(iKey,iAdditionalArgs,res)) {
+      if (listener.reuseResource(key,additionalArgs,res)) {
         break;
       }
+ else       res=null;
     }
   }
  while (!resources.isEmpty());
   try {
-    if (res == null)     res=listener.createNewResource(iKey,iAdditionalArgs);
-    resourceHolderMap.put(iKey,new ResourceHolder<V>(res));
+    if (res == null)     res=listener.createNewResource(key,additionalArgs);
     return res;
   }
  catch (  RuntimeException e) {
     sem.release();
-    resourceHolderMap.remove(iKey);
     throw e;
   }
 catch (  Exception e) {
     sem.release();
-    resourceHolderMap.remove(iKey);
     throw new OLockException("Error on creation of the new resource in the pool",e);
   }
 }

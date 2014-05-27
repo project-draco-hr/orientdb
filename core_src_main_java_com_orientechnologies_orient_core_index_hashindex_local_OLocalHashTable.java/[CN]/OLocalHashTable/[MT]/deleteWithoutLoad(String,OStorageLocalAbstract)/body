@@ -3,19 +3,25 @@
   try {
     storage=storageLocal;
     final ODiskCache diskCache=storage.getDiskCache();
-    initStores(metadataConfigurationFileExtension,treeStateFileExtension);
-    metadataStore.open();
-    treeStateStore.open();
-    filesMetadata=metadataStore.loadMetadata();
-    for (int i=0; i < filesMetadata.length; i++) {
-      OHashIndexFileLevelMetadata fileLevelMetadata=filesMetadata[i];
-      if (fileLevelMetadata != null) {
-        fileLevelIds[i]=diskCache.openFile(fileLevelMetadata.getFileName());
-        diskCache.deleteFile(fileLevelIds[i]);
+    fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
+    hashStateEntry=diskCache.load(fileStateId,0,true);
+    try {
+      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry.getCachePointer().getDataPointer(),ODurablePage.TrackMode.NONE,false);
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        if (!metadataPage.isRemoved(i)) {
+          diskCache.openFile(metadataPage.getFileId(i));
+          diskCache.deleteFile(metadataPage.getFileId(i));
+        }
       }
     }
-    metadataStore.delete();
-    treeStateStore.delete();
+  finally {
+      diskCache.release(hashStateEntry);
+    }
+    diskCache.deleteFile(fileStateId);
+    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+    directory.deleteWithoutOpen();
+    final long nullBucketId=diskCache.openFile(name + nullBucketFileExtension);
+    diskCache.deleteFile(nullBucketId);
   }
  catch (  IOException ioe) {
     throw new OIndexException("Can not delete hash table with name " + name,ioe);

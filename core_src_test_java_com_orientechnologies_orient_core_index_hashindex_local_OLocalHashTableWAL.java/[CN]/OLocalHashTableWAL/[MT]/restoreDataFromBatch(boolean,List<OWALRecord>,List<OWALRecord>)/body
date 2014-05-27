@@ -1,0 +1,44 @@
+{
+  final ODiskCache expectedDiskCache=((OStorageLocalAbstract)expectedDatabaseDocumentTx.getStorage()).getDiskCache();
+  for (  OWALRecord walRecord : records) {
+    atomicUnit.add(walRecord);
+    if (!atomicChangeIsProcessed) {
+      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
+      atomicChangeIsProcessed=true;
+    }
+ else     if (walRecord instanceof OAtomicUnitEndRecord) {
+      atomicChangeIsProcessed=false;
+      for (      OWALRecord restoreRecord : atomicUnit) {
+        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord)         continue;
+        if (restoreRecord instanceof OUpdatePageRecord) {
+          final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
+          final long fileId=updatePageRecord.getFileId();
+          final long pageIndex=updatePageRecord.getPageIndex();
+          if (!expectedDiskCache.isOpen(fileId))           expectedDiskCache.openFile(fileId);
+          final OCacheEntry cacheEntry=expectedDiskCache.load(fileId,pageIndex,true);
+          final OCachePointer cachePointer=cacheEntry.getCachePointer();
+          cachePointer.acquireExclusiveLock();
+          try {
+            ODurablePage durablePage=new ODurablePage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE);
+            durablePage.restoreChanges(updatePageRecord.getChanges());
+            durablePage.setLsn(updatePageRecord.getLsn());
+            cacheEntry.markDirty();
+          }
+  finally {
+            cachePointer.releaseExclusiveLock();
+            expectedDiskCache.release(cacheEntry);
+          }
+        }
+ else         if (restoreRecord instanceof OFileCreatedCreatedWALRecord) {
+          final OFileCreatedCreatedWALRecord fileCreatedCreatedRecord=(OFileCreatedCreatedWALRecord)restoreRecord;
+          expectedDiskCache.openFile(fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable"),fileCreatedCreatedRecord.getFileId());
+        }
+      }
+      atomicUnit.clear();
+    }
+ else {
+      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedCreatedWALRecord);
+    }
+  }
+  return atomicChangeIsProcessed;
+}

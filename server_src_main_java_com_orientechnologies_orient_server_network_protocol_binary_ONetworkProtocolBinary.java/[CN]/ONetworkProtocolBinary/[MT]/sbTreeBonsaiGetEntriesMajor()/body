@@ -3,11 +3,13 @@
   OBonsaiCollectionPointer collectionPointer=OCollectionNetworkSerializer.INSTANCE.readCollectionPointer(channel);
   byte[] keyStream=channel.readBytes();
   boolean inclusive=channel.readBoolean();
+  int pageSize=128;
+  if (connection.data.protocolVersion >= 21)   pageSize=channel.readInt();
   OSBTreeBonsai<OIdentifiable,Integer> tree=connection.database.getSbTreeCollectionManager().loadSBTree(collectionPointer);
   final OBinarySerializer<OIdentifiable> keySerializer=tree.getKeySerializer();
   OIdentifiable key=keySerializer.deserialize(keyStream,0);
   final OBinarySerializer<Integer> valueSerializer=tree.getValueSerializer();
-  OTreeInternal.AccumulativeListener<OIdentifiable,Integer> listener=new OTreeInternal.AccumulativeListener<OIdentifiable,Integer>(5);
+  OTreeInternal.AccumulativeListener<OIdentifiable,Integer> listener=new OTreeInternal.AccumulativeListener<OIdentifiable,Integer>(pageSize);
   tree.loadEntriesMajor(key,inclusive,true,listener);
   List<Entry<OIdentifiable,Integer>> result=listener.getResult();
   byte[] stream=serializeSBTreeEntryCollection(result,keySerializer,valueSerializer);

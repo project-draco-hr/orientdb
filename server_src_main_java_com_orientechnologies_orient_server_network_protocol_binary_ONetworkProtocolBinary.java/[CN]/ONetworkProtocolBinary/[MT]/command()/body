@@ -7,7 +7,7 @@
   try {
     final OAbstractCommandResultListener listener;
     if (asynch) {
-      listener=new OAsyncCommandResultListener(this,clientTxId);
+      listener=new OAsyncCommandResultListener(this,clientTxId,command.getResultListener());
       command.setResultListener(listener);
     }
  else     listener=new OSyncCommandResultListener();
@@ -21,7 +21,7 @@
       if (listener.isEmpty())       try {
         sendOk(clientTxId);
       }
- catch (      IOException e1) {
+ catch (      IOException ignored) {
       }
       channel.writeByte((byte)0);
     }
@@ -35,12 +35,24 @@
         listener.result(result);
         writeIdentifiable((OIdentifiable)result);
       }
+ else       if (result instanceof ODocumentWrapper) {
+        channel.writeByte((byte)'r');
+        final ODocument doc=((ODocumentWrapper)result).getDocument();
+        listener.result(doc);
+        writeIdentifiable(doc);
+      }
  else       if (OMultiValue.isMultiValue(result)) {
         channel.writeByte((byte)'l');
         channel.writeInt(OMultiValue.getSize(result));
         for (        Object o : OMultiValue.getMultiValueIterable(result)) {
-          listener.result(o);
-          writeIdentifiable((OIdentifiable)o);
+          try {
+            listener.result(o);
+            writeIdentifiable((OIdentifiable)o);
+          }
+ catch (          Exception e) {
+            OLogManager.instance().warn(this,"Cannot serialize record: " + o);
+            writeIdentifiable(null);
+          }
         }
       }
  else {

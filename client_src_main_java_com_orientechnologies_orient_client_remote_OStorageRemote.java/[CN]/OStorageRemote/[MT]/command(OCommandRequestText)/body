@@ -1,52 +1,50 @@
 {
-  checkConnection();
   if (!(iCommand instanceof OSerializableStream))   throw new OCommandExecutionException("Cannot serialize the command to be executed to the server side.");
-  OSerializableStream command=iCommand;
   Object result=null;
   final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
-  OChannelBinaryAsynchClient network=null;
-  do {
-    OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
-    final OCommandRequestText aquery=iCommand;
-    try {
-      final boolean asynch=iCommand instanceof OCommandRequestAsynch && ((OCommandRequestAsynch)iCommand).isAsynchronous();
+  try {
+    OChannelBinaryAsynchClient network=null;
+    do {
+      OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=true;
       try {
-        network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
-        network.writeByte((byte)(asynch ? 'a' : 's'));
-        network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(command));
-      }
+        final boolean asynch=iCommand instanceof OCommandRequestAsynch && ((OCommandRequestAsynch)iCommand).isAsynchronous();
+        try {
+          network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
+          network.writeByte((byte)(asynch ? 'a' : 's'));
+          network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(iCommand));
+        }
   finally {
-        endRequest(network);
-      }
-      try {
-        beginResponse(network);
-        boolean addNextRecord=true;
-        if (asynch) {
-          byte status;
-          while ((status=network.readByte()) > 0) {
-            final ORecordInternal<?> record=(ORecordInternal<?>)OChannelBinaryProtocol.readIdentifiable(network);
-            if (record == null)             continue;
+          endRequest(network);
+        }
+        try {
+          beginResponse(network);
+          boolean addNextRecord=true;
+          if (asynch) {
+            byte status;
+            while ((status=network.readByte()) > 0) {
+              final ORecordInternal<?> record=(ORecordInternal<?>)OChannelBinaryProtocol.readIdentifiable(network);
+              if (record == null)               continue;
 switch (status) {
 case 1:
-              if (addNextRecord) {
-                addNextRecord=aquery.getResultListener().result(record);
-                database.getLevel1Cache().updateRecord(record);
-              }
-            break;
+                if (addNextRecord) {
+                  addNextRecord=iCommand.getResultListener().result(record);
+                  database.getLevel1Cache().updateRecord(record);
+                }
+              break;
 case 2:
-          database.getLevel1Cache().updateRecord(record);
+            database.getLevel1Cache().updateRecord(record);
+        }
       }
     }
-  }
  else {
-    final byte type=network.readByte();
+      final byte type=network.readByte();
 switch (type) {
 case 'n':
-      result=null;
-    break;
+        result=null;
+      break;
 case 'r':
-  result=OChannelBinaryProtocol.readIdentifiable(network);
-if (result instanceof ORecord<?>) database.getLevel1Cache().updateRecord((ORecordInternal<?>)result);
+    result=OChannelBinaryProtocol.readIdentifiable(network);
+  if (result instanceof ORecord<?>)   database.getLevel1Cache().updateRecord((ORecordInternal<?>)result);
 break;
 case 'l':
 final int tot=network.readInt();
@@ -87,11 +85,12 @@ handleException(network,"Error on executing command: " + iCommand,e);
 }
  finally {
 OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=false;
-if (aquery.getResultListener() != null) {
-aquery.getResultListener().end();
-}
 }
 }
  while (true);
+}
+  finally {
+if (iCommand.getResultListener() != null) iCommand.getResultListener().end();
+}
 return result;
 }

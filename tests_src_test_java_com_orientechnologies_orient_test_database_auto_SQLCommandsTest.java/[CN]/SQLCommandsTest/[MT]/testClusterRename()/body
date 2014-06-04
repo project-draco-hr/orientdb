@@ -1,0 +1,19 @@
+{
+  if (database.getURL().startsWith("memory:"))   return;
+  Collection<String> names=database.getClusterNames();
+  Assert.assertFalse(names.contains("testClusterRename".toLowerCase()));
+  database.command(new OCommandSQL("create cluster testClusterRename physical")).execute();
+  names=database.getClusterNames();
+  Assert.assertTrue(names.contains("testClusterRename".toLowerCase()));
+  database.command(new OCommandSQL("alter cluster testClusterRename name testClusterRename42")).execute();
+  names=database.getClusterNames();
+  Assert.assertTrue(names.contains("testClusterRename42".toLowerCase()));
+  Assert.assertFalse(names.contains("testClusterRename".toLowerCase()));
+  if (database.getURL().startsWith("plocal:")) {
+    String storagePath=database.getStorage().getConfiguration().getDirectory();
+    File dataFile=new File(storagePath,"testClusterRename42" + OPaginatedCluster.DEF_EXTENSION);
+    File mapFile=new File(storagePath,"testClusterRename42" + OClusterPositionMap.DEF_EXTENSION);
+    Assert.assertTrue(dataFile.exists());
+    Assert.assertTrue(mapFile.exists());
+  }
+}

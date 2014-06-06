@@ -1,23 +1,21 @@
 {
+  if (iMessage == null)   throw new IllegalArgumentException("Configuration is null");
   final String profileName=(String)iMessage.get("profile");
   final OMailProfile profile=profiles.get(profileName);
   if (profile == null)   throw new IllegalArgumentException("Mail profile '" + profileName + "' is not configured on server");
   Authenticator auth=new OSMTPAuthenticator((String)profile.getProperty("mail.smtp.user"),(String)profile.getProperty("mail.smtp.password"));
-  Session session=Session.getInstance(profile,auth);
+  final Session session=Session.getInstance(profile,auth);
   MimeMessage msg=new MimeMessage(session);
-  msg.setFrom(new InternetAddress((String)iMessage.get("from")));
-  InternetAddress[] toAddresses={new InternetAddress((String)iMessage.get("to"))};
-  msg.setRecipients(Message.RecipientType.TO,toAddresses);
-  String cc=(String)iMessage.get("cc");
-  if (cc != null && !cc.isEmpty()) {
-    InternetAddress[] ccAddresses={new InternetAddress(cc)};
-    msg.setRecipients(Message.RecipientType.CC,ccAddresses);
-  }
-  String bcc=(String)iMessage.get("bcc");
-  if (bcc != null && !bcc.isEmpty()) {
-    InternetAddress[] bccAddresses={new InternetAddress(bcc)};
-    msg.setRecipients(Message.RecipientType.BCC,bccAddresses);
-  }
+  final String from;
+  if (iMessage.containsKey("from"))   from=(String)iMessage.get("from");
+ else   from=(String)profile.getProperty("mail.from");
+  if (from != null)   msg.setFrom(new InternetAddress(from));
+  final String to=(String)iMessage.get("to");
+  if (to != null && !to.isEmpty())   msg.setRecipients(Message.RecipientType.TO,getEmails(to));
+  final String cc=(String)iMessage.get("cc");
+  if (cc != null && !cc.isEmpty())   msg.setRecipients(Message.RecipientType.CC,getEmails(cc));
+  final String bcc=(String)iMessage.get("bcc");
+  if (bcc != null && !bcc.isEmpty())   msg.setRecipients(Message.RecipientType.BCC,getEmails(bcc));
   msg.setSubject((String)iMessage.get("subject"));
   Object date=iMessage.get("date");
   final Date sendDate;

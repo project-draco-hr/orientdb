@@ -1,0 +1,52 @@
+{
+  try {
+    short[] pos=new short[document.fields()];
+    int i=0;
+    for (    Entry<String,Object> entry : document) {
+      writeString(bytes,entry.getKey());
+      pos[i++]=bytes.alloc((short)3);
+    }
+    i=0;
+    for (    Entry<String,Object> entry : document) {
+      short pointer=0;
+      OType type=getFieldType(document,entry.getKey(),entry.getValue());
+switch (type) {
+case INTEGER:
+case LONG:
+case SHORT:
+        pointer=OVarIntSerializer.write(bytes,((Number)entry.getValue()).longValue());
+      break;
+case STRING:
+    pointer=writeString(bytes,(String)entry.getValue());
+  break;
+case DOUBLE:
+long dg=Double.doubleToLongBits((Double)entry.getValue());
+pointer=bytes.alloc((short)OLongSerializer.LONG_SIZE);
+OLongSerializer.INSTANCE.serialize(dg,bytes.bytes,pointer);
+break;
+case FLOAT:
+int fg=Float.floatToIntBits((Float)entry.getValue());
+OIntegerSerializer.INSTANCE.serialize(fg,bytes.bytes,pointer);
+break;
+case BYTE:
+pointer=bytes.alloc((short)1);
+bytes.bytes[pointer]=(Byte)entry.getValue();
+break;
+case BOOLEAN:
+pointer=bytes.alloc((short)1);
+bytes.bytes[pointer]=((Boolean)entry.getValue()) ? (byte)1 : (byte)0;
+break;
+case DECIMAL:
+break;
+default :
+break;
+}
+bytes.bytes[pos[i]]=(byte)((pointer >>> 8) & 0xFF);
+bytes.bytes[pos[i] + 1]=(byte)((pointer >>> 0) & 0xFF);
+bytes.bytes[pos[i] + 2]=(byte)type.ordinal();
+}
+}
+ catch (UnsupportedEncodingException e) {
+e.printStackTrace();
+}
+}

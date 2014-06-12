@@ -1,0 +1,43 @@
+{
+  try {
+    String field=readString(bytes);
+    if (field != null) {
+      OType type=OType.getById(bytes.bytes[bytes.offset]);
+      short valuePos=(short)((bytes.bytes[bytes.offset + 1] << 8) | (bytes.bytes[bytes.offset + 2] & 0xff));
+      Object value=null;
+      BytesContainer valueContainer=new BytesContainer(bytes.bytes,valuePos);
+switch (type) {
+case INTEGER:
+case LONG:
+case SHORT:
+        value=OVarIntSerializer.read(valueContainer);
+      break;
+case STRING:
+    value=readString(valueContainer);
+  break;
+case DOUBLE:
+long parsedd=OLongSerializer.INSTANCE.deserialize(bytes.bytes,valuePos);
+value=Double.longBitsToDouble(parsedd);
+break;
+case FLOAT:
+int parsedf=OIntegerSerializer.INSTANCE.deserialize(bytes.bytes,valuePos);
+value=Float.intBitsToFloat(parsedf);
+break;
+case BYTE:
+value=bytes.bytes[valuePos];
+break;
+case BOOLEAN:
+value=bytes.bytes[valuePos] == 1 ? true : false;
+break;
+case DECIMAL:
+break;
+default :
+break;
+}
+document.field(field,value,type);
+}
+}
+ catch (UnsupportedEncodingException e) {
+e.printStackTrace();
+}
+}

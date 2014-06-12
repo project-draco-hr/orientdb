@@ -1,20 +1,25 @@
 {
   try {
-    String field=readString(bytes);
-    if (field != null) {
-      OType type=OType.getById(bytes.bytes[bytes.offset]);
-      short valuePos=(short)((bytes.bytes[bytes.offset + 1] << 8) | (bytes.bytes[bytes.offset + 2] & 0xff));
+    String field;
+    while ((field=readString(bytes)) != null) {
+      short valuePos=OShortSerializer.INSTANCE.deserialize(bytes.bytes,bytes.offset);
+      OType type=OType.getById(bytes.bytes[bytes.offset + 2]);
+      bytes.read(3);
       Object value=null;
       BytesContainer valueContainer=new BytesContainer(bytes.bytes,valuePos);
 switch (type) {
 case INTEGER:
-case LONG:
-case SHORT:
-        value=OVarIntSerializer.read(valueContainer);
+        value=OVarIntSerializer.read(valueContainer).intValue();
       break;
-case STRING:
-    value=readString(valueContainer);
+case LONG:
+    value=OVarIntSerializer.read(valueContainer).longValue();
   break;
+case SHORT:
+value=OVarIntSerializer.read(valueContainer).shortValue();
+break;
+case STRING:
+value=readString(valueContainer);
+break;
 case DOUBLE:
 long parsedd=OLongSerializer.INSTANCE.deserialize(bytes.bytes,valuePos);
 value=Double.longBitsToDouble(parsedd);
@@ -28,6 +33,9 @@ value=bytes.bytes[valuePos];
 break;
 case BOOLEAN:
 value=bytes.bytes[valuePos] == 1 ? true : false;
+break;
+case DATETIME:
+value=new Date(OVarIntSerializer.read(valueContainer).longValue());
 break;
 case DECIMAL:
 break;

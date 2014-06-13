@@ -1,61 +1,21 @@
 {
-  try {
-    short[] pos=new short[document.fields()];
-    int i=0;
-    Entry<String,?> values[]=new Entry[document.fields()];
-    for (    Entry<String,Object> entry : document) {
-      writeString(bytes,entry.getKey());
-      pos[i]=bytes.alloc((short)3);
-      values[i]=entry;
-      i++;
-    }
-    OVarIntSerializer.write(bytes,0);
-    for (i=0; i < values.length; i++) {
-      short pointer=0;
-      Object value=values[i].getValue();
-      OType type=getFieldType(document,values[i].getKey(),value);
-      if (type == null)       continue;
-switch (type) {
-case INTEGER:
-case LONG:
-case SHORT:
-        pointer=OVarIntSerializer.write(bytes,((Number)value).longValue());
-      break;
-case STRING:
-    pointer=writeString(bytes,(String)value);
-  break;
-case DOUBLE:
-long dg=Double.doubleToLongBits((Double)value);
-pointer=bytes.alloc((short)OLongSerializer.LONG_SIZE);
-OLongSerializer.INSTANCE.serialize(dg,bytes.bytes,pointer);
-break;
-case FLOAT:
-int fg=Float.floatToIntBits((Float)value);
-pointer=bytes.alloc((short)OIntegerSerializer.INT_SIZE);
-OIntegerSerializer.INSTANCE.serialize(fg,bytes.bytes,pointer);
-break;
-case BYTE:
-pointer=bytes.alloc((short)1);
-bytes.bytes[pointer]=(Byte)value;
-break;
-case BOOLEAN:
-pointer=bytes.alloc((short)1);
-bytes.bytes[pointer]=((Boolean)value) ? (byte)1 : (byte)0;
-break;
-case DATETIME:
-long time=((Date)value).getTime();
-pointer=OVarIntSerializer.write(bytes,time);
-break;
-case DECIMAL:
-break;
-default :
-break;
-}
-OShortSerializer.INSTANCE.serialize(pointer,bytes.bytes,pos[i]);
-bytes.bytes[pos[i] + 2]=(byte)type.ordinal();
-}
-}
- catch (UnsupportedEncodingException e) {
-e.printStackTrace();
-}
+  short[] pos=new short[document.fields()];
+  int i=0;
+  Entry<String,?> values[]=new Entry[document.fields()];
+  for (  Entry<String,Object> entry : document) {
+    writeString(bytes,entry.getKey());
+    pos[i]=bytes.alloc((short)3);
+    values[i]=entry;
+    i++;
+  }
+  OVarIntSerializer.write(bytes,0);
+  for (i=0; i < values.length; i++) {
+    short pointer=0;
+    Object value=values[i].getValue();
+    OType type=getFieldType(document,values[i].getKey(),value);
+    if (type == null)     continue;
+    pointer=writeSingleValue(bytes,value,type);
+    OShortSerializer.INSTANCE.serialize(pointer,bytes.bytes,pos[i]);
+    writeOType(bytes,(short)(pos[i] + 2),type);
+  }
 }

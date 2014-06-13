@@ -1,51 +1,13 @@
 {
-  try {
-    String field;
-    while ((field=readString(bytes)) != null) {
-      short valuePos=OShortSerializer.INSTANCE.deserialize(bytes.bytes,bytes.offset);
-      OType type=OType.getById(bytes.bytes[bytes.offset + 2]);
-      bytes.read(3);
-      Object value=null;
-      BytesContainer valueContainer=new BytesContainer(bytes.bytes,valuePos);
-switch (type) {
-case INTEGER:
-        value=OVarIntSerializer.read(valueContainer).intValue();
-      break;
-case LONG:
-    value=OVarIntSerializer.read(valueContainer).longValue();
-  break;
-case SHORT:
-value=OVarIntSerializer.read(valueContainer).shortValue();
-break;
-case STRING:
-value=readString(valueContainer);
-break;
-case DOUBLE:
-long parsedd=OLongSerializer.INSTANCE.deserialize(bytes.bytes,valuePos);
-value=Double.longBitsToDouble(parsedd);
-break;
-case FLOAT:
-int parsedf=OIntegerSerializer.INSTANCE.deserialize(bytes.bytes,valuePos);
-value=Float.intBitsToFloat(parsedf);
-break;
-case BYTE:
-value=bytes.bytes[valuePos];
-break;
-case BOOLEAN:
-value=bytes.bytes[valuePos] == 1 ? true : false;
-break;
-case DATETIME:
-value=new Date(OVarIntSerializer.read(valueContainer).longValue());
-break;
-case DECIMAL:
-break;
-default :
-break;
-}
-document.field(field,value,type);
-}
-}
- catch (UnsupportedEncodingException e) {
-e.printStackTrace();
-}
+  String field;
+  while ((field=readString(bytes)) != null) {
+    short valuePos=OShortSerializer.INSTANCE.deserialize(bytes.bytes,bytes.offset);
+    bytes.read(2);
+    OType type=readOType(bytes);
+    short headerCursor=bytes.offset;
+    bytes.offset=valuePos;
+    Object value=readValue(bytes,type);
+    bytes.offset=headerCursor;
+    document.field(field,value,type);
+  }
 }

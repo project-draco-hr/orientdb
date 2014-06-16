@@ -1,20 +1,13 @@
 {
   final ODatabaseRecord database=getDatabase();
   database.checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_READ,iSchemaClass.getName().toLowerCase());
-  final List<OIndexSearchResult> indexSearchResults=new ArrayList<OIndexSearchResult>();
   if (compiledFilter == null) {
     if (orderedFields.size() == 0)     return false;
  else     return optimizeSort(iSchemaClass);
   }
-  analyzeQueryBranch(iSchemaClass,compiledFilter.getRootCondition(),indexSearchResults,context);
-  Collections.sort(indexSearchResults,new Comparator<OIndexSearchResult>(){
-    public int compare(    final OIndexSearchResult searchResultOne,    final OIndexSearchResult searchResultTwo){
-      return searchResultTwo.getFieldCount() - searchResultOne.getFieldCount();
-    }
-  }
-);
+  final List<OIndexSearchResult> indexSearchResults=new OFilterAnalyzer().analyzeCondition(compiledFilter.getRootCondition(),iSchemaClass,context);
   for (  final OIndexSearchResult searchResult : indexSearchResults) {
-    final List<OIndex<?>> involvedIndexes=getInvolvedIndexes(iSchemaClass,searchResult);
+    final List<OIndex<?>> involvedIndexes=new OFilterAnalyzer().getInvolvedIndexes(iSchemaClass,searchResult);
     Collections.sort(involvedIndexes,new IndexComparator());
     for (    final OIndex index : involvedIndexes) {
       if (index.isRebuiding())       continue;
@@ -37,19 +30,9 @@
           keyParams.add(searchResult.lastValue);
         }
       }
-      if (context.isRecordingMetrics()) {
-        Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
-        if (idxNames == null) {
-          idxNames=new HashSet<String>();
-          context.setVariable("involvedIndexes",idxNames);
-        }
-        if (index instanceof OChainedIndexProxy) {
-          idxNames.addAll(((OChainedIndexProxy)index).getIndexNames());
-        }
- else         idxNames.add(index.getName());
-      }
+      metricRecorder.recordInvolvedIndexesMetric(index);
       OIndexCursor cursor;
-      final boolean indexIsUsedInOrderBy=canBeUsedByOrderBy(index) && !(index.getInternal() instanceof OChainedIndexProxy);
+      final boolean indexIsUsedInOrderBy=orderByOptimizer.canBeUsedByOrderBy(index,orderedFields) && !(index.getInternal() instanceof OChainedIndexProxy);
       try {
         boolean ascSortOrder=!indexIsUsedInOrderBy || orderedFields.get(0).getValue().equals(KEYWORD_ASC);
         if (indexIsUsedInOrderBy)         fullySortedByIndex=indexDefinition.getFields().size() >= orderedFields.size();
@@ -61,12 +44,10 @@
         return false;
       }
       if (cursor == null)       continue;
+      filterOptimizer.optimize(compiledFilter,searchResult);
       boolean evaluateRecords=analyzeForFilterOptimization(searchResult);
       fetchValuesFromIndexCursor(cursor,evaluateRecords);
-      if (context.isRecordingMetrics()) {
-        context.setVariable("indexIsUsedInOrderBy",indexIsUsedInOrderBy);
-        context.setVariable("fullySortedByIndex",fullySortedByIndex);
-      }
+      metricRecorder.recordOrderByOptimizationMetric(indexIsUsedInOrderBy,this.fullySortedByIndex);
       return true;
     }
   }

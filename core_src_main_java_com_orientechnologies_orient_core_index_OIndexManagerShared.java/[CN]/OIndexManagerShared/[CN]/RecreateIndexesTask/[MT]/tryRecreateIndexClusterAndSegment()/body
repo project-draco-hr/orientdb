@@ -1,11 +1,18 @@
 {
   try {
-    final int dataId=newDb.getStorage().getDataSegmentIdByName(OMetadataDefault.DATASEGMENT_INDEX_NAME);
-    if (dataId > -1)     newDb.getStorage().dropDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME);
-    final int clusterId=newDb.getStorage().getClusterIdByName(OMetadataDefault.CLUSTER_INDEX_NAME);
-    if (clusterId > -1)     newDb.dropCluster(clusterId,false);
-    newDb.addDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME,null);
-    newDb.getStorage().addCluster(OClusterLocal.TYPE,OMetadataDefault.CLUSTER_INDEX_NAME,null,OMetadataDefault.DATASEGMENT_INDEX_NAME,true);
+    final OStorage storage=newDb.getStorage();
+    storage.callInLock(new Callable<Object>(){
+      @Override public Object call() throws Exception {
+        final int dataId=storage.getDataSegmentIdByName(OMetadataDefault.DATASEGMENT_INDEX_NAME);
+        if (dataId > -1)         storage.dropDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME);
+        final int clusterId=storage.getClusterIdByName(OMetadataDefault.CLUSTER_INDEX_NAME);
+        if (clusterId > -1)         storage.dropCluster(clusterId,false);
+        storage.addDataSegment(OMetadataDefault.DATASEGMENT_INDEX_NAME);
+        storage.addCluster(OClusterLocal.TYPE,OMetadataDefault.CLUSTER_INDEX_NAME,null,OMetadataDefault.DATASEGMENT_INDEX_NAME,true);
+        return null;
+      }
+    }
+,true);
   }
  catch (  IllegalArgumentException ex) {
     OLogManager.instance().info(this,"Creating 'index' data-segment to store all the index content...");

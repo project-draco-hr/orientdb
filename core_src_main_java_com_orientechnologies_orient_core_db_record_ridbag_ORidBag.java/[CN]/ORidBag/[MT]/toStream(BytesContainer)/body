@@ -1,0 +1,44 @@
+{
+  final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+  if (context != null) {
+    if (delegate.size() >= topThreshold && isEmbedded() && ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager() != null) {
+      ORidBagDelegate oldDelegate=delegate;
+      delegate=new OSBTreeRidBag();
+      boolean oldAutoConvert=oldDelegate.isAutoConvertToRecord();
+      oldDelegate.setAutoConvertToRecord(false);
+      for (      OIdentifiable identifiable : oldDelegate)       delegate.add(identifiable);
+      delegate.setOwner(oldDelegate.getOwner());
+      oldDelegate.setAutoConvertToRecord(oldAutoConvert);
+      oldDelegate.requestDelete();
+    }
+ else     if (delegate.size() <= bottomThreshold && !isEmbedded()) {
+      ORidBagDelegate oldDelegate=delegate;
+      boolean oldAutoConvert=oldDelegate.isAutoConvertToRecord();
+      oldDelegate.setAutoConvertToRecord(false);
+      delegate=new OEmbeddedRidBag();
+      for (      OIdentifiable identifiable : oldDelegate)       delegate.add(identifiable);
+      delegate.setOwner(oldDelegate.getOwner());
+      oldDelegate.setAutoConvertToRecord(oldAutoConvert);
+      oldDelegate.requestDelete();
+    }
+  }
+  final UUID oldUuid=uuid;
+  final OSBTreeCollectionManager sbTreeCollectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
+  if (sbTreeCollectionManager != null)   uuid=sbTreeCollectionManager.listenForChanges(this);
+ else   uuid=null;
+  boolean hasUuid=uuid != null;
+  final int serializedSize=OByteSerializer.BYTE_SIZE + delegate.getSerializedSize() + ((hasUuid) ? OUUIDSerializer.UUID_SIZE : 0);
+  short pointer=bytesContainer.alloc((short)serializedSize);
+  int offset=pointer;
+  final byte[] stream=bytesContainer.bytes;
+  byte configByte=0;
+  if (isEmbedded())   configByte|=1;
+  if (hasUuid)   configByte|=2;
+  stream[offset++]=configByte;
+  if (hasUuid) {
+    OUUIDSerializer.INSTANCE.serialize(uuid,stream,offset);
+    offset+=OUUIDSerializer.UUID_SIZE;
+  }
+  delegate.serialize(stream,offset,oldUuid);
+  return pointer;
+}

@@ -1,0 +1,42 @@
+{
+  boolean updated=false;
+  Object fieldValue;
+  for (  OPair<String,Object> entry : addEntries) {
+    Collection<Object> coll=null;
+    ORidBag bag=null;
+    if (!record.containsField(entry.getKey())) {
+      if (record.getSchemaClass() != null) {
+        OProperty prop=record.getSchemaClass().getProperty(entry.getKey());
+        if (prop != null && prop.getType() == OType.LINKSET)         coll=new HashSet<Object>();
+        if (prop != null && prop.getType() == OType.LINKBAG) {
+          bag=new ORidBag();
+          bag.setOwner(record);
+          record.field(entry.getKey(),bag);
+        }
+      }
+      if (coll == null && bag == null)       coll=new ArrayList<Object>();
+      if (coll != null) {
+        Collection<Object> currColl=record.field(entry.getKey());
+        if (currColl == null)         record.field(entry.getKey(),coll);
+ else         coll=currColl;
+      }
+    }
+ else {
+      fieldValue=record.field(entry.getKey());
+      if (fieldValue instanceof Collection<?>)       coll=(Collection<Object>)fieldValue;
+ else       if (fieldValue instanceof ORidBag)       bag=(ORidBag)fieldValue;
+ else       continue;
+    }
+    final Object value=extractValue(record,entry);
+    if (coll != null) {
+      if (value instanceof OIdentifiable)       coll.add(value);
+ else       OMultiValue.add(coll,value);
+    }
+ else {
+      if (!(value instanceof OIdentifiable))       throw new OCommandExecutionException("Only links or records can be added to LINKBAG");
+      bag.add((OIdentifiable)value);
+    }
+    updated=true;
+  }
+  return updated;
+}

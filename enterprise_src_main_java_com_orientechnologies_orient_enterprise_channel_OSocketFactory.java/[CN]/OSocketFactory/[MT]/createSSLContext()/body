@@ -1,0 +1,34 @@
+{
+  try {
+    if (keyStorePath != null && trustStorePath != null) {
+      if (keyStorePassword == null || keyStorePassword.equals("")) {
+        throw new OConfigurationException("Please provide a keystore password");
+      }
+      if (trustStorePassword == null || trustStorePassword.equals("")) {
+        throw new OConfigurationException("Please provide a truststore password");
+      }
+      SSLContext context=SSLContext.getInstance("TLS");
+      KeyManagerFactory kmf=KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+      KeyStore keyStore=KeyStore.getInstance(keyStoreType);
+      char[] keyStorePass=keyStorePassword.toCharArray();
+      keyStore.load(getAsStream(keyStorePath),keyStorePass);
+      kmf.init(keyStore,keyStorePass);
+      TrustManagerFactory tmf=null;
+      if (trustStorePath != null) {
+        tmf=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        KeyStore trustStore=KeyStore.getInstance(trustStoreType);
+        char[] trustStorePass=trustStorePassword.toCharArray();
+        trustStore.load(getAsStream(trustStorePath),trustStorePass);
+        tmf.init(trustStore);
+      }
+      context.init(kmf.getKeyManagers(),(tmf == null ? null : tmf.getTrustManagers()),null);
+      return context;
+    }
+ else {
+      return SSLContext.getDefault();
+    }
+  }
+ catch (  Exception e) {
+    throw new OConfigurationException("Failed to create ssl context",e);
+  }
+}

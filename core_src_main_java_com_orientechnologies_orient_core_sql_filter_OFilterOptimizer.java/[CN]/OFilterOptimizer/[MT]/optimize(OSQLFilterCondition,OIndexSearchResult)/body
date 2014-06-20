@@ -1,0 +1,28 @@
+{
+  OQueryOperator operator=condition.getOperator();
+  while (operator == null) {
+    if (condition.getRight() == null && condition.getLeft() instanceof OSQLFilterCondition) {
+      condition=(OSQLFilterCondition)condition.getLeft();
+      operator=condition.getOperator();
+    }
+ else {
+      return condition;
+    }
+  }
+  final OIndexReuseType reuseType=operator.getIndexReuseType(condition.getLeft(),condition.getRight());
+switch (reuseType) {
+case INDEX_METHOD:
+    if (isCovered(indexMatch,operator,condition.getLeft(),condition.getRight()) || isCovered(indexMatch,operator,condition.getRight(),condition.getLeft())) {
+      return null;
+    }
+  return condition;
+case INDEX_INTERSECTION:
+if (condition.getLeft() instanceof OSQLFilterCondition) condition.setLeft(optimize((OSQLFilterCondition)condition.getLeft(),indexMatch));
+if (condition.getRight() instanceof OSQLFilterCondition) condition.setRight(optimize((OSQLFilterCondition)condition.getRight(),indexMatch));
+if (condition.getLeft() == null) return (OSQLFilterCondition)condition.getRight();
+if (condition.getRight() == null) return (OSQLFilterCondition)condition.getLeft();
+return condition;
+default :
+return condition;
+}
+}

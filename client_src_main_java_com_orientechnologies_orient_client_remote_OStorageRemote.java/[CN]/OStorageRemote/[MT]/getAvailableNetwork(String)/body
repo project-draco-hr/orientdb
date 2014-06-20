@@ -1,14 +1,22 @@
 {
   OChannelBinaryAsynchClient network;
+  String lastURL=iCurrentURL;
   do {
-    network=engine.getConnectionManager().acquire(iCurrentURL,clientConfiguration,connectionOptions,asynchEventListener);
-    if (!network.isConnected()) {
-      OLogManager.instance().error(this,"Removing disconnected network channel '%s'...",iCurrentURL);
+    network=engine.getConnectionManager().acquire(lastURL,clientConfiguration,connectionOptions,asynchEventListener);
+    if (network == null) {
+      lastURL=useNewServerURL(lastURL);
+      if (lastURL == null) {
+        parseServerURLs();
+        throw new OIOException("Cannot open a connection to remote server: " + iCurrentURL);
+      }
+    }
+ else     if (!network.isConnected()) {
+      OLogManager.instance().error(this,"Removing disconnected network channel '%s'...",lastURL);
       engine.getConnectionManager().remove(network);
       network=null;
     }
  else     if (!network.tryLock()) {
-      OLogManager.instance().error(this,"Removing locked network channel '%s'...",iCurrentURL);
+      OLogManager.instance().error(this,"Removing locked network channel '%s'...",lastURL);
       engine.getConnectionManager().remove(network);
       network=null;
     }

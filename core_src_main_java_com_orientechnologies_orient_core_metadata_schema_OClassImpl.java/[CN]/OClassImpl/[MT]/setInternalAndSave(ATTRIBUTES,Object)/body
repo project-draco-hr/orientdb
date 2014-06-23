@@ -2,6 +2,7 @@
   if (attribute == null)   throw new IllegalArgumentException("attribute is null");
   final String stringValue=iValue != null ? iValue.toString() : null;
   final boolean isNull=stringValue == null || stringValue.equalsIgnoreCase("NULL");
+  Object result=null;
 switch (attribute) {
 case NAME:
     setNameInternal(stringValue);
@@ -13,7 +14,10 @@ case SUPERCLASS:
 setSuperClassInternal(isNull ? null : getDatabase().getMetadata().getSchema().getClass(stringValue));
 break;
 case OVERSIZE:
-setOverSizeInternal(Float.parseFloat(stringValue.replace(',','.')));
+final float overSizeValue;
+if (stringValue == null || stringValue.equalsIgnoreCase("null")) overSizeValue=0f;
+ else overSizeValue=Float.parseFloat(stringValue.replace(',','.'));
+setOverSizeInternal(overSizeValue);
 break;
 case STRICTMODE:
 setStrictModeInternal(Boolean.parseBoolean(stringValue));
@@ -23,30 +27,43 @@ setAbstractInternal(Boolean.parseBoolean(stringValue));
 break;
 case ADDCLUSTER:
 {
-int clId=getClusterId(stringValue);
-if (clId == -1) throw new IllegalArgumentException("Cluster id '" + stringValue + "' cannot be added");
+String[] parts=stringValue.split(" ");
+int clId=getClusterId(parts[0]);
+if (clId == NOT_EXISTENT_CLUSTER_ID) {
+try {
+clId=Integer.parseInt(parts[0]);
+throw new IllegalArgumentException("Cluster id '" + stringValue + "' cannot be added");
+}
+ catch (NumberFormatException e) {
+if (parts.length == 1) parts=new String[]{parts[0],getDatabase().getURL().startsWith(OEngineMemory.NAME.toLowerCase()) ? OStorage.CLUSTER_TYPE.MEMORY.toString() : OStorage.CLUSTER_TYPE.PHYSICAL.toString()};
+clId=getDatabase().addCluster(parts[0],OStorage.CLUSTER_TYPE.valueOf(parts[1]));
+}
+}
 addClusterIdInternal(clId);
+result=clId;
 break;
 }
 case REMOVECLUSTER:
 {
 int clId=getClusterId(stringValue);
-if (clId == -1) throw new IllegalArgumentException("Cluster id '" + stringValue + "' cannot be removed");
+if (clId == NOT_EXISTENT_CLUSTER_ID) throw new IllegalArgumentException("Cluster id '" + stringValue + "' cannot be removed");
 removeClusterIdInternal(clId);
 break;
 }
+case CLUSTERSELECTION:
+setClusterSelectionInternal(stringValue);
+break;
 case CUSTOM:
-if (iValue.toString().indexOf("=") == -1) {
-if (iValue.toString().equalsIgnoreCase("clear")) {
-clearCustomInternal();
-}
- else throw new IllegalArgumentException("Syntax error: expected <name> = <value> or clear, instead found: " + iValue);
-}
- else {
+if (isNull || stringValue.equalsIgnoreCase("clear")) clearCustomInternal();
+ else if (stringValue.contains("=")) {
 final List<String> words=OStringSerializerHelper.smartSplit(iValue.toString(),'=');
 setCustomInternal(words.get(0).trim(),words.get(1).trim());
+}
+ else {
+throw new IllegalArgumentException("Syntax error: expected <name> = <value> or clear, instead found: " + iValue);
 }
 break;
 }
 saveInternal();
+return result;
 }

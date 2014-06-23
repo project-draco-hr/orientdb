@@ -1,0 +1,43 @@
+{
+  long totalTime=0;
+  long totalIterations=0;
+  for (int i=0; i < 100; i++) {
+    int upperBorder=keyValues.lastKey() + 5000;
+    int fromKey;
+    if (upperBorder > 0)     fromKey=random.nextInt(upperBorder);
+ else     fromKey=random.nextInt(Integer.MAX_VALUE - 1);
+    if (random.nextBoolean()) {
+      Integer includedKey=keyValues.ceilingKey(fromKey);
+      if (includedKey != null)       fromKey=includedKey;
+ else       fromKey=keyValues.floorKey(fromKey);
+    }
+    int toKey=random.nextInt() + fromKey + 1;
+    if (toKey < 0)     toKey=Integer.MAX_VALUE;
+    if (random.nextBoolean()) {
+      Integer includedKey=keyValues.ceilingKey(toKey);
+      if (includedKey != null)       toKey=includedKey;
+ else       toKey=keyValues.floorKey(toKey);
+    }
+    if (fromKey > toKey)     toKey=fromKey;
+    OSBTree.OSBTreeCursor<Integer,OIdentifiable> cursor=sbTree.iterateEntriesBetween(fromKey,fromInclusive,toKey,toInclusive,ascSortOrder);
+    Iterator<Map.Entry<Integer,ORID>> iterator;
+    if (ascSortOrder)     iterator=keyValues.subMap(fromKey,fromInclusive,toKey,toInclusive).entrySet().iterator();
+ else     iterator=keyValues.descendingMap().subMap(toKey,toInclusive,fromKey,fromInclusive).entrySet().iterator();
+    long startTime=System.currentTimeMillis();
+    int iteration=0;
+    while (iterator.hasNext()) {
+      iteration++;
+      Map.Entry<Integer,OIdentifiable> indexEntry=cursor.next(-1);
+      Assert.assertNotNull(indexEntry);
+      Map.Entry<Integer,ORID> mapEntry=iterator.next();
+      Assert.assertEquals(indexEntry.getKey(),mapEntry.getKey());
+      Assert.assertEquals(indexEntry.getValue(),mapEntry.getValue());
+    }
+    long endTime=System.currentTimeMillis();
+    totalIterations+=iteration;
+    totalTime+=(endTime - startTime);
+    Assert.assertFalse(iterator.hasNext());
+    Assert.assertNull(cursor.next(-1));
+  }
+  if (totalTime != 0)   System.out.println("Iterations per second : " + (totalIterations * 1000) / totalTime);
+}

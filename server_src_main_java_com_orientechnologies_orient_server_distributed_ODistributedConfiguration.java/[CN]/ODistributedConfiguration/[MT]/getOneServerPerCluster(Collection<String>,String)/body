@@ -1,0 +1,24 @@
+{
+synchronized (configuration) {
+    if (iClusterNames == null || iClusterNames.isEmpty())     iClusterNames=Collections.singleton("*");
+    final Set<String> partitions=new HashSet<String>(iClusterNames.size());
+    for (    String p : iClusterNames) {
+      final ODocument partition=getClusterConfiguration(p);
+      if (partition == null)       return null;
+      final List<String> serverList=partition.field("servers");
+      if (serverList != null) {
+        boolean localNodeFound=false;
+        for (        String s : serverList)         if (s.equals(iLocalNode)) {
+          partitions.add(s);
+          localNodeFound=true;
+          break;
+        }
+        if (!localNodeFound)         for (        String s : serverList)         if (!s.equals(NEW_NODE_TAG)) {
+          partitions.add(s);
+          break;
+        }
+      }
+    }
+    return partitions;
+  }
+}

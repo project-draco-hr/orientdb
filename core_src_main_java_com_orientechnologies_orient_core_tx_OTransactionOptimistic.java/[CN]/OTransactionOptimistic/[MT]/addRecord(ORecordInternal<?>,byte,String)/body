@@ -2,14 +2,17 @@
   checkTransaction();
 switch (iStatus) {
 case ORecordOperation.CREATED:
-    database.callbackHooks(TYPE.BEFORE_CREATE,iRecord);
-  break;
+    database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
+  database.callbackHooks(TYPE.BEFORE_CREATE,iRecord);
+break;
 case ORecordOperation.LOADED:
 break;
 case ORecordOperation.UPDATED:
+database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
 database.callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
 break;
 case ORecordOperation.DELETED:
+database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_DELETE,iClusterName);
 database.callbackHooks(TYPE.BEFORE_DELETE,iRecord);
 break;
 }
@@ -19,7 +22,9 @@ if ((status == OTransaction.TXSTATUS.COMMITTING) && database.getStorage() instan
 switch (iStatus) {
 case ORecordOperation.CREATED:
 case ORecordOperation.UPDATED:
-database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),iRecord.getRecordType(),false,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+final ORID oldRid=iRecord.getIdentity().copy();
+database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),false,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+updateIdentityAfterCommit(oldRid,iRecord.getIdentity());
 break;
 case ORecordOperation.DELETED:
 database.executeDeleteRecord(iRecord,iRecord.getRecordVersion(),false,false,OPERATION_MODE.SYNCHRONOUS,false);
@@ -41,10 +46,16 @@ final ORecordId rid=(ORecordId)iRecord.getIdentity();
 if (!rid.isValid()) {
 iRecord.onBeforeIdentityChanged(rid);
 if (rid.clusterId == ORID.CLUSTER_ID_INVALID) rid.clusterId=iClusterName != null ? database.getClusterIdByName(iClusterName) : database.getDefaultClusterId();
+if (database.getStorageVersions().classesAreDetectedByClusterId() && iRecord instanceof ORecordSchemaAwareAbstract) {
+final ORecordSchemaAwareAbstract recordSchemaAware=(ORecordSchemaAwareAbstract)iRecord;
+final OClass recordClass=recordSchemaAware.getSchemaClass();
+final OClass clusterIdClass=database.getMetadata().getSchema().getClassByClusterId(rid.clusterId);
+if (recordClass == null && clusterIdClass != null || clusterIdClass == null && recordClass != null || (recordClass != null && !recordClass.equals(clusterIdClass))) throw new OSchemaException("Record saved into cluster " + iClusterName + " should be saved with class "+ clusterIdClass+ " but saved with class "+ recordClass);
+}
 rid.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(newObjectCounter--);
 iRecord.onAfterIdentityChanged(iRecord);
 }
- else database.getLevel1Cache().freeRecord(rid);
+ else database.getLocalCache().freeRecord(rid);
 ORecordOperation txEntry=getRecordEntry(rid);
 if (txEntry == null) {
 if (!(rid.isTemporary() && iStatus != ORecordOperation.CREATED)) {

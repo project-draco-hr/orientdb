@@ -1,0 +1,46 @@
+{
+  checkOpeness();
+  if (!rid.isPersistent())   throw new IllegalArgumentException("Cannot read record " + rid + " since the position is invalid in database '"+ name+ '\'');
+  final long timer=Orient.instance().getProfiler().startChrono();
+  clusterSegment.getExternalModificationLock().requestModificationLock();
+  try {
+    if (atomicLock)     lock.acquireSharedLock();
+    try {
+switch (iLockingStrategy) {
+case DEFAULT:
+case KEEP_SHARED_LOCK:
+        rid.lock(false);
+      break;
+case NONE:
+    break;
+case KEEP_EXCLUSIVE_LOCK:
+  rid.lock(true);
+}
+try {
+return clusterSegment.readRecord(rid.clusterPosition);
+}
+  finally {
+switch (iLockingStrategy) {
+case DEFAULT:
+  rid.unlock();
+break;
+case KEEP_EXCLUSIVE_LOCK:
+case NONE:
+case KEEP_SHARED_LOCK:
+break;
+}
+}
+}
+ catch (IOException e) {
+OLogManager.instance().error(this,"Error on reading record " + rid + " (cluster: "+ clusterSegment+ ')',e);
+return null;
+}
+ finally {
+if (atomicLock) lock.releaseSharedLock();
+}
+}
+  finally {
+clusterSegment.getExternalModificationLock().releaseModificationLock();
+Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+}
+}

@@ -1,37 +1,32 @@
 {
-  final OSchemaShared me=this;
-  getDatabase().getStorage().callInLock(new Callable<Object>(){
-    @Override public Object call() throws Exception {
-      final Integer schemaVersion=(Integer)document.field("schemaVersion");
-      if (schemaVersion == null) {
-        OLogManager.instance().error(this,"Database's schema is empty! Recreating the system classes and allow the opening of the database but double check the integrity of the database");
-        return null;
-      }
- else       if (schemaVersion.intValue() != CURRENT_VERSION_NUMBER) {
-        throw new OConfigurationException("Database schema is different. Please export your old database with the previous version of OrientDB and reimport it using the current one.");
-      }
-      classes.clear();
-      OClassImpl cls;
-      Collection<ODocument> storedClasses=document.field("classes");
-      for (      ODocument c : storedClasses) {
-        cls=new OClassImpl(me,c);
-        cls.fromStream();
-        classes.put(cls.getName().toLowerCase(),cls);
-        if (cls.getShortName() != null)         classes.put(cls.getShortName().toLowerCase(),cls);
-      }
-      String superClassName;
-      OClass superClass;
-      for (      ODocument c : storedClasses) {
-        superClassName=c.field("superClass");
-        if (superClassName != null) {
-          cls=(OClassImpl)classes.get(((String)c.field("name")).toLowerCase());
-          superClass=classes.get(superClassName.toLowerCase());
-          if (superClass == null)           throw new OConfigurationException("Super class '" + superClassName + "' was declared in class '"+ cls.getName()+ "' but was not found in schema. Remove the dependency or create the class to continue.");
-          cls.setSuperClassInternal(superClass);
-        }
-      }
-      return null;
+  final Integer schemaVersion=(Integer)document.field("schemaVersion");
+  if (schemaVersion == null) {
+    OLogManager.instance().error(this,"Database's schema is empty! Recreating the system classes and allow the opening of the database but double check the integrity of the database");
+    return;
+  }
+ else   if (schemaVersion != CURRENT_VERSION_NUMBER) {
+    throw new OConfigurationException("Database schema is different. Please export your old database with the previous version of OrientDB and reimport it using the current one.");
+  }
+  classes.clear();
+  clustersToClasses.clear();
+  OClassImpl cls;
+  Collection<ODocument> storedClasses=document.field("classes");
+  for (  ODocument c : storedClasses) {
+    cls=new OClassImpl(this,c);
+    cls.fromStream();
+    classes.put(cls.getName().toLowerCase(),cls);
+    if (cls.getShortName() != null)     classes.put(cls.getShortName().toLowerCase(),cls);
+    addClusterClassMap(cls);
+  }
+  String superClassName;
+  OClass superClass;
+  for (  ODocument c : storedClasses) {
+    superClassName=c.field("superClass");
+    if (superClassName != null) {
+      cls=(OClassImpl)classes.get(((String)c.field("name")).toLowerCase());
+      superClass=classes.get(superClassName.toLowerCase());
+      if (superClass == null)       throw new OConfigurationException("Super class '" + superClassName + "' was declared in class '"+ cls.getName()+ "' but was not found in schema. Remove the dependency or create the class to continue.");
+      cls.setSuperClassInternal(superClass);
     }
   }
-,true);
 }

@@ -1,36 +1,68 @@
 {
   if (fromExpr == null && toExpr == null && rid == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
-  if (rid != null) {
-    final OrientEdge e=graph.getEdge(rid);
-    if (e != null) {
-      e.remove();
-      removed=1;
-    }
-  }
- else {
-    final Set<OrientEdge> edges=new HashSet<OrientEdge>();
-    if (query == null) {
-      Set<ORID> fromIds=null;
-      if (fromExpr != null)       fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr);
-      Set<ORID> toIds=null;
-      if (toExpr != null)       toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),toExpr);
-      if (fromIds != null && toIds != null) {
-        for (        ORID fromId : fromIds)         for (        Edge e : graph.getVertex(fromId).getEdges(Direction.OUT))         if (toIds.contains(((OrientEdge)e).getInVertex().getIdentity()))         edges.add((OrientEdge)e);
+  for (int r=0; r < retry; ++r) {
+    try {
+      if (rid != null) {
+        OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+          @Override public Object call(          OrientBaseGraph graph){
+            final OrientEdge e=graph.getEdge(rid);
+            if (e != null) {
+              e.remove();
+              removed=1;
+            }
+            return null;
+          }
+        }
+);
       }
- else       if (fromIds != null)       for (      ORID fromId : fromIds)       edges.add((OrientEdge)graph.getVertex(fromId).getEdges(Direction.OUT));
- else       if (toIds != null)       for (      ORID toId : toIds)       edges.add((OrientEdge)graph.getVertex(toId).getEdges(Direction.IN));
- else       throw new OCommandExecutionException("Invalid target");
-      if (compiledFilter != null) {
-        for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
-          final OrientEdge edge=it.next();
-          if (!(Boolean)compiledFilter.evaluate((ODocument)edge.getRecord(),null,context))           it.remove();
+ else {
+        final Set<OrientEdge> edges=new HashSet<OrientEdge>();
+        if (query == null) {
+          OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+            @Override public Object call(            OrientBaseGraph graph){
+              Set<OIdentifiable> fromIds=null;
+              if (fromExpr != null)               fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr,context);
+              Set<OIdentifiable> toIds=null;
+              if (toExpr != null)               toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),toExpr,context);
+              if (fromIds != null && toIds != null) {
+                for (                OIdentifiable fromId : fromIds)                 for (                Edge e : graph.getVertex(fromId).getEdges(Direction.OUT))                 if (toIds.contains(((OrientEdge)e).getInVertex().getIdentity()))                 edges.add((OrientEdge)e);
+              }
+ else               if (fromIds != null)               for (              OIdentifiable fromId : fromIds)               edges.add((OrientEdge)graph.getVertex(fromId).getEdges(Direction.OUT));
+ else               if (toIds != null)               for (              OIdentifiable toId : toIds)               edges.add((OrientEdge)graph.getVertex(toId).getEdges(Direction.IN));
+ else               throw new OCommandExecutionException("Invalid target");
+              if (compiledFilter != null) {
+                for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
+                  final OrientEdge edge=it.next();
+                  if (!(Boolean)compiledFilter.evaluate((ODocument)edge.getRecord(),null,context))                   it.remove();
+                }
+              }
+              removed=edges.size();
+              for (              OrientEdge edge : edges)               edge.remove();
+              return null;
+            }
+          }
+);
+        }
+ else {
+          graph=OGraphCommandExecutorSQLFactory.getGraph(false);
+          OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+            @Override public Object call(            OrientBaseGraph graph){
+              return query.execute(iArgs);
+            }
+          }
+);
         }
       }
-      removed=edges.size();
-      for (      OrientEdge edge : edges)       edge.remove();
+      break;
     }
- else     query.execute(iArgs);
+ catch (    OConcurrentModificationException e) {
+      if (r + 1 >= retry)       throw e;
+      if (wait > 0)       try {
+        Thread.sleep(wait);
+      }
+ catch (      InterruptedException e1) {
+      }
+    }
   }
   return removed;
 }

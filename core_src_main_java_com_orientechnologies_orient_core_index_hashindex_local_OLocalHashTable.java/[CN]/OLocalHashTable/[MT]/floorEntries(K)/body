@@ -1,29 +1,30 @@
 {
   acquireSharedLock();
   try {
+    key=keySerializer.preprocess(key,(Object[])keyTypes);
     final long hashCode=keyHashFunction.hashCode(key);
     BucketPath bucketPath=getBucket(hashCode);
-    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
     int fileLevel=getFileLevel(bucketPointer);
     long pageIndex=getPageIndex(bucketPointer);
     OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
     OCachePointer pagePointer=cacheEntry.getCachePointer();
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),directMemory,keySerializer,valueSerializer);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
       while (bucket.size() == 0) {
         final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
         if (prevBucketPath == null)         return new OHashIndexBucket.Entry[0];
         diskCache.release(cacheEntry);
-        final long prevPointer=hashTree[prevBucketPath.nodeIndex][prevBucketPath.itemIndex + prevBucketPath.hashMapOffset];
+        final long prevPointer=directory.getNodePointer(prevBucketPath.nodeIndex,prevBucketPath.itemIndex + prevBucketPath.hashMapOffset);
         fileLevel=getFileLevel(prevPointer);
         pageIndex=getPageIndex(prevPointer);
         cacheEntry=loadPageEntry(pageIndex,fileLevel);
         pagePointer=cacheEntry.getCachePointer();
-        bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),directMemory,keySerializer,valueSerializer);
+        bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
         bucketPath=prevBucketPath;
       }
       final int startIndex=0;
-      final int index=bucket.getIndex(key);
+      final int index=bucket.getIndex(hashCode,key);
       final int endIndex;
       if (index >= 0)       endIndex=index + 1;
  else       endIndex=-index - 1;

@@ -1,11 +1,15 @@
 {
   if (isClosed())   return;
+  checkOpeness();
+  if (ownerPool.getConnectionsInCurrentThread(getURL(),userName) > 1) {
+    ownerPool.release(this);
+    return;
+  }
   objects2Records.clear();
   records2Objects.clear();
   rid2Records.clear();
-  checkOpeness();
   try {
-    rollback();
+    commit(true);
   }
  catch (  Exception e) {
     OLogManager.instance().error(this,"Error on releasing database '%s' in pool",e,getName());
@@ -18,7 +22,7 @@
  catch (  Exception e) {
     OLogManager.instance().error(this,"Error on releasing database '%s' in pool",e,getName());
   }
-  getLevel1Cache().clear();
+  getLocalCache().clear();
   if (ownerPool != null) {
     final OObjectDatabasePool localCopy=ownerPool;
     ownerPool=null;

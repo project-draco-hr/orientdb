@@ -1,31 +1,47 @@
 {
+  content=compression.compress(content);
   externalModificationLock.requestModificationLock();
   try {
     acquireExclusiveLock();
     try {
-      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+      if (positionEntry == null)       return;
       int recordPosition=positionEntry.getRecordPosition();
       long pageIndex=positionEntry.getPageIndex();
       long pagePointer=createPagePointer(pageIndex,recordPosition);
       byte[] fullEntryContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
       if (fullEntryContent == null)       return;
-      content=compression.compress(content);
+      if (useCRC32) {
+        CRC32 crc32=new CRC32();
+        final int crcPosition=fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE- OIntegerSerializer.INT_SIZE;
+        crc32.update(fullEntryContent,0,crcPosition);
+        final int crc=OIntegerSerializer.INSTANCE.deserializeNative(fullEntryContent,crcPosition);
+        if (crc != (int)crc32.getValue())         throw new OStorageException("Content of record for cluster with id " + id + " and position "+ clusterPosition+ " is broken.");
+      }
       int updatedContentLength=content.length + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
+      if (useCRC32)       updatedContentLength+=OIntegerSerializer.INT_SIZE;
       byte[] recordEntry;
       if (updatedContentLength <= fullEntryContent.length)       recordEntry=new byte[fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE];
  else {
-        int grownContent=(int)(content.length * config.recordOverflowGrowFactor);
-        recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
+        final int grownContent=(int)(content.length * config.recordOverflowGrowFactor);
+        if (!useCRC32)         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
+ else         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + 2 * OIntegerSerializer.INT_SIZE];
       }
       final OClusterPage.TrackMode trackMode=getTrackMode();
-      startDurableOperation(transaction);
+      startAtomicOperation();
+      lockTillAtomicOperationCompletes();
       int entryPosition=0;
       recordEntry[entryPosition]=recordType;
       entryPosition++;
       OIntegerSerializer.INSTANCE.serializeNative(content.length,recordEntry,entryPosition);
       entryPosition+=OIntegerSerializer.INT_SIZE;
       System.arraycopy(content,0,recordEntry,entryPosition,content.length);
+      if (useCRC32) {
+        CRC32 crc32=new CRC32();
+        final int crcPosition=recordEntry.length - OIntegerSerializer.INT_SIZE;
+        crc32.update(recordEntry,0,crcPosition);
+        OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),recordEntry,crcPosition);
+      }
       int recordsSizeDiff=0;
       long prevPageRecordPointer=-1;
       int currentPos=0;
@@ -40,9 +56,8 @@
           final OClusterPage localPage=new OClusterPage(dataPointer.getDataPointer(),false,trackMode);
           int freeSpace=localPage.getFreeSpace();
           freePageIndex=calculateFreePageIndex(localPage);
-          int recordPageOffset=localPage.getRecordPageOffset(recordPosition);
-          int chunkSize=localPage.getRecordSize(recordPosition);
-          long nextPagePointer=localPage.getLongValue(recordPageOffset + +chunkSize - OLongSerializer.LONG_SIZE);
+          final int chunkSize=localPage.getRecordSize(recordPosition);
+          final long nextPagePointer=localPage.getRecordLongValue(recordPosition,-OLongSerializer.LONG_SIZE);
           int newChunkLen=Math.min(recordEntry.length - currentPos + OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE,chunkSize);
           int dataLen=newChunkLen - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
           byte[] newRecordChunk=new byte[newChunkLen];
@@ -58,9 +73,7 @@
             prevPageMemoryPointer.acquireExclusiveLock();
             try {
               final OClusterPage prevPage=new OClusterPage(prevPageMemoryPointer.getDataPointer(),false,trackMode);
-              int prevRecordPageOffset=prevPage.getRecordPageOffset(prevPageRecordPosition);
-              int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
-              prevPage.setLongValue(prevRecordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,pagePointer);
+              prevPage.setRecordLongValue(prevPageRecordPosition,-OLongSerializer.LONG_SIZE,pagePointer);
               logPageChanges(prevPage,fileId,prevPageIndex,false);
               prevPageCacheEntry.markDirty();
             }
@@ -103,9 +116,7 @@
           prevPageMemoryPointer.acquireExclusiveLock();
           try {
             final OClusterPage prevPage=new OClusterPage(prevPageMemoryPointer.getDataPointer(),false,trackMode);
-            int recordPageOffset=prevPage.getRecordPageOffset(prevPageRecordPosition);
-            int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
-            prevPage.setLongValue(recordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,addedPagePointer);
+            prevPage.setRecordLongValue(prevPageRecordPosition,-OLongSerializer.LONG_SIZE,addedPagePointer);
             logPageChanges(prevPage,fileId,prevPageIndex,false);
             prevPageCacheEntry.markDirty();
           }
@@ -120,7 +131,7 @@
         if (to > recordEntry.length)         to=recordEntry.length;
       }
       updateClusterState(trackMode,0,recordsSizeDiff);
-      endDurableOperation(transaction,false);
+      endAtomicOperation(false);
     }
   finally {
       releaseExclusiveLock();

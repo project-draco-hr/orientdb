@@ -1,10 +1,9 @@
 {
-  checkConnection();
   if (iMode == 1 && iCallback == null)   iMode=2;
-  OChannelBinaryClient lastNetworkUsed=null;
+  OChannelBinaryAsynchClient lastNetworkUsed=null;
   do {
     try {
-      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
+      final OChannelBinaryAsynchClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
       lastNetworkUsed=network;
       try {
         network.writeRID(iRid);
@@ -20,41 +19,43 @@ switch (iMode) {
 case 0:
         try {
           beginResponse(network);
-          return new OStorageOperationResult<ORecordVersion>(network.readVersion());
+          OStorageOperationResult<ORecordVersion> r=new OStorageOperationResult<ORecordVersion>(network.readVersion());
+          readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
+          return r;
         }
   finally {
           endResponse(network);
         }
 case 1:
-      if (iCallback != null) {
-        final int sessionId=getSessionId();
-        Callable<Object> response=new Callable<Object>(){
-          public Object call() throws Exception {
-            ORecordVersion result;
-            try {
-              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
-              beginResponse(network);
-              result=network.readVersion();
-            }
-  finally {
-              endResponse(network);
-              OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
-            }
-            iCallback.call(iRid,result);
-            return null;
-          }
-        }
-;
-        asynchExecutor.submit(new FutureTask<Object>(response));
+      final int sessionId=getSessionId();
+    final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
+  Callable<Object> response=new Callable<Object>(){
+    public Object call() throws Exception {
+      ORecordVersion result;
+      try {
+        OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
+        beginResponse(network);
+        result=network.readVersion();
+        if (network.getSrvProtocolVersion() >= 20)         readCollectionChanges(network,collectionManager);
       }
+  finally {
+        endResponse(network);
+        OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
+      }
+      iCallback.call(iRid,result);
+      return null;
+    }
   }
-  return new OStorageOperationResult<ORecordVersion>(iVersion);
+;
+asynchExecutor.submit(new FutureTask<Object>(response));
+}
+return new OStorageOperationResult<ORecordVersion>(iVersion);
 }
  catch (OModificationOperationProhibitedException mope) {
-  handleDBFreeze();
+handleDBFreeze();
 }
 catch (Exception e) {
-  handleException(lastNetworkUsed,"Error on update record " + iRid,e);
+handleException(lastNetworkUsed,"Error on update record " + iRid,e);
 }
 }
  while (true);

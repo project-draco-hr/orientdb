@@ -1,0 +1,17 @@
+{
+  OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+  try {
+    OChannelBinaryAsynchClient client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_FIRST_KEY);
+    OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
+    storage.endRequest(client);
+    storage.beginResponse(client);
+    byte[] stream=client.readBytes();
+    storage.endResponse(client);
+    final byte serializerId=OByteSerializer.INSTANCE.deserialize(stream,0);
+    final OBinarySerializer<K> serializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
+    return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
+  }
+ catch (  IOException e) {
+    throw new ODatabaseException("Can't get first key from sb-tree bonsai.",e);
+  }
+}

@@ -1,0 +1,22 @@
+{
+  if (remoteCreationAllowed) {
+    OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+    try {
+      OChannelBinaryAsynchClient client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI);
+      client.writeInt(clusterId);
+      storage.endRequest(client);
+      storage.beginResponse(client);
+      OBonsaiCollectionPointer pointer=networkSerializer.readCollectionPointer(client);
+      storage.endResponse(client);
+      OBinarySerializer<OIdentifiable> keySerializer=OLinkSerializer.INSTANCE;
+      OBinarySerializer<Integer> valueSerializer=OIntegerSerializer.INSTANCE;
+      return new OSBTreeBonsaiRemote<OIdentifiable,Integer>(pointer,keySerializer,valueSerializer);
+    }
+ catch (    IOException e) {
+      throw new ODatabaseException("Can't create sb-tree bonsai.",e);
+    }
+  }
+ else {
+    throw new UnsupportedOperationException("Creation of SB-Tree from remote storage is not allowed");
+  }
+}

@@ -1,14 +1,15 @@
 {
+  content=compression.compress(content);
   externalModificationLock.requestModificationLock();
   try {
     acquireExclusiveLock();
     try {
-      final OStorageTransaction transaction=storageLocal.getStorageTransaction();
-      content=compression.compress(content);
       int grownContentSize=(int)(config.recordGrowFactor * content.length);
       int entryContentLength=grownContentSize + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE;
+      if (useCRC32)       entryContentLength+=OIntegerSerializer.INT_SIZE;
       if (entryContentLength < OClusterPage.MAX_RECORD_SIZE) {
-        startDurableOperation(transaction);
+        startAtomicOperation();
+        lockTillAtomicOperationCompletes();
         byte[] entryContent=new byte[entryContentLength];
         int entryPosition=0;
         entryContent[entryPosition]=recordType;
@@ -17,20 +18,28 @@
         entryPosition+=OIntegerSerializer.INT_SIZE;
         System.arraycopy(content,0,entryContent,entryPosition,content.length);
         entryPosition+=grownContentSize;
+        if (useCRC32) {
+          CRC32 crc32=new CRC32();
+          crc32.update(entryContent,0,entryPosition);
+          OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),entryContent,entryPosition);
+          entryPosition+=OIntegerSerializer.INT_SIZE;
+        }
         entryContent[entryPosition]=1;
         entryPosition++;
         OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryPosition);
         ODurablePage.TrackMode trackMode=getTrackMode();
         final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,trackMode);
         updateClusterState(trackMode,1,addEntryResult.recordsSizeDiff);
-        final OClusterPosition clusterPosition=clusterPositionMap.add(addEntryResult.pageIndex,addEntryResult.pagePosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-        endDurableOperation(transaction,false);
+        final OClusterPosition clusterPosition=clusterPositionMap.add(addEntryResult.pageIndex,addEntryResult.pagePosition);
+        endAtomicOperation(false);
         return createPhysicalPosition(recordType,clusterPosition,addEntryResult.recordVersion);
       }
  else {
-        startDurableOperation(transaction);
+        startAtomicOperation();
+        lockTillAtomicOperationCompletes();
         final OClusterPage.TrackMode trackMode=getTrackMode();
         int entrySize=grownContentSize + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
+        if (useCRC32)         entrySize+=OIntegerSerializer.INT_SIZE;
         int fullEntryPosition=0;
         byte[] fullEntry=new byte[entrySize];
         fullEntry[fullEntryPosition]=recordType;
@@ -38,6 +47,12 @@
         OIntegerSerializer.INSTANCE.serializeNative(content.length,fullEntry,fullEntryPosition);
         fullEntryPosition+=OIntegerSerializer.INT_SIZE;
         System.arraycopy(content,0,fullEntry,fullEntryPosition,content.length);
+        fullEntryPosition+=grownContentSize;
+        if (useCRC32) {
+          CRC32 crc32=new CRC32();
+          crc32.update(fullEntry,0,fullEntryPosition);
+          OIntegerSerializer.INSTANCE.serializeNative((int)crc32.getValue(),fullEntry,fullEntryPosition);
+        }
         long prevPageRecordPointer=-1;
         long firstPageIndex=-1;
         int firstPagePosition=-1;
@@ -67,9 +82,7 @@
             prevPageMemoryPointer.acquireExclusiveLock();
             try {
               final OClusterPage prevPage=new OClusterPage(prevPageMemoryPointer.getDataPointer(),false,ODurablePage.TrackMode.FULL);
-              int prevRecordPageOffset=prevPage.getRecordPageOffset(prevPageRecordPosition);
-              int prevPageRecordSize=prevPage.getRecordSize(prevPageRecordPosition);
-              prevPage.setLongValue(prevRecordPageOffset + prevPageRecordSize - OLongSerializer.LONG_SIZE,addedPagePointer);
+              prevPage.setRecordLongValue(prevPageRecordPosition,-OLongSerializer.LONG_SIZE,addedPagePointer);
               logPageChanges(prevPage,fileId,prevPageIndex,false);
               prevPageCacheEntry.markDirty();
             }
@@ -85,8 +98,8 @@
         }
  while (from < to);
         updateClusterState(trackMode,1,recordsSizeDiff);
-        OClusterPosition clusterPosition=clusterPositionMap.add(firstPageIndex,firstPagePosition,getCurrentOperationUnitId(),getStartLSN(),trackMode);
-        endDurableOperation(transaction,false);
+        OClusterPosition clusterPosition=clusterPositionMap.add(firstPageIndex,firstPagePosition);
+        endAtomicOperation(false);
         return createPhysicalPosition(recordType,clusterPosition,version);
       }
     }

@@ -1,0 +1,34 @@
+{
+  if (iKey.equals("@class"))   return getVerticesOfClass(iValue.toString());
+  String indexName;
+  final String key;
+  int pos=iKey.indexOf('.');
+  if (pos > -1) {
+    indexName=iKey;
+    final String className=iKey.substring(0,pos);
+    key=iKey.substring(iKey.indexOf('.') + 1);
+    final OClass clazz=getContext(true).rawGraph.getMetadata().getSchema().getClass(className);
+    final Collection<? extends OIndex<?>> indexes=clazz.getIndexes();
+    for (    OIndex<?> index : indexes) {
+      final String oInName=index.getName();
+      final int point=oInName.indexOf(".");
+      final String okey=oInName.substring(point + 1);
+      if (okey.equals(key)) {
+        indexName=oInName;
+        break;
+      }
+    }
+  }
+ else {
+    indexName=OrientVertexType.CLASS_NAME + "." + iKey;
+    key=iKey;
+  }
+  final OIndex<?> idx=getContext(true).rawGraph.getMetadata().getIndexManager().getIndex(indexName);
+  if (idx != null) {
+    iValue=convertKey(idx,iValue);
+    Object indexValue=idx.get(iValue);
+    if (indexValue != null && !(indexValue instanceof Iterable<?>))     indexValue=Arrays.asList(indexValue);
+    return new OrientElementIterable<Vertex>(this,(Iterable<?>)indexValue);
+  }
+  return query().has(key,iValue).vertices();
+}

@@ -43,13 +43,15 @@
           for (          ODocument idx : idxs) {
             try {
               String indexType=idx.field(OIndexInternal.CONFIG_TYPE);
-              String alghorithm=idx.field(OIndexInternal.ALGORITHM);
+              String algorithm=idx.field(OIndexInternal.ALGORITHM);
+              String valueContainerAlgorithm=idx.field(OIndexInternal.VALUE_CONTAINER_ALGORITHM);
+              ODocument metadata=idx.field(OIndexInternal.METADATA);
               if (indexType == null) {
                 OLogManager.instance().error(this,"Index type is null, will process other record.");
                 errors++;
                 continue;
               }
-              final OIndexInternal<?> index=OIndexes.createIndex(newDb,indexType,alghorithm);
+              final OIndexInternal<?> index=OIndexes.createIndex(newDb,indexType,algorithm,valueContainerAlgorithm,metadata);
               OIndexInternal.IndexMetadata indexMetadata=index.loadMetadata(idx);
               OIndexDefinition indexDefinition=indexMetadata.getIndexDefinition();
               if (indexDefinition == null || !indexDefinition.isAutomatic()) {
@@ -57,7 +59,6 @@
                 if (index.loadFromConfiguration(idx)) {
                   addIndexInternal(index);
                   setDirty();
-                  save();
                   ok++;
                 }
  else {
@@ -73,6 +74,7 @@
                 String type=indexMetadata.getType();
                 if (indexName != null && indexDefinition != null && clusters != null && !clusters.isEmpty() && type != null) {
                   OLogManager.instance().info(this,"Start creation of index %s",indexName);
+                  if (ODefaultIndexFactory.SBTREE_ALGORITHM.equals(algorithm) || indexType.endsWith("HASH_INDEX"))                   index.deleteWithoutIndexLoad(indexName);
                   index.create(indexName,indexDefinition,defaultClusterName,clusters,false,new OIndexRebuildOutputListener(index));
                   index.setRebuildingFlag();
                   addIndexInternal(index);
@@ -80,7 +82,6 @@
                   index.rebuild(new OIndexRebuildOutputListener(index));
                   index.flush();
                   setDirty();
-                  save();
                   ok++;
                   OLogManager.instance().info(this,"Rebuild of %s index was successfully finished.",indexName);
                 }
@@ -91,24 +92,30 @@
               }
             }
  catch (            Exception e) {
-              OLogManager.instance().error(this,"Error during addition of index %s",idx);
+              OLogManager.instance().error(this,"Error during addition of index %s",e,idx);
               errors++;
             }
           }
+          save();
+          final OStorage storage=newDb.getStorage();
+          if (OGlobalConfiguration.INDEX_FLUSH_AFTER_CREATE.getValueAsBoolean())           storage.synch();
           rebuildCompleted=true;
-          newDb.close();
           OLogManager.instance().info(this,"%d indexes were restored successfully, %d errors",ok,errors);
         }
  catch (        Exception e) {
-          OLogManager.instance().error(this,"Error when attempt to restore indexes after crash was performed.");
+          OLogManager.instance().error(this,"Error when attempt to restore indexes after crash was performed.",e);
         }
       }
     }
 ;
-    recreateIndexesThread=new Thread(recreateIndexesTask);
+    recreateIndexesThread=new Thread(recreateIndexesTask,"OrientDB rebuild indexes");
     recreateIndexesThread.start();
   }
   finally {
     releaseExclusiveLock();
+  }
+  if (OGlobalConfiguration.INDEX_SYNCHRONOUS_AUTO_REBUILD.getValueAsBoolean()) {
+    waitTillIndexRestore();
+    getDatabase().getMetadata().reload();
   }
 }

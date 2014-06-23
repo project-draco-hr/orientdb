@@ -26,7 +26,9 @@ case LINKLIST:
       final ORecordLazyList coll;
       final Iterator<OIdentifiable> it;
       if (iValue instanceof OMultiCollectionIterator<?>) {
-        it=(Iterator<OIdentifiable>)iValue;
+        final OMultiCollectionIterator<OIdentifiable> iterator=(OMultiCollectionIterator<OIdentifiable>)iValue;
+        iterator.reset();
+        it=iterator;
         coll=null;
       }
  else       if (!(iValue instanceof ORecordLazyList)) {
@@ -72,14 +74,13 @@ case LINKLIST:
   }
 case LINKSET:
 {
-  final OMVRBTreeRIDSet coll;
+  final OStringBuilderSerializable coll;
   if (!(iValue instanceof OMVRBTreeRIDSet)) {
     coll=new OMVRBTreeRIDSet(iRecord,(Collection<OIdentifiable>)iValue);
-    ((Collection<? extends OIdentifiable>)iValue).clear();
     iRecord.field(iName,coll);
   }
- else   coll=(OMVRBTreeRIDSet)iValue;
-  linkSetToStream(iOutput,iRecord,coll);
+ else   coll=(OStringBuilderSerializable)iValue;
+  coll.toStream(iOutput);
   PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.linkSet2string"),"Serialize linkset to string",timer);
   break;
 }
@@ -122,6 +123,13 @@ iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
 toString((ORecordInternal<?>)iValue,iOutput,null,iObjHandler,iMarshalledRecords,false,true);
 iOutput.append(OStringSerializerHelper.EMBEDDED_END);
 }
+ else if (iValue instanceof ODocumentSerializable) {
+final ODocument doc=((ODocumentSerializable)iValue).toDocument();
+doc.field(ODocumentSerializable.CLASS_NAME,iValue.getClass().getName());
+iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+toString(doc,iOutput,null,iObjHandler,iMarshalledRecords,false,true);
+iOutput.append(OStringSerializerHelper.EMBEDDED_END);
+}
  else if (iValue != null) iOutput.append(iValue.toString());
 PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embed2string"),"Serialize embedded to string",timer);
 break;
@@ -137,6 +145,13 @@ case EMBEDDEDMAP:
 {
 embeddedMapToStream(null,iObjHandler,iOutput,iLinkedClass,iLinkedType,iValue,iMarshalledRecords,iSaveOnlyDirty);
 PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedMap2string"),"Serialize embeddedmap to string",timer);
+break;
+}
+case LINKBAG:
+{
+iOutput.append(OStringSerializerHelper.BAG_BEGIN);
+((ORidBag)iValue).toStream(iOutput);
+iOutput.append(OStringSerializerHelper.BAG_END);
 break;
 }
 default :

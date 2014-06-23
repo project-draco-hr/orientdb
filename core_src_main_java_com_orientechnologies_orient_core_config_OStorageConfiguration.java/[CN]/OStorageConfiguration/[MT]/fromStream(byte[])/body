@@ -17,7 +17,7 @@
   }
   if (version > 1)   index=phySegmentFromStream(values,index,fileTemplate);
   int size=Integer.parseInt(read(values[index++]));
-  clusters=new ArrayList<OStorageClusterConfiguration>(size);
+  clusters.clear();
   for (int i=0; i < size; ++i) {
     final int clusterId=Integer.parseInt(read(values[index++]));
     if (clusterId == -1)     continue;
@@ -40,9 +40,6 @@
       currentCluster=phyClusterLocal;
     }
  else     if (clusterType.equals("m"))     currentCluster=new OStorageMemoryClusterConfiguration(clusterName,clusterId,targetDataSegmentId);
- else     if (clusterType.equals("h")) {
-      currentCluster=new OStorageEHClusterConfiguration(this,clusterId,clusterName,null,targetDataSegmentId);
-    }
  else     if (clusterType.equals("d")) {
       currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,Boolean.valueOf(read(values[index++])),Float.valueOf(read(values[index++])),Float.valueOf(read(values[index++])),read(values[index++]));
     }
@@ -51,7 +48,7 @@
     clusters.set(clusterId,currentCluster);
   }
   size=Integer.parseInt(read(values[index++]));
-  dataSegments=new ArrayList<OStorageDataConfiguration>(size);
+  dataSegments.clear();
   for (int i=0; i < size; ++i)   dataSegments.add(null);
   int dataId;
   String dataName;
@@ -67,9 +64,16 @@
   }
   txSegment=new OStorageTxConfiguration(read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]));
   size=Integer.parseInt(read(values[index++]));
-  properties=new ArrayList<OStorageEntryConfiguration>(size);
+  properties.clear();
   for (int i=0; i < size; ++i) {
     properties.add(new OStorageEntryConfiguration(read(values[index++]),read(values[index++])));
   }
+  if (version >= 7)   binaryFormatVersion=Integer.parseInt(read(values[index++]));
+ else   if (version == 6)   binaryFormatVersion=9;
+ else   binaryFormatVersion=8;
+  if (version >= 8)   clusterSelection=read(values[index++]);
+ else   clusterSelection=ORoundRobinClusterSelectionStrategy.NAME;
+  if (version >= 9)   minimumClusters=Integer.parseInt(read(values[index++]));
+ else   minimumClusters=1;
   return this;
 }

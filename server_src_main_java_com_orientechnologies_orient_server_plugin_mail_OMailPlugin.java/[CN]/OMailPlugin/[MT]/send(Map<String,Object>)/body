@@ -1,25 +1,28 @@
 {
+  if (iMessage == null)   throw new IllegalArgumentException("Configuration is null");
   final String profileName=(String)iMessage.get("profile");
-  OMailProfile profile=profiles.get(profileName);
+  final OMailProfile profile=profiles.get(profileName);
   if (profile == null)   throw new IllegalArgumentException("Mail profile '" + profileName + "' is not configured on server");
-  final Properties prop=profile.properties;
-  Authenticator auth=new OSMTPAuthenticator((String)prop.get("mail.smtp.user"),(String)prop.get("mail.smtp.password"));
-  Session session=Session.getInstance(prop,auth);
+  Authenticator auth=new OSMTPAuthenticator((String)profile.getProperty("mail.smtp.user"),(String)profile.getProperty("mail.smtp.password"));
+  final Session session=Session.getInstance(profile,auth);
   MimeMessage msg=new MimeMessage(session);
-  msg.setFrom(new InternetAddress((String)prop.get("mail.smtp.user")));
-  InternetAddress[] toAddresses={new InternetAddress((String)iMessage.get("to"))};
-  msg.setRecipients(Message.RecipientType.TO,toAddresses);
-  InternetAddress[] ccAddresses={new InternetAddress((String)iMessage.get("cc"))};
-  msg.setRecipients(Message.RecipientType.CC,ccAddresses);
-  InternetAddress[] bccAddresses={new InternetAddress((String)iMessage.get("bcc"))};
-  msg.setRecipients(Message.RecipientType.BCC,bccAddresses);
+  final String from;
+  if (iMessage.containsKey("from"))   from=(String)iMessage.get("from");
+ else   from=(String)profile.getProperty("mail.from");
+  if (from != null)   msg.setFrom(new InternetAddress(from));
+  final String to=(String)iMessage.get("to");
+  if (to != null && !to.isEmpty())   msg.setRecipients(Message.RecipientType.TO,getEmails(to));
+  final String cc=(String)iMessage.get("cc");
+  if (cc != null && !cc.isEmpty())   msg.setRecipients(Message.RecipientType.CC,getEmails(cc));
+  final String bcc=(String)iMessage.get("bcc");
+  if (bcc != null && !bcc.isEmpty())   msg.setRecipients(Message.RecipientType.BCC,getEmails(bcc));
   msg.setSubject((String)iMessage.get("subject"));
   Object date=iMessage.get("date");
   final Date sendDate;
   if (date == null)   sendDate=new Date();
  else   if (date instanceof Date)   sendDate=(Date)date;
  else {
-    String dateFormat=(String)prop.get("mail.date.format");
+    String dateFormat=(String)profile.getProperty("mail.date.format");
     if (dateFormat == null)     dateFormat="yyyy-MM-dd HH:mm:ss";
     sendDate=new SimpleDateFormat(dateFormat).parse(date.toString());
   }

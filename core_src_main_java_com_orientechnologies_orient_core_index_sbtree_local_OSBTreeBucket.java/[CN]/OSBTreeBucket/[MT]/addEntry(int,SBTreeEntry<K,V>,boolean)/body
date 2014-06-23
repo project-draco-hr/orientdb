@@ -1,5 +1,5 @@
 {
-  final int keySize=keySerializer.getObjectSize(treeEntry.key);
+  final int keySize=keySerializer.getObjectSize(treeEntry.key,(Object[])keyTypes);
   int valueSize=0;
   int entrySize=keySize;
   if (isLeaf) {
@@ -15,7 +15,7 @@
   int freePointer=getIntValue(FREE_POINTER_OFFSET);
   if (freePointer - entrySize < (size + 1) * OIntegerSerializer.INT_SIZE + POSITIONS_ARRAY_OFFSET)   return false;
   if (index <= size - 1) {
-    copyData(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE,(size - index) * OIntegerSerializer.INT_SIZE);
+    moveData(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + (index + 1) * OIntegerSerializer.INT_SIZE,(size - index) * OIntegerSerializer.INT_SIZE);
   }
   freePointer-=entrySize;
   setIntValue(FREE_POINTER_OFFSET,freePointer);
@@ -23,23 +23,19 @@
   setIntValue(SIZE_OFFSET,size + 1);
   if (isLeaf) {
     byte[] serializedKey=new byte[keySize];
-    keySerializer.serializeNative(treeEntry.key,serializedKey,0);
-    setBinaryValue(freePointer,serializedKey);
-    freePointer+=keySize;
-    setByteValue(freePointer,treeEntry.value.isLink() ? (byte)1 : (byte)0);
-    freePointer+=OByteSerializer.BYTE_SIZE;
+    keySerializer.serializeNative(treeEntry.key,serializedKey,0,(Object[])keyTypes);
+    freePointer+=setBinaryValue(freePointer,serializedKey);
+    freePointer+=setByteValue(freePointer,treeEntry.value.isLink() ? (byte)1 : (byte)0);
     byte[] serializedValue=new byte[valueSize];
     if (treeEntry.value.isLink())     OLongSerializer.INSTANCE.serializeNative(treeEntry.value.getLink(),serializedValue,0);
  else     valueSerializer.serializeNative(treeEntry.value.getValue(),serializedValue,0);
     setBinaryValue(freePointer,serializedValue);
   }
  else {
-    setLongValue(freePointer,treeEntry.leftChild);
-    freePointer+=OLongSerializer.LONG_SIZE;
-    setLongValue(freePointer,treeEntry.rightChild);
-    freePointer+=OLongSerializer.LONG_SIZE;
+    freePointer+=setLongValue(freePointer,treeEntry.leftChild);
+    freePointer+=setLongValue(freePointer,treeEntry.rightChild);
     byte[] serializedKey=new byte[keySize];
-    keySerializer.serializeNative(treeEntry.key,serializedKey,0);
+    keySerializer.serializeNative(treeEntry.key,serializedKey,0,(Object[])keyTypes);
     setBinaryValue(freePointer,serializedKey);
     size++;
     if (updateNeighbors && size > 1) {

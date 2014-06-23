@@ -20,21 +20,25 @@
           channel.writeRID(entry.getKey());
           channel.writeVersion(entry.getValue().getRecordVersion());
         }
+        if (connection.data.protocolVersion >= 20)         sendCollectionChanges();
       }
   finally {
         endResponse();
       }
     }
  catch (    Exception e) {
-      connection.database.rollback();
+      if (connection != null && connection.database != null) {
+        if (connection.database.getTransaction().isActive())         connection.database.rollback(true);
+        final OSBTreeCollectionManager collectionManager=connection.database.getSbTreeCollectionManager();
+        if (collectionManager != null)         collectionManager.clearChangedIds();
+      }
       sendError(clientTxId,e);
     }
   }
  catch (  OTransactionAbortedException e) {
   }
 catch (  Exception e) {
-    tx.rollback();
-    tx.close();
+    if (tx.isActive())     tx.rollback(true,-1);
     sendError(clientTxId,e);
   }
 }

@@ -1,5 +1,6 @@
 {
   checkOpeness();
+  final long timer=Orient.instance().getProfiler().startChrono();
   final OCluster cluster=getClusterById(rid.clusterId);
   cluster.getExternalModificationLock().requestModificationLock();
   try {
@@ -13,8 +14,19 @@
         try {
           if (recordVersion.getCounter() > -1)           recordVersion.increment();
  else           recordVersion=OVersionFactory.instance().createVersion();
-          ppos=cluster.createRecord(content,recordVersion,recordType);
-          rid.clusterPosition=ppos.clusterPosition;
+          dirtyFlag.makeDirty();
+          atomicOperationsManager.startAtomicOperation();
+          try {
+            ppos=cluster.createRecord(content,recordVersion,recordType);
+            rid.clusterPosition=ppos.clusterPosition;
+            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+            if (context != null)             context.executeOperations(this);
+            atomicOperationsManager.endAtomicOperation(false);
+          }
+ catch (          RuntimeException e) {
+            atomicOperationsManager.endAtomicOperation(true);
+            throw e;
+          }
           if (callback != null)           callback.call(rid,ppos.clusterPosition);
           return new OStorageOperationResult<OPhysicalPosition>(ppos);
         }
@@ -39,5 +51,6 @@
   }
   finally {
     cluster.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in database",timer,"db.*.createRecord");
   }
 }

@@ -1,0 +1,31 @@
+{
+  if (status == STATUS.CLOSED)   return;
+  OChannelBinaryAsynchClient network=null;
+  lock.acquireExclusiveLock();
+  try {
+    if (status == STATUS.CLOSED)     return;
+    network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
+    try {
+      setSessionId(null,-1);
+    }
+  finally {
+      endRequest(network);
+    }
+    engine.getConnectionManager().remove(network);
+    if (!checkForClose(iForce))     return;
+    status=STATUS.CLOSING;
+    engine.getConnectionManager().closePool(getCurrentServerURL());
+    super.close(iForce,onDelete);
+    status=STATUS.CLOSED;
+    Orient.instance().unregisterStorage(this);
+  }
+ catch (  Exception e) {
+    if (network != null) {
+      OLogManager.instance().debug(this,"Error on closing remote connection: %s",network);
+      network.close();
+    }
+  }
+ finally {
+    lock.releaseExclusiveLock();
+  }
+}

@@ -13,13 +13,40 @@
           final OProperty prop=iDocument.getSchemaClass().getProperty(fieldName);
           if (prop != null) {
             if (prop.getType() == OType.LINK) {
-              if (OMultiValue.isMultiValue(fieldValue) && OMultiValue.getSize(fieldValue) == 1)               fieldValue=OMultiValue.getFirstValue(fieldValue);
+              if (OMultiValue.isMultiValue(fieldValue)) {
+                final int size=OMultiValue.getSize(fieldValue);
+                if (size == 1)                 fieldValue=OMultiValue.getFirstValue(fieldValue);
+ else                 if (size == 0)                 fieldValue=null;
+              }
             }
           }
         }
+        if (OMultiValue.isMultiValue(fieldValue)) {
+          final List<Object> tempColl=new ArrayList<Object>(OMultiValue.getSize(fieldValue));
+          String singleFieldName=null;
+          for (          Object o : OMultiValue.getMultiValueIterable(fieldValue)) {
+            if (o instanceof OIdentifiable && !((OIdentifiable)o).getIdentity().isPersistent()) {
+              final ORecord<?> rec=((OIdentifiable)o).getRecord();
+              if (rec != null && rec instanceof ODocument) {
+                final ODocument doc=(ODocument)rec;
+                if (doc.fields() == 1) {
+                  singleFieldName=doc.fieldNames()[0];
+                  tempColl.add(doc.field(singleFieldName));
+                }
+ else {
+                  doc.getIdentity().reset();
+                  doc.addOwner(iDocument);
+                  tempColl.add(doc);
+                }
+              }
+            }
+ else             tempColl.add(o);
+          }
+          fieldValue=tempColl;
+        }
       }
     }
-    final ODocument doc=iDocument.field(fieldName,resolveFieldValue(iDocument,fieldName,fieldValue,iArguments));
+    final ODocument doc=iDocument.field(fieldName,resolveFieldValue(iDocument,fieldName,fieldValue,iArguments,iContext));
     if (doc != null) {
       if (changedDocuments == null)       changedDocuments=new HashSet<ODocument>();
       changedDocuments.add(doc);

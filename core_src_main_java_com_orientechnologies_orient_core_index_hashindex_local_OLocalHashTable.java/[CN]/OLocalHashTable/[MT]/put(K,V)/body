@@ -1,3 +1,21 @@
 {
-  doPut(key,value);
+  acquireExclusiveLock();
+  try {
+    startAtomicOperation();
+    checkNullSupport(key);
+    key=keySerializer.preprocess(key,(Object[])keyTypes);
+    doPut(key,value);
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    rollback();
+    throw new OIndexException("Error during index update",e);
+  }
+catch (  RuntimeException e) {
+    rollback();
+    throw e;
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

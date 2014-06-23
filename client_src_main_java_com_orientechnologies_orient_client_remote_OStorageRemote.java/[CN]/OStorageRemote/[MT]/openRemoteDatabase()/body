@@ -1,55 +1,56 @@
 {
-  minPool=OGlobalConfiguration.CLIENT_CHANNEL_MIN_POOL.getValueAsInteger();
-  maxPool=OGlobalConfiguration.CLIENT_CHANNEL_MAX_POOL.getValueAsInteger();
   connectionDbType=ODatabaseDocument.TYPE;
   if (connectionOptions != null && connectionOptions.size() > 0) {
-    if (connectionOptions.containsKey(PARAM_MIN_POOL))     minPool=Integer.parseInt(connectionOptions.get(PARAM_MIN_POOL).toString());
-    if (connectionOptions.containsKey(PARAM_MAX_POOL))     maxPool=Integer.parseInt(connectionOptions.get(PARAM_MAX_POOL).toString());
     if (connectionOptions.containsKey(PARAM_DB_TYPE))     connectionDbType=connectionOptions.get(PARAM_DB_TYPE).toString();
   }
-  boolean availableConnections=true;
-  OChannelBinaryClient network=null;
-  while (availableConnections) {
-    try {
-      network=getAvailableNetwork();
+  OChannelBinaryAsynchClient network=null;
+  String currentURL=getCurrentServerURL();
+  do {
+    do {
       try {
-        network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
-        network.writeInt(getSessionId());
-        sendClientInfo(network);
-        network.writeString(name);
-        if (network.getSrvProtocolVersion() >= 8)         network.writeString(connectionDbType);
-        network.writeString(connectionUserName);
-        network.writeString(connectionUserPassword);
-      }
+        network=getAvailableNetwork(currentURL);
+        try {
+          network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
+          network.writeInt(getSessionId());
+          sendClientInfo(network);
+          network.writeString(name);
+          if (network.getSrvProtocolVersion() >= 8)           network.writeString(connectionDbType);
+          network.writeString(connectionUserName);
+          network.writeString(connectionUserPassword);
+        }
   finally {
-        endRequest(network);
-      }
-      final int sessionId;
-      try {
-        beginResponse(network);
-        sessionId=network.readInt();
-        setSessionId(network.getServerURL(),sessionId);
-        OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
-        readDatabaseInformation(network);
-        updateClusterConfiguration(network.readBytes());
-        if (network.getSrvProtocolVersion() >= 14)         network.readString();
-        status=STATUS.OPEN;
-        return network;
-      }
+          endRequest(network);
+        }
+        final int sessionId;
+        try {
+          beginResponse(network);
+          sessionId=network.readInt();
+          setSessionId(network.getServerURL(),sessionId);
+          OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
+          readDatabaseInformation(network);
+          updateClusterConfiguration(network.readBytes());
+          if (network.getSrvProtocolVersion() >= 14)           network.readString();
+          status=STATUS.OPEN;
+          return;
+        }
   finally {
-        endResponse(network);
+          endResponse(network);
+        }
+      }
+ catch (      OException e) {
+        throw e;
+      }
+catch (      Exception e) {
+        if (network != null) {
+          engine.getConnectionManager().remove(network);
+          network=null;
+        }
       }
     }
- catch (    Exception e) {
-      handleException(network,"Cannot create a connection to remote server address(es): " + serverURLs,e);
-    }
-    networkPoolLock.lock();
-    try {
-      availableConnections=!networkPool.isEmpty();
-    }
-  finally {
-      networkPoolLock.unlock();
-    }
+ while (engine.getConnectionManager().getAvailableConnections(currentURL) > 0);
+    currentURL=removeServerURL(currentURL);
   }
+ while (currentURL != null);
+  parseServerURLs();
   throw new OStorageException("Cannot create a connection to remote server address(es): " + serverURLs);
 }

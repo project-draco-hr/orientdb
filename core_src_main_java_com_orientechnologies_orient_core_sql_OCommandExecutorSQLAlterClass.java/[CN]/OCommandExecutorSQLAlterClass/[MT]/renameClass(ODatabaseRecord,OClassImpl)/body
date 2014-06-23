@@ -1,0 +1,28 @@
+{
+  final OStorage storage=database.getStorage();
+  for (  int clusterId : cls.getClusterIds()) {
+    OClusterPosition[] range=storage.getClusterDataRange(clusterId);
+    OPhysicalPosition[] positions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(range[0]));
+    do {
+      for (      OPhysicalPosition position : positions) {
+        final ORecordId identity=new ORecordId(clusterId,position.clusterPosition);
+        final ORawBuffer record=storage.readRecord(identity,null,true,null,false,OStorage.LOCKING_STRATEGY.DEFAULT).getResult();
+        if (!database.getStorageVersions().classesAreDetectedByClusterId() && record.recordType == ODocument.RECORD_TYPE) {
+          final ORecordSerializerSchemaAware2CSV serializer=(ORecordSerializerSchemaAware2CSV)ORecordSerializerFactory.instance().getFormat(ORecordSerializerSchemaAware2CSV.NAME);
+          if (serializer.getClassName(OBinaryProtocol.bytes2string(record.buffer)).equalsIgnoreCase(className)) {
+            final ODocument document=new ODocument();
+            document.setLazyLoad(false);
+            document.fromStream(record.buffer);
+            document.getRecordVersion().copyFrom(record.version);
+            document.setIdentity(identity);
+            document.setClassName(cls.getName());
+            document.setDirty();
+            document.save();
+          }
+        }
+        if (positions.length > 0)         positions=storage.higherPhysicalPositions(clusterId,positions[positions.length - 1]);
+      }
+    }
+ while (positions.length > 0);
+  }
+}

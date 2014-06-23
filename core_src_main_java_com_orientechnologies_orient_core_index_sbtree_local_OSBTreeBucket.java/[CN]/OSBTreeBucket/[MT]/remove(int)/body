@@ -1,6 +1,6 @@
 {
   int entryPosition=getIntValue(POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE);
-  int keySize=keySerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition);
+  int keySize=keySerializer.getObjectSizeInDirectMemory(pagePointer,entryPosition);
   int entrySize;
   long linkValue=-1;
   if (isLeaf) {
@@ -8,11 +8,11 @@
       entrySize=keySize + valueSerializer.getFixedLength() + OByteSerializer.BYTE_SIZE;
     }
  else {
-      final boolean isLink=directMemory.getByte(pagePointer + entryPosition + keySize) > 0;
-      if (!isLink)       entrySize=keySize + valueSerializer.getObjectSizeInDirectMemory(directMemory,pagePointer + entryPosition + keySize+ OByteSerializer.BYTE_SIZE) + OByteSerializer.BYTE_SIZE;
+      final boolean isLink=pagePointer.getByte(entryPosition + keySize) > 0;
+      if (!isLink)       entrySize=keySize + valueSerializer.getObjectSizeInDirectMemory(pagePointer,entryPosition + keySize + OByteSerializer.BYTE_SIZE) + OByteSerializer.BYTE_SIZE;
  else {
         entrySize=keySize + OByteSerializer.BYTE_SIZE + OLongSerializer.LONG_SIZE;
-        linkValue=OLongSerializer.INSTANCE.deserializeFromDirectMemory(directMemory,pagePointer + entryPosition + keySize+ OByteSerializer.BYTE_SIZE);
+        linkValue=OLongSerializer.INSTANCE.deserializeFromDirectMemory(pagePointer,entryPosition + keySize + OByteSerializer.BYTE_SIZE);
       }
     }
   }
@@ -21,13 +21,13 @@
   }
   int size=size();
   if (entryIndex < size - 1) {
-    copyData(POSITIONS_ARRAY_OFFSET + (entryIndex + 1) * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE,(size - entryIndex - 1) * OIntegerSerializer.INT_SIZE);
+    moveData(POSITIONS_ARRAY_OFFSET + (entryIndex + 1) * OIntegerSerializer.INT_SIZE,POSITIONS_ARRAY_OFFSET + entryIndex * OIntegerSerializer.INT_SIZE,(size - entryIndex - 1) * OIntegerSerializer.INT_SIZE);
   }
   size--;
   setIntValue(SIZE_OFFSET,size);
   int freePointer=getIntValue(FREE_POINTER_OFFSET);
   if (size > 0 && entryPosition > freePointer) {
-    copyData(freePointer,freePointer + entrySize,entryPosition - freePointer);
+    moveData(freePointer,freePointer + entrySize,entryPosition - freePointer);
   }
   setIntValue(FREE_POINTER_OFFSET,freePointer + entrySize);
   int currentPositionOffset=POSITIONS_ARRAY_OFFSET;

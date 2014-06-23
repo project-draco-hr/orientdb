@@ -1,0 +1,77 @@
+{
+  if (key == null)   return setLastSearchNode(null,null);
+  pageItemFound=false;
+  if (getTreeSize() == 0) {
+    pageIndex=0;
+    return iGetContainer ? root : null;
+  }
+  final K k;
+  k=enhanceCompositeKey(key,partialSearchMode);
+  OMVRBTreeEntry<K,V> p=getBestEntryPoint(k);
+  checkTreeStructure(p);
+  if (p == null)   return setLastSearchNode(key,null);
+  OMVRBTreeEntry<K,V> lastNode=p;
+  OMVRBTreeEntry<K,V> prevNode=null;
+  OMVRBTreeEntry<K,V> tmpNode;
+  int beginKey=-1;
+  try {
+    while (p != null && p.getSize() > 0) {
+      searchNodeCallback();
+      lastNode=p;
+      beginKey=compare(k,p.getFirstKey());
+      if (beginKey == 0) {
+        pageIndex=0;
+        pageItemFound=true;
+        pageItemComparator=0;
+        return setLastSearchNode(key,p);
+      }
+      pageItemComparator=compare(k,p.getLastKey());
+      if (beginKey < 0) {
+        if (pageItemComparator < 0) {
+          tmpNode=predecessor(p);
+          if (tmpNode != null && tmpNode != prevNode) {
+            prevNode=p;
+            p=tmpNode;
+            continue;
+          }
+        }
+      }
+ else       if (beginKey > 0) {
+        if (pageItemComparator > 0) {
+          tmpNode=successor(p);
+          if (tmpNode != null && tmpNode != prevNode) {
+            prevNode=p;
+            p=tmpNode;
+            continue;
+          }
+        }
+      }
+      final V value=lastNode.search(k);
+      if (key instanceof OCompositeKey) {
+        final OCompositeKey compositeKey=(OCompositeKey)key;
+        if (value != null && compositeKey.getKeys().size() == keySize) {
+          return setLastSearchNode(key,lastNode);
+        }
+        if (partialSearchMode.equals(PartialSearchMode.NONE)) {
+          if (value != null || iGetContainer)           return lastNode;
+ else           return null;
+        }
+        if (partialSearchMode.equals(PartialSearchMode.HIGHEST_BOUNDARY)) {
+          return adjustHighestPartialSearchResult(iGetContainer,lastNode,compositeKey);
+        }
+        if (partialSearchMode.equals(PartialSearchMode.LOWEST_BOUNDARY)) {
+          return adjustLowestPartialSearchResult(iGetContainer,lastNode,compositeKey);
+        }
+      }
+      if (value != null) {
+        setLastSearchNode(key,lastNode);
+      }
+      if (value != null || iGetContainer)       return lastNode;
+      return null;
+    }
+  }
+  finally {
+    checkTreeStructure(p);
+  }
+  return setLastSearchNode(key,null);
+}

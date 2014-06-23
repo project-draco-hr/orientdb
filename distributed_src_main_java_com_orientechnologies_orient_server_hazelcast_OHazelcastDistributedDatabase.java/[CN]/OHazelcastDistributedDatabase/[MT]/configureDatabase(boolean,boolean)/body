@@ -1,0 +1,50 @@
+{
+  final String queueName=OHazelcastDistributedMessageService.getRequestQueueName(manager.getLocalNodeName(),databaseName);
+  final IQueue<ODistributedRequest> requestQueue=msgService.getQueue(queueName);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
+  final IMap<String,Object> lastPendingMessagesMap=restoreMessagesBeforeFailure(iRestoreMessages);
+  restoringMessages=msgService.checkForPendingMessages(requestQueue,queueName,iUnqueuePendingMessages);
+  listenerThread=new Thread(new Runnable(){
+    @Override public void run(){
+      Thread.currentThread().setName("OrientDB Node Request " + queueName);
+      while (!Thread.interrupted()) {
+        if (restoringMessages && requestQueue.isEmpty()) {
+          ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"executed all pending tasks in queue, set restoringMessages=false and database '%s' as online...",databaseName);
+          restoringMessages=false;
+          setOnline();
+        }
+        String senderNode=null;
+        ODistributedRequest message=null;
+        try {
+          message=readRequest(requestQueue);
+          if (message != null) {
+            final boolean saveAsPending=!message.getTask().isIdempotent();
+            if (saveAsPending)             lastPendingMessagesMap.put(databaseName,message);
+            senderNode=message.getSenderNodeName();
+            onMessage(message);
+            if (saveAsPending)             lastPendingMessagesMap.remove(databaseName);
+          }
+        }
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        DistributedObjectDestroyedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        HazelcastInstanceNotActiveException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        Throwable e) {
+          ODistributedServerLog.error(this,getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed request: %s",e,message != null ? message.getTask() : "-");
+        }
+      }
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"end of reading requests for database %s",databaseName);
+    }
+  }
+);
+  listenerThread.start();
+  return this;
+}

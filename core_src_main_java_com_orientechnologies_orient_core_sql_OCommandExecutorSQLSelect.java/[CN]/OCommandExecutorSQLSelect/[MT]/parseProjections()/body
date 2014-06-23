@@ -2,21 +2,24 @@
   if (!parserOptionalKeyword(KEYWORD_SELECT))   return -1;
   int upperBound=OStringSerializerHelper.getLowerIndexOf(parserTextUpperCase,parserGetCurrentPosition(),KEYWORD_FROM_2FIND,KEYWORD_LET_2FIND);
   if (upperBound == -1)   upperBound=parserText.length();
+  int lastRealPositionProjection=-1;
   final String projectionString=parserText.substring(parserGetCurrentPosition(),upperBound).trim();
   if (projectionString.length() > 0) {
     projections=new LinkedHashMap<String,Object>();
     projectionDefinition=new LinkedHashMap<String,String>();
     final List<String> items=OStringSerializerHelper.smartSplit(projectionString,',');
-    String fieldName;
     int beginPos;
     int endPos;
     for (    String projection : items) {
       projection=projection.trim();
       if (projectionDefinition == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() and EXPAND() operators");
-      fieldName=null;
+      final List<String> words=OStringSerializerHelper.smartSplit(projection,' ');
+      if (words.size() > 1)       lastRealPositionProjection+=words.get(0).length();
+      String fieldName;
       endPos=projection.toUpperCase(Locale.ENGLISH).indexOf(KEYWORD_AS);
       if (endPos > -1) {
         fieldName=projection.substring(endPos + KEYWORD_AS.length()).trim();
+        lastRealPositionProjection+=endPos + KEYWORD_AS.length() + fieldName.length()+ 1;
         projection=projection.substring(0,endPos).trim();
         if (projectionDefinition.containsKey(fieldName))         throw new OCommandSQLParsingException("Field '" + fieldName + "' is duplicated in current SELECT, choose a different name");
       }
@@ -57,6 +60,7 @@
     }
   }
   if (upperBound < parserText.length() - 1)   parserSetCurrentPosition(upperBound);
+ else   if (lastRealPositionProjection > -1)   parserMoveCurrentPosition(lastRealPositionProjection + 1);
  else   parserSetEndOfText();
   return parserGetCurrentPosition();
 }

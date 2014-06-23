@@ -1,18 +1,25 @@
 {
   if (writeAheadLog == null)   return;
-  lock.acquireExclusiveLock();
   try {
-    writeAheadLog.flush();
-    if (configuration != null)     configuration.synch();
-    writeAheadLog.logFullCheckpointStart();
-    for (    OCluster cluster : clusters)     if (cluster != null)     cluster.synch();
-    writeAheadLog.logFullCheckpointEnd();
-    writeAheadLog.flush();
-  }
- catch (  IOException ioe) {
-    throw new OStorageException("Error during checkpoint creation for storage " + name,ioe);
-  }
+    modificationLock.prohibitModifications();
+    lock.acquireSharedLock();
+    try {
+      writeAheadLog.flush();
+      if (configuration != null)       configuration.synch();
+      writeAheadLog.logFullCheckpointStart();
+      diskCache.flushBuffer();
+      writeAheadLog.logFullCheckpointEnd();
+      writeAheadLog.flush();
+      dirtyFlag.clearDirty();
+    }
+ catch (    IOException ioe) {
+      throw new OStorageException("Error during checkpoint creation for storage " + name,ioe);
+    }
  finally {
-    lock.releaseExclusiveLock();
+      lock.releaseSharedLock();
+    }
+  }
+  finally {
+    modificationLock.allowModifications();
   }
 }

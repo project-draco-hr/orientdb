@@ -1,19 +1,25 @@
 {
   List<OWALRecord> writtenRecords=new ArrayList<OWALRecord>();
   OWALRecord walRecord=new TestRecord(100,false);
-  OLogSequenceNumber end=writeAheadLog.log(walRecord);
+  writeAheadLog.log(walRecord);
   writtenRecords.add(walRecord);
   walRecord=new TestRecord(2 * OWALPage.PAGE_SIZE - OWALPage.RECORDS_OFFSET,false);
-  writeAheadLog.log(walRecord);
+  OLogSequenceNumber end=writeAheadLog.log(walRecord);
   writtenRecords.add(walRecord);
   writeAheadLog.close();
   RandomAccessFile rndFile=new RandomAccessFile(new File(testDir,"WriteAheadLogTest.0.wal"),"rw");
   rndFile.seek(2 * OWALPage.PAGE_SIZE);
   int bt=rndFile.read();
+  rndFile.seek(2 * OWALPage.PAGE_SIZE);
   rndFile.write(bt + 1);
   rndFile.close();
   writeAheadLog=createWAL();
-  Assert.assertEquals(writeAheadLog.end(),end);
+  Assert.assertTrue(writeAheadLog.end().compareTo(end) >= 0);
   assertLogContent(writeAheadLog,writtenRecords.subList(0,1));
-  Assert.assertNull(writeAheadLog.read(writtenRecords.get(1).getLsn()));
+  try {
+    writeAheadLog.read(writtenRecords.get(1).getLsn());
+    Assert.fail();
+  }
+ catch (  OWALPageBrokenException e) {
+  }
 }

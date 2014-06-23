@@ -1,28 +1,15 @@
 {
-  final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-  if (!iForce && cfg.isHotAlignment())   return;
-  boolean dirty=false;
-  for (  String clusterName : cfg.getClusterNames()) {
-    final List<List<String>> partitions=cfg.getPartitions(clusterName);
-    if (partitions != null) {
-      for (int p=0; p < partitions.size(); ++p) {
-        final List<String> partition=partitions.get(p);
-        for (int n=0; n < partition.size(); ++n) {
-          final String node=partition.get(n);
-          if (node.equals(iNode)) {
-            ODistributedServerLog.info(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"removing node '%s' in partition: %s.%s.%d",iNode,databaseName,clusterName,p);
-            partition.remove(n);
-            msgService.removeQueue(OHazelcastDistributedMessageService.getRequestQueueName(iNode,databaseName));
-            dirty=true;
-            break;
-          }
-        }
-      }
+  try {
+    final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
+    if (cfg.isHotAlignment())     return;
+    final List<String> foundPartition=cfg.removeNodeInServerList(iNode,iForce);
+    if (foundPartition != null) {
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"removing node '%s' in partition: db=%s %s",iNode,databaseName,foundPartition);
+      msgService.removeQueue(OHazelcastDistributedMessageService.getRequestQueueName(iNode,databaseName));
+      manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
     }
   }
-  if (dirty) {
-    final ODocument doc=cfg.serialize();
-    manager.updateCachedDatabaseConfiguration(databaseName,doc);
-    manager.getConfigurationMap().put(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + databaseName,doc);
+ catch (  Exception e) {
+    ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"unable to remove node '%s' in distributed configuration, db=%s",e,iNode,databaseName);
   }
 }

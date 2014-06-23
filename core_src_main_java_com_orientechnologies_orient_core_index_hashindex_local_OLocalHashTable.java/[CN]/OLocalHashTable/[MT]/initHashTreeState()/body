@@ -4,21 +4,31 @@
     final OCachePointer pagePointer=cacheEntry.getCachePointer();
     pagePointer.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,pagePointer.getDataPointer(),directMemory,keySerializer,valueSerializer);
+      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,getTrackMode());
+      cacheEntry.markDirty();
+      logPageChanges(emptyBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),true);
     }
   finally {
       pagePointer.releaseExclusiveLock();
-      cacheEntry.markDirty();
       diskCache.release(cacheEntry);
     }
   }
   final long[] rootTree=new long[MAX_LEVEL_SIZE];
   for (int i=0; i < MAX_LEVEL_SIZE; i++)   rootTree[i]=createBucketPointer(i,0);
-  hashTree=new long[1][];
-  hashTree[0]=rootTree;
-  nodesMetadata=new OHashTreeNodeMetadata[1];
-  nodesMetadata[0]=new OHashTreeNodeMetadata((byte)0,(byte)0,(byte)MAX_LEVEL_DEPTH);
-  filesMetadata[0].setBucketsCount(MAX_LEVEL_SIZE);
-  size=0;
-  hashTreeSize=1;
+  directory.clear();
+  directory.addNewNode((byte)0,(byte)0,(byte)MAX_LEVEL_DEPTH,rootTree);
+  diskCache.loadPinnedPage(hashStateEntry);
+  OCachePointer hashStatePointer=hashStateEntry.getCachePointer();
+  hashStatePointer.acquireExclusiveLock();
+  try {
+    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStatePointer.getDataPointer(),getTrackMode(),false);
+    metadataPage.setBucketsCount(0,MAX_LEVEL_SIZE);
+    metadataPage.setRecordsCount(0);
+    hashStateEntry.markDirty();
+    logPageChanges(metadataPage,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
+  }
+  finally {
+    hashStatePointer.releaseExclusiveLock();
+    diskCache.release(hashStateEntry);
+  }
 }

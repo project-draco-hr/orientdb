@@ -52,23 +52,37 @@
       OLogManager.instance().warn(this,"Error on checking the value of property %s against the record %s",e,iFieldName,getIdentity());
     }
   }
-  setFieldType(iFieldName,iFieldType);
-  if (iFieldType == null && _clazz != null) {
-    final OProperty prop=_clazz.getProperty(iFieldName);
-    if (prop != null)     iFieldType=prop.getType();
+  OType fieldType=deriveFieldType(iFieldName,iFieldType);
+  if (oldValue instanceof ORidBag) {
+    final ORidBag ridBag=(ORidBag)oldValue;
+    ridBag.setOwner(null);
   }
-  if (iPropertyValue != null)   if (iFieldType != null)   iPropertyValue=ODocumentHelper.convertField(this,iFieldName,iFieldType.getDefaultJavaType(),iPropertyValue);
- else   if (iPropertyValue instanceof Enum)   iPropertyValue=iPropertyValue.toString();
+ else   if (oldValue instanceof ODocument) {
+    final ODocument doc=(ODocument)oldValue;
+    doc.removeOwner(this);
+  }
+  if (iPropertyValue != null) {
+    if (fieldType != null) {
+      iPropertyValue=ODocumentHelper.convertField(this,iFieldName,fieldType.getDefaultJavaType(),iPropertyValue);
+      if (fieldType.equals(OType.EMBEDDED) && iPropertyValue instanceof ODocument) {
+        final ODocument embeddedDocument=(ODocument)iPropertyValue;
+        embeddedDocument.addOwner(this);
+      }
+    }
+ else     if (iPropertyValue instanceof Enum)     iPropertyValue=iPropertyValue.toString();
+    if (iPropertyValue instanceof ORidBag) {
+      final ORidBag ridBag=(ORidBag)iPropertyValue;
+      ridBag.setOwner(null);
+      ridBag.setOwner(this);
+    }
+  }
   removeCollectionChangeListener(iFieldName);
   removeCollectionTimeLine(iFieldName);
   _fieldValues.put(iFieldName,iPropertyValue);
   addCollectionChangeListener(iFieldName,iPropertyValue);
   if (_status != STATUS.UNMARSHALLING) {
     setDirty();
-    if (_trackingChanges && _recordId.isValid()) {
-      if (_fieldOriginalValues == null)       _fieldOriginalValues=new HashMap<String,Object>();
-      if (!_fieldOriginalValues.containsKey(iFieldName))       _fieldOriginalValues.put(iFieldName,oldValue);
-    }
+    saveOldFieldValue(iFieldName,oldValue);
   }
   return this;
 }

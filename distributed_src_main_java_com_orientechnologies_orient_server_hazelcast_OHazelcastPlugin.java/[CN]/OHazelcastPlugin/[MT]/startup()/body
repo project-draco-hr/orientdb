@@ -1,27 +1,31 @@
 {
   if (!enabled)   return;
   super.startup();
-  status=STATUS.STARTING;
-  OLogManager.instance().info(this,"Starting distributed server '%s'...",getLocalNodeName());
-  cachedClusterNodes.clear();
+  status=NODE_STATUS.STARTING;
+  final String localNodeName=getLocalNodeName();
+  OLogManager.instance().info(this,"Starting distributed server '%s'...",localNodeName);
+  activeNodes.clear();
   try {
-    hazelcastInstance=Hazelcast.newHazelcastInstance(new FileSystemXmlConfig(hazelcastConfigFile));
+    hazelcastInstance=configureHazelcast();
     nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
     timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
-    cachedClusterNodes.put(getLocalNodeName(),hazelcastInstance.getCluster().getLocalMember());
+    activeNodes.put(localNodeName,hazelcastInstance.getCluster().getLocalMember());
     membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
-    OServer.registerServerInstance(getLocalNodeName(),serverInstance);
-    final IMap<String,Object> configurationMap=getConfigurationMap();
+    OServer.registerServerInstance(localNodeName,serverInstance);
+    final IMap<String,Object> configurationMap=(IMap<String,Object>)getConfigurationMap();
     configurationMap.addEntryListener(this,true);
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
-      final String memberName=getNodeName(m);
-      if (memberName != null)       cachedClusterNodes.put(memberName,m);
+      if (!m.getUuid().equals(getLocalNodeId())) {
+        final String memberName=getNodeName(m);
+        if (memberName != null)         activeNodes.put(memberName,m);
+ else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
+      }
     }
     messageService=new OHazelcastDistributedMessageService(this);
-    getConfigurationMap().put(CONFIG_NODE_PREFIX + getLocalNodeId(),getLocalNodeConfiguration());
+    configurationMap.put(CONFIG_NODE_PREFIX + getLocalNodeId(),getLocalNodeConfiguration());
     installNewDatabases(true);
     loadDistributedDatabases();
-    setStatus(STATUS.ONLINE);
+    setNodeStatus(NODE_STATUS.ONLINE);
   }
  catch (  FileNotFoundException e) {
     throw new OConfigurationException("Error on creating Hazelcast instance",e);

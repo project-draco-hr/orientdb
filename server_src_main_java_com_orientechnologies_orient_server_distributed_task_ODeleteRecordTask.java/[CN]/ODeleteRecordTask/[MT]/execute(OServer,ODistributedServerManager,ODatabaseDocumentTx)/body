@@ -1,6 +1,10 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),null,DIRECTION.IN,"delete record %s/%s v.%s",database.getName(),rid.toString(),version.toString());
   final ORecordInternal<?> record=database.load(rid);
-  if (record != null)   record.delete();
-  return new OBuffer(record.toStream());
+  if (record != null) {
+    if (delayed)     if (record.getRecordVersion().equals(version))     ((ODistributedStorage)database.getStorage()).pushDeletedRecord(rid,version);
+ else     throw new OConcurrentModificationException(rid,record.getRecordVersion(),version,ORecordOperation.DELETED);
+ else     record.delete();
+  }
+  return true;
 }

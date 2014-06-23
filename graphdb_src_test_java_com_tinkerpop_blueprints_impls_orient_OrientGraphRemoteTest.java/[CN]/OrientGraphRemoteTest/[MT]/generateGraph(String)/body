@@ -1,0 +1,27 @@
+{
+  final String url="remote:localhost:3080/" + graphDirectoryName;
+  OrientGraph graph=currentGraphs.get(url);
+  if (graph != null) {
+    if (graph.isClosed())     currentGraphs.remove(url);
+ else     return graph;
+  }
+  try {
+    final OServerAdmin serverAdmin=new OServerAdmin(url);
+    serverAdmin.connect("root","root");
+    if (!serverAdmin.existsDatabase("plocal"))     serverAdmin.createDatabase("graph","plocal");
+    serverAdmin.close();
+  }
+ catch (  IOException e) {
+    throw new IllegalStateException(e);
+  }
+  OrientGraphFactory factory=graphFactories.get(url);
+  if (factory == null) {
+    factory=new OrientGraphFactory(url);
+    factory.setupPool(5,256);
+    graphFactories.put(url,factory);
+  }
+  graph=factory.getTx();
+  graph.setWarnOnForceClosingTx(false);
+  currentGraphs.put(url,graph);
+  return graph;
+}

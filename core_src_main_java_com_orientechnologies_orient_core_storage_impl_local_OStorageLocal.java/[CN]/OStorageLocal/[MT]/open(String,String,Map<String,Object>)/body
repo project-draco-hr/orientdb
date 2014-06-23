@@ -1,16 +1,17 @@
 {
+  addUser();
+  if (status != STATUS.CLOSED)   return;
   final long timer=Orient.instance().getProfiler().startChrono();
   lock.acquireExclusiveLock();
   try {
-    addUser();
-    if (status != STATUS.CLOSED)     return;
     if (!exists())     throw new OStorageException("Cannot open the storage '" + name + "' because it does not exist in path: "+ url);
     status=STATUS.OPEN;
+    configuration.load();
+    init();
     int pos;
     pos=registerDataSegment(new OStorageDataConfiguration(configuration,OStorage.DATA_DEFAULT_NAME,0,getStoragePath()));
     dataSegments[pos].open();
-    if (OGlobalConfiguration.USE_LHPEPS_CLUSTER.getValueAsBoolean())     addEHDefaultClusters();
- else     addDefaultClusters();
+    addDefaultClusters();
     for (int i=0; i < configuration.dataSegments.size(); ++i) {
       final OStorageDataConfiguration dataConfig=configuration.dataSegments.get(i);
       if (dataConfig == null)       continue;
@@ -29,7 +30,7 @@
         try {
           if (pos == -1) {
             if (clusters[i] != null && clusters[i] instanceof OClusterLocal)             clusters[i].close();
-            clusters[i]=Orient.instance().getClusterFactory().createCluster(OClusterLocal.TYPE,clusters[i] instanceof OClusterLocal);
+            clusters[i]=Orient.instance().getClusterFactory().createCluster(OClusterLocal.TYPE);
             clusters[i].configure(this,clusterConfig);
             clusterMap.put(clusters[i].getName(),clusters[i]);
             clusters[i].open();
@@ -51,14 +52,15 @@
       }
     }
     if (OGlobalConfiguration.USE_WAL.getValueAsBoolean())     writeAheadLog=new OWriteAheadLog(this);
+    atomicOperationsManager=new OAtomicOperationsManager(writeAheadLog);
     txManager.open();
   }
  catch (  Exception e) {
-    close(true);
+    close(true,false);
     throw new OStorageException("Cannot open local storage '" + url + "' with mode="+ mode,e);
   }
  finally {
     lock.releaseExclusiveLock();
-    Orient.instance().getProfiler().stopChrono("db." + name + ".open","Open a local database",timer,"db.*.open");
+    Orient.instance().getProfiler().stopChrono("db." + name + ".open","Open a database",timer,"db.*.open");
   }
 }

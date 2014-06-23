@@ -1,15 +1,15 @@
 {
-  if (iRecord == null)   return;
+  if (iRecord == null)   return true;
   if (projections != null || groupByFields != null && !groupByFields.isEmpty()) {
     if (groupedResult == null) {
       iRecord=ORuntimeResult.getProjectionResult(resultCount,projections,context,iRecord);
-      if (iRecord == null)       return;
+      if (iRecord == null)       return true;
     }
  else {
-      final ODocument doc=(ODocument)iRecord.getRecord();
       Object fieldValue=null;
       if (groupByFields != null && !groupByFields.isEmpty()) {
         if (groupByFields.size() > 1) {
+          final ODocument doc=iRecord.getRecord();
           final Object[] fields=new Object[groupByFields.size()];
           for (int i=0; i < groupByFields.size(); ++i) {
             final String field=groupByFields.get(i);
@@ -22,19 +22,21 @@
           final String field=groupByFields.get(0);
           if (field != null) {
             if (field.startsWith("$"))             fieldValue=context.getVariable(field);
- else             fieldValue=doc.field(field);
+ else             fieldValue=((ODocument)iRecord.getRecord()).field(field);
           }
         }
       }
       getProjectionGroup(fieldValue).applyRecord(iRecord);
-      return;
+      return true;
     }
   }
-  if (orderedFields == null && expandTarget == null) {
-    if (request.getResultListener() != null)     request.getResultListener().result(iRecord);
+  boolean result=true;
+  if ((fullySortedByIndex || orderedFields.isEmpty()) && expandTarget == null) {
+    if (request.getResultListener() != null)     result=request.getResultListener().result(iRecord);
   }
  else {
     if (tempResult == null)     tempResult=new ArrayList<OIdentifiable>();
     ((Collection<OIdentifiable>)tempResult).add(iRecord);
   }
+  return result;
 }

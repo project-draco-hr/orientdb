@@ -1,0 +1,38 @@
+{
+  acquireSharedLock();
+  try {
+    BucketSearchResult bucketSearchResult=findBucket(key);
+    OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
+    int index;
+    if (bucketSearchResult.itemIndex >= 0) {
+      index=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex - 1;
+    }
+ else {
+      index=-bucketSearchResult.itemIndex - 2;
+    }
+    boolean firstBucket=true;
+    do {
+      OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+      final OCachePointer pointer=cacheEntry.getCachePointer();
+      try {
+        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(pointer.getDataPointer(),bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        if (!firstBucket)         index=bucket.size() - 1;
+        for (int i=index; i >= 0; i--) {
+          if (!listener.addResult(bucket.getEntry(i)))           return;
+        }
+        bucketPointer=bucket.getLeftSibling();
+        firstBucket=false;
+      }
+  finally {
+        diskCache.release(cacheEntry);
+      }
+    }
+ while (bucketPointer.getPageIndex() >= 0);
+  }
+ catch (  IOException ioe) {
+    throw new OSBTreeException("Error during fetch of minor values for key " + key + " in sbtree "+ name);
+  }
+ finally {
+    releaseSharedLock();
+  }
+}

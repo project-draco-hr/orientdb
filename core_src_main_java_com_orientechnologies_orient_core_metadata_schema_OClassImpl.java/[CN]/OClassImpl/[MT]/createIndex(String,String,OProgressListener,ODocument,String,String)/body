@@ -1,0 +1,20 @@
+{
+  if (type == null)   throw new IllegalArgumentException("Index type is null");
+  type=type.toUpperCase();
+  if (fields.length == 0) {
+    throw new OIndexException("List of fields to index cannot be empty.");
+  }
+  final Set<String> existingFieldNames=new HashSet<String>();
+  OClassImpl currentClass=this;
+  do {
+    existingFieldNames.addAll(currentClass.properties.keySet());
+    currentClass=(OClassImpl)currentClass.getSuperClass();
+  }
+ while (currentClass != null);
+  for (  final String fieldToIndex : fields) {
+    final String fieldName=OIndexDefinitionFactory.extractFieldName(fieldToIndex);
+    if (!fieldName.equals("@rid") && !existingFieldNames.contains(fieldName.toLowerCase()))     throw new OIndexException("Index with name : '" + name + "' cannot be created on class : '"+ this.name+ "' because field: '"+ fieldName+ "' is absent in class definition.");
+  }
+  final OIndexDefinition indexDefinition=OIndexDefinitionFactory.createIndexDefinition(this,Arrays.asList(fields),extractFieldTypes(fields),null);
+  return getDatabase().getMetadata().getIndexManager().createIndex(name,type,indexDefinition,polymorphicClusterIds,progressListener,metadata,algorithm);
+}

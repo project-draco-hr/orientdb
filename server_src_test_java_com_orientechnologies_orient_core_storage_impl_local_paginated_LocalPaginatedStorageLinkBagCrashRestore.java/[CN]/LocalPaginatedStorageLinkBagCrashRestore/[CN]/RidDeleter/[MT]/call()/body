@@ -1,0 +1,42 @@
+{
+  final Random random=new Random();
+  try {
+    while (true) {
+      if (lastClusterPosition == null)       continue;
+      final long ts=System.currentTimeMillis();
+      final long position=random.nextInt(lastClusterPosition.intValue());
+      final ORID orid=new ORecordId(defaultClusterId,OClusterPositionFactory.INSTANCE.valueOf(position));
+      lockManager.acquireLock(this,orid,OLockManager.LOCK.EXCLUSIVE);
+      try {
+        ODatabaseDocumentTx base_db=ODatabaseDocumentPool.global().acquire(URL_BASE,"admin","admin");
+        final List<ORID> ridsToRemove=new ArrayList<ORID>();
+        ODocument document=base_db.load(orid);
+        document.setLazyLoad(false);
+        ORidBag ridBag=document.field("ridBag");
+        for (        OIdentifiable identifiable : ridBag) {
+          if (random.nextBoolean())           ridsToRemove.add(identifiable.getIdentity());
+          if (ridsToRemove.size() >= 5)           break;
+        }
+        for (        ORID ridToRemove : ridsToRemove)         ridBag.remove(ridToRemove);
+        document.field("ts",ts);
+        document.save();
+        base_db.close();
+        ODatabaseDocumentTx test_db=ODatabaseDocumentPool.global().acquire(URL_TEST,"admin","admin");
+        document=test_db.load(orid);
+        document.setLazyLoad(false);
+        ridBag=document.field("ridBag");
+        for (        ORID ridToRemove : ridsToRemove)         ridBag.remove(ridToRemove);
+        document.field("ts",ts);
+        document.save();
+        test_db.close();
+      }
+  finally {
+        lockManager.releaseLock(this,orid,OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  }
+ catch (  RuntimeException e) {
+    e.printStackTrace();
+    throw e;
+  }
+}

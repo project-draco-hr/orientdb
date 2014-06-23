@@ -3,14 +3,14 @@
     listener.onMessage("\nStarted import of database '" + database.getURL() + "' from "+ fileName+ "...");
     long time=System.currentTimeMillis();
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
-    database.getLevel1Cache().setEnable(false);
-    database.getLevel2Cache().setEnable(false);
+    database.getLocalCache().setEnable(false);
     database.setMVCC(false);
     database.setValidationEnabled(false);
     database.setStatus(STATUS.IMPORTING);
-    for (    OIndex index : database.getMetadata().getIndexManager().getIndexes()) {
-      indexesToRebuild.add(index.getName().toLowerCase());
+    for (    OIndex<?> index : database.getMetadata().getIndexManager().getIndexes()) {
+      if (index.isAutomatic())       indexesToRebuild.add(index.getName().toLowerCase());
     }
+    if (!merge)     removeDefaultNonSecurityClasses();
     String tag;
     while (jsonReader.hasNext() && jsonReader.lastChar() != '}') {
       tag=jsonReader.readString(OJSONReader.FIELD_ASSIGNMENT);
@@ -21,21 +21,25 @@
  else       if (tag.equals("indexes"))       importIndexes();
  else       if (tag.equals("manualIndexes"))       importManualIndexes();
     }
-    listener.onMessage("\nRebuild of stale indexes...");
-    for (    String indexName : indexesToRebuild) {
-      listener.onMessage("\nStart rebuild index " + indexName);
-      database.command(new OCommandSQL("rebuild index " + indexName)).execute();
-      listener.onMessage("\nRebuild  of index " + indexName + " is completed.");
-    }
-    listener.onMessage("\nStale indexes were rebuilt...");
+    if (rebuildIndexes)     rebuildIndexes();
     database.getStorage().synch();
     database.setStatus(STATUS.OPEN);
     if (isDeleteRIDMapping())     removeExportImportRIDsMap();
     listener.onMessage("\n\nDatabase import completed in " + ((System.currentTimeMillis() - time)) + " ms");
   }
  catch (  Exception e) {
-    System.err.println("Error on database import happened just before line " + jsonReader.getLineNumber() + ", column "+ jsonReader.getColumnNumber());
-    e.printStackTrace();
+    final StringWriter writer=new StringWriter();
+    writer.append("Error on database import happened just before line " + jsonReader.getLineNumber() + ", column "+ jsonReader.getColumnNumber()+ "\n");
+    final PrintWriter printWriter=new PrintWriter(writer);
+    e.printStackTrace(printWriter);
+    printWriter.flush();
+    listener.onMessage(writer.toString());
+    try {
+      writer.close();
+    }
+ catch (    IOException e1) {
+      throw new ODatabaseExportException("Error on importing database '" + database.getName() + "' from file: "+ fileName,e1);
+    }
     throw new ODatabaseExportException("Error on importing database '" + database.getName() + "' from file: "+ fileName,e);
   }
  finally {

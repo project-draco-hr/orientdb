@@ -1,11 +1,11 @@
 {
-  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
-  graph.getRawGraph().checkSecurity(ODatabaseSecurityResources.COMMAND,ORole.PERMISSION_READ);
   init((OCommandRequestText)iRequest);
   parserRequiredKeyword("DELETE");
   parserRequiredKeyword("EDGE");
   OClass clazz=null;
+  String where=null;
   String temp=parseOptionalWord(true);
+  final OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false);
   while (temp != null) {
     if (temp.equals("FROM")) {
       fromExpr=parserRequiredWord(false,"Syntax error"," =><,\r\n");
@@ -20,10 +20,13 @@
       if (fromExpr != null || toExpr != null)       throwSyntaxErrorException("Specifying the RID " + rid + " is not allowed with FROM/TO");
     }
  else     if (temp.equals(KEYWORD_WHERE)) {
-      if (clazz == null)       clazz=graph.getEdgeType(OGraphDatabase.EDGE_CLASS_NAME);
-      final String condition=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetCurrentPosition()) : "";
-      compiledFilter=OSQLEngine.getInstance().parseCondition(condition,getContext(),KEYWORD_WHERE);
+      if (clazz == null)       clazz=graph.getEdgeType(OrientEdgeType.CLASS_NAME);
+      where=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetCurrentPosition()) : "";
+      compiledFilter=OSQLEngine.getInstance().parseCondition(where,getContext(),KEYWORD_WHERE);
       break;
+    }
+ else     if (temp.equals(KEYWORD_RETRY)) {
+      parseRetry();
     }
  else     if (temp.length() > 0) {
       clazz=graph.getEdgeType(temp);
@@ -32,7 +35,9 @@
     temp=parseOptionalWord(true);
     if (parserIsEnded())     break;
   }
-  if (fromExpr == null && toExpr == null && rid == null)   if (clazz == null)   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from E",this));
- else   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from " + clazz.getName(),this));
+  if (where == null)   where="";
+ else   where=" WHERE " + where;
+  if (fromExpr == null && toExpr == null && rid == null)   if (clazz == null)   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from E" + where,this));
+ else   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from " + clazz.getName() + where,this));
   return this;
 }

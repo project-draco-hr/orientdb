@@ -1,0 +1,30 @@
+{
+  checkClass();
+  checkIfAttached();
+  setCurrentGraphInThreadLocal();
+  graph.autoStartTransaction();
+  final ODocument doc=getRecord();
+  if (doc == null)   throw ExceptionFactory.vertexWithIdDoesNotExist(this.getId());
+  final Iterator<Index<? extends Element>> it=graph.getIndices().iterator();
+  if (it.hasNext()) {
+    final Set<Edge> allEdges=new HashSet<Edge>();
+    for (    Edge e : getEdges(Direction.BOTH))     allEdges.add(e);
+    while (it.hasNext()) {
+      final Index<? extends Element> index=it.next();
+      if (Vertex.class.isAssignableFrom(index.getIndexClass())) {
+        OrientIndex<OrientVertex> idx=(OrientIndex<OrientVertex>)index;
+        idx.removeElement(this);
+      }
+      if (Edge.class.isAssignableFrom(index.getIndexClass())) {
+        OrientIndex<OrientEdge> idx=(OrientIndex<OrientEdge>)index;
+        for (        Edge e : allEdges)         idx.removeElement((OrientEdge)e);
+      }
+    }
+  }
+  for (  String fieldName : doc.fieldNames()) {
+    final OPair<Direction,String> connection=getConnection(Direction.BOTH,fieldName);
+    if (connection == null)     continue;
+    removeEdges(doc,fieldName,null,true,settings.useVertexFieldsForEdgeLabels);
+  }
+  super.remove();
+}

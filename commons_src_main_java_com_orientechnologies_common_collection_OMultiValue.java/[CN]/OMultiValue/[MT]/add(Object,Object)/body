@@ -1,9 +1,32 @@
 {
   if (iObject != null) {
-    if (iObject instanceof Collection<?>) {
-      final Collection<Object> coll=(Collection<Object>)iObject;
-      if (iToAdd instanceof Collection<?>) {
-        for (        Object o : (Collection<Object>)iToAdd) {
+    if (!isMultiValue(iObject)) {
+      final List<Object> result=new ArrayList<Object>();
+      result.add(iObject);
+    }
+    if (iObject instanceof Collection<?> || iObject instanceof OCollection<?>) {
+      final OCollection<Object> coll;
+      if (iObject instanceof Collection<?>) {
+        final Collection<Object> collection=(Collection<Object>)iObject;
+        coll=new OCollection<Object>(){
+          @Override public void add(          Object value){
+            collection.add(value);
+          }
+          @Override public void remove(          Object value){
+            collection.remove(value);
+          }
+          @Override public Iterator<Object> iterator(){
+            return collection.iterator();
+          }
+          @Override public int size(){
+            return collection.size();
+          }
+        }
+;
+      }
+ else       coll=(OCollection<Object>)iObject;
+      if (iToAdd instanceof Iterable<?>) {
+        for (        Object o : (Iterable<Object>)iToAdd) {
           if (isMultiValue(o))           add(coll,o);
  else           coll.add(o);
         }
@@ -17,9 +40,6 @@
       }
  else       if (iToAdd instanceof Map<?,?>) {
         for (        Entry<Object,Object> entry : ((Map<Object,Object>)iToAdd).entrySet())         coll.add(entry.getValue());
-      }
- else       if (iToAdd instanceof Iterable<?>) {
-        for (        Object o : (Iterable<?>)iToAdd)         coll.add(o);
       }
  else       if (iToAdd instanceof Iterator<?>) {
         for (Iterator<?> it=(Iterator<?>)iToAdd; it.hasNext(); )         coll.add(it.next());
@@ -45,7 +65,6 @@
       }
       return copy;
     }
- else     throw new IllegalArgumentException("Object " + iObject + " is not a multi value");
   }
   return iObject;
 }

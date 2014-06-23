@@ -1,0 +1,35 @@
+{
+  setCurrentGraphInThreadLocal();
+  final ODocument doc=getRecord();
+  OrientBaseGraph.encodeClassNames(iLabels);
+  final OMultiCollectionIterator<Edge> iterable=new OMultiCollectionIterator<Edge>().setEmbedded(true);
+  for (  String fieldName : doc.fieldNames()) {
+    final OPair<Direction,String> connection=getConnection(iDirection,fieldName,iLabels);
+    if (connection == null)     continue;
+    final Object fieldValue=doc.field(fieldName);
+    if (fieldValue != null) {
+      final OIdentifiable destinationVId=iDestination != null ? (OIdentifiable)iDestination.getId() : null;
+      if (fieldValue instanceof OIdentifiable) {
+        addSingleEdge(doc,iterable,fieldName,connection,fieldValue,destinationVId,iLabels);
+      }
+ else       if (fieldValue instanceof Collection<?>) {
+        Collection<?> coll=(Collection<?>)fieldValue;
+        if (coll.size() == 1) {
+          if (coll instanceof ORecordLazyMultiValue)           addSingleEdge(doc,iterable,fieldName,connection,((ORecordLazyMultiValue)coll).rawIterator().next(),destinationVId,iLabels);
+ else           if (coll instanceof List<?>)           addSingleEdge(doc,iterable,fieldName,connection,((List<?>)coll).get(0),destinationVId,iLabels);
+ else           addSingleEdge(doc,iterable,fieldName,connection,coll.iterator().next(),destinationVId,iLabels);
+        }
+ else {
+          if (coll instanceof ORecordLazyMultiValue) {
+            iterable.add(new OrientEdgeIterator(this,iDestination,((ORecordLazyMultiValue)coll).rawIterator(),connection,iLabels,((ORecordLazyMultiValue)coll).size()));
+          }
+ else           iterable.add(new OrientEdgeIterator(this,iDestination,coll.iterator(),connection,iLabels,-1));
+        }
+      }
+ else       if (fieldValue instanceof ORidBag) {
+        iterable.add(new OrientEdgeIterator(this,iDestination,((ORidBag)fieldValue).rawIterator(),connection,iLabels,((ORidBag)fieldValue).size()));
+      }
+    }
+  }
+  return iterable;
+}

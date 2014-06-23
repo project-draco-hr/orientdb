@@ -1,11 +1,10 @@
 {
-  checkConnection();
   if (iMode == 1 && iCallback == null)   iMode=2;
   final OPhysicalPosition ppos=new OPhysicalPosition(iDataSegmentId,-1,iRecordType);
-  OChannelBinaryClient lastNetworkUsed=null;
+  OChannelBinaryAsynchClient lastNetworkUsed=null;
   do {
     try {
-      final OChannelBinaryClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+      final OChannelBinaryAsynchClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
       lastNetworkUsed=network;
       try {
         if (network.getSrvProtocolVersion() >= 10)         network.writeInt(iDataSegmentId);
@@ -27,6 +26,7 @@ case 0:
             ppos.recordVersion=network.readVersion();
           }
  else           ppos.recordVersion=OVersionFactory.instance().createVersion();
+          if (network.getSrvProtocolVersion() >= 20)           readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
           return new OStorageOperationResult<OPhysicalPosition>(ppos);
         }
   finally {
@@ -35,6 +35,7 @@ case 0:
 case 1:
       if (iCallback != null) {
         final int sessionId=getSessionId();
+        final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
         Callable<Object> response=new Callable<Object>(){
           public Object call() throws Exception {
             final OClusterPosition result;
@@ -43,6 +44,7 @@ case 1:
               beginResponse(network);
               result=network.readClusterPosition();
               if (network.getSrvProtocolVersion() >= 11)               network.readVersion();
+              if (network.getSrvProtocolVersion() >= 20)               readCollectionChanges(network,collectionManager);
             }
   finally {
               endResponse(network);

@@ -1,12 +1,14 @@
 {
-  if (iName == null || recordingFrom < 0)   return;
-  updateMetadata(iMetadata,iDescription,METRIC_TYPE.COUNTER);
-  acquireSharedLock();
-  try {
-    if (lastSnapshot != null)     lastSnapshot.updateCounter(iName,iPlus);
-    realTime.updateCounter(iName,iPlus);
+  if (statName == null || !isRecording())   return;
+  Long oldValue;
+  Long newValue;
+  do {
+    oldValue=counters.get(statName);
+    if (oldValue == null) {
+      counters.putIfAbsent(statName,0L);
+      oldValue=counters.get(statName);
+    }
+    newValue=oldValue + plus;
   }
-  finally {
-    releaseSharedLock();
-  }
+ while (!counters.replace(statName,oldValue,newValue));
 }

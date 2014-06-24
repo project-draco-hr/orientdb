@@ -10,11 +10,14 @@
       final Runnable callback=new CommitIndexesCallback(indexes);
       final String storageType=database.getStorage().getType();
       if (storageType.equals(OEngineLocal.NAME) || storageType.equals(OEngineLocalPaginated.NAME))       database.getStorage().commit(OTransactionOptimistic.this,callback);
+ else       if (storageType.equals(OEngineMemory.NAME)) {
+        database.getStorage().commit(OTransactionOptimistic.this,null);
+        callback.run();
+      }
  else {
         database.getStorage().callInLock(new Callable<Object>(){
           @Override public Object call() throws Exception {
-            database.getStorage().commit(OTransactionOptimistic.this,null);
-            callback.run();
+            database.getStorage().commit(OTransactionOptimistic.this,callback);
             return null;
           }
         }

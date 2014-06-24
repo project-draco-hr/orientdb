@@ -3,31 +3,32 @@
   int upperBound=OStringSerializerHelper.getLowerIndexOf(parserTextUpperCase,parserGetCurrentPosition(),KEYWORD_FROM_2FIND,KEYWORD_LET_2FIND);
   if (upperBound == -1)   upperBound=parserText.length();
   int lastRealPositionProjection=-1;
-  final String projectionString=parserText.substring(parserGetCurrentPosition(),upperBound).trim();
-  if (projectionString.length() > 0) {
+  final String projectionString=parserText.substring(parserGetCurrentPosition(),upperBound);
+  if (projectionString.trim().length() > 0) {
     projections=new LinkedHashMap<String,Object>();
     projectionDefinition=new LinkedHashMap<String,String>();
     final List<String> items=OStringSerializerHelper.smartSplit(projectionString,',');
-    int beginPos;
     int endPos;
-    for (    String projection : items) {
-      projection=projection.trim();
+    for (    String projectionItem : items) {
+      String projection=OStringSerializerHelper.smartTrim(projectionItem.trim(),true,true);
       if (projectionDefinition == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() and EXPAND() operators");
       final List<String> words=OStringSerializerHelper.smartSplit(projection,' ');
-      if (words.size() > 1)       lastRealPositionProjection+=words.get(0).length();
       String fieldName;
-      endPos=projection.toUpperCase(Locale.ENGLISH).indexOf(KEYWORD_AS);
-      if (endPos > -1) {
-        fieldName=projection.substring(endPos + KEYWORD_AS.length()).trim();
-        lastRealPositionProjection+=endPos + KEYWORD_AS.length() + fieldName.length()+ 1;
-        projection=projection.substring(0,endPos).trim();
+      if (words.size() > 1 && words.get(1).trim().equalsIgnoreCase(KEYWORD_AS)) {
+        if (words.size() < 3)         throw new OCommandSQLParsingException("Found 'AS' without alias");
+        fieldName=words.get(2).trim();
         if (projectionDefinition.containsKey(fieldName))         throw new OCommandSQLParsingException("Field '" + fieldName + "' is duplicated in current SELECT, choose a different name");
+        projection=words.get(0).trim();
+        if (words.size() > 3)         lastRealPositionProjection=projectionString.indexOf(words.get(3));
+ else         lastRealPositionProjection+=projectionItem.length() + 1;
       }
  else {
-        beginPos=projection.charAt(0) == '@' ? 1 : 0;
-        endPos=extractProjectionNameSubstringEndPosition(projection);
-        fieldName=endPos > -1 ? projection.substring(beginPos,endPos) : projection.substring(beginPos);
-        fieldName=OStringSerializerHelper.getStringContent(fieldName);
+        projection=words.get(0);
+        fieldName=projection;
+        lastRealPositionProjection=projectionString.indexOf(fieldName) + fieldName.length() + 1;
+        if (fieldName.charAt(0) == '@')         fieldName=fieldName.substring(1);
+        endPos=extractProjectionNameSubstringEndPosition(fieldName);
+        if (endPos > -1)         fieldName=fieldName.substring(0,endPos);
         for (int fieldIndex=2; projectionDefinition.containsKey(fieldName); ++fieldIndex)         fieldName+=fieldIndex;
       }
       String p=projection.toUpperCase(Locale.ENGLISH);
@@ -43,6 +44,7 @@
         if (groupedResult == null && expandTarget instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)expandTarget).aggregateResults())         getProjectionGroup(null);
         continue;
       }
+      fieldName=OStringSerializerHelper.getStringContent(fieldName);
       projectionDefinition.put(fieldName,projection);
     }
     if (projectionDefinition != null && (projectionDefinition.size() > 1 || !projectionDefinition.values().iterator().next().equals("*"))) {
@@ -60,7 +62,7 @@
     }
   }
   if (upperBound < parserText.length() - 1)   parserSetCurrentPosition(upperBound);
- else   if (lastRealPositionProjection > -1)   parserMoveCurrentPosition(lastRealPositionProjection + 1);
+ else   if (lastRealPositionProjection > -1)   parserMoveCurrentPosition(lastRealPositionProjection);
  else   parserSetEndOfText();
   return parserGetCurrentPosition();
 }

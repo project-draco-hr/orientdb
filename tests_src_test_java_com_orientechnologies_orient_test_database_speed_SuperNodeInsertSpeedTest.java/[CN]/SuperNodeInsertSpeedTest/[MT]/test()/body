@@ -3,17 +3,20 @@
   superNode.save();
   graph.commit();
   final ORID superNodeId=superNode.getIdentity();
-  createLinks(WARM_UP_COUNT,superNode);
+  createLinks(WARM_UP_COUNT,superNode,graph);
   final CountDownLatch startLatch=new CountDownLatch(THREAD_COUNT);
   final CountDownLatch endLatch=new CountDownLatch(THREAD_COUNT);
   final ExecutorService executorService=Executors.newFixedThreadPool(THREAD_COUNT);
   for (int i=0; i < THREAD_COUNT; i++) {
     executorService.submit(new Callable<Long>(){
       @Override public Long call() throws Exception {
+        final OrientGraph graph=openGraph();
+        OrientVertex superNode=graph.getVertex(superNodeId);
         startLatch.countDown();
         startLatch.await();
-        long time=doTest(superNodeId);
+        long time=doTest(superNode,graph);
         endLatch.countDown();
+        graph.shutdown();
         return time;
       }
     }
@@ -23,5 +26,6 @@
   final long startTime=System.currentTimeMillis();
   endLatch.await();
   final long time=System.currentTimeMillis() - startTime;
+  executorService.shutdown();
   return time;
 }

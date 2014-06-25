@@ -40,6 +40,18 @@ break;
 case EMBEDDED:
 value=new ODocument();
 deserialize((ODocument)value,bytes);
+if (((ODocument)value).containsField(ODocumentSerializable.CLASS_NAME)) {
+String className=((ODocument)value).field(ODocumentSerializable.CLASS_NAME);
+try {
+Class<?> clazz=Class.forName(className);
+ODocumentSerializable newValue=(ODocumentSerializable)clazz.newInstance();
+newValue.fromDocument((ODocument)value);
+value=newValue;
+}
+ catch (Exception e) {
+throw new RuntimeException(e);
+}
+}
 break;
 case EMBEDDEDSET:
 value=readEmbeddedCollection(bytes,new OTrackedSet<Object>(document),document);
@@ -48,17 +60,13 @@ case EMBEDDEDLIST:
 value=readEmbeddedCollection(bytes,new OTrackedList<Object>(document),document);
 break;
 case LINKSET:
-value=readLinkCollection(bytes,new OMVRBTreeRIDSet(document));
+value=readLinkCollection(bytes,new ORecordLazySet(document));
 break;
 case LINKLIST:
 value=readLinkCollection(bytes,new ORecordLazyList(document));
 break;
 case BINARY:
-Number n=OVarIntSerializer.read(bytes);
-byte[] newValue=new byte[n.intValue()];
-System.arraycopy(bytes.bytes,bytes.offset,newValue,0,newValue.length);
-bytes.read(n.intValue());
-value=newValue;
+value=readBinary(bytes);
 break;
 case LINK:
 value=readOptimizedLink(bytes);
@@ -81,6 +89,16 @@ break;
 case TRANSIENT:
 break;
 case CUSTOM:
+try {
+String className=readString(bytes);
+Class<?> clazz=Class.forName(className);
+OSerializableStream stream=(OSerializableStream)clazz.newInstance();
+stream.fromStream(readBinary(bytes));
+value=stream;
+}
+ catch (Exception e) {
+throw new RuntimeException(e);
+}
 break;
 case ANY:
 break;

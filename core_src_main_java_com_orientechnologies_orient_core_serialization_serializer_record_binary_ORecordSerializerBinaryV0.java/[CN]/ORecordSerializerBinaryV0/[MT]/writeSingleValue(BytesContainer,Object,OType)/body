@@ -35,7 +35,14 @@ pointer=OVarIntSerializer.write(bytes,(((Date)value).getTime() + ONE_HOUR) / MIL
 break;
 case EMBEDDED:
 pointer=bytes.offset;
+if (value instanceof ODocumentSerializable) {
+ODocument cur=((ODocumentSerializable)value).toDocument();
+cur.field(ODocumentSerializable.CLASS_NAME,value.getClass().getName());
+serialize(cur,bytes);
+}
+ else {
 serialize((ODocument)value,bytes);
+}
 break;
 case EMBEDDEDSET:
 case EMBEDDEDLIST:
@@ -48,10 +55,7 @@ pointer=bytes.alloc(ODecimalSerializer.INSTANCE.getObjectSize(decimalValue));
 ODecimalSerializer.INSTANCE.serialize(decimalValue,bytes.bytes,pointer);
 break;
 case BINARY:
-byte[] valueBytes=(byte[])(value);
-pointer=OVarIntSerializer.write(bytes,valueBytes.length);
-int start=bytes.alloc(valueBytes.length);
-System.arraycopy(valueBytes,0,bytes.bytes,start,valueBytes.length);
+pointer=writeBinary(bytes,(byte[])(value));
 break;
 case LINKSET:
 case LINKLIST:
@@ -72,6 +76,8 @@ pointer=((ORidBag)value).toStream(bytes);
 case TRANSIENT:
 break;
 case CUSTOM:
+pointer=writeString(bytes,value.getClass().getName());
+writeBinary(bytes,((OSerializableStream)value).toStream());
 break;
 case ANY:
 break;

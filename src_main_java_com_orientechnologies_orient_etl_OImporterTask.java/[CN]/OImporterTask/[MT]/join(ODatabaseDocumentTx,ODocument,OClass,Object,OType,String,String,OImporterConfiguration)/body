@@ -1,0 +1,35 @@
+{
+  final int pos=joinTargetField.indexOf('.');
+  final String[] parts=new String[2];
+  parts[0]=joinTargetField.substring(0,pos);
+  parts[1]=joinTargetField.substring(pos + 1);
+  final OClass targetClass=db.getMetadata().getSchema().getClass(parts[0]);
+  if (targetClass == null)   throw new IllegalArgumentException(String.format("* Found join '%s' but target class not exists",joinTargetField));
+  final OProperty targetProperty=targetClass.getProperty(parts[1]);
+  if (targetProperty != null && !targetProperty.getAllIndexes().isEmpty()) {
+    final OIndex<?> idx=targetProperty.getAllIndexes().iterator().next();
+    if (idx.getType().equals("UNIQUE")) {
+      fieldValue=OType.convert(fieldValue,idx.getKeyTypes()[0].getDefaultJavaType());
+      final Object res=((OIndex<OIdentifiable>)idx).get(fieldValue);
+      if (res == null)       iTemplate.getImplementation().onJoinNotFound(db,context,idx,fieldValue);
+      return res;
+    }
+  }
+  final String q="select from " + parts[0] + " where "+ parts[1]+ " = '"+ fieldValue+ "'";
+  final List<OIdentifiable> result=db.query(new OSQLSynchQuery<Object>(q));
+  if (result == null || result.isEmpty()) {
+    OLogManager.instance().warn(this,"     + line %d: join record not found from query '%s'",currentLine,q);
+    warnings++;
+  }
+  OClass edgeClass;
+  edgeClass=null;
+  if (edgeClass != null) {
+  }
+ else   if (fieldType == OType.LINK) {
+    if (result.size() > 1)     throw new IllegalArgumentException(String.format("* Found join '%s' against multiple records (%d) using key = %s, while it's configured for only one",joinTargetField,result.size(),fieldValue));
+    fieldValue=result.get(0).getIdentity();
+  }
+ else   if (fieldType == OType.LINKSET)   fieldValue=result;
+ else   if (fieldType == OType.LINKLIST)   fieldValue=result;
+  return fieldValue;
+}

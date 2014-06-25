@@ -1,0 +1,82 @@
+{
+  errors=0;
+  warnings=0;
+  recordsImportedInFile=0;
+  recordsCreated=0;
+  recordsUpdated=0;
+  recordsJoined=0;
+  byteParsed=0;
+  byteToParse=f.length();
+  final long startTime=System.currentTimeMillis();
+  try {
+    String fileName=f.getName();
+    if (f.getName().indexOf("-") > -1)     fileName=fileName.substring(0,f.getName().indexOf("-"));
+ else     if (f.getName().endsWith(".gz"))     fileName=fileName.substring(0,f.getName().length() - ".gz".length());
+    if (fileName.endsWith(data.importFileExtension))     fileName=fileName.substring(0,fileName.length() - data.importFileExtension.length());
+    final int extPos=f.getName().indexOf('.');
+    final String finalFileName=extPos > -1 ? f.getName().substring(0,extPos) : f.getName();
+    final String finalFileExtension=extPos > -1 ? f.getName().substring(extPos) : "";
+    if (template == null)     return false;
+    final OClass cls=checkSchema(db,template);
+    final OSQLSynchQuery<ODocument> lookupQuery=getLookupQuery(template);
+    final RandomAccessFile raf=new RandomAccessFile(f,"rw");
+    try {
+      final FileChannel channel=raf.getChannel();
+      final java.nio.channels.FileLock lock=channel.tryLock();
+      try {
+        if (lock == null) {
+          OLogManager.instance().debug(this,"File locked, retry it later...",f);
+          return false;
+        }
+        InputStreamReader fileReader=null;
+        final FileInputStream fis=new FileInputStream(f);
+        try {
+          if (f.getName().endsWith(".gz"))           fileReader=new InputStreamReader(new GZIPInputStream(fis));
+ else           fileReader=new FileReader(f);
+          final BufferedReader br=new BufferedReader(fileReader);
+          try {
+            String thisLine;
+            currentLine=-1;
+            lastLap=0;
+            context=new OBasicCommandContext();
+            context.setVariable("fileName",f.getName());
+            context.setVariable("errors",0);
+            context.setVariable("warnings",0);
+            template.getImplementation().onBeforeFile(db,context);
+            if (Boolean.TRUE.equals(context.getVariable("skip"))) {
+              OLogManager.instance().info(this,"Skipped file %s",f.getName());
+              return false;
+            }
+            while ((thisLine=br.readLine()) != null) {
+              byteParsed+=thisLine.length() + 1;
+              importLine(db,template,cls,lookupQuery,thisLine);
+            }
+            dumpProgress(db,template);
+            template.getImplementation().onAfterFile(db,context);
+            context=null;
+          }
+  finally {
+            br.close();
+          }
+        }
+  finally {
+          fis.close();
+          if (fileReader != null)           fileReader.close();
+        }
+      }
+  finally {
+        if (lock != null)         lock.release();
+        channel.close();
+      }
+    }
+  finally {
+      raf.close();
+    }
+    callback.onAfterProcessingFile(f);
+  }
+ catch (  Throwable e) {
+    OLogManager.instance().error(this,"Error on importing file %s (imported rows: %d)",e,f,recordsImportedInFile);
+    errors++;
+  }
+  return true;
+}

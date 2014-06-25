@@ -1,0 +1,39 @@
+{
+  if (template.getClassName() != null && !record.getClassName().equals(template.getClassName()))   record.setClassName(template.getClassName());
+  while (iFieldNames.hasNext() && iFieldValues.hasNext()) {
+    final String fieldName=iFieldNames.next();
+    Object fieldValue=iFieldValues.next();
+    final OType fieldType=template.getFieldType(fieldName);
+    if (fieldType == null)     continue;
+    if (fieldValue != null) {
+      if (template.getTrims().contains(fieldName))       fieldValue=fieldValue.toString().trim();
+      fieldValue=OStringSerializerHelper.getStringContent(fieldValue);
+    }
+    try {
+      if (fieldValue != null) {
+        if (fieldValue.toString().length() == 0 || fieldValue.toString().equals(data.nullValue))         fieldValue=null;
+ else {
+          final String joinTargetField=template.getFieldTargetJoin(fieldName);
+          final String edgeClass=template.getFieldEdge(fieldName);
+          if (joinTargetField != null) {
+            fieldValue=join(db,record,cls,fieldValue,fieldType,joinTargetField,edgeClass,template);
+            recordsJoined++;
+          }
+ else           if (fieldType == OType.DATE || fieldType == OType.DATETIME) {
+            final SimpleDateFormat df=new SimpleDateFormat(template.getFieldFormatDetail(fieldName));
+            df.setTimeZone(TimeZone.getTimeZone("UTC"));
+            fieldValue=df.parse((String)fieldValue);
+          }
+ else {
+            fieldValue=OType.convert(fieldValue,fieldType.getDefaultJavaType());
+          }
+        }
+      }
+      record.field(fieldName,fieldValue);
+    }
+ catch (    Exception e) {
+      OLogManager.instance().info(this,"* Error on row %d field %s",e,currentLine,fieldName);
+      continue;
+    }
+  }
+}

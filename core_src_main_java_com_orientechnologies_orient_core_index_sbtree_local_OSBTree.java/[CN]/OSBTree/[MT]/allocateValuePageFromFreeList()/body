@@ -1,7 +1,6 @@
 {
   OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
-  OCachePointer rootCachePointer=rootCacheEntry.getCachePointer();
-  OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCachePointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+  OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
   long freeListFirstIndex;
   try {
     freeListFirstIndex=rootBucket.getValuesFreeListFirstIndex();
@@ -11,22 +10,20 @@
   }
   if (freeListFirstIndex >= 0) {
     OCacheEntry freePageEntry=diskCache.load(fileId,freeListFirstIndex,false);
-    OCachePointer freePageCachePointer=freePageEntry.getCachePointer();
-    OSBTreeValuePage valuePage=new OSBTreeValuePage(freePageCachePointer.getDataPointer(),getTrackMode(),false);
-    freePageCachePointer.acquireExclusiveLock();
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(freePageEntry,getTrackMode(),false);
+    freePageEntry.acquireExclusiveLock();
     try {
       long nextFreeListIndex=valuePage.getNextFreeListPage();
       rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
-      rootCachePointer=rootCacheEntry.getCachePointer();
-      rootCachePointer.acquireExclusiveLock();
-      rootBucket=new OSBTreeBucket<K,V>(rootCachePointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,getTrackMode());
+      rootCacheEntry.acquireExclusiveLock();
+      rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,keySerializer,keyTypes,valueSerializer,getTrackMode());
       try {
         rootBucket.setValuesFreeListFirstIndex(nextFreeListIndex);
         rootCacheEntry.markDirty();
         logPageChanges(rootBucket,fileId,ROOT_INDEX,false);
       }
   finally {
-        rootCachePointer.releaseExclusiveLock();
+        rootCacheEntry.releaseExclusiveLock();
         diskCache.release(rootCacheEntry);
       }
       valuePage.setNextFreeListPage(-1);
@@ -34,7 +31,7 @@
       logPageChanges(valuePage,fileId,freePageEntry.getPageIndex(),false);
     }
   finally {
-      freePageCachePointer.releaseExclusiveLock();
+      freePageEntry.releaseExclusiveLock();
       diskCache.release(freePageEntry);
     }
     return freePageEntry.getPageIndex();

@@ -8,20 +8,18 @@
       isNewPage=true;
     }
     OCacheEntry cacheEntry=diskCache.load(fileId,lastPage,false);
-    OCachePointer cachePointer=cacheEntry.getCachePointer();
-    cachePointer.acquireExclusiveLock();
+    cacheEntry.acquireExclusiveLock();
     try {
       startAtomicOperation();
       final ODurablePage.TrackMode trackMode=getTrackMode();
-      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,trackMode);
       if (bucket.isFull()) {
-        cachePointer.releaseExclusiveLock();
+        cacheEntry.releaseExclusiveLock();
         diskCache.release(cacheEntry);
         isNewPage=true;
         cacheEntry=diskCache.allocateNewPage(fileId);
-        cachePointer=cacheEntry.getCachePointer();
-        cachePointer.acquireExclusiveLock();
-        bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+        cacheEntry.acquireExclusiveLock();
+        bucket=new OClusterPositionMapBucket(cacheEntry,trackMode);
       }
       final long index=bucket.add(pageIndex,recordPosition);
       final OClusterPosition result=OClusterPositionFactory.INSTANCE.valueOf(index + cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES);
@@ -35,7 +33,7 @@
       throw new OStorageException("Error during creation of mapping between logical adn physical record position.",e);
     }
  finally {
-      cachePointer.releaseExclusiveLock();
+      cacheEntry.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
   }

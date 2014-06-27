@@ -1,0 +1,48 @@
+{
+  String dbURL=null;
+  String dbUser="admin";
+  String dbPassword="admin";
+  boolean dbAutoCreate=true;
+  Object cfgExtract;
+  Object cfgTransformers;
+  Object cfgLoaders;
+  for (int i=0; i < args.length; ++i) {
+    final String arg=args[i];
+    if (arg.equalsIgnoreCase("-dbUrl"))     dbURL=args[++i];
+ else     if (arg.equalsIgnoreCase("-dbUser"))     dbUser=args[++i];
+ else     if (arg.equalsIgnoreCase("-dbPassword"))     dbPassword=args[++i];
+ else     if (arg.equalsIgnoreCase("-dbAutoCreate"))     dbAutoCreate=Boolean.parseBoolean(args[++i]);
+ else     if (arg.equalsIgnoreCase("-config")) {
+      final String cfgPath=args[++i];
+      try {
+        final String config=OIOUtils.readFileAsString(new File(cfgPath));
+        final ODocument cfg=new ODocument().fromJSON(config);
+        cfgExtract=cfg.field("extractors");
+        cfgTransformers=cfg.field("transformers");
+        cfgLoaders=cfg.field("loaders");
+      }
+ catch (      IOException e) {
+        throw new OConfigurationException("Error on loading config file: " + cfgPath);
+      }
+    }
+ else     if (arg.equalsIgnoreCase("-e")) {
+      cfgExtract=new ODocument().fromJSON(args[++i]);
+    }
+ else     if (arg.equalsIgnoreCase("-t")) {
+      cfgTransformers=new ODocument().fromJSON(args[++i]);
+    }
+ else     if (arg.equalsIgnoreCase("-l")) {
+      cfgLoaders=new ODocument().fromJSON(args[++i]);
+    }
+  }
+  if (dbURL == null)   throw new IllegalArgumentException("Argument dbURL not found");
+  final ODatabaseDocumentTx db=new ODatabaseDocumentTx(dbURL);
+  if (db.exists())   db.open(dbUser,dbPassword);
+ else {
+    if (dbAutoCreate)     db.create();
+ else     throw new IllegalArgumentException("Database '" + dbURL + "' not exists and 'dbAutoCreate' setting is false");
+  }
+  final OETLProcessor processor=new OETLProcessor(new OCSVTransformer(),new ONullTransformer(),new OOrientLoader());
+  processor.configure(db,null);
+  processor.execute();
+}

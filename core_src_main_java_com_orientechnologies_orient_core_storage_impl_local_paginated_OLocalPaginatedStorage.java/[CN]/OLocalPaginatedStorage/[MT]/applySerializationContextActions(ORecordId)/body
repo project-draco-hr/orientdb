@@ -1,0 +1,44 @@
+{
+  checkOpeness();
+  final long timer=Orient.instance().getProfiler().startChrono();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  cluster.getExternalModificationLock().requestModificationLock();
+  try {
+    modificationLock.requestModificationLock();
+    try {
+      lock.acquireSharedLock();
+      try {
+        lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        try {
+          dirtyFlag.makeDirty();
+          atomicOperationsManager.startAtomicOperation();
+          try {
+            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+            if (context != null)             context.executeOperations(this);
+            atomicOperationsManager.endAtomicOperation(false);
+          }
+ catch (          RuntimeException e) {
+            atomicOperationsManager.endAtomicOperation(true);
+            throw e;
+          }
+        }
+  finally {
+          lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        }
+      }
+ catch (      IOException e) {
+        OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",e);
+      }
+ finally {
+        lock.releaseSharedLock();
+      }
+    }
+  finally {
+      modificationLock.releaseModificationLock();
+    }
+  }
+  finally {
+    cluster.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
+  }
+}

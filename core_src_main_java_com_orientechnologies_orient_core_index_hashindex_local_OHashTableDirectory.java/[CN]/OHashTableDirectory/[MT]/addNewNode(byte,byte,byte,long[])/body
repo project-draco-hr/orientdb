@@ -4,10 +4,9 @@
   startAtomicOperation();
   try {
     diskCache.loadPinnedPage(firstEntry);
-    final OCachePointer firstPagePointer=firstEntry.getCachePointer();
-    firstPagePointer.acquireExclusiveLock();
+    firstEntry.acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstPagePointer.getDataPointer(),getTrackMode(),firstEntry);
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getTrackMode(),firstEntry);
       final int tombstone=firstPage.getTombstone();
       if (tombstone >= 0)       nodeIndex=tombstone;
  else {
@@ -35,10 +34,9 @@
         }
         OCacheEntry cacheEntry=entries.get(pageIndex);
         diskCache.loadPinnedPage(cacheEntry);
-        OCachePointer cachePointer=cacheEntry.getCachePointer();
-        cachePointer.acquireExclusiveLock();
+        cacheEntry.acquireExclusiveLock();
         try {
-          ODirectoryPage page=new ODirectoryPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,cacheEntry);
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,ODurablePage.TrackMode.NONE,cacheEntry);
           page.setMaxLeftChildDepth(localLevel,maxLeftChildDepth);
           page.setMaxRightChildDepth(localLevel,maxRightChildDepth);
           page.setNodeLocalDepth(localLevel,nodeLocalDepth);
@@ -48,15 +46,14 @@
           logPageChanges(page,cacheEntry.getFileId(),firstEntry.getPageIndex(),newPage);
         }
   finally {
-          cachePointer.releaseExclusiveLock();
+          cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
       }
-      firstEntry.markDirty();
       logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
-      firstPagePointer.releaseExclusiveLock();
+      firstEntry.releaseExclusiveLock();
       diskCache.release(firstEntry);
     }
     endAtomicOperation(false);

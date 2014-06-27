@@ -5,12 +5,11 @@
     long pageIndex=position / OClusterPositionMapBucket.MAX_ENTRIES;
     int index=(int)(position % OClusterPositionMapBucket.MAX_ENTRIES);
     final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-    final OCachePointer cachePointer=cacheEntry.getCachePointer();
-    cachePointer.acquireExclusiveLock();
+    cacheEntry.acquireExclusiveLock();
     try {
       startAtomicOperation();
       final ODurablePage.TrackMode trackMode=getTrackMode();
-      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cachePointer.getDataPointer(),trackMode);
+      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,trackMode);
       OClusterPositionMapBucket.PositionEntry positionEntry=bucket.remove(index);
       if (positionEntry == null)       return null;
       cacheEntry.markDirty();
@@ -23,7 +22,7 @@
       throw new OStorageException("Error during removal of mapping between logical and physical record position.",e);
     }
  finally {
-      cachePointer.releaseExclusiveLock();
+      cacheEntry.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
   }

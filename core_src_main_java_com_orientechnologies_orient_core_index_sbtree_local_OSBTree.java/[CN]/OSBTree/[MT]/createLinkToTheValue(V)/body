@@ -8,10 +8,9 @@
   if (freeListPageIndex < 0)   cacheEntry=diskCache.allocateNewPage(fileId);
  else   cacheEntry=diskCache.load(fileId,freeListPageIndex,false);
   final long valueLink=cacheEntry.getPageIndex();
-  OCachePointer cachePointer=cacheEntry.getCachePointer();
-  cachePointer.acquireExclusiveLock();
+  cacheEntry.acquireExclusiveLock();
   try {
-    OSBTreeValuePage valuePage=new OSBTreeValuePage(cachePointer.getDataPointer(),getTrackMode(),freeListPageIndex >= 0);
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getTrackMode(),freeListPageIndex >= 0);
     position=valuePage.fillBinaryContent(serializeValue,position);
     valuePage.setNextFreeListPage(-1);
     valuePage.setNextPage(-1);
@@ -20,7 +19,7 @@
  else     logPageChanges(valuePage,fileId,cacheEntry.getPageIndex(),false);
   }
   finally {
-    cachePointer.releaseExclusiveLock();
+    cacheEntry.releaseExclusiveLock();
     diskCache.release(cacheEntry);
   }
   long prevPage=valueLink;
@@ -28,10 +27,9 @@
     freeListPageIndex=allocateValuePageFromFreeList();
     if (freeListPageIndex < 0)     cacheEntry=diskCache.allocateNewPage(fileId);
  else     cacheEntry=diskCache.load(fileId,freeListPageIndex,false);
-    cachePointer=cacheEntry.getCachePointer();
-    cachePointer.acquireExclusiveLock();
+    cacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeValuePage valuePage=new OSBTreeValuePage(cachePointer.getDataPointer(),getTrackMode(),freeListPageIndex >= 0);
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getTrackMode(),freeListPageIndex >= 0);
       position=valuePage.fillBinaryContent(serializeValue,position);
       valuePage.setNextFreeListPage(-1);
       valuePage.setNextPage(-1);
@@ -40,20 +38,19 @@
  else       logPageChanges(valuePage,fileId,cacheEntry.getPageIndex(),false);
     }
   finally {
-      cachePointer.releaseExclusiveLock();
+      cacheEntry.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
     OCacheEntry prevPageCacheEntry=diskCache.load(fileId,prevPage,false);
-    OCachePointer prevPageCachePointer=prevPageCacheEntry.getCachePointer();
-    prevPageCachePointer.acquireExclusiveLock();
+    prevPageCacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeValuePage valuePage=new OSBTreeValuePage(prevPageCachePointer.getDataPointer(),getTrackMode(),freeListPageIndex >= 0);
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(prevPageCacheEntry,getTrackMode(),freeListPageIndex >= 0);
       valuePage.setNextPage(cacheEntry.getPageIndex());
       prevPageCacheEntry.markDirty();
       logPageChanges(valuePage,fileId,prevPage,false);
     }
   finally {
-      prevPageCachePointer.releaseExclusiveLock();
+      prevPageCacheEntry.releaseExclusiveLock();
       diskCache.release(prevPageCacheEntry);
     }
     prevPage=cacheEntry.getPageIndex();

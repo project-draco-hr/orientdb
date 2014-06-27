@@ -1,15 +1,14 @@
 {
   for (long pageIndex=0; pageIndex < MAX_LEVEL_SIZE; pageIndex++) {
     final OCacheEntry cacheEntry=loadPageEntry(pageIndex,0);
-    final OCachePointer pagePointer=cacheEntry.getCachePointer();
-    pagePointer.acquireExclusiveLock();
+    cacheEntry.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,getTrackMode());
+      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,cacheEntry,keySerializer,valueSerializer,keyTypes,getTrackMode());
       cacheEntry.markDirty();
       logPageChanges(emptyBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),true);
     }
   finally {
-      pagePointer.releaseExclusiveLock();
+      cacheEntry.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
   }
@@ -18,17 +17,16 @@
   directory.clear();
   directory.addNewNode((byte)0,(byte)0,(byte)MAX_LEVEL_DEPTH,rootTree);
   diskCache.loadPinnedPage(hashStateEntry);
-  OCachePointer hashStatePointer=hashStateEntry.getCachePointer();
-  hashStatePointer.acquireExclusiveLock();
+  hashStateEntry.acquireExclusiveLock();
   try {
-    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStatePointer.getDataPointer(),getTrackMode(),false);
+    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
     metadataPage.setBucketsCount(0,MAX_LEVEL_SIZE);
     metadataPage.setRecordsCount(0);
     hashStateEntry.markDirty();
     logPageChanges(metadataPage,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
   }
   finally {
-    hashStatePointer.releaseExclusiveLock();
+    hashStateEntry.releaseExclusiveLock();
     diskCache.release(hashStateEntry);
   }
 }

@@ -1,0 +1,38 @@
+{
+  ODocument adamDoc=new ODocument("InnerDocCreationFieldTypes");
+  adamDoc.fromJSON("{\"name\":\"adam\"}");
+  adamDoc.save();
+  ODocument eveDoc=new ODocument("InnerDocCreationFieldTypes");
+  eveDoc.fromJSON("{\"@type\":\"d\", \"@fieldTypes\" : \"friends=z\", \"name\":\"eve\",\"friends\":[" + adamDoc.getIdentity() + "]}");
+  eveDoc.save();
+  Map<ORID,ODocument> contentMap=new HashMap<ORID,ODocument>();
+  ODocument adam=new ODocument("InnerDocCreationFieldTypes");
+  adam.field("name","adam");
+  contentMap.put(adamDoc.getIdentity(),adam);
+  ODocument eve=new ODocument("InnerDocCreationFieldTypes");
+  eve.field("name","eve");
+  List<ORID> friends=new ArrayList<ORID>();
+  friends.add(adamDoc.getIdentity());
+  eve.field("friends",friends);
+  contentMap.put(eveDoc.getIdentity(),eve);
+  Map<ORID,List<ORID>> traverseMap=new HashMap<ORID,List<ORID>>();
+  List<ORID> adamTraverse=new ArrayList<ORID>();
+  adamTraverse.add(adamDoc.getIdentity());
+  traverseMap.put(adamDoc.getIdentity(),adamTraverse);
+  List<ORID> eveTraverse=new ArrayList<ORID>();
+  eveTraverse.add(eveDoc.getIdentity());
+  eveTraverse.add(adamDoc.getIdentity());
+  traverseMap.put(eveDoc.getIdentity(),eveTraverse);
+  for (  ODocument o : database.browseClass("InnerDocCreationFieldTypes")) {
+    ODocument content=contentMap.get(o.getIdentity());
+    Assert.assertTrue(content.hasSameContentOf(o));
+  }
+  for (  ODocument o : database.browseClass("InnerDocCreationFieldTypes")) {
+    List<ORID> traverse=traverseMap.remove(o.getIdentity());
+    for (    OIdentifiable id : new OSQLSynchQuery<ODocument>("traverse * from " + o.getIdentity().toString())) {
+      Assert.assertTrue(traverse.remove(id.getIdentity()));
+    }
+    Assert.assertTrue(traverse.isEmpty());
+  }
+  Assert.assertTrue(traverseMap.isEmpty());
+}

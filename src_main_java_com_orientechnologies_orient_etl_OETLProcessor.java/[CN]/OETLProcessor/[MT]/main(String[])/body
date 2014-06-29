@@ -3,9 +3,9 @@
   String dbUser="admin";
   String dbPassword="admin";
   boolean dbAutoCreate=true;
-  Object cfgExtract;
-  Object cfgTransformers;
-  Object cfgLoaders;
+  Object cfgExtract=null;
+  Object cfgTransformers=null;
+  Object cfgLoaders=null;
   for (int i=0; i < args.length; ++i) {
     final String arg=args[i];
     if (arg.equalsIgnoreCase("-dbUrl"))     dbURL=args[++i];
@@ -42,7 +42,14 @@
     if (dbAutoCreate)     db.create();
  else     throw new IllegalArgumentException("Database '" + dbURL + "' not exists and 'dbAutoCreate' setting is false");
   }
-  final OETLProcessor processor=new OETLProcessor(new OCSVTransformer(),new ONullTransformer(),new OOrientLoader());
+  final List<OExtractor> extractors=new ArrayList<OExtractor>();
+  final List<OTransformer> transformers=new ArrayList<OTransformer>();
+  final List<OLoader> loaders=new ArrayList<OLoader>();
+  if (cfgExtract instanceof Iterable) {
+    for (    Object o : (Iterable)cfgExtract)     extractors.add((OExtractor)o);
+  }
+ else   if (cfgExtract instanceof OExtractor)   extractors.add((OExtractor)cfgExtract);
+  final OETLProcessor processor=new OETLProcessor(extractors,transformers,loaders);
   processor.configure(db,null);
   processor.execute();
 }

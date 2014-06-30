@@ -1,5 +1,5 @@
 {
-  OWriteAheadLog log=new OWriteAheadLog(4,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,storage);
+  ODiskWriteAheadLog log=new ODiskWriteAheadLog(4,-1,10 * 1024L * OWALPage.PAGE_SIZE,100L * 1024 * 1024* 1024,storage);
   OLogSequenceNumber lsn=log.begin();
   List<OWALRecord> atomicUnit=new ArrayList<OWALRecord>();
   boolean atomicChangeIsProcessed=false;
@@ -19,16 +19,15 @@
         final long pageIndex=updatePageRecord.getPageIndex();
         if (!testDiskCache.isOpen(fileId))         testDiskCache.openFile(fileId);
         final OCacheEntry cacheEntry=testDiskCache.load(fileId,pageIndex,true);
-        final OCachePointer cachePointer=cacheEntry.getCachePointer();
-        cachePointer.acquireExclusiveLock();
+        cacheEntry.acquireExclusiveLock();
         try {
-          ODurablePage durablePage=new ODurablePage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE);
+          ODurablePage durablePage=new ODurablePage(cacheEntry,ODurablePage.TrackMode.NONE);
           durablePage.restoreChanges(updatePageRecord.getChanges());
           durablePage.setLsn(updatePageRecord.getLsn());
           cacheEntry.markDirty();
         }
   finally {
-          cachePointer.releaseExclusiveLock();
+          cacheEntry.releaseExclusiveLock();
           testDiskCache.release(cacheEntry);
         }
       }

@@ -1,7 +1,10 @@
 {
   ODirectMemoryPointer pagePointer=new ODirectMemoryPointer(new byte[OClusterPage.PAGE_SIZE]);
+  OCachePointer cachePointer=new OCachePointer(pagePointer,new OLogSequenceNumber(0,0));
+  cachePointer.incrementReferrer();
+  OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
   try {
-    OClusterPage localPage=new OClusterPage(pagePointer,true,ODurablePage.TrackMode.FULL);
+    OClusterPage localPage=new OClusterPage(cacheEntry,true,ODurablePage.TrackMode.FULL);
     int freeSpace=localPage.getFreeSpace();
     Assert.assertEquals(localPage.getRecordsCount(),0);
     ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
@@ -17,6 +20,6 @@
     assertChangesTracking(localPage,pagePointer);
   }
   finally {
-    pagePointer.free();
+    cachePointer.decrementReferrer();
   }
 }

@@ -7,7 +7,10 @@
     keys.add(random.nextLong());
   }
   ODirectMemoryPointer pointer=new ODirectMemoryPointer(OSBTreeBucket.MAX_PAGE_SIZE_BYTES);
-  OSBTreeBucket<Long,OIdentifiable> treeBucket=new OSBTreeBucket<Long,OIdentifiable>(pointer,true,OLongSerializer.INSTANCE,null,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
+  OCachePointer cachePointer=new OCachePointer(pointer,new OLogSequenceNumber(0,0));
+  cachePointer.incrementReferrer();
+  OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
+  OSBTreeBucket<Long,OIdentifiable> treeBucket=new OSBTreeBucket<Long,OIdentifiable>(cacheEntry,true,OLongSerializer.INSTANCE,null,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
   int index=0;
   for (  Long key : keys) {
     if (!treeBucket.addEntry(index,new OSBTreeBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,key,new OSBTreeValue<OIdentifiable>(false,-1,new ORecordId(index,OClusterPositionFactory.INSTANCE.valueOf(index)))),true))     break;
@@ -46,5 +49,5 @@
   }
   Assert.assertEquals(treeBucket.size(),originalSize);
   Assert.assertEquals(addedKeys,keysToAdd);
-  pointer.free();
+  cachePointer.decrementReferrer();
 }

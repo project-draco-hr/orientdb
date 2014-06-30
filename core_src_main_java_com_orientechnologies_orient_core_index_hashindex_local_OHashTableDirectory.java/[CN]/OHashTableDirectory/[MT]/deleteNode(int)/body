@@ -3,10 +3,9 @@
   startAtomicOperation();
   try {
     diskCache.loadPinnedPage(firstEntry);
-    final OCachePointer firstPagePointer=firstEntry.getCachePointer();
-    firstPagePointer.acquireExclusiveLock();
+    firstEntry.acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstPagePointer.getDataPointer(),ODurablePage.TrackMode.NONE,firstEntry);
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,ODurablePage.TrackMode.NONE,firstEntry);
       if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
         firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
         firstPage.setTombstone(nodeIndex);
@@ -16,25 +15,23 @@
         final int localNodeIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) % ODirectoryPage.NODES_PER_PAGE;
         final OCacheEntry cacheEntry=entries.get(pageIndex);
         diskCache.loadPinnedPage(cacheEntry);
-        OCachePointer cachePointer=cacheEntry.getCachePointer();
-        cachePointer.acquireExclusiveLock();
+        cacheEntry.acquireExclusiveLock();
         try {
-          ODirectoryPage page=new ODirectoryPage(cachePointer.getDataPointer(),ODurablePage.TrackMode.NONE,cacheEntry);
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,ODurablePage.TrackMode.NONE,cacheEntry);
           page.setPointer(localNodeIndex,0,firstPage.getTombstone());
           firstPage.setTombstone(nodeIndex);
           cacheEntry.markDirty();
           logPageChanges(page,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
   finally {
-          cachePointer.releaseExclusiveLock();
+          cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
       }
-      firstEntry.markDirty();
       logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
-      firstPagePointer.releaseExclusiveLock();
+      firstEntry.releaseExclusiveLock();
       diskCache.release(firstEntry);
     }
     endAtomicOperation(false);

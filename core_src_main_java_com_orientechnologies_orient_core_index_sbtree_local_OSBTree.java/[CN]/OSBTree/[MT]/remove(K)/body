@@ -7,11 +7,10 @@
       BucketSearchResult bucketSearchResult=findBucket(key);
       if (bucketSearchResult.itemIndex < 0)       return null;
       OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
-      OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
-      keyBucketPointer.acquireExclusiveLock();
+      keyBucketCacheEntry.acquireExclusiveLock();
       try {
         startAtomicOperation();
-        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,getTrackMode());
+        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getTrackMode());
         final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
         final V value=readValue(removed);
         long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
@@ -23,7 +22,7 @@
         return value;
       }
   finally {
-        keyBucketPointer.releaseExclusiveLock();
+        keyBucketCacheEntry.releaseExclusiveLock();
         diskCache.release(keyBucketCacheEntry);
       }
     }
@@ -32,19 +31,17 @@
       startAtomicOperation();
       V removedValue=null;
       OCacheEntry nullCacheEntry=diskCache.load(nullBucketFileId,0,false);
-      OCachePointer nullCachePointer=nullCacheEntry.getCachePointer();
-      nullCachePointer.acquireExclusiveLock();
+      nullCacheEntry.acquireExclusiveLock();
       try {
-        ONullBucket<V> nullBucket=new ONullBucket<V>(nullCachePointer.getDataPointer(),getTrackMode(),valueSerializer,false);
+        ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getTrackMode(),valueSerializer,false);
         OSBTreeValue<V> treeValue=nullBucket.getValue();
         if (treeValue == null)         return null;
         removedValue=readValue(treeValue);
         nullBucket.removeValue();
         logPageChanges(nullBucket,nullBucketFileId,0,false);
-        nullCacheEntry.markDirty();
       }
   finally {
-        nullCachePointer.releaseExclusiveLock();
+        nullCacheEntry.releaseExclusiveLock();
         diskCache.release(nullCacheEntry);
       }
       if (removedValue != null)       setSize(size() - 1);

@@ -13,7 +13,7 @@
   }
   query.setUseCache(false);
   query.setContext(context);
-  allUpdatedRecords=new ArrayList<ORecord<?>>();
+  returnHandler.reset();
   if (lockStrategy.equals("RECORD"))   query.getContext().setVariable("$locking",OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK);
   for (int r=0; r < retry; ++r) {
     try {
@@ -25,36 +25,16 @@
       if (wait > 0)       try {
         Thread.sleep(wait);
       }
- catch (      InterruptedException e1) {
+ catch (      InterruptedException ignored) {
       }
     }
   }
-  if (upsertMode && recordCount == 0) {
+  if (upsertMode && !updated) {
     final ODocument doc=subjectName != null ? new ODocument(subjectName) : new ODocument();
     final String suspendedLockStrategy=lockStrategy;
     lockStrategy="NONE";
     result(doc);
     lockStrategy=suspendedLockStrategy;
   }
-  if (returnMode == SQLUpdateReturnModeEnum.COUNT)   return recordCount;
- else   if (returnExpression == null) {
-    return allUpdatedRecords;
-  }
- else {
-    List<Object> result=new ArrayList<Object>();
-    Object itemResult=null;
-    ODocument wrappingDoc=null;
-    for (    ORecord o : allUpdatedRecords) {
-      this.getContext().setVariable("current",o);
-      itemResult=OSQLHelper.getValue(returnExpression,(ODocument)((OIdentifiable)o).getRecord(),this.getContext());
-      if (itemResult instanceof OIdentifiable)       result.add(itemResult);
- else {
-        wrappingDoc=new ODocument("result",itemResult);
-        wrappingDoc.field("rid",o.getIdentity());
-        wrappingDoc.field("version",o.getVersion());
-        result.add(wrappingDoc);
-      }
-    }
-    return result;
-  }
+  return returnHandler.ret();
 }

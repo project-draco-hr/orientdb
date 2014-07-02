@@ -4,14 +4,16 @@
   int last=0;
   String field;
   while ((field=readString(bytes)).length() != 0) {
-    int valuePos=OIntegerSerializer.INSTANCE.deserialize(bytes.bytes,bytes.offset);
-    bytes.read(OIntegerSerializer.INT_SIZE);
-    OType type=readOType(bytes);
-    if (document.containsField(field))     continue;
+    if (document.containsField(field)) {
+      bytes.skip(OIntegerSerializer.INT_SIZE + 1);
+      continue;
+    }
+    final int valuePos=readInteger(bytes);
+    final OType type=readOType(bytes);
     if (valuePos != 0) {
       int headerCursor=bytes.offset;
       bytes.offset=valuePos;
-      Object value=readSingleValue(bytes,type,document);
+      final Object value=readSingleValue(bytes,type,document);
       if (bytes.offset > last)       last=bytes.offset;
       bytes.offset=headerCursor;
       if (document.fieldType(field) != null || OType.LINK == type)       document.field(field,value);

@@ -1,70 +1,41 @@
 {
-  String dbURL=null;
-  String dbUser="admin";
-  String dbPassword="admin";
-  boolean verbose=false;
-  boolean dbAutoCreate=true;
+  ODocument cfgGlobal=null;
+  Collection<ODocument> cfgBegin=null;
   ODocument cfgExtract=null;
   Collection<ODocument> cfgTransformers=null;
   ODocument cfgLoader=null;
+  Collection<ODocument> cfgEnd=null;
+  final OBasicCommandContext context=createDefaultContext();
   for (int i=0; i < args.length; ++i) {
     final String arg=args[i];
-    if (arg.equalsIgnoreCase("-dbUrl")) {
-      dbURL=args[++i];
+    if (arg.charAt(0) == '-') {
+      final String[] parts=arg.substring(1).split("=");
+      context.setVariable(parts[0].toUpperCase(),parts[1]);
     }
- else     if (arg.equalsIgnoreCase("-dbUser")) {
-      dbUser=args[++i];
-    }
- else     if (arg.equalsIgnoreCase("-dbPassword")) {
-      dbPassword=args[++i];
-    }
- else     if (arg.equalsIgnoreCase("-dbAutoCreate")) {
-      dbAutoCreate=Boolean.parseBoolean(args[++i]);
-    }
- else     if (arg.equalsIgnoreCase("-v")) {
-      verbose=true;
-    }
- else     if (arg.equalsIgnoreCase("-config")) {
-      final String cfgPath=args[++i];
+ else {
       try {
-        final String config=OIOUtils.readFileAsString(new File(cfgPath));
+        final String config=OIOUtils.readFileAsString(new File(arg));
         final ODocument cfg=new ODocument().fromJSON(config,"noMap");
+        cfgGlobal=cfg.field("config");
+        cfgBegin=cfg.field("begin");
         cfgExtract=cfg.field("extractor");
         cfgTransformers=cfg.field("transformers");
         cfgLoader=cfg.field("loader");
+        cfgEnd=cfg.field("end");
       }
  catch (      IOException e) {
-        throw new OConfigurationException("Error on loading config file: " + cfgPath);
+        throw new OConfigurationException("Error on loading config file: " + arg);
       }
-    }
- else     if (arg.equalsIgnoreCase("-e")) {
-      cfgExtract=new ODocument().fromJSON(args[++i],"noMap");
-    }
- else     if (arg.equalsIgnoreCase("-t")) {
-      final String value=args[++i];
-      cfgTransformers=parseTransformers(value);
-    }
- else     if (arg.equalsIgnoreCase("-l")) {
-      cfgLoader=new ODocument().fromJSON(args[++i],"noMap");
     }
   }
   if (cfgExtract == null)   throw new IllegalArgumentException("No Extractor configured");
   if (cfgTransformers == null)   throw new IllegalArgumentException("No Transformer configured");
   if (cfgLoader == null)   throw new IllegalArgumentException("No Loader configured");
-  if (dbURL == null)   throw new IllegalArgumentException("Argument dbURL not found");
-  final ODatabaseDocumentTx db=new ODatabaseDocumentTx(dbURL);
-  if (db.exists()) {
-    db.open(dbUser,dbPassword);
-  }
- else {
-    if (dbAutoCreate) {
-      db.create();
-    }
- else {
-      throw new IllegalArgumentException("Database '" + dbURL + "' not exists and 'dbAutoCreate' setting is false");
+  if (cfgGlobal != null) {
+    for (    String f : cfgGlobal.fieldNames()) {
+      context.setVariable(f,cfgGlobal.field(f));
     }
   }
-  final OETLProcessor processor=new OETLProcessor(cfgExtract,cfgTransformers,cfgLoader).setVerbose(verbose);
-  processor.init(processor,db);
+  final OETLProcessor processor=new OETLProcessor(cfgBegin,cfgExtract,cfgTransformers,cfgLoader,cfgEnd,context);
   processor.execute();
 }

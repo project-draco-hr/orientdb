@@ -1,0 +1,48 @@
+{
+  if (className != null) {
+    schemaClass=getOrCreateClass(className);
+    processor.out(true,"%s: found %d %s in class '%s'",getName(),schemaClass.count(),getUnit(),className);
+  }
+  if (indexes != null) {
+    for (    ODocument idx : indexes) {
+      OIndex index;
+      String idxName=idx.field("name");
+      if (idxName != null) {
+        index=documentDatabase.getMetadata().getIndexManager().getIndex(idxName);
+        if (index != null)         continue;
+      }
+      final String idxClass=idx.field("class");
+      if (idxClass == null)       throw new OConfigurationException("Index 'class' missed in OrientDocument loader");
+      final OClass cls=getOrCreateClass(idxClass);
+      final String idxType=idx.field("type");
+      if (idxType == null)       throw new OConfigurationException("Index 'type' missed in OrientDocument loader for index '" + idxName + "'");
+      final List<String> idxFields=idx.field("fields");
+      if (idxFields == null)       throw new OConfigurationException("Index 'fields' missed in OrientDocument loader");
+      String[] fields=new String[idxFields.size()];
+      for (int f=0; f < fields.length; ++f) {
+        final String fieldName=idxFields.get(f);
+        final String[] fieldNameParts=fieldName.split(":");
+        if (!cls.existsProperty(fieldNameParts[0])) {
+          if (fieldNameParts.length < 2)           throw new OConfigurationException("Index field type missed in OrientDocument loader for field '" + fieldName + "'");
+          final String fieldType=fieldNameParts[1].toUpperCase();
+          final OType type=OType.valueOf(fieldType);
+          cls.createProperty(fieldNameParts[0],type);
+          processor.out(true,"- OrientDBLoader: created property '%s.%s' of type: %s",idxClass,fieldNameParts[0],fieldNameParts[1]);
+        }
+        fields[f]=fieldNameParts[0];
+      }
+      if (idxName == null) {
+        idxName=idxClass + ".";
+        for (int i=0; i < fields.length; ++i) {
+          if (i > 0)           idxName+='_';
+          idxName+=fields[i];
+        }
+      }
+      index=documentDatabase.getMetadata().getIndexManager().getIndex(idxName);
+      if (index != null)       continue;
+      index=cls.createIndex(idxName,idxType,fields);
+      processor.out(true,"- OrientDocumentLoader: created index '%s' type '%s' against Class '%s', fields %s",idxName,idxType,idxClass,idxFields);
+    }
+  }
+  documentDatabase.declareIntent(new OIntentMassiveInsert());
+}

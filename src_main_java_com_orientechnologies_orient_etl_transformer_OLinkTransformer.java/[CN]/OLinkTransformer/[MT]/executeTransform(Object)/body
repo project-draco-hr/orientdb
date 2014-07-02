@@ -1,0 +1,68 @@
+{
+  Object joinValue=((ODocument)input).field(joinFieldName);
+  if (joinValue != null) {
+    Object result=null;
+    if (sqlQuery == null && index == null) {
+      if (lookup.toUpperCase().startsWith("SELECT"))       sqlQuery=new OSQLSynchQuery<ODocument>(lookup);
+ else       index=db.getMetadata().getIndexManager().getIndex(lookup);
+    }
+    if (sqlQuery != null)     result=db.query(sqlQuery,joinValue);
+ else {
+      final OType idxFieldType=index.getDefinition().getTypes()[0];
+      joinValue=idxFieldType.convert(joinValue,idxFieldType.getDefaultJavaType());
+      result=index.get(joinValue);
+    }
+    if (result != null) {
+      if (linkFieldType != null) {
+        if (linkFieldType == OType.LINK) {
+          if (result instanceof Collection<?>) {
+            if (!((Collection)result).isEmpty())             result=((Collection)result).iterator().next();
+ else             result=null;
+          }
+        }
+ else         if (linkFieldType == OType.LINKSET) {
+          if (!(result instanceof Collection)) {
+            final Set<OIdentifiable> res=new HashSet<OIdentifiable>();
+            res.add((OIdentifiable)result);
+            result=res;
+          }
+        }
+ else         if (linkFieldType == OType.LINKLIST) {
+          if (!(result instanceof Collection)) {
+            final List<OIdentifiable> res=new ArrayList<OIdentifiable>();
+            res.add((OIdentifiable)result);
+            result=res;
+          }
+        }
+      }
+    }
+    if (result == null) {
+switch (unresolvedLinkAction) {
+case CREATE:
+        if (lookup != null) {
+          final String[] lookupParts=lookup.split("\\.");
+          final ODocument linkedDoc=new ODocument(lookupParts[0]);
+          linkedDoc.field(lookupParts[1],joinValue);
+          linkedDoc.save();
+          result=linkedDoc;
+        }
+ else         throw new OConfigurationException("Cannot create linked document because target class is unknown. Use 'lookup' field");
+      break;
+case ERROR:
+    processor.getStats().incrementErrors();
+  processor.out(true,"%s: ERROR Cannot resolve join for value '%s'",getName(),joinValue);
+break;
+case WARNING:
+processor.getStats().incrementWarnings();
+processor.out(true,"%s: WARN Cannot resolve join for value '%s'",getName(),joinValue);
+break;
+case SKIP:
+return null;
+case HALT:
+throw new OETLProcessHaltedException("Cannot resolve join for value '" + joinValue + "'");
+}
+}
+ else ((ODocument)input).field(linkFieldName,result);
+}
+return input;
+}

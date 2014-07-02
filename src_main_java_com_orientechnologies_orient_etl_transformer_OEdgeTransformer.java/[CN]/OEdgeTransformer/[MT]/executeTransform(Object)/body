@@ -1,0 +1,62 @@
+{
+  Object joinValue;
+  final OrientVertex vertex;
+  if (input instanceof ODocument) {
+    joinValue=((ODocument)input).field(joinFieldName);
+    vertex=graph.getVertex(input);
+  }
+ else {
+    joinValue=((OrientVertex)input).getProperty(joinFieldName);
+    vertex=(OrientVertex)input;
+  }
+  if (joinValue != null) {
+    Object result=null;
+    if (sqlQuery == null && index == null) {
+      if (lookup.toUpperCase().startsWith("SELECT"))       sqlQuery=new OSQLSynchQuery<OrientVertex>(lookup);
+ else       index=processor.getDocumentDatabase().getMetadata().getIndexManager().getIndex(lookup);
+    }
+    if (sqlQuery != null)     result=graph.command(sqlQuery).execute(joinValue);
+ else {
+      final OType idxFieldType=index.getDefinition().getTypes()[0];
+      joinValue=idxFieldType.convert(joinValue,idxFieldType.getDefaultJavaType());
+      result=index.get(joinValue);
+    }
+    if (result != null) {
+      if (result instanceof Collection<?>) {
+        if (!((Collection)result).isEmpty())         result=((Collection)result).iterator().next();
+ else         result=null;
+      }
+      if (result != null) {
+        final OrientVertex targetVertex=graph.getVertex(result);
+        vertex.addEdge(edgeClass,targetVertex);
+      }
+    }
+    if (result == null) {
+switch (unresolvedLinkAction) {
+case CREATE:
+        if (lookup != null) {
+          final String[] lookupParts=lookup.split("\\.");
+          final OrientVertex linkedV=graph.addTemporaryVertex(lookupParts[0]);
+          linkedV.setProperty(lookupParts[1],joinValue);
+          linkedV.save();
+          result=linkedV;
+        }
+ else         throw new OConfigurationException("Cannot create linked document because target class is unknown. Use 'lookup' field");
+      break;
+case ERROR:
+    processor.getStats().incrementErrors();
+  processor.out(true,"%s: ERROR Cannot resolve join for value '%s'",getName(),joinValue);
+break;
+case WARNING:
+processor.getStats().incrementWarnings();
+processor.out(true,"%s: WARN Cannot resolve join for value '%s'",getName(),joinValue);
+break;
+case SKIP:
+return null;
+case HALT:
+throw new OETLProcessHaltedException("Cannot resolve join for value '" + joinValue + "'");
+}
+}
+}
+return input;
+}

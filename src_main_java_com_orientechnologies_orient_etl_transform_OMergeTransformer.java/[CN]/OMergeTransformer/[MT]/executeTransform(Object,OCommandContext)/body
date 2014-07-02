@@ -1,0 +1,44 @@
+{
+  Object joinValue=((ODocument)input).field(joinFieldName);
+  if (joinValue != null) {
+    Object result=null;
+    if (sqlQuery == null && index == null) {
+      if (lookup.toUpperCase().startsWith("SELECT"))       sqlQuery=new OSQLSynchQuery<ODocument>(lookup);
+ else       index=db.getMetadata().getIndexManager().getIndex(lookup);
+    }
+    if (sqlQuery != null)     result=db.query(sqlQuery,joinValue);
+ else {
+      final OType idxFieldType=index.getDefinition().getTypes()[0];
+      joinValue=idxFieldType.convert(joinValue,idxFieldType.getDefaultJavaType());
+      result=index.get(joinValue);
+    }
+    if (result != null)     if (result instanceof Collection) {
+      if (!((Collection)result).isEmpty())       result=((Collection<OIdentifiable>)result).iterator().next().getRecord();
+    }
+ else     if (result instanceof OIdentifiable)     result=((OIdentifiable)result).getRecord();
+    if (result == null) {
+switch (unresolvedLinkAction) {
+case NOTHING:
+        break;
+case ERROR:
+      processor.getStats().errors++;
+    processor.out(true,"%s: ERROR Cannot resolve join for value '%s'",getName(),joinValue);
+  break;
+case WARNING:
+processor.getStats().warnings++;
+processor.out(true,"%s: WARN Cannot resolve join for value '%s'",getName(),joinValue);
+break;
+case SKIP:
+return null;
+case HALT:
+throw new OETLProcessHaltedException("Cannot resolve join for value '" + joinValue + "'");
+}
+}
+ else {
+final ODocument loadedDocument=(ODocument)result;
+((ODocument)result).merge((ODocument)input,true,false);
+return result;
+}
+}
+return input;
+}

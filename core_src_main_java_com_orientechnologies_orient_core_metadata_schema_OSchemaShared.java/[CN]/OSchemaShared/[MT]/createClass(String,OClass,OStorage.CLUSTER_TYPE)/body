@@ -1,6 +1,17 @@
 {
-  if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot create class " + iClassName + " inside a transaction");
-  int clusterId=getDatabase().getClusterIdByName(iClassName);
-  if (clusterId == -1)   clusterId=createCluster(iType.toString(),iClassName);
-  return createClass(iClassName,iSuperClass,clusterId);
+  OClass result;
+  readWriteLock.writeLock().lock();
+  startReloadRequest();
+  try {
+    if (getDatabase().getTransaction().isActive())     throw new IllegalStateException("Cannot create class " + className + " inside a transaction");
+    int clusterId=getDatabase().getClusterIdByName(className);
+    if (clusterId == -1)     clusterId=createCluster(type.toString(),className);
+    result=createClass(className,superClass,clusterId);
+  }
+  finally {
+    readWriteLock.writeLock().unlock();
+    endReloadRequest();
+  }
+  reloadStorageMetadata();
+  return result;
 }

@@ -1,8 +1,26 @@
 {
-  OClass cls=classes.get(iClassName.toLowerCase());
-  if (cls != null)   return cls;
-  cls=createClass(iClassName,iSuperClass);
-  if (iSuperClass != null && !cls.isSubClassOf(iSuperClass))   throw new IllegalArgumentException("Class '" + iClassName + "' is not an instance of "+ iSuperClass.getShortName());
-  addClusterClassMap(cls);
+  readWriteLock.readLock().lock();
+  try {
+    OClass cls=classes.get(iClassName.toLowerCase());
+    if (cls != null)     return cls;
+  }
+  finally {
+    readWriteLock.readLock().unlock();
+  }
+  OClass cls;
+  readWriteLock.writeLock().lock();
+  startReloadRequest();
+  try {
+    cls=classes.get(iClassName.toLowerCase());
+    if (cls != null)     return cls;
+    cls=createClass(iClassName,iSuperClass);
+    if (iSuperClass != null && !cls.isSubClassOf(iSuperClass))     throw new IllegalArgumentException("Class '" + iClassName + "' is not an instance of "+ iSuperClass.getShortName());
+    addClusterClassMap(cls);
+  }
+  finally {
+    readWriteLock.writeLock().unlock();
+    endReloadRequest();
+  }
+  reloadStorageMetadata();
   return cls;
 }

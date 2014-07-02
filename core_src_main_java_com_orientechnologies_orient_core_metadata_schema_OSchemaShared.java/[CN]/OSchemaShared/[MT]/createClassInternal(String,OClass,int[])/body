@@ -1,38 +1,43 @@
 {
-  if (iClassName == null || iClassName.length() == 0)   throw new OSchemaException("Found class name null or empty");
-  if (Character.isDigit(iClassName.charAt(0)))   throw new OSchemaException("Found invalid class name. Cannot start with numbers");
-  final Character wrongCharacter=checkNameIfValid(iClassName);
-  if (wrongCharacter != null)   throw new OSchemaException("Found invalid class name. Character '" + wrongCharacter + "' cannot be used in class name.");
-  final ODatabaseRecord database=getDatabase();
-  checkClustersAreAbsent(iClusterIds);
-  final int[] clusterIds;
-  if (iClusterIds == null || iClusterIds.length == 0) {
-    final int minimumClusters=database.getStorage().getConfiguration().getMinimumClusters();
-    clusterIds=new int[minimumClusters];
-    if (minimumClusters <= 1)     clusterIds[0]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName,null,null);
- else     for (int i=0; i < minimumClusters; ++i) {
-      clusterIds[i]=database.getClusterIdByName(iClassName + "_" + i);
-      if (clusterIds[i] == -1)       clusterIds[i]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),iClassName + "_" + i,null,null);
+  readWriteLock.writeLock().lock();
+  try {
+    if (className == null || className.length() == 0)     throw new OSchemaException("Found class name null or empty");
+    if (Character.isDigit(className.charAt(0)))     throw new OSchemaException("Found invalid class name. Cannot start with numbers");
+    final Character wrongCharacter=checkNameIfValid(className);
+    if (wrongCharacter != null)     throw new OSchemaException("Found invalid class name. Character '" + wrongCharacter + "' cannot be used in class name.");
+    final ODatabaseRecord database=getDatabase();
+    checkClustersAreAbsent(clusterIdsToAdd);
+    final int[] clusterIds;
+    if (clusterIdsToAdd == null || clusterIdsToAdd.length == 0) {
+      final int minimumClusters=database.getStorage().getConfiguration().getMinimumClusters();
+      clusterIds=new int[minimumClusters];
+      if (minimumClusters <= 1)       clusterIds[0]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),className,null,null);
+ else       for (int i=0; i < minimumClusters; ++i) {
+        clusterIds[i]=database.getClusterIdByName(className + "_" + i);
+        if (clusterIds[i] == -1)         clusterIds[i]=database.addCluster(CLUSTER_TYPE.PHYSICAL.toString(),className + "_" + i,null,null);
+      }
     }
-  }
- else   clusterIds=iClusterIds;
-  database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
-  final String key=iClassName.toLowerCase();
-  if (classes.containsKey(key))   throw new OSchemaException("Class " + iClassName + " already exists in current database");
-  OClassImpl cls=new OClassImpl(this,iClassName,clusterIds);
-  final OClass prevClass=classes.putIfAbsent(key,cls);
-  if (prevClass != null)   cls=(OClassImpl)prevClass;
-  if (cls.getShortName() != null)   classes.putIfAbsent(cls.getShortName().toLowerCase(),cls);
-  if (superClass != null) {
-    cls.setSuperClassInternal(superClass);
-    if (!(getDatabase().getStorage() instanceof OStorageProxy)) {
-      final int[] clustersToIndex=superClass.getPolymorphicClusterIds();
-      final String[] clusterNames=new String[clustersToIndex.length];
-      for (int i=0; i < clustersToIndex.length; i++)       clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
-      for (      OIndex<?> index : superClass.getIndexes())       for (      String clusterName : clusterNames)       if (clusterName != null)       database.getMetadata().getIndexManager().addClusterToIndex(clusterName,index.getName());
+ else     clusterIds=clusterIdsToAdd;
+    database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+    final String key=className.toLowerCase();
+    if (classes.containsKey(key))     throw new OSchemaException("Class " + className + " already exists in current database");
+    OClassImpl cls=new OClassImpl(this,className,clusterIds);
+    classes.put(key,cls);
+    if (cls.getShortName() != null)     classes.put(cls.getShortName().toLowerCase(),cls);
+    if (superClass != null) {
+      cls.setSuperClassInternal(superClass);
+      if (!(getDatabase().getStorage() instanceof OStorageProxy)) {
+        final int[] clustersToIndex=superClass.getPolymorphicClusterIds();
+        final String[] clusterNames=new String[clustersToIndex.length];
+        for (int i=0; i < clustersToIndex.length; i++)         clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
+        for (        OIndex<?> index : superClass.getIndexes())         for (        String clusterName : clusterNames)         if (clusterName != null)         database.getMetadata().getIndexManager().addClusterToIndex(clusterName,index.getName());
+      }
     }
+    addClusterClassMap(cls);
+    saveInternal();
+    return cls;
   }
-  addClusterClassMap(cls);
-  saveInternal();
-  return cls;
+  finally {
+    readWriteLock.writeLock().unlock();
+  }
 }

@@ -1,13 +1,19 @@
 {
-  document.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+  readWriteLock.writeLock().lock();
   try {
-    document.field("schemaVersion",CURRENT_VERSION_NUMBER);
-    Set<ODocument> cc=new HashSet<ODocument>();
-    for (    OClass c : classes.values())     cc.add(((OClassImpl)c).toStream());
-    document.field("classes",cc,OType.EMBEDDEDSET);
+    document.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+    try {
+      document.field("schemaVersion",CURRENT_VERSION_NUMBER);
+      Set<ODocument> cc=new HashSet<ODocument>();
+      for (      OClass c : classes.values())       cc.add(((OClassImpl)c).toStream());
+      document.field("classes",cc,OType.EMBEDDEDSET);
+    }
+  finally {
+      document.setInternalStatus(ORecordElement.STATUS.LOADED);
+    }
+    return document;
   }
   finally {
-    document.setInternalStatus(ORecordElement.STATUS.LOADED);
+    readWriteLock.writeLock().unlock();
   }
-  return document;
 }

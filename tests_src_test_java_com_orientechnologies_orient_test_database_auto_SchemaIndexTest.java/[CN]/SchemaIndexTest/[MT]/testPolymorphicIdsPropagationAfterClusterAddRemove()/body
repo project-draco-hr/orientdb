@@ -1,0 +1,39 @@
+{
+  final OSchema schema=database.getMetadata().getSchema();
+  OClass polymorpicIdsPropagationSuperSuper=schema.getClass("polymorpicIdsPropagationSuperSuper");
+  if (polymorpicIdsPropagationSuperSuper == null)   polymorpicIdsPropagationSuperSuper=schema.createClass("polymorpicIdsPropagationSuperSuper");
+  OClass polymorpicIdsPropagationSuper=schema.getClass("polymorpicIdsPropagationSuper");
+  if (polymorpicIdsPropagationSuper == null)   polymorpicIdsPropagationSuper=schema.createClass("polymorpicIdsPropagationSuper");
+  OClass polymorpicIdsPropagation=schema.getClass("polymorpicIdsPropagation");
+  if (polymorpicIdsPropagation == null)   polymorpicIdsPropagation=schema.createClass("polymorpicIdsPropagation");
+  polymorpicIdsPropagation.setSuperClass(polymorpicIdsPropagationSuper);
+  polymorpicIdsPropagationSuper.setSuperClass(polymorpicIdsPropagationSuperSuper);
+  polymorpicIdsPropagationSuperSuper.createProperty("value",OType.STRING);
+  polymorpicIdsPropagationSuperSuper.createIndex("PolymorpicIdsPropagationSuperSuperIndex",OClass.INDEX_TYPE.UNIQUE,"value");
+  int counter=0;
+  for (int i=0; i < 10; i++) {
+    ODocument document=new ODocument("polymorpicIdsPropagation");
+    document.field("value","val" + counter);
+    document.save();
+    counter++;
+  }
+  final int clusterId2=database.addCluster("polymorpicIdsPropagationSuperSuper2",OStorage.CLUSTER_TYPE.PHYSICAL);
+  for (int i=0; i < 10; i++) {
+    ODocument document=new ODocument();
+    document.field("value","val" + counter);
+    document.save("polymorpicIdsPropagationSuperSuper2");
+    counter++;
+  }
+  polymorpicIdsPropagation.addCluster("polymorpicIdsPropagationSuperSuper2");
+  assertContains(polymorpicIdsPropagationSuperSuper.getPolymorphicClusterIds(),clusterId2);
+  assertContains(polymorpicIdsPropagationSuper.getPolymorphicClusterIds(),clusterId2);
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from polymorpicIdsPropagationSuperSuper where value = 'val12'"));
+  Assert.assertEquals(result.size(),1);
+  ODocument doc=result.get(0);
+  Assert.assertEquals(doc.getSchemaClass().getName(),"polymorpicIdsPropagation");
+  polymorpicIdsPropagation.removeClusterId(clusterId2);
+  assertDoesNotContain(polymorpicIdsPropagationSuperSuper.getPolymorphicClusterIds(),clusterId2);
+  assertDoesNotContain(polymorpicIdsPropagationSuper.getPolymorphicClusterIds(),clusterId2);
+  result=database.query(new OSQLSynchQuery<ODocument>("select from polymorpicIdsPropagationSuperSuper  where value = 'val12'"));
+  Assert.assertTrue(result.isEmpty());
+}

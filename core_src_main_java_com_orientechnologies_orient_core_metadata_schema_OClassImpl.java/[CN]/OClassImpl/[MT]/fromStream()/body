@@ -1,4 +1,6 @@
 {
+  baseClasses=null;
+  superClass=null;
   name=document.field("name");
   if (document.containsField("shortName"))   shortName=document.field("shortName");
  else   shortName=null;
@@ -21,12 +23,19 @@
   if (clusterIds.length == 1 && clusterIds[0] == -1)   setPolymorphicClusterIds(new int[0]);
  else   setPolymorphicClusterIds(clusterIds);
   OPropertyImpl prop;
-  Collection<ODocument> storedProperties=document.field("properties");
+  final Map<String,OProperty> newProperties=new HashMap<String,OProperty>();
+  final Collection<ODocument> storedProperties=document.field("properties");
   if (storedProperties != null)   for (  ODocument p : storedProperties) {
     prop=new OPropertyImpl(this,p);
     prop.fromStream();
-    properties.put(prop.getName().toLowerCase(),prop);
+    if (properties.containsKey(prop.getName())) {
+      prop=(OPropertyImpl)properties.get(prop.getName().toLowerCase());
+      prop.fromStream(p);
+    }
+    newProperties.put(prop.getName().toLowerCase(),prop);
   }
+  properties.clear();
+  properties.putAll(newProperties);
   customFields=document.field("customFields",OType.EMBEDDEDMAP);
   clusterSelection=owner.getClusterSelectionFactory().getStrategy((String)document.field("clusterSelection"));
 }

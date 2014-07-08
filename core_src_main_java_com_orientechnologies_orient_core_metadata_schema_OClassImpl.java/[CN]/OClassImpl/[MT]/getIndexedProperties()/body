@@ -1,14 +1,20 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_READ);
-  Collection<OProperty> indexedProps=null;
-  OClassImpl currentClass=this;
-  do {
-    for (    OProperty p : currentClass.properties.values())     if (areIndexed(p.getName())) {
-      if (indexedProps == null)       indexedProps=new ArrayList<OProperty>();
-      indexedProps.add(p);
+  acquireSchemaReadLock();
+  try {
+    Collection<OProperty> indexedProps=null;
+    OClassImpl currentClass=this;
+    do {
+      for (      OProperty p : currentClass.properties.values())       if (areIndexed(p.getName())) {
+        if (indexedProps == null)         indexedProps=new ArrayList<OProperty>();
+        indexedProps.add(p);
+      }
+      currentClass=(OClassImpl)currentClass.getSuperClass();
     }
-    currentClass=(OClassImpl)currentClass.getSuperClass();
-  }
  while (currentClass != null);
-  return (Collection<OProperty>)(indexedProps != null ? indexedProps : Collections.emptyList());
+    return (Collection<OProperty>)(indexedProps != null ? indexedProps : Collections.emptyList());
+  }
+  finally {
+    releaseSchemaReadLock();
+  }
 }

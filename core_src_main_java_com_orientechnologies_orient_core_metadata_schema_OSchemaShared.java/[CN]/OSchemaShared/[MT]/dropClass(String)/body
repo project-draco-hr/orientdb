@@ -1,6 +1,5 @@
 {
-  readWriteLock.writeLock().lock();
-  startReloadRequest();
+  acquireSchemaWriteLock();
   try {
     if (getDatabase().getTransaction().isActive())     throw new IllegalStateException("Cannot drop a class inside a transaction");
     if (className == null)     throw new IllegalArgumentException("Class name is null");
@@ -13,23 +12,21 @@
     final OStorage storage=db.getStorage();
     final StringBuilder cmd=new StringBuilder("drop class ");
     cmd.append(className);
-    if (storage instanceof OAutoshardedStorage) {
+    if (isDistributedCommand()) {
       final OAutoshardedStorage autoshardedStorage=(OAutoshardedStorage)storage;
       OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       commandSQL.addExcludedNode(autoshardedStorage.getNodeId());
       db.command(commandSQL).execute();
-      commandSQL=db.command(commandSQL);
-      storage.getUnderlying().command(commandSQL);
+      dropClassInternal(className);
     }
- else {
+ else     if (storage instanceof OStorageProxy) {
       final OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       db.command(commandSQL).execute();
+      reload();
     }
-    if (storage instanceof OStorageProxy)     reload();
+ else     dropClassInternal(className);
   }
   finally {
-    readWriteLock.writeLock().unlock();
-    endReloadRequest();
+    releaseSchemaWriteLock();
   }
-  reloadStorageMetadata();
 }

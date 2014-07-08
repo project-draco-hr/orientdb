@@ -1,5 +1,35 @@
 {
-  if (iCollate == null)   iCollate=ODefaultCollate.NAME;
-  collate=OSQLEngine.getCollate(iCollate);
+  acquireSchemaWriteLock();
+  try {
+    checkEmbedded();
+    final OCollate oldCollate=this.collate;
+    if (iCollate == null)     iCollate=ODefaultCollate.NAME;
+    collate=OSQLEngine.getCollate(iCollate);
+    if ((this.collate != null && !this.collate.equals(oldCollate)) || (this.collate == null && oldCollate != null)) {
+      final Set<OIndex<?>> indexes=owner.getClassIndexes();
+      final List<OIndex<?>> indexesToRecreate=new ArrayList<OIndex<?>>();
+      for (      OIndex<?> index : indexes) {
+        OIndexDefinition definition=index.getDefinition();
+        final List<String> fields=definition.getFields();
+        if (fields.contains(getName()))         indexesToRecreate.add(index);
+      }
+      if (!indexesToRecreate.isEmpty()) {
+        OLogManager.instance().info(this,"Collate value was changed, following indexes will be rebuilt %s",indexesToRecreate);
+        final ODatabaseRecord database=getDatabase();
+        final OIndexManager indexManager=database.getMetadata().getIndexManager();
+        for (        OIndex<?> indexToRecreate : indexesToRecreate) {
+          final OIndexInternal.IndexMetadata indexMetadata=indexToRecreate.getInternal().loadMetadata(indexToRecreate.getConfiguration());
+          final ODocument metadata=indexToRecreate.getMetadata();
+          final List<String> fields=indexMetadata.getIndexDefinition().getFields();
+          final String[] fieldsToIndex=fields.toArray(new String[fields.size()]);
+          indexManager.dropIndex(indexMetadata.getName());
+          owner.createIndex(indexMetadata.getName(),indexMetadata.getType(),null,metadata,indexMetadata.getAlgorithm(),fieldsToIndex);
+        }
+      }
+    }
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

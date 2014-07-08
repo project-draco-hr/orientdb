@@ -1,7 +1,28 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter class %s addcluster %s %s",name,iClusterName,iClusterType);
-  final Integer clusterId=getDatabase().command(new OCommandSQL(cmd)).execute();
-  addClusterIdInternal(clusterId);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter class %s addcluster %s %s",name,clusterName,iClusterType);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter class %s addcluster %s %s",name,clusterName,iClusterType);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      final int clusterId=database.getClusterIdByName(clusterName);
+      addClusterIdInternal(clusterId);
+    }
+ else {
+      final int clusterId=database.getClusterIdByName(clusterName);
+      addClusterIdInternal(clusterId);
+    }
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

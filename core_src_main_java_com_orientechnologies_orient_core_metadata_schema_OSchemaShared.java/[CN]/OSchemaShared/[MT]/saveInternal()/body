@@ -1,11 +1,15 @@
 {
-  readWriteLock.writeLock().lock();
-  try {
-    final ODatabaseRecord db=getDatabase();
-    if (db.getTransaction().isActive())     throw new OSchemaException("Cannot change the schema while a transaction is active. Schema changes are not transactional");
-    saveInternal(OMetadataDefault.CLUSTER_INTERNAL_NAME);
+  final ODatabaseRecord db=getDatabase();
+  if (db.getTransaction().isActive()) {
+    reload(null,true);
+    throw new OSchemaException("Cannot change the schema while a transaction is active. Schema changes are not transactional");
   }
-  finally {
-    readWriteLock.writeLock().unlock();
+  setDirty();
+  try {
+    super.save(OMetadataDefault.CLUSTER_INTERNAL_NAME);
+  }
+ catch (  OConcurrentModificationException e) {
+    reload(null,true);
+    throw e;
   }
 }

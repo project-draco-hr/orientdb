@@ -1,7 +1,24 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter property %s regexp %s",getFullName(),iRegexp);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  this.regexp=iRegexp;
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter property %s regexp %s",getFullName(),regexp);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter property %s regexp %s",getFullName(),regexp);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(new OCommandSQL(cmd)).execute();
+      setRegexpInternal(regexp);
+    }
+ else     setRegexpInternal(regexp);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

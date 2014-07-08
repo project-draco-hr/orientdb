@@ -1,9 +1,8 @@
 {
   OClass result;
-  startReloadRequest();
-  readWriteLock.writeLock().lock();
+  getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+  acquireSchemaWriteLock();
   try {
-    getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
     StringBuilder cmd=null;
     final String key=className.toLowerCase();
     if (classes.containsKey(key))     throw new OSchemaException("Class " + className + " already exists in current database");
@@ -27,22 +26,22 @@
     }
     final ODatabaseRecord db=getDatabase();
     final OStorage storage=db.getStorage();
-    if (storage instanceof OAutoshardedStorage) {
+    if (isDistributedCommand()) {
       final OAutoshardedStorage autoshardedStorage=(OAutoshardedStorage)storage;
       OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       commandSQL.addExcludedNode(autoshardedStorage.getNodeId());
       db.command(commandSQL).execute();
-      commandSQL=db.command(commandSQL);
-      storage.getUnderlying().command(commandSQL);
+      createClassInternal(className,superClass,clusterIds);
     }
- else     db.command(new OCommandSQL(cmd.toString())).execute();
-    if (storage instanceof OStorageProxy)     reload();
+ else     if (storage instanceof OStorageProxy) {
+      db.command(new OCommandSQL(cmd.toString())).execute();
+      reload();
+    }
+ else     createClassInternal(className,superClass,clusterIds);
     result=classes.get(className.toLowerCase());
   }
   finally {
-    readWriteLock.writeLock().unlock();
-    endReloadRequest();
+    releaseSchemaWriteLock();
   }
-  reloadStorageMetadata();
   return result;
 }

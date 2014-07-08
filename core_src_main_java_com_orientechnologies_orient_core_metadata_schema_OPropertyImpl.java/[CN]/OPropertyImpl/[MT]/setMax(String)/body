@@ -1,8 +1,24 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter property %s max %s",getFullName(),iMax);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  this.max=iMax;
-  checkForDateFormat(iMax);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter property %s max %s",getFullName(),max);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter property %s max %s",getFullName(),max);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setMaxInternal(max);
+    }
+ else     setMaxInternal(max);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

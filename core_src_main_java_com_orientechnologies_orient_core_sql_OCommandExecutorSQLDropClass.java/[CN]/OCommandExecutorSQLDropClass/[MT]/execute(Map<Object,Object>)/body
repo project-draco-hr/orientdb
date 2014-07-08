@@ -3,25 +3,6 @@
   final ODatabaseRecord database=getDatabase();
   final OClass oClass=database.getMetadata().getSchema().getClass(className);
   if (oClass == null)   return null;
-  for (  final OIndex<?> oIndex : oClass.getClassIndexes()) {
-    database.getMetadata().getIndexManager().dropIndex(oIndex.getName());
-  }
-  final OClass superClass=oClass.getSuperClass();
-  final int[] clustersToIndex=oClass.getPolymorphicClusterIds();
-  final String[] clusterNames=new String[clustersToIndex.length];
-  for (int i=0; i < clustersToIndex.length; i++) {
-    clusterNames[i]=database.getClusterNameById(clustersToIndex[i]);
-  }
-  final int clusterId=oClass.getDefaultClusterId();
-  ((OSchemaProxy)database.getMetadata().getSchema()).dropClassInternal(className);
-  database.getMetadata().getSchema().reload();
-  deleteDefaultCluster(clusterId);
-  if (superClass == null)   return true;
-  final OIndexManagerProxy indexManagerProxy=getDatabase().getMetadata().getIndexManager();
-  for (  final OIndex<?> oIndex : superClass.getIndexes()) {
-    for (    final String clusterName : clusterNames)     indexManagerProxy.removeClusterFromIndex(clusterName,oIndex.getName());
-    OLogManager.instance().info(this,"Index %s is used in super class of %s and should be rebuilt.",oIndex.getName(),className);
-    oIndex.rebuild();
-  }
+  database.getMetadata().getSchema().dropClass(className);
   return true;
 }

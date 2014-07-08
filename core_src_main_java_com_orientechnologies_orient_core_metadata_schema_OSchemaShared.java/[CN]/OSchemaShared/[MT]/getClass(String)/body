@@ -1,31 +1,22 @@
 {
-  readWriteLock.readLock().lock();
+  acquireSchemaReadLock();
   try {
     if (iClassName == null)     return null;
     OClass cls=classes.get(iClassName.toLowerCase());
     if (cls != null)     return cls;
   }
   finally {
-    readWriteLock.readLock().unlock();
+    releaseSchemaReadLock();
   }
   OClass cls=null;
-  startReloadRequest();
-  readWriteLock.writeLock().lock();
-  try {
-    if (getDatabase().getDatabaseOwner() instanceof ODatabaseObject) {
-      final ODatabase ownerDb=getDatabase().getDatabaseOwner();
-      if (ownerDb instanceof ODatabaseObject) {
-        final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
-        if (javaClass != null) {
-          cls=cascadeCreate(javaClass);
-        }
+  if (getDatabase().getDatabaseOwner() instanceof ODatabaseObject) {
+    final ODatabase ownerDb=getDatabase().getDatabaseOwner();
+    if (ownerDb instanceof ODatabaseObject) {
+      final Class<?> javaClass=((ODatabaseObject)ownerDb).getEntityManager().getEntityClass(iClassName);
+      if (javaClass != null) {
+        cls=cascadeCreate(javaClass);
       }
     }
   }
-  finally {
-    readWriteLock.writeLock().unlock();
-    endReloadRequest();
-  }
-  reloadStorageMetadata();
   return cls;
 }

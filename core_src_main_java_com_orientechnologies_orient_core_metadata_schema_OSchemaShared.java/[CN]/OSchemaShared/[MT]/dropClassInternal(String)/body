@@ -1,5 +1,5 @@
 {
-  readWriteLock.writeLock().lock();
+  acquireSchemaWriteLock();
   try {
     if (getDatabase().getTransaction().isActive())     throw new IllegalStateException("Cannot drop a class inside a transaction");
     if (className == null)     throw new IllegalArgumentException("Class name is null");
@@ -8,15 +8,15 @@
     final OClass cls=classes.get(key);
     if (cls == null)     throw new OSchemaException("Class " + className + " was not found in current database");
     if (!cls.getBaseClasses().isEmpty())     throw new OSchemaException("Class " + className + " cannot be dropped because it has sub classes. Remove the dependencies before trying to drop it again");
+    checkEmbedded(getDatabase().getStorage());
     if (cls.getSuperClass() != null)     ((OClassImpl)cls.getSuperClass()).removeBaseClassInternal(cls);
     dropClassIndexes(cls);
     classes.remove(key);
     if (cls.getShortName() != null)     classes.remove(cls.getShortName().toLowerCase());
     removeClusterClassMap(cls);
     deleteDefaultCluster(cls);
-    saveInternal();
   }
   finally {
-    readWriteLock.writeLock().unlock();
+    releaseSchemaWriteLock();
   }
 }

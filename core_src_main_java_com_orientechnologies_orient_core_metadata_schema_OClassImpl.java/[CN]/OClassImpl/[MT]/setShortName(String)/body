@@ -1,11 +1,28 @@
 {
-  if (iShortName != null) {
-    iShortName=iShortName.trim();
-    if (iShortName.isEmpty())     iShortName=null;
+  if (shortName != null) {
+    shortName=shortName.trim();
+    if (shortName.isEmpty())     shortName=null;
   }
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter class %s shortname %s",name,iShortName);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  setShortNameInternal(iShortName);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter class %s shortname %s",name,shortName);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter class %s shortname %s",name,shortName);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setShortNameInternal(shortName);
+    }
+ else     setShortNameInternal(shortName);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

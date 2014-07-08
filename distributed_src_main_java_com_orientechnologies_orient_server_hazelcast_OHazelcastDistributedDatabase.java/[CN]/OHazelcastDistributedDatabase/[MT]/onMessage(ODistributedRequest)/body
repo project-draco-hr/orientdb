@@ -9,13 +9,11 @@
       if (task.isRequiredOpenDatabase())       initDatabaseInstance();
       ODatabaseRecordThreadLocal.INSTANCE.set(database);
       task.setNodeSource(iRequest.getSenderNodeName());
-      origin=ODatabaseRecordThreadLocal.INSTANCE.get().getUser();
-      if (ODatabaseRecordThreadLocal.INSTANCE.get() != null) {
+      if (database != null) {
+        origin=database.getUser();
         try {
-          if (database != null) {
-            if (lastUser == null || !(lastUser.getName()).equals(iRequest.getUserName()))             lastUser=database.getMetadata().getSecurity().getUser(iRequest.getUserName());
-            ODatabaseRecordThreadLocal.INSTANCE.get().setUser(lastUser);
-          }
+          if (lastUser == null || !(lastUser.getName()).equals(iRequest.getUserName()))           lastUser=database.getMetadata().getSecurity().getUser(iRequest.getUserName());
+          database.setUser(lastUser);
         }
  catch (        Throwable ex) {
           OLogManager.instance().error(this,"failed to convert to OUser " + ex.getMessage());
@@ -24,8 +22,10 @@
       responsePayload=manager.executeOnLocalNode(iRequest,database);
     }
   finally {
-      if (database != null)       database.getLevel1Cache().clear();
-      if (ODatabaseRecordThreadLocal.INSTANCE.get() != null)       ODatabaseRecordThreadLocal.INSTANCE.get().setUser(origin);
+      if (database != null) {
+        database.getLevel1Cache().clear();
+        database.setUser(origin);
+      }
     }
     if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,manager.getLocalNodeName(),iRequest.getSenderNodeName(),DIRECTION.OUT,"sending back response '%s' to request: %s",responsePayload,task);
     final OHazelcastDistributedResponse response=new OHazelcastDistributedResponse(iRequest.getId(),manager.getLocalNodeName(),iRequest.getSenderNodeName(),responsePayload);

@@ -1,8 +1,24 @@
 {
-  if (iCollate == null)   iCollate=ODefaultCollate.NAME;
+  if (collate == null)   collate=ODefaultCollate.NAME;
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter property %s collate %s",getFullName(),iCollate);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  setCollateInternal(iCollate);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    final String cmd=String.format("alter property %s collate %s",getFullName(),collate);
+    final OCommandSQL commandSQL=new OCommandSQL(cmd);
+    if (storage instanceof OStorageProxy) {
+      database.command(commandSQL).execute();
+    }
+ else     if (isDistributedCommand()) {
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setCollateInternal(collate);
+    }
+ else     setCollateInternal(collate);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

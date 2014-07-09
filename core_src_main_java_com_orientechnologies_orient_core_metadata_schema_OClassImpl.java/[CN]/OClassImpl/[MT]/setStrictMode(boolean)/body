@@ -1,7 +1,24 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter class %s strictmode %s",name,iStrict);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  setStrictModeInternal(iStrict);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter class %s strictmode %s",name,isStrict);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter class %s strictmode %s",name,isStrict);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setStrictModeInternal(isStrict);
+    }
+ else     setStrictModeInternal(isStrict);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

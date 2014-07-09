@@ -1,8 +1,24 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter class %s removecluster %d",name,clusterId);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  removeClusterIdInternal(clusterId);
-  owner.removeClusterForClass(clusterId,this);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter class %s removecluster %d",name,clusterId);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter class %s removecluster %d",name,clusterId);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      removeClusterIdInternal(clusterId);
+    }
+ else     removeClusterIdInternal(clusterId);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

@@ -1,7 +1,24 @@
 {
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String cmd=String.format("alter property %s name %s",getFullName(),iName);
-  getDatabase().command(new OCommandSQL(cmd)).execute();
-  this.name=iName;
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter property %s name %s",getFullName(),name);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter property %s name %s",getFullName(),name);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setNameInternal(name);
+    }
+ else     setNameInternal(name);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

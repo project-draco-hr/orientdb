@@ -1,0 +1,31 @@
+{
+  lock.acquireExclusiveLock();
+  try {
+    if (status != STATUS.CLOSED)     throw new OStorageException("Cannot create new storage '" + name + "' because it is not closed");
+    addUser();
+    if (exists())     throw new OStorageException("Cannot create new storage '" + name + "' because it already exists");
+    componentsFactory=new OCurrentStorageComponentsFactory(configuration);
+    initWalAndDiskCache();
+    atomicOperationsManager=new OAtomicOperationsManager(writeAheadLog);
+    preCreateSteps();
+    status=STATUS.OPEN;
+    doAddCluster(OMetadataDefault.CLUSTER_INTERNAL_NAME,null,false,null);
+    configuration.create();
+    doAddCluster(OMetadataDefault.CLUSTER_INDEX_NAME,null,false,null);
+    doAddCluster(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME,null,false,null);
+    defaultClusterId=doAddCluster(CLUSTER_DEFAULT_NAME,null,false,null);
+    clearStorageDirty();
+    if (OGlobalConfiguration.STORAGE_MAKE_FULL_CHECKPOINT_AFTER_CREATE.getValueAsBoolean())     makeFullCheckpoint();
+  }
+ catch (  OStorageException e) {
+    close();
+    throw e;
+  }
+catch (  IOException e) {
+    close();
+    throw new OStorageException("Error on creation of storage '" + name + "'",e);
+  }
+ finally {
+    lock.releaseExclusiveLock();
+  }
+}

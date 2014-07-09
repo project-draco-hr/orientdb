@@ -1,5 +1,6 @@
 {
   readWriteLock.writeLock().lock();
+  modificationCounter.get().increment();
   try {
     final Integer schemaVersion=(Integer)document.field("schemaVersion");
     if (schemaVersion == null) {
@@ -9,17 +10,23 @@
  else     if (schemaVersion != CURRENT_VERSION_NUMBER) {
       throw new OConfigurationException("Database schema is different. Please export your old database with the previous version of OrientDB and reimport it using the current one.");
     }
-    classes.clear();
     clustersToClasses.clear();
+    final Map<String,OClass> newClasses=new HashMap<String,OClass>();
     OClassImpl cls;
     Collection<ODocument> storedClasses=document.field("classes");
     for (    ODocument c : storedClasses) {
       cls=new OClassImpl(this,c);
       cls.fromStream();
-      classes.put(cls.getName().toLowerCase(),cls);
-      if (cls.getShortName() != null)       classes.put(cls.getShortName().toLowerCase(),cls);
+      if (classes.containsKey(cls.getName().toLowerCase())) {
+        cls=(OClassImpl)classes.get(cls.getName().toLowerCase());
+        cls.fromStream(c);
+      }
+      newClasses.put(cls.getName().toLowerCase(),cls);
+      if (cls.getShortName() != null)       newClasses.put(cls.getShortName().toLowerCase(),cls);
       addClusterClassMap(cls);
     }
+    classes.clear();
+    classes.putAll(newClasses);
     String superClassName;
     OClass superClass;
     for (    ODocument c : storedClasses) {
@@ -33,6 +40,7 @@
     }
   }
   finally {
+    modificationCounter.get().decrement();
     readWriteLock.writeLock().unlock();
   }
 }

@@ -1,24 +1,29 @@
 {
-  boolean found=false;
-  for (  int clusterId : clusterIds) {
-    if (clusterId == clusterToRemove) {
-      found=true;
-      break;
+  acquireSchemaWriteLock();
+  try {
+    checkEmbedded();
+    boolean found=false;
+    for (    int clusterId : clusterIds) {
+      if (clusterId == clusterToRemove) {
+        found=true;
+        break;
+      }
     }
-  }
-  if (found) {
-    final int[] newClusterIds=new int[clusterIds.length - 1];
-    for (int i=0, k=0; i < clusterIds.length; ++i) {
-      if (clusterIds[i] == clusterToRemove)       continue;
-      newClusterIds[k]=clusterIds[i];
-      k++;
+    if (found) {
+      final int[] newClusterIds=new int[clusterIds.length - 1];
+      for (int i=0, k=0; i < clusterIds.length; ++i) {
+        if (clusterIds[i] == clusterToRemove)         continue;
+        newClusterIds[k]=clusterIds[i];
+        k++;
+      }
+      clusterIds=newClusterIds;
+      removePolymorphicClusterId(clusterToRemove);
     }
-    clusterIds=newClusterIds;
-    removePolymorphicClusterId(clusterToRemove);
+    if (defaultClusterId == clusterToRemove)     defaultClusterId=NOT_EXISTENT_CLUSTER_ID;
+    owner.removeClusterForClass(clusterToRemove,this);
   }
-  if (defaultClusterId == clusterToRemove)   defaultClusterId=NOT_EXISTENT_CLUSTER_ID;
-  owner.removeClusterForClass(clusterToRemove,this);
-  setDirty();
-  saveInternal();
+  finally {
+    releaseSchemaWriteLock();
+  }
   return this;
 }

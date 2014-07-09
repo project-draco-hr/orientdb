@@ -1,26 +1,41 @@
 {
-  if (iPropertyName == null || iPropertyName.length() == 0)   throw new OSchemaException("Property name is null or empty");
-  if (Character.isDigit(iPropertyName.charAt(0)))   throw new OSchemaException("Found invalid property name. Cannot start with numbers");
+  if (type == null)   throw new OSchemaException("Property type not defined.");
+  if (propertyName == null || propertyName.length() == 0)   throw new OSchemaException("Property name is null or empty");
+  if (Character.isDigit(propertyName.charAt(0)))   throw new OSchemaException("Found invalid property name. Cannot start with numbers");
   if (getDatabase().getTransaction().isActive())   throw new OSchemaException("Cannot create a new property inside a transaction");
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
-  final String lowerName=iPropertyName.toLowerCase();
-  if (properties.containsKey(lowerName))   throw new OSchemaException("Class " + name + " already has property '"+ iPropertyName+ "'");
-  if (iType == null)   throw new OSchemaException("Property type not defined.");
-  final StringBuilder cmd=new StringBuilder("create property ");
-  cmd.append(name);
-  cmd.append('.');
-  cmd.append(iPropertyName);
-  cmd.append(' ');
-  cmd.append(iType.name);
-  if (iLinkedType != null) {
+  acquireSchemaWriteLock();
+  try {
+    final StringBuilder cmd=new StringBuilder("create property ");
+    cmd.append(name);
+    cmd.append('.');
+    cmd.append(propertyName);
     cmd.append(' ');
-    cmd.append(iLinkedType.name);
+    cmd.append(type.name);
+    if (linkedType != null) {
+      cmd.append(' ');
+      cmd.append(linkedType.name);
+    }
+ else     if (linkedClass != null) {
+      cmd.append(' ');
+      cmd.append(linkedClass.getName());
+    }
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      database.command(new OCommandSQL(cmd.toString())).execute();
+      reload();
+      return getProperty(propertyName);
+    }
+ else     if (isDistributedCommand()) {
+      final OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      return addPropertyInternal(propertyName,type,linkedType,linkedClass);
+    }
+ else     return addPropertyInternal(propertyName,type,linkedType,linkedClass);
   }
- else   if (iLinkedClass != null) {
-    cmd.append(' ');
-    cmd.append(iLinkedClass.getName());
+  finally {
+    releaseSchemaWriteLock();
   }
-  getDatabase().command(new OCommandSQL(cmd.toString())).execute();
-  if (existsProperty(iPropertyName))   return properties.get(lowerName);
- else   return addPropertyInternal(iPropertyName,iType,iLinkedType,iLinkedClass);
 }

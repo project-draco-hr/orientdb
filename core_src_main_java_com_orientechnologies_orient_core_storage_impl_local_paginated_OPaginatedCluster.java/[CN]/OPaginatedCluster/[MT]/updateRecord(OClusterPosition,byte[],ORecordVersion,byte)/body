@@ -50,10 +50,9 @@
         pageIndex=pagePointer >>> PAGE_INDEX_OFFSET;
         int freePageIndex;
         final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-        final OCachePointer dataPointer=cacheEntry.getCachePointer();
-        dataPointer.acquireExclusiveLock();
+        cacheEntry.acquireExclusiveLock();
         try {
-          final OClusterPage localPage=new OClusterPage(dataPointer.getDataPointer(),false,trackMode);
+          final OClusterPage localPage=new OClusterPage(cacheEntry,false,trackMode);
           int freeSpace=localPage.getFreeSpace();
           freePageIndex=calculateFreePageIndex(localPage);
           final int chunkSize=localPage.getRecordSize(recordPosition);
@@ -69,16 +68,15 @@
             long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
             int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
             final OCacheEntry prevPageCacheEntry=diskCache.load(fileId,prevPageIndex,false);
-            final OCachePointer prevPageMemoryPointer=prevPageCacheEntry.getCachePointer();
-            prevPageMemoryPointer.acquireExclusiveLock();
+            prevPageCacheEntry.acquireExclusiveLock();
             try {
-              final OClusterPage prevPage=new OClusterPage(prevPageMemoryPointer.getDataPointer(),false,trackMode);
+              final OClusterPage prevPage=new OClusterPage(prevPageCacheEntry,false,trackMode);
               prevPage.setRecordLongValue(prevPageRecordPosition,-OLongSerializer.LONG_SIZE,pagePointer);
               logPageChanges(prevPage,fileId,prevPageIndex,false);
               prevPageCacheEntry.markDirty();
             }
   finally {
-              prevPageMemoryPointer.releaseExclusiveLock();
+              prevPageCacheEntry.releaseExclusiveLock();
               diskCache.release(prevPageCacheEntry);
             }
           }
@@ -88,10 +86,9 @@
           prevPageRecordPointer=pagePointer;
           pagePointer=nextPagePointer;
           logPageChanges(localPage,fileId,pageIndex,false);
-          cacheEntry.markDirty();
         }
   finally {
-          dataPointer.releaseExclusiveLock();
+          cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
         updateFreePagesIndex(freePageIndex,pageIndex,trackMode);
@@ -112,16 +109,15 @@
           long prevPageIndex=prevPageRecordPointer >>> PAGE_INDEX_OFFSET;
           int prevPageRecordPosition=(int)(prevPageRecordPointer & RECORD_POSITION_MASK);
           final OCacheEntry prevPageCacheEntry=diskCache.load(fileId,prevPageIndex,false);
-          final OCachePointer prevPageMemoryPointer=prevPageCacheEntry.getCachePointer();
-          prevPageMemoryPointer.acquireExclusiveLock();
+          prevPageCacheEntry.acquireExclusiveLock();
           try {
-            final OClusterPage prevPage=new OClusterPage(prevPageMemoryPointer.getDataPointer(),false,trackMode);
+            final OClusterPage prevPage=new OClusterPage(prevPageCacheEntry,false,trackMode);
             prevPage.setRecordLongValue(prevPageRecordPosition,-OLongSerializer.LONG_SIZE,addedPagePointer);
             logPageChanges(prevPage,fileId,prevPageIndex,false);
             prevPageCacheEntry.markDirty();
           }
   finally {
-            prevPageMemoryPointer.releaseExclusiveLock();
+            prevPageCacheEntry.releaseExclusiveLock();
             diskCache.release(prevPageCacheEntry);
           }
         }

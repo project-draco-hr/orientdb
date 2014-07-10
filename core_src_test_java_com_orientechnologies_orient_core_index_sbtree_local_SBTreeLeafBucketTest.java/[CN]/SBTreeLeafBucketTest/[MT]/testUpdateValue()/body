@@ -7,7 +7,10 @@
     keys.add(random.nextLong());
   }
   ODirectMemoryPointer pointer=new ODirectMemoryPointer(OSBTreeBucket.MAX_PAGE_SIZE_BYTES);
-  OSBTreeBucket<Long,OIdentifiable> treeBucket=new OSBTreeBucket<Long,OIdentifiable>(pointer,true,OLongSerializer.INSTANCE,null,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
+  OCachePointer cachePointer=new OCachePointer(pointer,new OLogSequenceNumber(0,0));
+  OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
+  cachePointer.incrementReferrer();
+  OSBTreeBucket<Long,OIdentifiable> treeBucket=new OSBTreeBucket<Long,OIdentifiable>(cacheEntry,true,OLongSerializer.INSTANCE,null,OLinkSerializer.INSTANCE,ODurablePage.TrackMode.FULL);
   Map<Long,Integer> keyIndexMap=new HashMap<Long,Integer>();
   int index=0;
   for (  Long key : keys) {
@@ -22,5 +25,5 @@
     Assert.assertEquals(entry,new OSBTreeBucket.SBTreeEntry<Long,OIdentifiable>(-1,-1,keyIndexEntry.getKey(),new OSBTreeValue<OIdentifiable>(false,-1,new ORecordId(keyIndexEntry.getValue() + 5,OClusterPositionFactory.INSTANCE.valueOf(keyIndexEntry.getValue() + 5)))));
     Assert.assertEquals(keyIndexEntry.getKey(),treeBucket.getKey(keyIndexEntry.getValue()));
   }
-  pointer.free();
+  cachePointer.decrementReferrer();
 }

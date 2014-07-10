@@ -13,10 +13,9 @@
       final int fileLevel=getFileLevel(bucketPointer);
       final V removed;
       final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
-      final OCachePointer dataPointer=cacheEntry.getCachePointer();
-      dataPointer.acquireExclusiveLock();
+      cacheEntry.acquireExclusiveLock();
       try {
-        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(dataPointer.getDataPointer(),keySerializer,valueSerializer,keyTypes,getTrackMode());
+        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getTrackMode());
         final int positionIndex=bucket.getIndex(hashCode,key);
         if (positionIndex < 0) {
           endAtomicOperation(false);
@@ -29,7 +28,7 @@
         logPageChanges(bucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
       }
   finally {
-        dataPointer.releaseExclusiveLock();
+        cacheEntry.releaseExclusiveLock();
         diskCache.release(cacheEntry);
       }
       if (nodePath.parent != null) {
@@ -45,10 +44,9 @@
       if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
       V removed=null;
       OCacheEntry cacheEntry=diskCache.load(nullBucketFileId,0,false);
-      OCachePointer cachePointer=cacheEntry.getCachePointer();
-      cachePointer.acquireExclusiveLock();
+      cacheEntry.acquireExclusiveLock();
       try {
-        final ONullBucket<V> nullBucket=new ONullBucket<V>(cachePointer.getDataPointer(),getTrackMode(),valueSerializer,false);
+        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getTrackMode(),valueSerializer,false);
         removed=nullBucket.getValue();
         if (removed != null) {
           nullBucket.removeValue();
@@ -58,7 +56,7 @@
         }
       }
   finally {
-        cachePointer.releaseExclusiveLock();
+        cacheEntry.releaseExclusiveLock();
         diskCache.release(cacheEntry);
       }
       changeSize(sizeDiff);

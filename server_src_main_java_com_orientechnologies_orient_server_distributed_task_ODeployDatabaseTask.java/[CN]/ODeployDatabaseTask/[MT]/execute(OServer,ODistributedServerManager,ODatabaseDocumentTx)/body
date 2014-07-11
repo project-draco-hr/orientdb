@@ -5,6 +5,12 @@
     final Lock lock=iManager.getLock(databaseName);
     if (lock.tryLock()) {
       try {
+        final Long lastDeployment=(Long)iManager.getConfigurationMap().get(DEPLOYDB + databaseName);
+        if (lastDeployment != null && lastDeployment.longValue() == random) {
+          ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.NONE,"skip deploying database because already executed");
+          return Boolean.FALSE;
+        }
+        iManager.getConfigurationMap().put(DEPLOYDB + databaseName,random);
         while (database.getStorage().getLastOperationId() >= iManager.getMessageService().getLastMessageId()) {
           ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"pausing deploy of database %s until all pending operations are completed...",databaseName);
           Thread.sleep(300);

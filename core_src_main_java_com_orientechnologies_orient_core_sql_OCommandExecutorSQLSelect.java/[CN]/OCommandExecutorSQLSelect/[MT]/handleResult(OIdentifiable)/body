@@ -1,11 +1,17 @@
 {
-  if ((orderedFields.isEmpty() || fullySortedByIndex) && skip > 0) {
-    lastRecord=null;
-    skip--;
-    return true;
+  if (parallel)   parallelLock.lock();
+  try {
+    if ((orderedFields.isEmpty() || fullySortedByIndex) && skip > 0) {
+      lastRecord=null;
+      skip--;
+      return true;
+    }
+    lastRecord=iRecord;
+    resultCount++;
+    if (!addResult(lastRecord))     return false;
+    return !((orderedFields.isEmpty() || fullySortedByIndex) && !isAnyFunctionAggregates() && fetchLimit > -1 && resultCount >= fetchLimit);
   }
-  lastRecord=iRecord;
-  resultCount++;
-  if (!addResult(lastRecord))   return false;
-  return !((orderedFields.isEmpty() || fullySortedByIndex) && !isAnyFunctionAggregates() && fetchLimit > -1 && resultCount >= fetchLimit);
+  finally {
+    if (parallel)     parallelLock.unlock();
+  }
 }

@@ -6,12 +6,12 @@
   Set<Future> threads=new HashSet<Future>();
   ExecutorService executorService=Executors.newFixedThreadPool(4);
   for (int i=0; i < dbs; i++) {
-    final String dbUrl=baseUrl + i;
+    final String dbUrl=url + i;
     Callable<Void> t=new Callable<Void>(){
       @Override public Void call() throws InterruptedException, IOException {
         OObjectDatabaseTx tx=new OObjectDatabaseTx(dbUrl);
-        ODatabaseHelper.deleteDatabase(tx,"plocal");
-        ODatabaseHelper.createDatabase(tx,dbUrl,"plocal");
+        ODatabaseHelper.deleteDatabase(tx,getStorageType());
+        ODatabaseHelper.createDatabase(tx,dbUrl,getStorageType());
         try {
           System.out.println("(" + getDbId(tx) + ") "+ "Created");
           if (tx.isClosed()) {
@@ -23,7 +23,7 @@
             DummyObject dummy=new DummyObject("name" + j);
             Assert.assertEquals(ODatabaseRecordThreadLocal.INSTANCE.get().getURL(),dbUrl);
             dummy=tx.save(dummy);
-            if (!dbUrl.startsWith("plocal:"))             Assert.assertEquals(((ORID)dummy.getId()).getClusterPosition(),OClusterPositionFactory.INSTANCE.valueOf(j),"RID was " + dummy.getId());
+            Assert.assertEquals(((ORID)dummy.getId()).getClusterPosition(),OClusterPositionFactory.INSTANCE.valueOf(j),"RID was " + dummy.getId());
             if ((j + 1) % 20000 == 0) {
               System.out.println("(" + getDbId(tx) + ") "+ "Operations (WRITE) executed: "+ (j + 1));
             }
@@ -49,7 +49,7 @@
   finally {
           System.out.println("(" + getDbId(tx) + ") "+ "Dropping");
           System.out.flush();
-          ODatabaseHelper.deleteDatabase(tx,"plocal");
+          ODatabaseHelper.deleteDatabase(tx,getStorageType());
           System.out.println("(" + getDbId(tx) + ") "+ "Dropped");
           System.out.flush();
         }

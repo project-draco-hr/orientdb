@@ -1,15 +1,9 @@
 {
-  ODatabaseDocumentTx db=new ODatabaseDocumentTx("plocal:scratchpad");
-  if (db.exists()) {
-    db.open("admin","admin");
-    db.drop();
-  }
-  db.create();
-  OClass personClass=db.getMetadata().getSchema().createClass("Person");
+  OClass personClass=database.getMetadata().getSchema().createClass("Person");
   personClass.createProperty("ssn",OType.STRING).createIndex(OClass.INDEX_TYPE.UNIQUE);
   personClass.createProperty("name",OType.STRING).createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
   try {
-    db.begin();
+    database.begin();
     ODocument person1=new ODocument("Person");
     person1.field("name","John Doe");
     person1.field("ssn","111-11-1111");
@@ -18,11 +12,11 @@
     person2.field("name","Jane Doe");
     person2.field("ssn","222-22-2222");
     person2.save();
-    db.commit();
-    final List<ODocument> result1=db.command(new OCommandSQL("select from Person")).execute();
+    database.commit();
+    final List<ODocument> result1=database.command(new OCommandSQL("select from Person")).execute();
     System.out.println("After transaction 1");
     for (    ODocument d : result1)     System.out.println(d);
-    db.begin();
+    database.begin();
     person2.field("ssn","111-11-1111");
     person2.save();
     person1.field("ssn","222-22-2222");
@@ -30,15 +24,14 @@
     System.out.println("To be committed:");
     System.out.println(person1);
     System.out.println(person2);
-    db.commit();
+    database.commit();
     System.out.println("Success!");
   }
  catch (  OIndexException e) {
     System.out.println("Exception: " + e.toString());
-    db.rollback();
+    database.rollback();
   }
-  final List<ODocument> result2=db.command(new OCommandSQL("select from Person")).execute();
+  final List<ODocument> result2=database.command(new OCommandSQL("select from Person")).execute();
   System.out.println("After transaction 2");
   for (  ODocument d : result2)   System.out.println(d);
-  db.close();
 }

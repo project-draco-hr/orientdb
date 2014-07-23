@@ -3,13 +3,15 @@
   final IQueue<ODistributedRequest> requestQueue=msgService.getQueue(queueName);
   if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"listening for incoming requests on queue: %s",queueName);
   final IMap<String,Object> lastPendingMessagesMap=restoreMessagesBeforeFailure(iRestoreMessages);
+  final int queuedMsg=requestQueue.size();
   restoringMessages=msgService.checkForPendingMessages(requestQueue,queueName,iUnqueuePendingMessages);
   listenerThread=new Thread(new Runnable(){
     @Override public void run(){
       Thread.currentThread().setName("OrientDB Node Request " + queueName);
-      while (!Thread.interrupted()) {
-        if (restoringMessages && requestQueue.isEmpty()) {
-          ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"executed all pending tasks in queue, set restoringMessages=false and database '%s' as online...",databaseName);
+      if (!restoringMessages)       setOnline();
+      for (long processedMessages=0; !Thread.interrupted(); processedMessages++) {
+        if (restoringMessages && processedMessages >= queuedMsg) {
+          ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"executed all pending tasks in queue (%d), set restoringMessages=false and database '%s' as online...",queuedMsg,databaseName);
           restoringMessages=false;
           setOnline();
         }
@@ -46,5 +48,16 @@ catch (        Throwable e) {
   }
 );
   listenerThread.start();
+  while (!status.get()) {
+synchronized (waitForOnline) {
+      try {
+        waitForOnline.wait(5000);
+      }
+ catch (      InterruptedException e) {
+        Thread.interrupted();
+        break;
+      }
+    }
+  }
   return this;
 }

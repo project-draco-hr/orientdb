@@ -1,8 +1,14 @@
 {
-  String dbSerializerName=iRecord.getDatabase().getSerializer().toString();
+  String dbSerializerName=null;
+  if (ODatabaseRecordThreadLocal.INSTANCE.getIfDefined() != null)   dbSerializerName=iRecord.getDatabase().getSerializer().toString();
   final byte[] stream;
   String name=getRecordSerializerName();
-  if (iRecord.getRecordType() == ODocument.RECORD_TYPE && !dbSerializerName.equals(name))   stream=ORecordSerializerFactory.instance().getFormat(name).toStream(iRecord,false);
- else   stream=iRecord.toStream();
+  if (iRecord.getRecordType() == ODocument.RECORD_TYPE && (dbSerializerName == null || !dbSerializerName.equals(name))) {
+    ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(name);
+    ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
+    if (iRecord instanceof ODocument)     ((ODocument)iRecord).deserializeFields();
+  }
+  stream=iRecord.toStream();
+  ONetworkThreadLocalSerializer.setNetworkSerializer(null);
   return stream;
 }

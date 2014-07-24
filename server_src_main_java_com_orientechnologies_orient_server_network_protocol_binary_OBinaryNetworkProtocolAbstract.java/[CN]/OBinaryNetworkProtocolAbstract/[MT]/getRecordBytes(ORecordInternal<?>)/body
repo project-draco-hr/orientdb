@@ -1,14 +1,20 @@
 {
-  String dbSerializerName=null;
-  if (ODatabaseRecordThreadLocal.INSTANCE.getIfDefined() != null)   dbSerializerName=iRecord.getDatabase().getSerializer().toString();
   final byte[] stream;
-  String name=getRecordSerializerName();
-  if (iRecord.getRecordType() == ODocument.RECORD_TYPE && (dbSerializerName == null || !dbSerializerName.equals(name))) {
-    ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(name);
-    ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
-    if (iRecord instanceof ODocument)     ((ODocument)iRecord).deserializeFields();
+  try {
+    String dbSerializerName=null;
+    if (ODatabaseRecordThreadLocal.INSTANCE.getIfDefined() != null)     dbSerializerName=iRecord.getDatabase().getSerializer().toString();
+    String name=getRecordSerializerName();
+    if (iRecord.getRecordType() == ODocument.RECORD_TYPE && (dbSerializerName == null || !dbSerializerName.equals(name))) {
+      ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(dbSerializerName);
+      ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
+      ((ODocument)iRecord).deserializeFields();
+      ser=ORecordSerializerFactory.instance().getFormat(name);
+      ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
+    }
+    stream=iRecord.toStream();
   }
-  stream=iRecord.toStream();
-  ONetworkThreadLocalSerializer.setNetworkSerializer(null);
+  finally {
+    ONetworkThreadLocalSerializer.setNetworkSerializer(null);
+  }
   return stream;
 }

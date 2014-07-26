@@ -1,15 +1,17 @@
 {
   CacheKey key=new CacheKey(fileId,pageIndex);
-  final LRUEntry valueToRemove=cache.get(key);
-  if (valueToRemove == null) {
-    return null;
+  final LRUEntry valueToRemove=cache.remove(key);
+  if (valueToRemove == null)   return null;
+  valueToRemove.removeLock.writeLock().lock();
+  try {
+    valueToRemove.removed=true;
+    ListNode node=valueToRemove.listNode.get();
+    valueToRemove.listNode.set(null);
+    if (node != null)     addToTrash(node);
   }
- else {
-    ListNode listNode=valueToRemove.listNode.getAndSet(null);
-    if (listNode == null)     return null;
-    listNode.entry=null;
-    trash.add(listNode);
-    cache.remove(key);
-    return valueToRemove.entry;
+  finally {
+    valueToRemove.removeLock.writeLock().unlock();
   }
+  purge();
+  return valueToRemove.entry;
 }

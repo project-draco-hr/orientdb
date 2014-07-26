@@ -1,23 +1,39 @@
 {
-  ListNode head=headReference.get();
-  ListNode current=head;
-  if (current == null)   return null;
+  ListNode current=headReference;
+  boolean removed=false;
+  LRUEntry currentEntry=null;
+  int inUseCounter=0;
   do {
-    while (currentEntryDeletedOrInUse(current)) {
-      ListNode next=current.next;
-      if (next == null)       return null;
+    while (current.isDummy || (currentEntry=current.entry) == null || (isInUse(currentEntry.entry))) {
+      if (currentEntry != null && isInUse(currentEntry.entry))       inUseCounter++;
+      ListNode next=current.next.get();
+      if (next == null) {
+        if (cache.size() == inUseCounter)         return null;
+        current=headReference;
+        inUseCounter=0;
+        continue;
+      }
       current=next;
     }
-    headReference.compareAndSet(head,current);
-    final LRUEntry oldEntry=current.entry;
-    if (oldEntry == null || !oldEntry.listNode.compareAndSet(current,null)) {
-      continue;
+    if (cache.remove(currentEntry.key,currentEntry)) {
+      currentEntry.removeLock.writeLock().lock();
+      try {
+        currentEntry.removed=true;
+        ListNode node=currentEntry.listNode.get();
+        currentEntry.listNode.set(null);
+        addToTrash(node);
+        removed=true;
+      }
+  finally {
+        currentEntry.removeLock.writeLock().unlock();
+      }
     }
-    current.entry=null;
-    trash.add(current);
-    cache.remove(oldEntry.key);
-    purge();
-    return oldEntry.entry;
+ else {
+      current=headReference;
+      inUseCounter=0;
+    }
   }
- while (true);
+ while (!removed);
+  purge();
+  return currentEntry.entry;
 }

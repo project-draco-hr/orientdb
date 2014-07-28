@@ -1,0 +1,34 @@
+{
+  final OSchema schema=database.getMetadata().getSchema();
+  OClass clazz=schema.createClass("CompositeIndexQueryCollateWasChangedTest");
+  OProperty csp=clazz.createProperty("csp",OType.STRING);
+  csp.setCollate(ODefaultCollate.NAME);
+  clazz.createProperty("cip",OType.STRING);
+  clazz.createIndex("collateCompositeIndexCollateWasChanged",OClass.INDEX_TYPE.NOTUNIQUE,"csp","cip");
+  for (int i=0; i < 10; i++) {
+    ODocument document=new ODocument("CompositeIndexQueryCollateWasChangedTest");
+    if (i % 2 == 0) {
+      document.field("csp","VAL");
+      document.field("cip","VAL");
+    }
+ else {
+      document.field("csp","val");
+      document.field("cip","val");
+    }
+    document.save();
+  }
+  String query="select from CompositeIndexQueryCollateWasChangedTest where csp = 'VAL'";
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),5);
+  for (  ODocument document : result)   Assert.assertEquals(document.field("csp"),"VAL");
+  ODocument explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Set<String>>field("involvedIndexes").contains("collateCompositeIndexCollateWasChanged"));
+  csp=clazz.getProperty("csp");
+  csp.setCollate(OCaseInsensitiveCollate.NAME);
+  query="select from CompositeIndexQueryCollateWasChangedTest where csp = 'VaL'";
+  result=database.query(new OSQLSynchQuery<ODocument>(query));
+  Assert.assertEquals(result.size(),10);
+  for (  ODocument document : result)   Assert.assertEquals(document.<String>field("csp").toUpperCase(),"VAL");
+  explain=database.command(new OCommandSQL("explain " + query)).execute();
+  Assert.assertTrue(explain.<Set<String>>field("involvedIndexes").contains("collateCompositeIndexCollateWasChanged"));
+}

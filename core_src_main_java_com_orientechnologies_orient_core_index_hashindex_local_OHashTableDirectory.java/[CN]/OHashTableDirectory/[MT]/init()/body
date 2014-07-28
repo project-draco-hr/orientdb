@@ -1,0 +1,29 @@
+{
+  startAtomicOperation();
+  try {
+    firstEntry=diskCache.load(fileId,0,true);
+    diskCache.pinPage(firstEntry);
+    firstEntry.acquireExclusiveLock();
+    try {
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getTrackMode(),firstEntry);
+      firstPage.setTreeSize(0);
+      firstPage.setTombstone(-1);
+      firstEntry.markDirty();
+      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),true);
+    }
+  finally {
+      firstEntry.releaseExclusiveLock();
+      diskCache.release(firstEntry);
+    }
+    entries=new ArrayList<OCacheEntry>();
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+}

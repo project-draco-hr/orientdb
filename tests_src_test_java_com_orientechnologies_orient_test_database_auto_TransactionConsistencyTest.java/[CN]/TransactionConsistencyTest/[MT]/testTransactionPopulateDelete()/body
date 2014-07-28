@@ -1,39 +1,36 @@
 {
-  ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
-  db.open("admin","admin");
-  if (!db.getMetadata().getSchema().existsClass("MyFruit")) {
-    OClass fruitClass=db.getMetadata().getSchema().createClass("MyFruit");
+  if (!database.getMetadata().getSchema().existsClass("MyFruit")) {
+    OClass fruitClass=database.getMetadata().getSchema().createClass("MyFruit");
     fruitClass.createProperty("name",OType.STRING);
     fruitClass.createProperty("color",OType.STRING);
     fruitClass.createProperty("flavor",OType.STRING);
-    db.getMetadata().getSchema().getClass("MyFruit").getProperty("name").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
-    db.getMetadata().getSchema().getClass("MyFruit").getProperty("color").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
-    db.getMetadata().getSchema().getClass("MyFruit").getProperty("flavor").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    database.getMetadata().getSchema().getClass("MyFruit").getProperty("name").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    database.getMetadata().getSchema().getClass("MyFruit").getProperty("color").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    database.getMetadata().getSchema().getClass("MyFruit").getProperty("flavor").createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
   }
-  db.close();
-  db=new ODatabaseDocumentTx(url);
-  db.open("admin","admin");
+  database.close();
+  database.open("admin","admin");
   int chunkSize=500;
   for (int initialValue=0; initialValue < 10; initialValue++) {
     System.out.println("initialValue = " + initialValue);
-    Assert.assertEquals(db.countClusterElements("MyFruit"),0);
+    Assert.assertEquals(database.countClusterElements("MyFruit"),0);
     Vector<ODocument> v=new Vector<ODocument>();
-    db.begin();
+    database.begin();
     for (int i=initialValue * chunkSize; i < (initialValue * chunkSize) + chunkSize; i++) {
       ODocument d=new ODocument("MyFruit").field("name","" + i).field("color","FOO").field("flavor","BAR" + i);
       d.save();
       v.addElement(d);
     }
     System.out.println("populate commit");
-    db.commit();
-    db.begin();
+    database.commit();
+    database.begin();
     System.out.println("vector size = " + v.size());
     for (int i=0; i < v.size(); i++) {
-      db.delete(v.elementAt(i));
+      database.delete(v.elementAt(i));
     }
     System.out.println("delete commit");
-    db.commit();
-    Assert.assertEquals(db.countClusterElements("MyFruit"),0);
+    database.commit();
+    Assert.assertEquals(database.countClusterElements("MyFruit"),0);
   }
-  db.close();
+  database.close();
 }

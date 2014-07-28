@@ -1,21 +1,16 @@
 {
   final ODatabaseRecord database=getDatabase();
   database.checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_READ,iSchemaClass.getName().toLowerCase());
-  final List<OIndexSearchResult> indexSearchResults=new ArrayList<OIndexSearchResult>();
-  if (compiledFilter == null)   return false;
-  analyzeQueryBranch(iSchemaClass,compiledFilter.getRootCondition(),indexSearchResults);
-  Collections.sort(indexSearchResults,new Comparator<OIndexSearchResult>(){
-    public int compare(    final OIndexSearchResult searchResultOne,    final OIndexSearchResult searchResultTwo){
-      return searchResultTwo.getFieldCount() - searchResultOne.getFieldCount();
-    }
-  }
-);
+  if (compiledFilter == null)   if (orderedFields.size() == 0)   return false;
+ else   return optimizeSort(iSchemaClass);
+  final List<OIndexSearchResult> indexSearchResults=filterAnalyzer.analyzeCondition(compiledFilter.getRootCondition(),iSchemaClass,context);
   for (  final OIndexSearchResult searchResult : indexSearchResults) {
-    final List<OIndex<?>> involvedIndexes=getInvolvedIndexes(iSchemaClass,searchResult);
-    Collections.sort(involvedIndexes,IndexComparator.INSTANCE);
+    final List<OIndex<?>> involvedIndexes=filterAnalyzer.getInvolvedIndexes(iSchemaClass,searchResult);
+    Collections.sort(involvedIndexes,new IndexComparator());
     for (    final OIndex index : involvedIndexes) {
       if (index.isRebuiding())       continue;
       final OIndexDefinition indexDefinition=index.getDefinition();
+      if (searchResult.containsNullValues && indexDefinition.isNullValuesIgnored())       continue;
       final OQueryOperator operator=searchResult.lastOperator;
       if (!OIndexSearchResult.isIndexEqualityOperator(operator)) {
         final String lastFiled=searchResult.lastField.getItemName(searchResult.lastField.getItemCount() - 1);
@@ -33,43 +28,23 @@
           keyParams.add(searchResult.lastValue);
         }
       }
-      INDEX_OPERATION_TYPE opType=null;
-      if (context.isRecordingMetrics()) {
-        Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
-        if (idxNames == null) {
-          idxNames=new HashSet<String>();
-          context.setVariable("involvedIndexes",idxNames);
-        }
-        if (index instanceof OChainedIndexProxy) {
-          idxNames.addAll(((OChainedIndexProxy)index).getIndexNames());
-        }
- else         idxNames.add(index.getName());
-      }
-      if (projections != null && projections.size() == 1) {
-        final Object v=projections.values().iterator().next();
-        if (v instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)v).getFunction() instanceof OSQLFunctionCount) {
-          if (!(compiledFilter.getRootCondition().getLeft() instanceof OSQLFilterCondition || compiledFilter.getRootCondition().getRight() instanceof OSQLFilterCondition))           opType=INDEX_OPERATION_TYPE.COUNT;
-        }
-      }
-      if (opType == null)       opType=INDEX_OPERATION_TYPE.GET;
-      OQueryOperator.IndexResultListener resultListener;
-      if (fetchLimit < 0 || opType == INDEX_OPERATION_TYPE.COUNT)       resultListener=null;
- else       resultListener=new IndexResultListener();
-      Object result;
+      metricRecorder.recordInvolvedIndexesMetric(index);
+      OIndexCursor cursor;
+      final boolean indexIsUsedInOrderBy=orderByOptimizer.canBeUsedByOrderBy(index,orderedFields) && !(index.getInternal() instanceof OChainedIndexProxy);
       try {
-        result=operator.executeIndexQuery(context,index,opType,keyParams,resultListener,fetchLimit);
+        boolean ascSortOrder=!indexIsUsedInOrderBy || orderedFields.get(0).getValue().equals(KEYWORD_ASC);
+        if (indexIsUsedInOrderBy)         fullySortedByIndex=indexDefinition.getFields().size() >= orderedFields.size();
+        cursor=operator.executeIndexQuery(context,index,keyParams,ascSortOrder);
       }
  catch (      Exception e) {
         OLogManager.instance().error(this,"Error on using index %s in query '%s'. Probably you need to rebuild indexes. Now executing query using cluster scan",e,index.getName(),request != null && request.getText() != null ? request.getText() : "");
+        fullySortedByIndex=false;
         return false;
       }
-      if (result == null)       continue;
-      if (opType == INDEX_OPERATION_TYPE.COUNT) {
-        final String projName=projectionDefinition.keySet().iterator().next();
-        projectionDefinition.clear();
-        getProjectionGroup(null).applyValue(projName,result);
-      }
- else       fillSearchIndexResultSet(result);
+      if (cursor == null)       continue;
+      filterOptimizer.optimize(compiledFilter,searchResult);
+      fetchValuesFromIndexCursor(cursor);
+      metricRecorder.recordOrderByOptimizationMetric(indexIsUsedInOrderBy,this.fullySortedByIndex);
       return true;
     }
   }

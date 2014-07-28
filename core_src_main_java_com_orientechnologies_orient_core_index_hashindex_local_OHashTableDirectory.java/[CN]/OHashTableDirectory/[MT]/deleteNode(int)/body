@@ -1,0 +1,50 @@
+{
+  acquireExclusiveLock();
+  startAtomicOperation();
+  try {
+    diskCache.loadPinnedPage(firstEntry);
+    firstEntry.acquireExclusiveLock();
+    try {
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,ODurablePage.TrackMode.NONE,firstEntry);
+      if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
+        firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
+        firstPage.setTombstone(nodeIndex);
+      }
+ else {
+        final int pageIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) / ODirectoryPage.NODES_PER_PAGE;
+        final int localNodeIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) % ODirectoryPage.NODES_PER_PAGE;
+        final OCacheEntry cacheEntry=entries.get(pageIndex);
+        diskCache.loadPinnedPage(cacheEntry);
+        cacheEntry.acquireExclusiveLock();
+        try {
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,ODurablePage.TrackMode.NONE,cacheEntry);
+          page.setPointer(localNodeIndex,0,firstPage.getTombstone());
+          firstPage.setTombstone(nodeIndex);
+          cacheEntry.markDirty();
+          logPageChanges(page,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
+        }
+  finally {
+          cacheEntry.releaseExclusiveLock();
+          diskCache.release(cacheEntry);
+        }
+      }
+      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
+    }
+  finally {
+      firstEntry.releaseExclusiveLock();
+      diskCache.release(firstEntry);
+    }
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

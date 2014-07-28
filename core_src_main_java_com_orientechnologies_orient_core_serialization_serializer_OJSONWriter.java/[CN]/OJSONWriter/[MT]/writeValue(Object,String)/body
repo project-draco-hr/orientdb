@@ -7,6 +7,7 @@
   }
  else   oldAutoConvertSettings=false;
   if (iValue == null)   buffer.append("null");
+ else   if (iValue instanceof Boolean || iValue instanceof Number)   buffer.append(iValue.toString());
  else   if (iValue instanceof OIdentifiable) {
     final OIdentifiable linked=(OIdentifiable)iValue;
     if (linked.getIdentity().isValid()) {
@@ -16,7 +17,11 @@
     }
  else {
       if (iFormat != null && iFormat.contains("shallow"))       buffer.append("{}");
- else       buffer.append(linked.getRecord().toJSON(iFormat));
+ else {
+        final ORecord<?> rec=linked.getRecord();
+        if (rec != null)         buffer.append(rec.toJSON(iFormat));
+ else         buffer.append("null");
+      }
     }
   }
  else   if (iValue.getClass().isArray()) {
@@ -57,16 +62,15 @@
       buffer.append('"');
     }
   }
- else   if (iValue instanceof String) {
-    final String v=(String)iValue;
+ else   if (iValue instanceof BigDecimal)   buffer.append(((BigDecimal)iValue).toPlainString());
+ else   if (iValue instanceof ORecordLazyMultiValue)   iteratorToJSON(((ORecordLazyMultiValue)iValue).rawIterator(),iFormat,buffer);
+ else   if (iValue instanceof Iterable<?>)   iteratorToJSON(((Iterable<?>)iValue).iterator(),iFormat,buffer);
+ else {
+    final String v=iValue.toString();
     buffer.append('"');
     buffer.append(encode(v));
     buffer.append('"');
   }
- else   if (iValue instanceof BigDecimal)   buffer.append(((BigDecimal)iValue).toPlainString());
- else   if (iValue instanceof ORecordLazyMultiValue)   iteratorToJSON(((ORecordLazyMultiValue)iValue).rawIterator(),iFormat,buffer);
- else   if (iValue instanceof Iterable<?>)   iteratorToJSON(((Iterable<?>)iValue).iterator(),iFormat,buffer);
- else   buffer.append(iValue.toString());
   if (iValue instanceof ORecordLazyMultiValue)   ((ORecordLazyMultiValue)iValue).setAutoConvertToRecord(oldAutoConvertSettings);
   return buffer.toString();
 }

@@ -13,11 +13,10 @@
       int removedContentSize=0;
       do {
         final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-        final OCachePointer pointer=cacheEntry.getCachePointer();
-        pointer.acquireExclusiveLock();
+        cacheEntry.acquireExclusiveLock();
         int initialFreePageIndex;
         try {
-          final OClusterPage localPage=new OClusterPage(pointer.getDataPointer(),false,trackMode);
+          final OClusterPage localPage=new OClusterPage(cacheEntry,false,trackMode);
           initialFreePageIndex=calculateFreePageIndex(localPage);
           if (localPage.isDeleted(recordPosition)) {
             if (removedContentSize == 0)             return false;
@@ -33,10 +32,9 @@
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
           logPageChanges(localPage,fileId,pageIndex,false);
-          cacheEntry.markDirty();
         }
   finally {
-          pointer.releaseExclusiveLock();
+          cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);

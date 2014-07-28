@@ -1,0 +1,23 @@
+{
+  final OrientVertex toAdd;
+  final ODocument fieldRecord=((OIdentifiable)fieldValue).getRecord();
+  if (fieldRecord.getSchemaClass().isSubClassOf(OrientVertexType.CLASS_NAME)) {
+    toAdd=new OrientVertex(graph,fieldRecord);
+  }
+ else   if (fieldRecord.getSchemaClass().isSubClassOf(OrientEdgeType.CLASS_NAME)) {
+    if (settings.useVertexFieldsForEdgeLabels || OrientEdge.isLabeled(OrientEdge.getRecordLabel(fieldRecord),iLabels)) {
+      final OIdentifiable vertexDoc=OrientEdge.getConnection(fieldRecord,connection.getKey().opposite());
+      if (vertexDoc == null) {
+        fieldRecord.reload();
+        if (vertexDoc == null) {
+          OLogManager.instance().warn(this,"Cannot load edge " + fieldRecord + " to get the "+ connection.getKey().opposite()+ " vertex");
+          return;
+        }
+      }
+      toAdd=new OrientVertex(graph,vertexDoc);
+    }
+ else     toAdd=null;
+  }
+ else   throw new IllegalStateException("Invalid content found in " + fieldName + " field: "+ fieldRecord);
+  if (toAdd != null)   iterable.add(toAdd);
+}

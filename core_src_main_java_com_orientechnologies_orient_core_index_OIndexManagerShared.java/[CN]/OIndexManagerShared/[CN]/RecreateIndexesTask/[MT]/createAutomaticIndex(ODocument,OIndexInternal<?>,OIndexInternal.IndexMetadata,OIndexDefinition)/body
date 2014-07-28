@@ -1,0 +1,22 @@
+{
+  final String indexName=indexMetadata.getName();
+  final Set<String> clusters=indexMetadata.getClustersToIndex();
+  final String type=indexMetadata.getType();
+  if (indexName != null && clusters != null && !clusters.isEmpty() && type != null) {
+    OLogManager.instance().info(this,"Start creation of index %s",indexName);
+    index.deleteWithoutIndexLoad(indexName);
+    index.create(indexName,indexDefinition,defaultClusterName,clusters,false,new OIndexRebuildOutputListener(index));
+    index.setRebuildingFlag();
+    addIndexInternal(index);
+    OLogManager.instance().info(this,"Index %s was successfully created and rebuild is going to be started.",indexName);
+    index.rebuild(new OIndexRebuildOutputListener(index));
+    index.flush();
+    setDirty();
+    ok++;
+    OLogManager.instance().info(this,"Rebuild of %s index was successfully finished.",indexName);
+  }
+ else {
+    errors++;
+    OLogManager.instance().error(this,"Information about index was restored incorrectly, following data were loaded : " + "index name - %s, index definition %s, clusters %s, type %s.",indexName,indexDefinition,clusters,type);
+  }
+}

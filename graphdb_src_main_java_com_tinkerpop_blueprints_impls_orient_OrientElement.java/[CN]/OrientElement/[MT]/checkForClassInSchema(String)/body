@@ -1,0 +1,23 @@
+{
+  if (className == null)   return null;
+  if (isDetached())   return className;
+  final OSchema schema=graph.getRawGraph().getMetadata().getSchema();
+  if (!schema.existsClass(className)) {
+    try {
+      graph.executeOutsideTx(new OCallable<OClass,OrientBaseGraph>(){
+        @Override public OClass call(        final OrientBaseGraph g){
+          return schema.createClass(className,schema.getClass(getBaseClassName()));
+        }
+      }
+,"Committing the active transaction to create the new type '",className,"' as subclass of '",getBaseClassName(),"'. The transaction will be reopen right after that. To avoid this behavior create the classes outside the transaction");
+    }
+ catch (    OSchemaException e) {
+      if (!schema.existsClass(className))       throw e;
+    }
+  }
+ else {
+    final OClass cls=schema.getClass(className);
+    if (!cls.isSubClassOf(getBaseClassName()))     throw new IllegalArgumentException("Class '" + className + "' is not an instance of "+ getBaseClassName());
+  }
+  return className;
+}

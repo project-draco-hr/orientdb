@@ -1,0 +1,34 @@
+{
+  if (database.getStorage().getType().equals(OEngineRemote.NAME) || database.getStorage().getType().equals(OEngineMemory.NAME))   return;
+  float reuseTrigger=OGlobalConfiguration.SBTREEBOSAI_FREE_SPACE_REUSE_TRIGGER.getValueAsFloat();
+  OGlobalConfiguration.SBTREEBOSAI_FREE_SPACE_REUSE_TRIGGER.setValue(Float.MIN_VALUE);
+  ODocument realDoc=new ODocument();
+  ORidBag realDocRidBag=new ORidBag();
+  realDoc.field("ridBag",realDocRidBag);
+  for (int i=0; i < 10; i++) {
+    ODocument docToAdd=new ODocument();
+    realDocRidBag.add(docToAdd);
+  }
+  assertEmbedded(realDocRidBag.isEmbedded());
+  realDoc.save();
+  final int clusterId=database.addCluster("ridBagDeleteTest");
+  ODocument testDocument=crateTestDeleteDoc(realDoc);
+  database.freeze();
+  database.release();
+  final String directory=database.getStorage().getConfiguration().getDirectory();
+  File testRidBagFile=new File(directory,OSBTreeCollectionManagerShared.FILE_NAME_PREFIX + clusterId + OSBTreeCollectionManagerShared.DEFAULT_EXTENSION);
+  long testRidBagSize=testRidBagFile.length();
+  for (int i=0; i < 100; i++) {
+    testDocument.reload();
+    testDocument.delete();
+    testDocument=crateTestDeleteDoc(realDoc);
+  }
+  database.freeze();
+  database.release();
+  OGlobalConfiguration.SBTREEBOSAI_FREE_SPACE_REUSE_TRIGGER.setValue(reuseTrigger);
+  testRidBagFile=new File(directory,OSBTreeCollectionManagerShared.FILE_NAME_PREFIX + clusterId + OSBTreeCollectionManagerShared.DEFAULT_EXTENSION);
+  Assert.assertEquals(testRidBagFile.length(),testRidBagSize);
+  realDoc=database.load(realDoc.getIdentity(),"*:*",true);
+  ORidBag ridBag=realDoc.field("ridBag");
+  Assert.assertEquals(ridBag.size(),10);
+}

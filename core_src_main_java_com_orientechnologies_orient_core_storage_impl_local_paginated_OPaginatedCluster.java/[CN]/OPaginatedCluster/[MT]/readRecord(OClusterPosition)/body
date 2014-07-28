@@ -8,9 +8,8 @@
     if (diskCache.getFilledUpTo(fileId) <= pageIndex)     return null;
     ORecordVersion recordVersion=null;
     OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-    OCachePointer pointer=cacheEntry.getCachePointer();
     try {
-      final OClusterPage localPage=new OClusterPage(pointer.getDataPointer(),false,ODurablePage.TrackMode.NONE);
+      final OClusterPage localPage=new OClusterPage(cacheEntry,false,ODurablePage.TrackMode.NONE);
       if (localPage.isDeleted(recordPosition))       return null;
       recordVersion=localPage.getRecordVersion(recordPosition);
     }
@@ -19,14 +18,19 @@
     }
     byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
     if (fullContent == null)     return null;
+    if (useCRC32) {
+      CRC32 crc32=new CRC32();
+      final int crcPosition=fullContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE- OIntegerSerializer.INT_SIZE;
+      crc32.update(fullContent,0,crcPosition);
+      final int crc=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,crcPosition);
+      if (crc != (int)crc32.getValue())       throw new OStorageException("Content of record for cluster with id " + id + " and position "+ clusterPosition+ " is broken.");
+    }
     int fullContentPosition=0;
     byte recordType=fullContent[fullContentPosition];
     fullContentPosition++;
     int readContentSize=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,fullContentPosition);
     fullContentPosition+=OIntegerSerializer.INT_SIZE;
-    byte[] recordContent=new byte[readContentSize];
-    System.arraycopy(fullContent,fullContentPosition,recordContent,0,recordContent.length);
-    recordContent=compression.uncompress(recordContent);
+    byte[] recordContent=compression.uncompress(fullContent,fullContentPosition,readContentSize);
     return new ORawBuffer(recordContent,recordVersion,recordType);
   }
   finally {

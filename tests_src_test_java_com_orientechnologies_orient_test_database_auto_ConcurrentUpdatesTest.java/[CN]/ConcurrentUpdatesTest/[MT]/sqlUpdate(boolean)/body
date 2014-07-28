@@ -1,0 +1,23 @@
+{
+  System.out.println("Started Test " + (lock ? "LOCK" : ""));
+  counter.set(0);
+  startedOn=System.currentTimeMillis();
+  ODatabaseDocumentTx[] databases=new ODatabaseDocumentTx[THREADS];
+  for (int i=0; i < THREADS; ++i)   databases[i]=new ODatabaseDocumentTx(url).open("admin","admin");
+  ODocument doc1=databases[0].newInstance();
+  doc1.field("total",0);
+  databases[0].save(doc1);
+  ORID rid1=doc1.getIdentity();
+  PessimisticUpdate[] ops=new PessimisticUpdate[THREADS];
+  for (int i=0; i < THREADS; ++i)   ops[i]=new PessimisticUpdate(databases[i],rid1,"thread" + i,lock);
+  Thread[] threads=new Thread[THREADS];
+  for (int i=0; i < THREADS; ++i)   threads[i]=new Thread(ops[i],"ConcurrentTest" + i);
+  for (int i=0; i < THREADS; ++i)   threads[i].start();
+  for (int i=0; i < THREADS; ++i)   threads[i].join();
+  System.out.println("Done! Total sql updates executed in parallel: " + counter.get());
+  Assert.assertEquals(counter.get(),PESSIMISTIC_CYCLES * THREADS);
+  doc1=databases[0].load(rid1,null,true);
+  Assert.assertEquals(doc1.field("total"),PESSIMISTIC_CYCLES * THREADS);
+  for (int i=0; i < THREADS; ++i)   databases[i].close();
+  System.out.println("concurrentOptimisticSQLUpdates Test " + (lock ? "LOCK" : "") + " completed in "+ (System.currentTimeMillis() - startedOn));
+}

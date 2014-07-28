@@ -1,21 +1,24 @@
 {
   ODistributedRequest req=requestQueue.take();
-  while (waitForTaskType != null) {
+  while (waitForMessageId.get() > -1) {
     if (req != null) {
-      if (req.getTask().getClass().equals(waitForTaskType)) {
-        waitForTaskType=null;
-        return req;
+      if (req.getId() >= waitForMessageId.get()) {
+        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.IN,"reached waited request %d on request=%s sourceNode=%s",waitForMessageId.get(),req,req.getSenderNodeName());
+        waitForMessageId.set(-1);
+        break;
       }
  else {
-        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.OUT,"skip request because the node is not online yet, request=%s sourceNode=%s",req,req.getSenderNodeName());
+        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.IN,"discarded request %d because waiting for %d request=%s sourceNode=%s",req.getId(),waitForMessageId.get(),req,req.getSenderNodeName());
         req=requestQueue.take();
       }
     }
   }
-  while (!status.get() && req.getTask().isRequireNodeOnline()) {
+  while (!restoringMessages && !status.get() && req.getTask().isRequireNodeOnline()) {
 synchronized (waitForOnline) {
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.OUT,"node is not online, request=%s sourceNode=%s must wait to be processed",req,req.getSenderNodeName());
       waitForOnline.wait(5000);
     }
   }
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),DIRECTION.OUT,"processing request=%s sourceNode=%s",req,req.getSenderNodeName());
   return req;
 }

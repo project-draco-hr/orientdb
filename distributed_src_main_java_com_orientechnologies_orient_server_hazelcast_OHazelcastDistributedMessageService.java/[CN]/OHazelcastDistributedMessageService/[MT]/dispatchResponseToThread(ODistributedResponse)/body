@@ -1,14 +1,20 @@
 {
+  final long chrono=Orient.instance().getProfiler().startChrono();
   try {
     final long reqId=response.getRequestId();
     final ODistributedResponseManager asynchMgr=responsesByRequestIds.get(reqId);
     if (asynchMgr == null) {
       if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,manager.getLocalNodeName(),response.getExecutorNodeName(),DIRECTION.IN,"received response for message %d after the timeout (%dms)",reqId,OGlobalConfiguration.DISTRIBUTED_ASYNCH_RESPONSES_TIMEOUT.getValueAsLong());
     }
- else     if (asynchMgr.addResponse(response))     responsesByRequestIds.remove(reqId);
+ else     if (asynchMgr.collectResponse(response)) {
+      responsesByRequestIds.remove(reqId);
+      return System.currentTimeMillis() - asynchMgr.getSentOn();
+    }
   }
   finally {
-    Orient.instance().getProfiler().updateCounter("distributed.replication.msgReceived","Number of replication messages received in current node",+1);
-    Orient.instance().getProfiler().updateCounter("distributed.replication." + response.getExecutorNodeName() + ".msgReceived","Number of replication messages received in current node from a node",+1,"distributed.replication.*.msgReceived");
+    Orient.instance().getProfiler().stopChrono("distributed.node." + response.getExecutorNodeName() + ".latency","Latency in ms from current node",chrono);
+    Orient.instance().getProfiler().updateCounter("distributed.node.msgReceived","Number of replication messages received in current node",+1,"distributed.node.msgReceived");
+    Orient.instance().getProfiler().updateCounter("distributed.node." + response.getExecutorNodeName() + ".msgReceived","Number of replication messages received in current node from a node",+1,"distributed.node.*.msgReceived");
   }
+  return -1;
 }

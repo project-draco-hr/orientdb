@@ -1,29 +1,9 @@
 {
-  if (e.getIdentity().isNew()) {
-    final ORecord<?> record=e.getRecord();
-    if (newItems == null)     newItems=new IdentityHashMap<ORecord<?>,Object>();
- else     if (newItems.containsKey(record))     return false;
-    newItems.put(record,NEWMAP_VALUE);
-    setDirty();
-    return true;
-  }
- else   if (OGlobalConfiguration.LAZYSET_WORK_ON_STREAM.getValueAsBoolean() && getStreamedContent() != null) {
-    final String ridString=e.getIdentity().toString();
-    final StringBuilder buffer=getStreamedContent();
-    if (buffer.indexOf(ridString) < 0) {
-      if (buffer.length() > 0)       buffer.append(',');
-      e.getIdentity().toString(buffer);
-      setDirty();
-      return true;
-    }
-    return false;
-  }
- else {
-    final int pos=indexOf(e);
-    if (pos < 0) {
-      delegate.add(pos * -1 - 1,e);
-      return true;
-    }
-    return false;
-  }
+  if (map.containsKey(e))   return false;
+  if (e instanceof ORecord)   map.put(e,e);
+ else   map.put(e,ENTRY_REMOVAL);
+  setDirty();
+  if (e instanceof ODocument)   ((ODocument)e).addOwner(this);
+  fireCollectionChangedEvent(new OMultiValueChangeEvent<OIdentifiable,OIdentifiable>(OMultiValueChangeEvent.OChangeType.ADD,e,e));
+  return true;
 }

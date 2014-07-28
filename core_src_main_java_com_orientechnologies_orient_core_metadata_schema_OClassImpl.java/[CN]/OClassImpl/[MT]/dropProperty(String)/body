@@ -1,12 +1,24 @@
 {
   if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot drop a property inside a transaction");
   getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_DELETE);
-  final String lowerName=iPropertyName.toLowerCase();
-  if (!properties.containsKey(lowerName))   throw new OSchemaException("Property '" + iPropertyName + "' not found in class "+ name+ "'");
-  final StringBuilder cmd=new StringBuilder("drop property ");
-  cmd.append(name);
-  cmd.append('.');
-  cmd.append(iPropertyName);
-  getDatabase().command(new OCommandSQL(cmd.toString())).execute();
-  if (existsProperty(iPropertyName))   properties.remove(lowerName);
+  final String lowerName=propertyName.toLowerCase();
+  acquireSchemaWriteLock();
+  try {
+    if (!properties.containsKey(lowerName))     throw new OSchemaException("Property '" + propertyName + "' not found in class "+ name+ "'");
+    final ODatabaseRecord database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      database.command(new OCommandSQL("drop property " + name + '.'+ propertyName)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final OCommandSQL commandSQL=new OCommandSQL("drop property " + name + '.'+ propertyName);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      dropPropertyInternal(propertyName);
+    }
+ else     dropPropertyInternal(propertyName);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
 }

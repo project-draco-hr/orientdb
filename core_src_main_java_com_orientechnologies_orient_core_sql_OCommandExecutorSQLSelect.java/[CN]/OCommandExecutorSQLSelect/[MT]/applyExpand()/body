@@ -1,12 +1,11 @@
 {
   if (expandTarget == null)   return;
-  Object fieldValue;
   final long startExpand=System.currentTimeMillis();
   try {
     if (tempResult == null) {
       tempResult=new ArrayList<OIdentifiable>();
       if (expandTarget instanceof OSQLFilterItemVariable) {
-        Object r=((OSQLFilterItemVariable)expandTarget).getValue(null,context);
+        Object r=((OSQLFilterItemVariable)expandTarget).getValue(null,null,context);
         if (r != null) {
           if (r instanceof OIdentifiable)           ((Collection<OIdentifiable>)tempResult).add((OIdentifiable)r);
  else           if (OMultiValue.isMultiValue(r)) {
@@ -19,19 +18,16 @@
       final OMultiCollectionIterator<OIdentifiable> finalResult=new OMultiCollectionIterator<OIdentifiable>();
       finalResult.setLimit(limit);
       for (      OIdentifiable id : tempResult) {
-        if (expandTarget instanceof OSQLFilterItem)         fieldValue=((OSQLFilterItem)expandTarget).getValue(id.getRecord(),context);
+        final Object fieldValue;
+        if (expandTarget instanceof OSQLFilterItem)         fieldValue=((OSQLFilterItem)expandTarget).getValue(id.getRecord(),null,context);
  else         if (expandTarget instanceof OSQLFunctionRuntime)         fieldValue=((OSQLFunctionRuntime)expandTarget).getResult();
  else         fieldValue=expandTarget.toString();
-        if (fieldValue != null)         if (fieldValue instanceof Collection<?>) {
-          finalResult.add((Collection<OIdentifiable>)fieldValue);
+        if (fieldValue != null)         if (fieldValue instanceof Collection<?> || fieldValue.getClass().isArray() || fieldValue instanceof Iterator<?>|| fieldValue instanceof OIdentifiable) {
+          finalResult.add(fieldValue);
         }
  else         if (fieldValue instanceof Map<?,?>) {
           finalResult.add(((Map<?,OIdentifiable>)fieldValue).values());
         }
- else         if (fieldValue instanceof OMultiCollectionIterator) {
-          finalResult.add((OMultiCollectionIterator<OIdentifiable>)fieldValue);
-        }
- else         if (fieldValue instanceof OIdentifiable)         finalResult.add((OIdentifiable)fieldValue);
       }
       tempResult=finalResult;
     }

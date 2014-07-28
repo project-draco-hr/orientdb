@@ -1,0 +1,39 @@
+{
+  OChannelBinaryAsynchClient network=null;
+  do {
+    lock.acquireExclusiveLock();
+    try {
+      try {
+        network=beginRequest(OChannelBinaryProtocol.REQUEST_DATACLUSTER_ADD);
+        network.writeString(iClusterName);
+        if (network.getSrvProtocolVersion() >= 18)         network.writeShort((short)iRequestedId);
+      }
+  finally {
+        endRequest(network);
+      }
+      try {
+        beginResponse(network);
+        final int clusterId=network.readShort();
+        final OClusterRemote cluster=new OClusterRemote();
+        cluster.configure(this,clusterId,iClusterName.toLowerCase());
+        if (clusters.length <= clusterId)         clusters=Arrays.copyOf(clusters,clusterId + 1);
+        clusters[cluster.getId()]=cluster;
+        clusterMap.put(cluster.getName().toLowerCase(),cluster);
+        return clusterId;
+      }
+  finally {
+        endResponse(network);
+      }
+    }
+ catch (    OModificationOperationProhibitedException mphe) {
+      handleDBFreeze();
+    }
+catch (    Exception e) {
+      handleException(network,"Error on add new cluster",e);
+    }
+ finally {
+      lock.releaseExclusiveLock();
+    }
+  }
+ while (true);
+}

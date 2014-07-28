@@ -1,0 +1,36 @@
+{
+  OWriteAheadLog log=((OAbstractPaginatedStorage)databaseDocumentTx.getStorage()).getWALInstance();
+  OLogSequenceNumber lsn=log.begin();
+  List<OWALRecord> atomicUnit=new ArrayList<OWALRecord>();
+  List<OWALRecord> batch=new ArrayList<OWALRecord>();
+  final AtomicBoolean lowMemory=new AtomicBoolean(false);
+  OMemoryWatchDog.Listener watchdogListener=new OMemoryWatchDog.Listener(){
+    @Override public void lowMemory(    long iFreeMemory,    long iFreeMemoryPercentage){
+      lowMemory.set(true);
+    }
+  }
+;
+  watchdogListener=Orient.instance().getMemoryWatchDog().addListener(watchdogListener);
+  boolean atomicChangeIsProcessed=false;
+  while (lsn != null) {
+    OWALRecord walRecord=log.read(lsn);
+    batch.add(walRecord);
+    if (lowMemory.get()) {
+      System.out.println("Heap memory is low, apply batch");
+      atomicChangeIsProcessed=restoreDataFromBatch(atomicChangeIsProcessed,atomicUnit,batch);
+      batch=new ArrayList<OWALRecord>();
+      lowMemory.set(false);
+    }
+    lsn=log.next(lsn);
+  }
+  if (batch.size() > 0) {
+    System.out.println("Apply batch the last batch.");
+    restoreDataFromBatch(atomicChangeIsProcessed,atomicUnit,batch);
+    batch=null;
+  }
+  Assert.assertTrue(atomicUnit.isEmpty());
+  log.close();
+  Orient.instance().getMemoryWatchDog().removeListener(watchdogListener);
+  final ODiskCache expectedDiskCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getDiskCache();
+  expectedDiskCache.flushBuffer();
+}

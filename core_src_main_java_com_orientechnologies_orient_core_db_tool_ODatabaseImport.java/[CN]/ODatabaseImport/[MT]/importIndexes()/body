@@ -6,6 +6,7 @@
   int n=0;
   while (jsonReader.lastChar() != ']') {
     jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
+    String blueprintsIndexClass=null;
     String indexName=null;
     String indexType=null;
     Set<String> clustersToIndex=new HashSet<String>();
@@ -25,7 +26,9 @@
         metadata=new ODocument().fromJSON(jsonMetadata);
         jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
       }
+ else       if (fieldName.equals("blueprintsIndexClass"))       blueprintsIndexClass=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
     }
+    if (indexName == null)     throw new IllegalArgumentException("Index name is missing");
     jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
     if (!indexName.equalsIgnoreCase(EXPORT_IMPORT_MAP_NAME)) {
       listener.onMessage("\n- Index '" + indexName + "'...");
@@ -37,7 +40,12 @@
         clusterIdsToIndex[i]=database.getClusterIdByName(clusterName);
         i++;
       }
-      indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null,metadata);
+      OIndex index=indexManager.createIndex(indexName,indexType,indexDefinition,clusterIdsToIndex,null,metadata);
+      if (blueprintsIndexClass != null) {
+        ODocument configuration=index.getConfiguration();
+        configuration.field("blueprintsIndexClass",blueprintsIndexClass);
+        indexManager.save();
+      }
       n++;
       listener.onMessage("OK");
     }

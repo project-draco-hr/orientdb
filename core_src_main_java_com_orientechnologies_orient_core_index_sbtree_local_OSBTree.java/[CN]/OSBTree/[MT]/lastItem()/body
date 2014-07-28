@@ -1,0 +1,56 @@
+{
+  LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
+  long bucketIndex=ROOT_INDEX;
+  OCacheEntry cacheEntry=diskCache.load(fileId,bucketIndex,false);
+  OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+  int itemIndex=bucket.size() - 1;
+  try {
+    while (true) {
+      if (!bucket.isLeaf()) {
+        if (itemIndex < -1) {
+          if (!path.isEmpty()) {
+            PagePathItemUnit pagePathItemUnit=path.removeLast();
+            bucketIndex=pagePathItemUnit.pageIndex;
+            itemIndex=pagePathItemUnit.itemIndex - 1;
+          }
+ else           return null;
+        }
+ else {
+          path.add(new PagePathItemUnit(bucketIndex,itemIndex));
+          if (itemIndex > -1) {
+            OSBTreeBucket.SBTreeEntry<K,V> entry=bucket.getEntry(itemIndex);
+            bucketIndex=entry.rightChild;
+          }
+ else {
+            OSBTreeBucket.SBTreeEntry<K,V> entry=bucket.getEntry(0);
+            bucketIndex=entry.leftChild;
+          }
+          itemIndex=OSBTreeBucket.MAX_PAGE_SIZE_BYTES + 1;
+        }
+      }
+ else {
+        if (bucket.isEmpty()) {
+          if (!path.isEmpty()) {
+            PagePathItemUnit pagePathItemUnit=path.removeLast();
+            bucketIndex=pagePathItemUnit.pageIndex;
+            itemIndex=pagePathItemUnit.itemIndex - 1;
+          }
+ else           return null;
+        }
+ else {
+          final ArrayList<Long> resultPath=new ArrayList<Long>(path.size() + 1);
+          for (          PagePathItemUnit pathItemUnit : path)           resultPath.add(pathItemUnit.pageIndex);
+          resultPath.add(bucketIndex);
+          return new BucketSearchResult(bucket.size() - 1,resultPath);
+        }
+      }
+      diskCache.release(cacheEntry);
+      cacheEntry=diskCache.load(fileId,bucketIndex,false);
+      bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+      if (itemIndex == OSBTreeBucket.MAX_PAGE_SIZE_BYTES + 1)       itemIndex=bucket.size() - 1;
+    }
+  }
+  finally {
+    diskCache.release(cacheEntry);
+  }
+}

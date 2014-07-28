@@ -1,22 +1,20 @@
 {
   System.out.println("**************************TransactionRollbackConsistencyTest***************************************");
-  ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
-  db.open("admin","admin");
-  OClass vertexClass=db.getMetadata().getSchema().createClass("TRVertex");
-  OClass edgeClass=db.getMetadata().getSchema().createClass("TREdge");
+  OClass vertexClass=database.getMetadata().getSchema().createClass("TRVertex");
+  OClass edgeClass=database.getMetadata().getSchema().createClass("TREdge");
   vertexClass.createProperty("in",OType.LINKSET,edgeClass);
   vertexClass.createProperty("out",OType.LINKSET,edgeClass);
   edgeClass.createProperty("in",OType.LINK,vertexClass);
   edgeClass.createProperty("out",OType.LINK,vertexClass);
-  OClass personClass=db.getMetadata().getSchema().createClass("TRPerson",vertexClass);
+  OClass personClass=database.getMetadata().getSchema().createClass("TRPerson",vertexClass);
   personClass.createProperty("name",OType.STRING).createIndex(OClass.INDEX_TYPE.UNIQUE);
   personClass.createProperty("surname",OType.STRING).createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
   personClass.createProperty("version",OType.INTEGER);
-  db.getMetadata().getSchema().save();
-  db.close();
+  database.getMetadata().getSchema().save();
+  database.close();
   final int cnt=4;
-  db.open("admin","admin");
-  db.begin();
+  database.open("admin","admin");
+  database.begin();
   Vector inserted=new Vector();
   for (int i=0; i < cnt; i++) {
     ODocument person=new ODocument("TRPerson");
@@ -36,14 +34,14 @@
     inserted.add(person);
     person.save();
   }
-  db.commit();
-  final List<ODocument> result1=db.command(new OCommandSQL("select from TRPerson")).execute();
+  database.commit();
+  final List<ODocument> result1=database.command(new OCommandSQL("select from TRPerson")).execute();
   Assert.assertNotNull(result1);
   Assert.assertEquals(result1.size(),cnt);
   System.out.println("Before transaction commit");
   for (  ODocument d : result1)   System.out.println(d);
   try {
-    db.begin();
+    database.begin();
     Vector inserted2=new Vector();
     for (int i=0; i < cnt; i++) {
       ODocument person=new ODocument("TRPerson");
@@ -72,22 +70,21 @@
     ((ODocument)inserted.elementAt(cnt - 1)).delete();
     ((ODocument)inserted.elementAt(cnt - 2)).getRecordVersion().reset();
     ((ODocument)inserted.elementAt(cnt - 2)).save();
-    db.commit();
+    database.commit();
     Assert.assertTrue(false);
   }
  catch (  OResponseProcessingException e) {
     Assert.assertTrue(e.getCause() instanceof OConcurrentModificationException);
-    db.rollback();
+    database.rollback();
   }
 catch (  OConcurrentModificationException e) {
     Assert.assertTrue(true);
-    db.rollback();
+    database.rollback();
   }
-  final List<ODocument> result2=db.command(new OCommandSQL("select from TRPerson")).execute();
+  final List<ODocument> result2=database.command(new OCommandSQL("select from TRPerson")).execute();
   Assert.assertNotNull(result2);
   System.out.println("After transaction commit failure/rollback");
   for (  ODocument d : result2)   System.out.println(d);
   Assert.assertEquals(result2.size(),cnt);
-  db.close();
   System.out.println("**************************TransactionRollbackConstistencyTest***************************************");
 }

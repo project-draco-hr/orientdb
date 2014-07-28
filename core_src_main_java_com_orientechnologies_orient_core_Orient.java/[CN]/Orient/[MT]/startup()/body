@@ -3,7 +3,20 @@
   try {
     if (active)     return this;
     shutdownHook=new OrientShutdownHook();
-    registerEngine(new OEngineLocal());
+    final int cores=Runtime.getRuntime().availableProcessors();
+    workers=new ThreadPoolExecutor(cores,cores * 3,10,TimeUnit.SECONDS,new LinkedBlockingQueue<Runnable>(cores * 500){
+      @Override public boolean offer(      Runnable e){
+        try {
+          put(e);
+          return true;
+        }
+ catch (        InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+        return false;
+      }
+    }
+);
     registerEngine(new OEngineLocalPaginated());
     registerEngine(new OEngineMemory());
     registerEngine("com.orientechnologies.orient.client.remote.OEngineRemote");

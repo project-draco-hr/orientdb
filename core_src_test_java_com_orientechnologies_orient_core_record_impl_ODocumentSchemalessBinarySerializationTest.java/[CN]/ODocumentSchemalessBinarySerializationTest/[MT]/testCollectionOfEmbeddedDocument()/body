@@ -1,0 +1,45 @@
+{
+  ODatabaseRecordThreadLocal.INSTANCE.set(null);
+  ODocument document=new ODocument();
+  ODocument embeddedInList=new ODocument();
+  embeddedInList.field("name","test");
+  embeddedInList.field("surname","something");
+  ODocument embeddedInList2=new ODocument();
+  embeddedInList2.field("name","test1");
+  embeddedInList2.field("surname","something2");
+  List<ODocument> embeddedList=new ArrayList<ODocument>();
+  embeddedList.add(embeddedInList);
+  embeddedList.add(embeddedInList2);
+  embeddedList.add(new ODocument());
+  document.field("embeddedList",embeddedList,OType.EMBEDDEDLIST);
+  ODocument embeddedInSet=new ODocument();
+  embeddedInSet.field("name","test2");
+  embeddedInSet.field("surname","something3");
+  ODocument embeddedInSet2=new ODocument();
+  embeddedInSet2.field("name","test5");
+  embeddedInSet2.field("surname","something6");
+  Set<ODocument> embeddedSet=new HashSet<ODocument>();
+  embeddedSet.add(embeddedInSet);
+  embeddedSet.add(embeddedInSet2);
+  embeddedSet.add(new ODocument());
+  document.field("embeddedSet",embeddedSet,OType.EMBEDDEDSET);
+  byte[] res=serializer.toStream(document,false);
+  ODocument extr=(ODocument)serializer.fromStream(res,new ODocument(),new String[]{});
+  List<ODocument> ser=extr.field("embeddedList");
+  assertEquals(ser.size(),3);
+  assertNotNull(ser.get(0));
+  assertNotNull(ser.get(1));
+  assertNotNull(ser.get(2));
+  ODocument inList=ser.get(0);
+  assertNotNull(inList);
+  assertEquals(inList.field("name"),embeddedInList.field("name"));
+  assertEquals(inList.field("surname"),embeddedInList.field("surname"));
+  Set<ODocument> setEmb=extr.field("embeddedSet");
+  assertEquals(setEmb.size(),3);
+  boolean ok=false;
+  for (  ODocument inSet : setEmb) {
+    assertNotNull(inSet);
+    if (embeddedInSet.field("name").equals(inSet.field("name")) && embeddedInSet.field("surname").equals(inSet.field("surname")))     ok=true;
+  }
+  assertTrue(ok,"not found record in the set after serilize");
+}

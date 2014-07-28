@@ -1,0 +1,59 @@
+{
+  checkOpeness();
+  final long timer=Orient.instance().getProfiler().startChrono();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  cluster.getExternalModificationLock().requestModificationLock();
+  try {
+    modificationLock.requestModificationLock();
+    try {
+      lock.acquireSharedLock();
+      try {
+        lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        try {
+          final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+          if (!checkForRecordValidity(ppos)) {
+            final ORecordVersion recordVersion=OVersionFactory.instance().createUntrackedVersion();
+            if (callback != null)             callback.call(rid,recordVersion);
+            return new OStorageOperationResult<ORecordVersion>(recordVersion);
+          }
+          if (updateContent) {
+            checkAndIncrementVersion(rid,version,ppos);
+          }
+          makeStorageDirty();
+          atomicOperationsManager.startAtomicOperation();
+          try {
+            if (updateContent)             cluster.updateRecord(rid.clusterPosition,content,ppos.recordVersion,recordType);
+            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+            if (context != null)             context.executeOperations(this);
+            atomicOperationsManager.endAtomicOperation(false);
+          }
+ catch (          RuntimeException e) {
+            atomicOperationsManager.endAtomicOperation(true);
+            throw e;
+          }
+          if (callback != null)           callback.call(rid,ppos.recordVersion);
+          return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
+        }
+  finally {
+          lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        }
+      }
+ catch (      IOException e) {
+        OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",e);
+        final ORecordVersion recordVersion=OVersionFactory.instance().createUntrackedVersion();
+        if (callback != null)         callback.call(rid,recordVersion);
+        return new OStorageOperationResult<ORecordVersion>(recordVersion);
+      }
+ finally {
+        lock.releaseSharedLock();
+      }
+    }
+  finally {
+      modificationLock.releaseModificationLock();
+    }
+  }
+  finally {
+    cluster.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
+  }
+}

@@ -2,28 +2,51 @@
   acquireExclusiveLock();
   OStorageTransaction transaction=storage.getStorageTransaction();
   try {
-    key=keySerializer.preprocess(key,(Object[])keyTypes);
-    BucketSearchResult bucketSearchResult=findBucket(key,PartialSearchMode.NONE);
-    if (bucketSearchResult.itemIndex < 0)     return null;
-    OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
-    OCachePointer keyBucketPointer=keyBucketCacheEntry.getCachePointer();
-    keyBucketPointer.acquireExclusiveLock();
-    try {
-      startAtomicOperation();
-      OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketPointer.getDataPointer(),keySerializer,keyTypes,valueSerializer,getTrackMode());
-      final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
-      final V value=readValue(removed);
-      long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
-      if (removedValueLink >= 0)       removeLinkedValue(removedValueLink);
-      logPageChanges(keyBucket,fileId,keyBucketCacheEntry.getPageIndex(),false);
-      keyBucketCacheEntry.markDirty();
-      setSize(size() - 1);
-      endAtomicOperation(false);
-      return value;
-    }
+    if (key != null) {
+      key=keySerializer.preprocess(key,(Object[])keyTypes);
+      BucketSearchResult bucketSearchResult=findBucket(key);
+      if (bucketSearchResult.itemIndex < 0)       return null;
+      OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
+      keyBucketCacheEntry.acquireExclusiveLock();
+      try {
+        startAtomicOperation();
+        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getTrackMode());
+        final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
+        final V value=readValue(removed);
+        long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
+        if (removedValueLink >= 0)         removeLinkedValue(removedValueLink);
+        logPageChanges(keyBucket,fileId,keyBucketCacheEntry.getPageIndex(),false);
+        keyBucketCacheEntry.markDirty();
+        setSize(size() - 1);
+        endAtomicOperation(false);
+        return value;
+      }
   finally {
-      keyBucketPointer.releaseExclusiveLock();
-      diskCache.release(keyBucketCacheEntry);
+        keyBucketCacheEntry.releaseExclusiveLock();
+        diskCache.release(keyBucketCacheEntry);
+      }
+    }
+ else {
+      if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
+      startAtomicOperation();
+      V removedValue=null;
+      OCacheEntry nullCacheEntry=diskCache.load(nullBucketFileId,0,false);
+      nullCacheEntry.acquireExclusiveLock();
+      try {
+        ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getTrackMode(),valueSerializer,false);
+        OSBTreeValue<V> treeValue=nullBucket.getValue();
+        if (treeValue == null)         return null;
+        removedValue=readValue(treeValue);
+        nullBucket.removeValue();
+        logPageChanges(nullBucket,nullBucketFileId,0,false);
+      }
+  finally {
+        nullCacheEntry.releaseExclusiveLock();
+        diskCache.release(nullCacheEntry);
+      }
+      if (removedValue != null)       setSize(size() - 1);
+      endAtomicOperation(false);
+      return removedValue;
     }
   }
  catch (  IOException e) {

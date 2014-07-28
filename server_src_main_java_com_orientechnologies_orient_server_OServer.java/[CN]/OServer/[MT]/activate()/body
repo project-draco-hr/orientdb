@@ -1,7 +1,20 @@
 {
   for (  OServerLifecycleListener l : lifecycleListeners)   l.onBeforeActivate();
+  if (configuration.network.sockets != null) {
+    for (    OServerSocketFactoryConfiguration f : configuration.network.sockets) {
+      Class<? extends OServerSocketFactory> fClass=(Class<? extends OServerSocketFactory>)Class.forName(f.implementation);
+      OServerSocketFactory factory=fClass.newInstance();
+      try {
+        factory.config(f.name,f.parameters);
+        networkSocketFactories.put(f.name,factory);
+      }
+ catch (      OConfigurationException e) {
+        OLogManager.instance().error(this,"Error creating socket factory",e);
+      }
+    }
+  }
   for (  OServerNetworkProtocolConfiguration p : configuration.network.protocols)   networkProtocols.put(p.name,(Class<? extends ONetworkProtocol>)Class.forName(p.implementation));
-  for (  OServerNetworkListenerConfiguration l : configuration.network.listeners)   networkListeners.add(new OServerNetworkListener(this,l.ipAddress,l.portRange,l.protocol,networkProtocols.get(l.protocol),l.parameters,l.commands));
+  for (  OServerNetworkListenerConfiguration l : configuration.network.listeners)   networkListeners.add(new OServerNetworkListener(this,networkSocketFactories.get(l.socket),l.ipAddress,l.portRange,l.protocol,networkProtocols.get(l.protocol),l.parameters,l.commands));
   registerPlugins();
   for (  OServerLifecycleListener l : lifecycleListeners)   l.onAfterActivate();
   try {
@@ -9,7 +22,7 @@
     loadUsers();
   }
  catch (  IOException e) {
-    OLogManager.instance().error(this,"Error on reading server configuration.",OConfigurationException.class,e);
+    OLogManager.instance().error(this,"Error on reading server configuration",e,OConfigurationException.class);
   }
   OLogManager.instance().info(this,"OrientDB Server v" + OConstants.ORIENT_VERSION + " is active.");
   startupLatch.countDown();

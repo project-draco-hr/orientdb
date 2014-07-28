@@ -1,0 +1,23 @@
+{
+  if (iTask.isRequireNodeOnline())   while (getDatabaseStatus(getLocalNodeName(),iDatabaseName) != DB_STATUS.ONLINE) {
+    try {
+      ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"waiting for the database '%s' is online on local node...",iDatabaseName);
+      Thread.sleep(100);
+    }
+ catch (    InterruptedException e) {
+    }
+  }
+  checkForClusterRebalance(iDatabaseName);
+  final OHazelcastDistributedRequest req=new OHazelcastDistributedRequest(getLocalNodeName(),iDatabaseName,iTask,iExecutionMode);
+  if (ODatabaseRecordThreadLocal.INSTANCE.get().getUser() != null)   req.setUserName(ODatabaseRecordThreadLocal.INSTANCE.get().getUser().getName());
+  final ODatabaseRecord currentDatabase=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  if (currentDatabase != null && currentDatabase.getUser() != null)   req.setUserName(currentDatabase.getUser().getName());
+  final OHazelcastDistributedDatabase db=messageService.getDatabase(iDatabaseName);
+  if (iTargetNodes == null || iTargetNodes.isEmpty()) {
+    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.OUT,"No nodes configured for partition '%s.%s' request: %s",iDatabaseName,iClusterNames,req);
+    throw new ODistributedException("No nodes configured for partition '" + iDatabaseName + "."+ iClusterNames+ "' request: "+ req);
+  }
+  final ODistributedResponse response=db.send2Nodes(req,iClusterNames,iTargetNodes);
+  if (response != null)   return response.getPayload();
+  return null;
+}

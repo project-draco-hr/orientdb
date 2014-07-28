@@ -1,6 +1,7 @@
 {
   this.manager=manager;
   this.responsesByRequestIds=new ConcurrentHashMap<Long,ODistributedResponseManager>();
+  for (int i=0; i < responseTimeMetrics.length; ++i)   responseTimeMetrics[i]=-1;
   final String queueName=getResponseQueueName(manager.getLocalNodeName());
   nodeResponseQueue=getQueue(queueName);
   if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
@@ -11,8 +12,9 @@
     }
   }
 ;
-  new Thread(new Runnable(){
+  responseThread=new Thread(new Runnable(){
     @Override public void run(){
+      Thread.currentThread().setName("OrientDB Node Response " + queueName);
       while (!Thread.interrupted()) {
         String senderNode=null;
         ODistributedResponse message=null;
@@ -20,10 +22,19 @@
           message=nodeResponseQueue.take();
           if (message != null) {
             senderNode=message.getSenderNodeName();
-            dispatchResponseToThread(message);
+            final long responseTime=dispatchResponseToThread(message);
+            if (responseTime > -1)             collectMetric(responseTime);
           }
         }
  catch (        InterruptedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        DistributedObjectDestroyedException e) {
+          Thread.interrupted();
+          break;
+        }
+catch (        HazelcastInstanceNotActiveException e) {
           Thread.interrupted();
           break;
         }
@@ -31,7 +42,10 @@ catch (        Throwable e) {
           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
         }
       }
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"end of reading responses");
     }
   }
-).start();
+);
+  responseThread.setDaemon(true);
+  responseThread.start();
 }

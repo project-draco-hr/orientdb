@@ -1,0 +1,31 @@
+{
+  if (status == STATUS.CLOSED)   return;
+  final long timer=Orient.instance().getProfiler().startChrono();
+  lock.acquireExclusiveLock();
+  try {
+    if (!checkForClose(force))     return;
+    status=STATUS.CLOSING;
+    if (!onDelete)     makeFullCheckpoint();
+    preCloseSteps();
+    for (    OCluster cluster : clusters)     if (cluster != null)     cluster.close(!onDelete);
+    clusters.clear();
+    clusterMap.clear();
+    if (configuration != null)     configuration.close();
+    super.close(force,onDelete);
+    if (!onDelete)     diskCache.close();
+ else     diskCache.delete();
+    if (writeAheadLog != null) {
+      writeAheadLog.close();
+      if (onDelete)       writeAheadLog.delete();
+    }
+    postCloseSteps(onDelete);
+    status=STATUS.CLOSED;
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Error on closing of storage '" + name,e,OStorageException.class);
+  }
+ finally {
+    lock.releaseExclusiveLock();
+    Orient.instance().getProfiler().stopChrono("db." + name + ".close","Close a database",timer,"db.*.close");
+  }
+}

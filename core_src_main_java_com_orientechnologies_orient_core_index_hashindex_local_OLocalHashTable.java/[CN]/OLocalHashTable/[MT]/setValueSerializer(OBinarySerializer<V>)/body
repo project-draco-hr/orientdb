@@ -1,3 +1,31 @@
 {
-  this.valueSerializer=valueSerializer;
+  acquireExclusiveLock();
+  try {
+    startAtomicOperation();
+    this.valueSerializer=valueSerializer;
+    diskCache.loadPinnedPage(hashStateEntry);
+    hashStateEntry.acquireExclusiveLock();
+    try {
+      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+      metadataPage.setValueSerializerId(valueSerializer.getId());
+      hashStateEntry.markDirty();
+      logPageChanges(metadataPage,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
+    }
+  finally {
+      hashStateEntry.releaseExclusiveLock();
+      diskCache.release(hashStateEntry);
+    }
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    rollback();
+    throw new OIndexException("Can not set serializer for index values",e);
+  }
+catch (  RuntimeException e) {
+    rollback();
+    throw e;
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

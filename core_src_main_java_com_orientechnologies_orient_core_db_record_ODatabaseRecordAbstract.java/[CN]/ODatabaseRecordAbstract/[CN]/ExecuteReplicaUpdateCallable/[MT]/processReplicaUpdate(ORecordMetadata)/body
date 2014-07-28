@@ -12,28 +12,27 @@
       replicaToUpdate=mergeWithRecord(rid);
       callbackHooks(TYPE.BEFORE_REPLICA_UPDATE,replicaToUpdate);
     }
- else     if (!loadedRecordMetadata.getRecordVersion().isTombstone() && replicaVersion.isTombstone()) {
-      replicaToUpdate=load(rid,"*:0",false,true);
+ else     if (!loadedRecordMetadata.getRecordVersion().isTombstone()) {
+      replicaToUpdate=load(rid,"*:0",false,true,OStorage.LOCKING_STRATEGY.DEFAULT);
       replicaToUpdate.getRecordVersion().copyFrom(replicaVersion);
       callbackHooks(TYPE.BEFORE_REPLICA_DELETE,replicaToUpdate);
     }
     byte[] stream=replicaToUpdate.toStream();
-    final int dataSegmentId=dataSegmentStrategy.assignDataSegmentId(ODatabaseRecordAbstract.this,replicaToUpdate);
-    result=underlying.updateReplica(dataSegmentId,rid,stream,replicaVersion,recordType);
+    result=underlying.updateReplica(rid,stream,replicaVersion,recordType);
     if (loadedRecordMetadata.getRecordVersion().isTombstone() && !replicaVersion.isTombstone()) {
       callbackHooks(TYPE.AFTER_REPLICA_ADD,replicaToUpdate);
       replicaToUpdate.unsetDirty();
-      getLevel1Cache().updateRecord(replicaToUpdate);
+      getLocalCache().updateRecord(replicaToUpdate);
     }
  else     if (!loadedRecordMetadata.getRecordVersion().isTombstone() && !replicaVersion.isTombstone()) {
       callbackHooks(TYPE.AFTER_REPLICA_UPDATE,replicaToUpdate);
       replicaToUpdate.unsetDirty();
-      getLevel1Cache().updateRecord(replicaToUpdate);
+      getLocalCache().updateRecord(replicaToUpdate);
     }
  else     if (!loadedRecordMetadata.getRecordVersion().isTombstone() && replicaVersion.isTombstone()) {
       callbackHooks(TYPE.AFTER_REPLICA_DELETE,replicaToUpdate);
       replicaToUpdate.unsetDirty();
-      getLevel1Cache().deleteRecord(rid);
+      getLocalCache().deleteRecord(rid);
     }
   }
  catch (  Exception e) {

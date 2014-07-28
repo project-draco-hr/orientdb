@@ -1,21 +1,24 @@
 {
   try {
-    if (!sem.tryAcquire(iMaxWaitMillis,TimeUnit.MILLISECONDS))     throw new OLockException("Not more resources available in pool. Requested resource: " + iKey);
+    if (!sem.tryAcquire(maxWaitMillis,TimeUnit.MILLISECONDS))     throw new OLockException("No more resources available in pool. Requested resource: " + key);
   }
  catch (  InterruptedException e) {
     Thread.currentThread().interrupt();
-    throw new OLockException("Not more resources available in pool. Requested resource: " + iKey,e);
+    throw new OInterruptedException(e);
   }
   V res;
   do {
     res=resources.poll();
     if (res != null) {
-      if (listener.reuseResource(iKey,iAdditionalArgs,res))       return res;
+      if (listener.reuseResource(key,additionalArgs,res)) {
+        break;
+      }
+ else       res=null;
     }
   }
  while (!resources.isEmpty());
   try {
-    res=listener.createNewResource(iKey,iAdditionalArgs);
+    if (res == null)     res=listener.createNewResource(key,additionalArgs);
     return res;
   }
  catch (  RuntimeException e) {

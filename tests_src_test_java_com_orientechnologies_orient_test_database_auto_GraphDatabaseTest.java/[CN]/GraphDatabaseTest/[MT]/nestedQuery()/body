@@ -1,22 +1,23 @@
 {
-  ODocument countryDoc1=database.createVertex().field("name","UK").field("area","Europe").field("code","2").save();
-  ODocument cityDoc1=database.createVertex().field("name","leicester").field("lat","52.64640").field("long","-1.13159").save();
-  ODocument cityDoc2=database.createVertex().field("name","manchester").field("lat","53.47497").field("long","-2.25769").save();
-  database.createEdge(countryDoc1,cityDoc1).field("label","owns").save();
-  database.createEdge(countryDoc1,cityDoc2).field("label","owns").save();
-  String subquery="select out_[label='owns'].in from V where name = 'UK'";
-  List<OIdentifiable> result=database.query(new OSQLSynchQuery<ODocument>(subquery));
+  Vertex countryVertex1=database.addVertex(null,"name","UK","area","Europe","code","2");
+  Vertex cityVertex1=database.addVertex(null,"name","leicester","lat","52.64640","long","-1.13159");
+  Vertex cityVertex2=database.addVertex(null,"name","manchester","lat","53.47497","long","-2.25769");
+  database.addEdge(null,countryVertex1,cityVertex1,"owns");
+  database.addEdge(null,countryVertex1,cityVertex2,"owns");
+  database.commit();
+  String subquery="select out('owns') from V where name = 'UK'";
+  List<OIdentifiable> result=database.getRawGraph().query(new OSQLSynchQuery<ODocument>(subquery));
   Assert.assertEquals(result.size(),1);
-  Assert.assertEquals(((Collection<ODocument>)((ODocument)result.get(0)).field("out_")).size(),2);
-  subquery="select expand(out_[label='owns'].in) from V where name = 'UK'";
-  result=database.query(new OSQLSynchQuery<ODocument>(subquery));
+  Assert.assertEquals(((Collection)((ODocument)result.get(0)).field("out")).size(),2);
+  subquery="select expand(out('owns')) from V where name = 'UK'";
+  result=database.getRawGraph().query(new OSQLSynchQuery<ODocument>(subquery));
   Assert.assertEquals(result.size(),2);
   for (int i=0; i < result.size(); i++) {
     System.out.println("uno: " + result.get(i));
     Assert.assertTrue(((ODocument)result.get(i).getRecord()).containsField("lat"));
   }
-  String query="select name, lat, long, distance(lat,long,51.5,0.08) as distance from (select expand(out_[label='owns'].in) from V where name = 'UK') order by distance";
-  result=database.query(new OSQLSynchQuery<ODocument>(query));
+  String query="select name, lat, long, distance(lat,long,51.5,0.08) as distance from (select expand(out('owns')) from V where name = 'UK') order by distance";
+  result=database.getRawGraph().query(new OSQLSynchQuery<ODocument>(query));
   Assert.assertEquals(result.size(),2);
   for (int i=0; i < result.size(); i++) {
     System.out.println("dos: " + result.get(i));

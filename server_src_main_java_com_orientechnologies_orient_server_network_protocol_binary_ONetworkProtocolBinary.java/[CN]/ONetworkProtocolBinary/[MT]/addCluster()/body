@@ -1,23 +1,25 @@
 {
   setDataCommandInfo("Add cluster");
   if (!isConnectionAlive())   return;
-  final String type=channel.readString();
+  String type="";
+  if (connection.data.protocolVersion < 24)   type=channel.readString();
   final String name=channel.readString();
   int clusterId=-1;
   final String location;
-  if (connection.data.protocolVersion >= 10 || type.equalsIgnoreCase("PHYSICAL"))   location=channel.readString();
+  if (connection.data.protocolVersion >= 10 && connection.data.protocolVersion < 24 || type.equalsIgnoreCase("PHYSICAL"))   location=channel.readString();
  else   location=null;
-  final String dataSegmentName;
-  if (connection.data.protocolVersion >= 10)   dataSegmentName=channel.readString();
+  if (connection.data.protocolVersion < 24) {
+    final String dataSegmentName;
+    if (connection.data.protocolVersion >= 10)     dataSegmentName=channel.readString();
  else {
-    channel.readInt();
-    dataSegmentName=null;
+      channel.readInt();
+      dataSegmentName=null;
+    }
   }
   if (connection.data.protocolVersion >= 18)   clusterId=channel.readShort();
-  Object[] params=null;
   final int num;
-  if (clusterId < 0)   num=connection.database.addCluster(type,name,location,dataSegmentName,params);
- else   num=connection.database.addCluster(type,name,clusterId,location,dataSegmentName,params);
+  if (clusterId < 0)   num=connection.database.addCluster(name);
+ else   num=connection.database.addCluster(name,clusterId,null);
   beginResponse();
   try {
     sendOk(clientTxId);

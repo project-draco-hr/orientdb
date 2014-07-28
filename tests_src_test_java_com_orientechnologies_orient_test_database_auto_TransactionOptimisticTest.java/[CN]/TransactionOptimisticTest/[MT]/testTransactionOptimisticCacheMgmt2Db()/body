@@ -1,22 +1,25 @@
 {
-  ODatabaseFlat db1=new ODatabaseFlat(url);
-  db1.open("admin","admin");
-  ODatabaseFlat db2=new ODatabaseFlat(url);
+  if (database.getClusterIdByName("binary") == -1)   database.addCluster("binary");
+  ODatabaseDocumentTx db2=new ODatabaseDocumentTx(database.getURL());
   db2.open("admin","admin");
-  ORecordFlat record1=new ORecordFlat(db1);
-  record1.value("This is the first version").save();
+  ORecordBytes record1=new ORecordBytes("This is the first version".getBytes());
+  record1.save();
   try {
-    db1.begin();
+    ODatabaseRecordThreadLocal.INSTANCE.set(database);
+    database.begin();
     record1.load();
     int v1=record1.getRecordVersion().getCounter();
-    record1.value("This is the second version").save();
-    db1.commit();
-    ORecordFlat record2=db2.load(record1.getIdentity());
+    record1.setDirty();
+    record1.fromStream("This is the second version".getBytes());
+    record1.save();
+    database.commit();
+    ODatabaseRecordThreadLocal.INSTANCE.set(db2);
+    ORecordBytes record2=db2.load(record1.getIdentity(),"*:-1",true);
     Assert.assertEquals(record2.getRecordVersion().getCounter(),v1 + 1);
-    Assert.assertTrue(record2.value().contains("second"));
+    Assert.assertTrue(new String(record2.toStream()).contains("second"));
   }
   finally {
-    db1.close();
+    database.close();
     db2.close();
   }
 }

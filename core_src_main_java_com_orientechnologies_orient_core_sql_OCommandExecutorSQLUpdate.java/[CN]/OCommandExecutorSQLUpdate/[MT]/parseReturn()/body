@@ -1,0 +1,22 @@
+{
+  parserNextWord(false," ");
+  String mode=parserGetLastWord().trim();
+  if (mode.equalsIgnoreCase("COUNT")) {
+    returnHandler=new ORecordCountHandler();
+  }
+ else   if (mode.equalsIgnoreCase("BEFORE") || mode.equalsIgnoreCase("AFTER")) {
+    parserNextWord(false," ");
+    String returning=parserGetLastWord().trim();
+    Object returnExpression=null;
+    if (returning.equalsIgnoreCase(KEYWORD_WHERE) || returning.equalsIgnoreCase(KEYWORD_TIMEOUT) || returning.equalsIgnoreCase(KEYWORD_LIMIT)|| returning.equalsIgnoreCase(KEYWORD_UPSERT)|| returning.equalsIgnoreCase(KEYWORD_LOCK)|| returning.length() == 0) {
+      parserGoBack();
+    }
+ else {
+      if (returning.startsWith("$") || returning.startsWith("@"))       returnExpression=(returning.length() > 0) ? OSQLHelper.parseValue(this,returning,this.getContext()) : null;
+ else       throwSyntaxErrorException("record attribute (@attributes) or functions with $current variable expected");
+    }
+    if (mode.equalsIgnoreCase("BEFORE"))     returnHandler=new OOriginalRecordsReturnHandler(returnExpression,getContext());
+ else     returnHandler=new OUpdatedRecordsReturnHandler(returnExpression,getContext());
+  }
+ else   throwSyntaxErrorException(" COUNT | BEFORE | AFTER keywords expected");
+}

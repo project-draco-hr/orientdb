@@ -1,13 +1,18 @@
 {
-  for (  int currId : clusterIds)   if (currId == iId)   return this;
-  clusterIds=OArrays.copyOf(clusterIds,clusterIds.length + 1);
-  clusterIds[clusterIds.length - 1]=iId;
-  Arrays.sort(clusterIds);
-  polymorphicClusterIds=OArrays.copyOf(polymorphicClusterIds,polymorphicClusterIds.length + 1);
-  polymorphicClusterIds[polymorphicClusterIds.length - 1]=iId;
-  Arrays.sort(polymorphicClusterIds);
-  if (defaultClusterId == -1)   defaultClusterId=iId;
-  setDirty();
-  addClusterIdToIndexes(iId);
-  return this;
+  acquireSchemaWriteLock();
+  try {
+    checkEmbedded();
+    owner.checkClusterCanBeAdded(clusterId,this);
+    for (    int currId : clusterIds)     if (currId == clusterId)     return this;
+    clusterIds=OArrays.copyOf(clusterIds,clusterIds.length + 1);
+    clusterIds[clusterIds.length - 1]=clusterId;
+    Arrays.sort(clusterIds);
+    addPolymorphicClusterId(clusterId);
+    if (defaultClusterId == NOT_EXISTENT_CLUSTER_ID)     defaultClusterId=clusterId;
+    owner.addClusterForClass(clusterId,this);
+    return this;
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
 }

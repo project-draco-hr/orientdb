@@ -17,7 +17,8 @@
   }
   if (version > 1)   index=phySegmentFromStream(values,index,fileTemplate);
   int size=Integer.parseInt(read(values[index++]));
-  clusters=new ArrayList<OStorageClusterConfiguration>(size);
+  clusters.clear();
+  String determineStorageCompression=null;
   for (int i=0; i < size; ++i) {
     final int clusterId=Integer.parseInt(read(values[index++]));
     if (clusterId == -1)     continue;
@@ -39,16 +40,20 @@
       if (holeFlag.equals("f"))       phyClusterLocal.setHoleFile(new OStorageClusterHoleConfiguration(phyClusterLocal,read(values[index++]),read(values[index++]),read(values[index++])));
       currentCluster=phyClusterLocal;
     }
- else     if (clusterType.equals("m"))     currentCluster=new OStorageMemoryClusterConfiguration(clusterName,clusterId,targetDataSegmentId);
  else     if (clusterType.equals("d")) {
-      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,Boolean.valueOf(read(values[index++])),Float.valueOf(read(values[index++])),Float.valueOf(read(values[index++])),read(values[index++]));
+      final boolean cc=Boolean.valueOf(read(values[index++]));
+      final float bb=Float.valueOf(read(values[index++]));
+      final float aa=Float.valueOf(read(values[index++]));
+      final String clusterCompression=read(values[index++]);
+      if (determineStorageCompression == null)       determineStorageCompression=clusterCompression;
+      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,cc,bb,aa,clusterCompression);
     }
  else     throw new IllegalArgumentException("Unsupported cluster type: " + clusterType);
     for (int c=clusters.size(); c <= clusterId; ++c)     clusters.add(null);
     clusters.set(clusterId,currentCluster);
   }
   size=Integer.parseInt(read(values[index++]));
-  dataSegments=new ArrayList<OStorageDataConfiguration>(size);
+  dataSegments.clear();
   for (int i=0; i < size; ++i)   dataSegments.add(null);
   int dataId;
   String dataName;
@@ -64,9 +69,31 @@
   }
   txSegment=new OStorageTxConfiguration(read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]),read(values[index++]));
   size=Integer.parseInt(read(values[index++]));
-  properties=new ArrayList<OStorageEntryConfiguration>(size);
+  properties.clear();
   for (int i=0; i < size; ++i) {
     properties.add(new OStorageEntryConfiguration(read(values[index++]),read(values[index++])));
   }
+  if (version >= 7)   binaryFormatVersion=Integer.parseInt(read(values[index++]));
+ else   if (version == 6)   binaryFormatVersion=9;
+ else   binaryFormatVersion=8;
+  if (version >= 8)   clusterSelection=read(values[index++]);
+ else   clusterSelection=ORoundRobinClusterSelectionStrategy.NAME;
+  if (version >= 9)   minimumClusters=Integer.parseInt(read(values[index++]));
+ else   minimumClusters=1;
+  if (version >= 10) {
+    recordSerializer=read(values[index++]);
+    recordSerializerVersion=Integer.parseInt(read(values[index++]));
+  }
+  if (version >= 11) {
+    final int cfgSize=Integer.parseInt(read(values[index++]));
+    for (int i=0; i < cfgSize; ++i) {
+      final String key=read(values[index++]);
+      final Object value=read(values[index++]);
+      final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(key);
+      if (cfg != null)       configuration.setValue(key,OType.convert(value,cfg.getType()));
+ else       OLogManager.instance().warn(this,"Ignored storage configuration because not supported: %s=%s.",key,value);
+    }
+  }
+ else   configuration.setValue(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD,determineStorageCompression);
   return this;
 }

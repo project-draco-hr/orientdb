@@ -1,17 +1,24 @@
 {
   final long beginTime=System.currentTimeMillis();
-  lock.lock();
+  synchronousResponsesLock.lock();
   try {
-    do {
-      if ((waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses) {
-        if (synchronousResponsesArrived.await(synchTimeout,TimeUnit.MILLISECONDS))         break;
+    long currentTimeout=synchTimeout;
+    while (currentTimeout > 0 && ((waitForLocalNode && !receivedCurrentNode) || receivedResponses < expectedSynchronousResponses)) {
+      synchronousResponsesArrived.await(currentTimeout,TimeUnit.MILLISECONDS);
+      if ((!waitForLocalNode || receivedCurrentNode) && (receivedResponses >= expectedSynchronousResponses))       break;
+      final long now=System.currentTimeMillis();
+      final long elapsed=now - beginTime;
+      currentTimeout=synchTimeout - elapsed;
+      final long lastClusterChange=dManager.getLastClusterChangeOn();
+      if (lastClusterChange > 0 && now - lastClusterChange < (synchTimeout * 2)) {
+        currentTimeout+=synchTimeout;
+        ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"cluster shape changed during request %s: enlarge timeout +%dms, wait again for %dms",request,synchTimeout,currentTimeout);
       }
     }
- while (waitForLocalNode && !receivedCurrentNode);
     return receivedResponses >= expectedSynchronousResponses;
   }
   finally {
-    lock.unlock();
-    Orient.instance().getProfiler().stopChrono("distributed.replication.synchResponses","Time to collect all the synchronous responses from distributed nodes",beginTime);
+    synchronousResponsesLock.unlock();
+    Orient.instance().getProfiler().stopChrono("distributed.synchResponses","Time to collect all the synchronous responses from distributed nodes",beginTime);
   }
 }

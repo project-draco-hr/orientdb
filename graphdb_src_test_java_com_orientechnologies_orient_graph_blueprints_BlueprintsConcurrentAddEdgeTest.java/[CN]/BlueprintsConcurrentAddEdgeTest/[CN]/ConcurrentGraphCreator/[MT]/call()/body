@@ -1,0 +1,91 @@
+{
+  OrientGraph graph=new OrientGraph(URL);
+  latch.await();
+  final int startIndex=random.nextInt(vertexes.size());
+  final String startUUID=vertexes.get(startIndex).uuid;
+  String currentUUID=startUUID;
+  try {
+    do {
+      TestVertex fromVertex=vertexesToCreate.get(currentUUID);
+      for (      TestEdge edge : fromVertex.outEdges) {
+        TestVertex toVertex=vertexesToCreate.get(edge.out);
+        boolean success=false;
+        while (!success)         try {
+          Iterable<Vertex> vertexes=graph.command(new OSQLSynchQuery<Vertex>("select from TestVertex where uuid = '" + fromVertex.uuid + "'")).execute();
+          Vertex gFromVertex;
+          Iterator<Vertex> gVertexesIterator=vertexes.iterator();
+          if (!gVertexesIterator.hasNext()) {
+            graph.command(new OCommandSQL("CREATE VERTEX TestVertex SET uuid = '" + fromVertex.uuid + "'")).execute();
+            vertexes=graph.command(new OSQLSynchQuery<Vertex>("select from TestVertex where uuid = '" + fromVertex.uuid + "'")).execute();
+            gVertexesIterator=vertexes.iterator();
+            gFromVertex=gVertexesIterator.next();
+          }
+ else {
+            gFromVertex=gVertexesIterator.next();
+          }
+          vertexes=graph.command(new OSQLSynchQuery<Vertex>("select from TestVertex where uuid = '" + toVertex.uuid + "'")).execute();
+          Vertex gToVertex;
+          gVertexesIterator=vertexes.iterator();
+          if (!gVertexesIterator.hasNext()) {
+            graph.command(new OCommandSQL("CREATE VERTEX TestVertex SET uuid = '" + toVertex.uuid + "'")).execute();
+            vertexes=graph.command(new OSQLSynchQuery<Vertex>("select from TestVertex where uuid = '" + toVertex.uuid + "'")).execute();
+            gVertexesIterator=vertexes.iterator();
+            gToVertex=gVertexesIterator.next();
+          }
+ else {
+            gToVertex=gVertexesIterator.next();
+          }
+          Edge gEdge;
+          Iterable<Edge> edges=graph.command(new OSQLSynchQuery<Edge>("select from TestEdge where uuid = '" + edge.uuid + "'")).execute();
+          if (!edges.iterator().hasNext()) {
+            graph.command(new OCommandSQL("CREATE EDGE TestEdge FROM " + gFromVertex.getId() + " TO "+ gToVertex.getId()+ " SET uuid = '"+ edge.uuid+ "'")).execute();
+          }
+          graph.commit();
+          success=true;
+        }
+ catch (        OConcurrentModificationException e) {
+          graph.rollback();
+          versionCollisions.incrementAndGet();
+          Thread.yield();
+        }
+catch (        ORecordDuplicatedException e) {
+          graph.rollback();
+          indexCollisions.incrementAndGet();
+          Thread.yield();
+        }
+      }
+      if (fromVertex.outEdges.isEmpty()) {
+        boolean success=false;
+        while (!success)         try {
+          Iterable<Vertex> vertexes=graph.command(new OSQLSynchQuery<Vertex>("select from TestVertex where uuid = '" + fromVertex.uuid + "'")).execute();
+          Iterator<Vertex> gVertexesIterator=vertexes.iterator();
+          if (!gVertexesIterator.hasNext()) {
+            graph.command(new OCommandSQL("CREATE VERTEX TestVertex SET uuid = '" + fromVertex.uuid + "'")).execute();
+          }
+          success=true;
+        }
+ catch (        OConcurrentModificationException e) {
+          graph.rollback();
+          versionCollisions.incrementAndGet();
+          Thread.yield();
+        }
+catch (        ORecordDuplicatedException e) {
+          graph.rollback();
+          indexCollisions.incrementAndGet();
+          Thread.yield();
+        }
+      }
+      currentUUID=vertexesToCreate.higherKey(currentUUID);
+      if (currentUUID == null)       currentUUID=vertexesToCreate.firstKey();
+    }
+ while (!startUUID.equals(currentUUID));
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw e;
+  }
+ finally {
+    graph.shutdown();
+  }
+  return null;
+}

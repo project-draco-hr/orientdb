@@ -1,0 +1,25 @@
+{
+  final ODocument indexEntries=getIndexChanges();
+  if (indexEntries != null) {
+    final Map<String,OIndexInternal<?>> indexesToCommit=new HashMap<String,OIndexInternal<?>>();
+    for (    Entry<String,Object> indexEntry : indexEntries) {
+      final OIndexInternal<?> index=indexes.get(indexEntry.getKey()).getInternal();
+      indexesToCommit.put(index.getName(),index.getInternal());
+    }
+    for (    OIndexInternal<?> indexInternal : indexesToCommit.values())     indexInternal.preCommit();
+    for (    Entry<String,Object> indexEntry : indexEntries) {
+      final OIndexInternal<?> index=indexesToCommit.get(indexEntry.getKey()).getInternal();
+      if (index == null) {
+        OLogManager.instance().error(this,"Index with name " + indexEntry.getKey() + " was not found.");
+        throw new OIndexException("Index with name " + indexEntry.getKey() + " was not found.");
+      }
+ else       index.addTxOperation((ODocument)indexEntry.getValue());
+    }
+    try {
+      for (      OIndexInternal<?> indexInternal : indexesToCommit.values())       indexInternal.commit();
+    }
+  finally {
+      for (      OIndexInternal<?> indexInternal : indexesToCommit.values())       indexInternal.postCommit();
+    }
+  }
+}

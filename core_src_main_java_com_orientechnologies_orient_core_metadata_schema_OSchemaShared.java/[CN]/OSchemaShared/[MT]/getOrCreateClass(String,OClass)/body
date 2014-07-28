@@ -1,11 +1,23 @@
 {
-  return getDatabase().getStorage().callInLock(new Callable<OClass>(){
-    @Override public OClass call() throws Exception {
-      OClass cls=classes.get(iClassName.toLowerCase());
-      if (cls == null)       cls=createClass(iClassName,iSuperClass);
- else       if (iSuperClass != null && !cls.isSubClassOf(iSuperClass))       throw new IllegalArgumentException("Class '" + iClassName + "' is not an instance of "+ iSuperClass.getShortName());
-      return cls;
-    }
+  acquireSchemaReadLock();
+  try {
+    OClass cls=classes.get(className.toLowerCase());
+    if (cls != null)     return cls;
   }
-,true);
+  finally {
+    releaseSchemaReadLock();
+  }
+  OClass cls;
+  acquireSchemaWriteLock();
+  try {
+    cls=classes.get(className.toLowerCase());
+    if (cls != null)     return cls;
+    cls=createClass(className,superClass);
+    if (superClass != null && !cls.isSubClassOf(superClass))     throw new IllegalArgumentException("Class '" + className + "' is not an instance of "+ superClass.getShortName());
+    addClusterClassMap(cls);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
+  return cls;
 }

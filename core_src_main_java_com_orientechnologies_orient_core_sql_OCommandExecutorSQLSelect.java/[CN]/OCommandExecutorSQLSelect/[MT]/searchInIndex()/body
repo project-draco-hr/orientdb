@@ -1,37 +1,42 @@
 {
   final OIndex<Object> index=(OIndex<Object>)getDatabase().getMetadata().getIndexManager().getIndex(parsedTarget.getTargetIndex());
   if (index == null)   throw new OCommandExecutionException("Target index '" + parsedTarget.getTargetIndex() + "' not found");
+  boolean ascOrder=true;
+  if (!orderedFields.isEmpty()) {
+    if (orderedFields.size() != 1)     throw new OCommandExecutionException("Index can be ordered only by key field");
+    final String fieldName=orderedFields.get(0).getKey();
+    if (!fieldName.equalsIgnoreCase("key"))     throw new OCommandExecutionException("Index can be ordered only by key field");
+    final String order=orderedFields.get(0).getValue();
+    ascOrder=order.equalsIgnoreCase(KEYWORD_ASC);
+  }
   if (index.getDefinition() == null)   return;
   if (compiledFilter != null && compiledFilter.getRootCondition() != null) {
     if (!"KEY".equalsIgnoreCase(compiledFilter.getRootCondition().getLeft().toString()))     throw new OCommandExecutionException("'Key' field is required for queries against indexes");
     final OQueryOperator indexOperator=compiledFilter.getRootCondition().getOperator();
     if (indexOperator instanceof OQueryOperatorBetween) {
       final Object[] values=(Object[])compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesBetween(getIndexKey(index.getDefinition(),values[0]),getIndexKey(index.getDefinition(),values[2]));
-      for (      final OIdentifiable r : entries) {
-        final boolean continueResultParsing=handleResult(r,false);
-        if (!continueResultParsing)         break;
-      }
+      final OIndexCursor cursor=index.iterateEntriesBetween(getIndexKey(index.getDefinition(),values[0],context),true,getIndexKey(index.getDefinition(),values[2],context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMajor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),false);
-      parseIndexSearchResult(entries);
+      final OIndexCursor cursor=index.iterateEntriesMajor(getIndexKey(index.getDefinition(),value,context),false,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMajorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMajor(getIndexKey(index.getDefinition(),value),true);
-      parseIndexSearchResult(entries);
+      final OIndexCursor cursor=index.iterateEntriesMajor(getIndexKey(index.getDefinition(),value,context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMinor) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),false);
-      parseIndexSearchResult(entries);
+      OIndexCursor cursor=index.iterateEntriesMinor(getIndexKey(index.getDefinition(),value,context),false,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorMinorEquals) {
       final Object value=compiledFilter.getRootCondition().getRight();
-      final Collection<ODocument> entries=index.getEntriesMinor(getIndexKey(index.getDefinition(),value),true);
-      parseIndexSearchResult(entries);
+      OIndexCursor cursor=index.iterateEntriesMinor(getIndexKey(index.getDefinition(),value,context),true,ascOrder);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else     if (indexOperator instanceof OQueryOperatorIn) {
       final List<Object> origValues=(List<Object>)compiledFilter.getRootCondition().getRight();
@@ -40,15 +45,16 @@
         if (index.getDefinition() instanceof OCompositeIndexDefinition) {
           throw new OCommandExecutionException("Operator IN not supported yet.");
         }
-        val=getIndexKey(index.getDefinition(),val);
+        val=getIndexKey(index.getDefinition(),val,context);
         values.add(val);
       }
-      final Collection<ODocument> entries=index.getEntries(values);
-      parseIndexSearchResult(entries);
+      OIndexCursor cursor=index.iterateEntries(values,true);
+      fetchEntriesFromIndexCursor(cursor);
     }
  else {
       final Object right=compiledFilter.getRootCondition().getRight();
-      Object keyValue=getIndexKey(index.getDefinition(),right);
+      Object keyValue=getIndexKey(index.getDefinition(),right,context);
+      if (keyValue == null)       return;
       final Object res;
       if (index.getDefinition().getParamCount() == 1) {
         final OType type=index.getDefinition().getTypes()[0];
@@ -56,12 +62,20 @@
         res=index.get(keyValue);
       }
  else {
-        final Object secondKey=getIndexKey(index.getDefinition(),right);
+        final Object secondKey=getIndexKey(index.getDefinition(),right,context);
         if (keyValue instanceof OCompositeKey && secondKey instanceof OCompositeKey && ((OCompositeKey)keyValue).getKeys().size() == index.getDefinition().getParamCount() && ((OCompositeKey)secondKey).getKeys().size() == index.getDefinition().getParamCount())         res=index.get(keyValue);
- else         res=index.getValuesBetween(keyValue,secondKey);
+ else {
+          OIndexCursor cursor=index.iterateEntriesBetween(keyValue,true,secondKey,true,true);
+          fetchEntriesFromIndexCursor(cursor);
+          return;
+        }
       }
-      if (res != null)       if (res instanceof Collection<?>)       for (      final OIdentifiable r : (Collection<OIdentifiable>)res)       handleResult(createIndexEntryAsDocument(keyValue,r.getIdentity()),true);
- else       handleResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()),true);
+      if (res != null)       if (res instanceof Collection<?>) {
+        for (        final OIdentifiable r : (Collection<OIdentifiable>)res)         if (!handleResult(createIndexEntryAsDocument(keyValue,r.getIdentity())))         break;
+      }
+ else {
+        handleResult(createIndexEntryAsDocument(keyValue,((OIdentifiable)res).getIdentity()));
+      }
     }
   }
  else {
@@ -76,12 +90,17 @@
     final OIndexInternal<?> indexInternal=index.getInternal();
     if (indexInternal instanceof OSharedResource)     ((OSharedResource)indexInternal).acquireExclusiveLock();
     try {
-      for (Iterator<Entry<Object,Object>> it=index.iterator(); it.hasNext(); ) {
-        final Entry<Object,Object> current=it.next();
-        if (current.getValue() instanceof Collection<?>) {
-          for (          OIdentifiable identifiable : ((Set<OIdentifiable>)current.getValue()))           if (!handleResult(createIndexEntryAsDocument(current.getKey(),identifiable.getIdentity()),true))           break;
-        }
- else         if (!handleResult(createIndexEntryAsDocument(current.getKey(),(OIdentifiable)current.getValue()),true))         break;
+      if (ascOrder) {
+        final Object firstKey=index.getFirstKey();
+        if (firstKey == null)         return;
+        final OIndexCursor cursor=index.iterateEntriesMajor(firstKey,true,true);
+        fetchEntriesFromIndexCursor(cursor);
+      }
+ else {
+        final Object lastKey=index.getLastKey();
+        if (lastKey == null)         return;
+        final OIndexCursor cursor=index.iterateEntriesMinor(lastKey,true,false);
+        fetchEntriesFromIndexCursor(cursor);
       }
     }
   finally {

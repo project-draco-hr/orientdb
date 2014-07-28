@@ -1,0 +1,23 @@
+{
+  final OIndexDefinition indexDefinition=index.getDefinition();
+  final OIndexInternal<?> internalIndex=index.getInternal();
+  if (!internalIndex.canBeUsedInEqualityOperators() || !internalIndex.hasRangeQuerySupport())   return null;
+  final OIndexCursor cursor;
+  if (indexDefinition.getParamCount() == 1) {
+    final Object key;
+    if (indexDefinition instanceof OIndexDefinitionMultiValue)     key=((OIndexDefinitionMultiValue)indexDefinition).createSingleValue(keyParams.get(0));
+ else     key=indexDefinition.createValue(keyParams);
+    if (key == null)     return null;
+    cursor=index.iterateEntriesMinor(key,false,ascSortOrder);
+  }
+ else {
+    final OCompositeIndexDefinition compositeIndexDefinition=(OCompositeIndexDefinition)indexDefinition;
+    final Object keyOne=compositeIndexDefinition.createSingleValue(keyParams.subList(0,keyParams.size() - 1));
+    if (keyOne == null)     return null;
+    final Object keyTwo=compositeIndexDefinition.createSingleValue(keyParams);
+    if (keyTwo == null)     return null;
+    cursor=index.iterateEntriesBetween(keyOne,true,keyTwo,false,ascSortOrder);
+  }
+  updateProfiler(iContext,index,keyParams,indexDefinition);
+  return cursor;
+}

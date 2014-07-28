@@ -4,23 +4,21 @@
     key=keySerializer.preprocess(key,(Object[])keyTypes);
     final long hashCode=keyHashFunction.hashCode(key);
     BucketPath bucketPath=getBucket(hashCode);
-    long bucketPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+    long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
     int fileLevel=getFileLevel(bucketPointer);
     long pageIndex=getPageIndex(bucketPointer);
     OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
-    OCachePointer pagePointer=cacheEntry.getCachePointer();
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
       while (bucket.size() == 0 || comparator.compare(bucket.getKey(bucket.size() - 1),key) <= 0) {
         bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
         if (bucketPath == null)         return new OHashIndexBucket.Entry[0];
         diskCache.release(cacheEntry);
-        final long nextPointer=hashTree[bucketPath.nodeIndex][bucketPath.itemIndex + bucketPath.hashMapOffset];
+        final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
         fileLevel=getFileLevel(nextPointer);
         pageIndex=getPageIndex(nextPointer);
         cacheEntry=loadPageEntry(pageIndex,fileLevel);
-        pagePointer=cacheEntry.getCachePointer();
-        bucket=new OHashIndexBucket<K,V>(pagePointer.getDataPointer(),keySerializer,valueSerializer,keyTypes);
+        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
       }
       final int index=bucket.getIndex(hashCode,key);
       final int startIndex;

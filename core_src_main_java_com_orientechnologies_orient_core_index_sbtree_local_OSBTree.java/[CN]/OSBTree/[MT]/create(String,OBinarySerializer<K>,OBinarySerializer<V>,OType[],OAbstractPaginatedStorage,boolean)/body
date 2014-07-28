@@ -1,0 +1,41 @@
+{
+  acquireExclusiveLock();
+  try {
+    this.storage=storageLocal;
+    this.keyTypes=keyTypes;
+    this.diskCache=storage.getDiskCache();
+    this.name=name;
+    this.keySerializer=keySerializer;
+    this.valueSerializer=valueSerializer;
+    this.nullPointerSupport=nullPointerSupport;
+    fileId=diskCache.openFile(name + dataFileExtension);
+    if (nullPointerSupport)     nullBucketFileId=diskCache.openFile(name + nullFileExtension);
+    initDurableComponent(storageLocal);
+    OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+    rootCacheEntry.acquireExclusiveLock();
+    try {
+      super.startAtomicOperation();
+      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,true,keySerializer,keyTypes,valueSerializer,getTrackMode());
+      rootBucket.setTreeSize(0);
+      super.logPageChanges(rootBucket,fileId,ROOT_INDEX,true);
+      rootCacheEntry.markDirty();
+    }
+  finally {
+      rootCacheEntry.releaseExclusiveLock();
+      diskCache.release(rootCacheEntry);
+    }
+    super.endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    try {
+      super.endAtomicOperation(true);
+    }
+ catch (    IOException e1) {
+      OLogManager.instance().error(this,"Error during sbtree data rollback",e1);
+    }
+    throw new OSBTreeException("Error creation of sbtree with name" + name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

@@ -1,0 +1,29 @@
+{
+  acquireExclusiveLock();
+  try {
+    this.storage=storageLocal;
+    this.rootBucketPointer=rootBucketPointer;
+    diskCache=storage.getDiskCache();
+    diskCache.openFile(fileId);
+    this.fileId=fileId;
+    this.name=resolveTreeName(fileId);
+    OCacheEntry rootCacheEntry=diskCache.load(this.fileId,this.rootBucketPointer.getPageIndex(),false);
+    rootCacheEntry.acquireSharedLock();
+    try {
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+      keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(rootBucket.getKeySerializerId());
+      valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(rootBucket.getValueSerializerId());
+    }
+  finally {
+      rootCacheEntry.releaseSharedLock();
+      diskCache.release(rootCacheEntry);
+    }
+    initDurableComponent(storageLocal);
+  }
+ catch (  IOException e) {
+    throw new OSBTreeException("Exception during loading of sbtree " + fileId,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

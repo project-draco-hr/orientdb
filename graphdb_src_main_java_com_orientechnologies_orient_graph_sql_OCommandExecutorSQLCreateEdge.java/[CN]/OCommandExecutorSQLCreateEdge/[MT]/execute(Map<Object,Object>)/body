@@ -1,36 +1,56 @@
 {
   if (clazz == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
-  final Set<ORID> fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),from);
-  final Set<ORID> toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),to);
-  final List<Object> edges=new ArrayList<Object>();
-  for (  ORID from : fromIds) {
-    final OrientVertex fromVertex=graph.getVertex(from);
-    if (fromVertex == null)     throw new OCommandExecutionException("Source vertex '" + from + "' not exists");
-    for (    ORID to : toIds) {
-      final OrientVertex toVertex;
-      if (from.equals(to)) {
-        toVertex=fromVertex;
-      }
+  return OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<List<Object>>(){
+    @Override public List<Object> call(    OrientBaseGraph graph){
+      final Set<OIdentifiable> fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),from,context,iArgs);
+      final Set<OIdentifiable> toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),to,context,iArgs);
+      final List<Object> edges=new ArrayList<Object>();
+      for (      OIdentifiable from : fromIds) {
+        final OrientVertex fromVertex=graph.getVertex(from);
+        if (fromVertex == null)         throw new OCommandExecutionException("Source vertex '" + from + "' not exists");
+        for (        OIdentifiable to : toIds) {
+          final OrientVertex toVertex;
+          if (from.equals(to)) {
+            toVertex=fromVertex;
+          }
  else {
-        toVertex=graph.getVertex(to);
+            toVertex=graph.getVertex(to);
+          }
+          final String clsName=clazz.getName();
+          if (fields != null)           for (          Entry<String,Object> f : fields.entrySet()) {
+            if (f.getValue() instanceof OSQLFunctionRuntime)             fields.put(f.getKey(),((OSQLFunctionRuntime)f.getValue()).getValue(to,null,context));
+          }
+          OrientEdge edge=null;
+          for (int r=0; r < retry; ++r) {
+            try {
+              edge=fromVertex.addEdge(null,toVertex,clsName,clusterName,fields);
+              if (fields != null && !fields.isEmpty()) {
+                if (!edge.getRecord().getIdentity().isValid())                 edge.convertToDocument();
+                OSQLHelper.bindParameters(edge.getRecord(),fields,new OCommandParameters(iArgs),context);
+              }
+              if (content != null) {
+                if (!edge.getRecord().getIdentity().isValid())                 edge.convertToDocument();
+                edge.getRecord().merge(content,true,false);
+              }
+              edge.save(clusterName);
+              break;
+            }
+ catch (            OConcurrentModificationException e) {
+              if (r + 1 >= retry)               throw e;
+              if (wait > 0)               try {
+                Thread.sleep(wait);
+              }
+ catch (              InterruptedException e1) {
+              }
+              fromVertex.getRecord().reload(null,true);
+              toVertex.getRecord().reload(null,true);
+            }
+          }
+          edges.add(edge);
+        }
       }
-      final String clsName=clazz.getName();
-      if (fields != null)       for (      Entry<String,Object> f : fields.entrySet()) {
-        if (f.getValue() instanceof OSQLFunctionRuntime)         fields.put(f.getKey(),((OSQLFunctionRuntime)f.getValue()).getValue(to,context));
-      }
-      final OrientEdge edge=fromVertex.addEdge(null,toVertex,clsName,clusterName,fields);
-      if (fields != null && !fields.isEmpty()) {
-        if (!edge.getRecord().getIdentity().isValid())         edge.convertToDocument();
-        OSQLHelper.bindParameters(edge.getRecord(),fields,new OCommandParameters(iArgs),context);
-      }
-      if (content != null) {
-        if (!edge.getRecord().getIdentity().isValid())         edge.convertToDocument();
-        edge.getRecord().merge(content,true,false);
-      }
-      edge.save(clusterName);
-      edges.add(edge);
+      return edges;
     }
   }
-  return edges;
+);
 }

@@ -1,0 +1,39 @@
+{
+  setCurrentDatabaseinThreadLocal();
+  try {
+    super.create(iInitialSettings);
+    componentsFactory=getStorage().getComponentsFactory();
+    sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
+      @Override public OSBTreeCollectionManager call() throws Exception {
+        Class<? extends OSBTreeCollectionManager> managerClass=getStorage().getCollectionManagerClass();
+        if (managerClass == null) {
+          OLogManager.instance().warn(this,"Current implementation of storage does not support sbtree collections");
+          return null;
+        }
+ else {
+          return managerClass.newInstance();
+        }
+      }
+    }
+));
+    level1Cache.startup();
+    getStorage().getConfiguration().setRecordSerializer(getSerializer().toString());
+    getStorage().getConfiguration().setRecordSerializerVersion(getSerializer().getCurrentVersion());
+    getStorage().getConfiguration().update();
+    if (!(getStorage() instanceof OStorageProxy))     installHooks();
+    metadata=new OMetadataDefault();
+    metadata.create();
+    user=getMetadata().getSecurity().getUser(OUser.ADMIN);
+    if (!metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))     metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
+    for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreate(getDatabaseOwner());
+    for (    ODatabaseListener listener : underlying.browseListeners())     try {
+      listener.onCreate(underlying);
+    }
+ catch (    Throwable ignore) {
+    }
+  }
+ catch (  Exception e) {
+    throw new ODatabaseException("Cannot create database",e);
+  }
+  return (DB)this;
+}

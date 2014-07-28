@@ -1,0 +1,32 @@
+{
+  if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot create a new index inside a transaction");
+  final Character c=OSchemaShared.checkNameIfValid(iName);
+  if (c != null)   throw new IllegalArgumentException("Invalid index name '" + iName + "'. Character '"+ c+ "' is invalid");
+  ODatabase database=getDatabase();
+  OStorage storage=database.getStorage();
+  algorithm=chooseTreeAlgorithm(algorithm);
+  final String valueContainerAlgorithm=chooseContainerAlgorithm(iType);
+  final OIndexInternal<?> index;
+  acquireExclusiveLock();
+  try {
+    if (indexes.containsKey(iName.toLowerCase()))     throw new OIndexException("Index with name " + iName.toLowerCase() + " already exists.");
+    index=OIndexes.createIndex(getDatabase(),iType,algorithm,valueContainerAlgorithm,metadata);
+    final String clusterName=indexDefinition != null && indexDefinition.getClassName() != null ? defaultClusterName : manualClusterName;
+    if (progressListener == null)     progressListener=new OIndexRebuildOutputListener(index);
+    final Set<String> clustersToIndex=findClustersByIds(clusterIdsToIndex,database);
+    if (metadata != null && Boolean.FALSE.equals(metadata.field("ignoreNullValues")) && indexDefinition != null)     indexDefinition.setNullValuesIgnored(false);
+    index.create(iName,indexDefinition,clusterName,clustersToIndex,true,progressListener);
+    addIndexInternal(index);
+    if (metadata != null) {
+      final ODocument config=index.getConfiguration();
+      config.field("metadata",metadata,OType.EMBEDDED);
+    }
+    setDirty();
+    save();
+  }
+  finally {
+    releaseExclusiveLock();
+  }
+  if (OGlobalConfiguration.INDEX_FLUSH_AFTER_CREATE.getValueAsBoolean())   storage.synch();
+  return index;
+}

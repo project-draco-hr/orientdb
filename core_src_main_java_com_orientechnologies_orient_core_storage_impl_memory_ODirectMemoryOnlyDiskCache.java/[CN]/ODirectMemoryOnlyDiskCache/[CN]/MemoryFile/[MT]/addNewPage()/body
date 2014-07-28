@@ -1,0 +1,28 @@
+{
+  clearLock.readLock().lock();
+  try {
+    OCacheEntry cacheEntry;
+    long index=-1;
+    do {
+      if (content.isEmpty())       index=0;
+ else {
+        long lastIndex=content.lastKey();
+        index=lastIndex + 1;
+      }
+      final ODirectMemoryPointer directMemoryPointer=new ODirectMemoryPointer(new byte[pageSize]);
+      final OCachePointer cachePointer=new OCachePointer(directMemoryPointer,new OLogSequenceNumber(0,0));
+      cachePointer.incrementReferrer();
+      cacheEntry=new OCacheEntry(id,index,cachePointer,false);
+      OCacheEntry oldCacheEntry=content.putIfAbsent(index,cacheEntry);
+      if (oldCacheEntry != null) {
+        cacheEntry.getCachePointer().decrementReferrer();
+        index=-1;
+      }
+    }
+ while (index < 0);
+    return cacheEntry;
+  }
+  finally {
+    clearLock.readLock().unlock();
+  }
+}

@@ -1,0 +1,41 @@
+{
+  if (inVertex == null)   throw new IllegalArgumentException("destination vertex is null");
+  if (graph != null) {
+    setCurrentGraphInThreadLocal();
+    graph.autoStartTransaction();
+  }
+  final ODocument outDocument=getRecord();
+  final ODocument inDocument=inVertex.getRecord();
+  final OrientEdge edge;
+  OIdentifiable to;
+  OIdentifiable from;
+  label=OrientBaseGraph.encodeClassName(label);
+  if (label == null && iClassName != null)   label=OrientBaseGraph.encodeClassName(iClassName);
+  final String outFieldName=getConnectionFieldName(Direction.OUT,label,settings.useVertexFieldsForEdgeLabels);
+  final String inFieldName=getConnectionFieldName(Direction.IN,label,settings.useVertexFieldsForEdgeLabels);
+  if (label == null)   throw ExceptionFactory.edgeLabelCanNotBeNull();
+  if (canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
+    from=rawElement;
+    to=inDocument;
+    edge=new OrientEdge(graph,from,to,label);
+  }
+ else {
+    edge=new OrientEdge(graph,label,fields);
+    if (settings.keepInMemoryReferences)     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
+ else     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
+    from=(OIdentifiable)edge.getRecord();
+    to=(OIdentifiable)edge.getRecord();
+  }
+  if (settings.keepInMemoryReferences) {
+    from=from.getIdentity();
+    to=to.getIdentity();
+  }
+  createLink(outDocument,to,outFieldName);
+  createLink(inDocument,from,inFieldName);
+  if (graph != null) {
+    edge.save(iClusterName);
+    inDocument.save();
+    outDocument.save();
+  }
+  return edge;
+}

@@ -1,14 +1,27 @@
 {
   if (rid == null && query == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph();
   if (rid != null) {
-    final OrientVertex v=graph.getVertex(rid);
-    if (v != null) {
-      v.remove();
-      removed=1;
+    OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+      @Override public Object call(      OrientBaseGraph graph){
+        final OrientVertex v=graph.getVertex(rid);
+        if (v != null) {
+          v.remove();
+          removed=1;
+        }
+        return null;
+      }
     }
+);
   }
- else   if (query != null)   query.execute(iArgs);
+ else   if (query != null) {
+    graph=OGraphCommandExecutorSQLFactory.getGraph(false);
+    OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+      @Override public Object call(      OrientBaseGraph graph){
+        return query.execute(iArgs);
+      }
+    }
+);
+  }
  else   throw new OCommandExecutionException("Invalid target");
   return removed;
 }

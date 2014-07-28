@@ -1,0 +1,65 @@
+{
+  if (iMode == 1 && iCallback == null)   iMode=2;
+  OChannelBinaryAsynchClient lastNetworkUsed=null;
+  do {
+    try {
+      final OChannelBinaryAsynchClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
+      lastNetworkUsed=network;
+      try {
+        network.writeRID(iRid);
+        if (network.getSrvProtocolVersion() >= 23) {
+          network.writeBoolean(updateContent);
+        }
+        network.writeBytes(iContent);
+        network.writeVersion(iVersion);
+        network.writeByte(iRecordType);
+        network.writeByte((byte)iMode);
+      }
+  finally {
+        endRequest(network);
+      }
+switch (iMode) {
+case 0:
+        try {
+          beginResponse(network);
+          OStorageOperationResult<ORecordVersion> r=new OStorageOperationResult<ORecordVersion>(network.readVersion());
+          readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
+          return r;
+        }
+  finally {
+          endResponse(network);
+        }
+case 1:
+      final int sessionId=getSessionId();
+    final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
+  Callable<Object> response=new Callable<Object>(){
+    public Object call() throws Exception {
+      ORecordVersion result;
+      try {
+        OStorageRemoteThreadLocal.INSTANCE.get().sessionId=sessionId;
+        beginResponse(network);
+        result=network.readVersion();
+        if (network.getSrvProtocolVersion() >= 20)         readCollectionChanges(network,collectionManager);
+      }
+  finally {
+        endResponse(network);
+        OStorageRemoteThreadLocal.INSTANCE.get().sessionId=-1;
+      }
+      iCallback.call(iRid,result);
+      return null;
+    }
+  }
+;
+asynchExecutor.submit(new FutureTask<Object>(response));
+}
+return new OStorageOperationResult<ORecordVersion>(iVersion);
+}
+ catch (OModificationOperationProhibitedException mope) {
+handleDBFreeze();
+}
+catch (Exception e) {
+handleException(lastNetworkUsed,"Error on update record " + iRid,e);
+}
+}
+ while (true);
+}

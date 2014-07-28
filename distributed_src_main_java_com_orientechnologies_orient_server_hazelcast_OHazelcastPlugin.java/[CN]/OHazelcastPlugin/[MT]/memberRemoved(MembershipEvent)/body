@@ -1,12 +1,14 @@
 {
+  updateLastClusterChange();
   ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"node removed id=%s name=%s",iEvent.getMember(),getNodeName(iEvent.getMember()));
   final Member member=iEvent.getMember();
   final String nodeName=getNodeName(member);
   if (nodeName != null) {
-    cachedClusterNodes.remove(nodeName);
-    for (    String dbName : messageService.getDatabases()) {
-      final OHazelcastDistributedDatabase db=messageService.getDatabase(dbName);
-      db.removeNodeInConfiguration(nodeName,false);
+    activeNodes.remove(nodeName);
+    if (messageService != null) {
+      final Set<String> dbs=messageService.getDatabases();
+      if (dbs != null)       for (      String dbName : dbs)       messageService.getDatabase(dbName).removeNodeInConfiguration(nodeName,false);
+      messageService.removeQueue(OHazelcastDistributedMessageService.getResponseQueueName(nodeName));
     }
   }
   OClientConnectionManager.instance().pushDistribCfg2Clients(getClusterConfiguration());

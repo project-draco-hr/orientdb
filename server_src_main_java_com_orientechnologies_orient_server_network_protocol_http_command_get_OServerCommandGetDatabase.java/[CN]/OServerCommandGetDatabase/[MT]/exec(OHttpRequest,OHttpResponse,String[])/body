@@ -33,62 +33,32 @@
       }
       json.endCollection();
     }
-    if (db.getStorage() instanceof OStorageLocal) {
-      json.beginCollection("dataSegments");
-      for (      ODataLocal data : ((OStorageLocal)db.getStorage()).getDataSegments()) {
-        if (data != null) {
-          json.beginObject();
-          json.writeAttribute("id",data.getId());
-          json.writeAttribute("name",data.getName());
-          json.writeAttribute("size",data.getSize());
-          json.writeAttribute("filled",data.getFilledUpTo());
-          json.writeAttribute("maxSize",data.getConfig().maxSize);
-          json.writeAttribute("files",Arrays.toString(data.getConfig().infoFiles));
-          json.endObject();
-        }
-      }
-      json.endCollection();
-    }
     if (db.getClusterNames() != null) {
       json.beginCollection("clusters");
       OCluster cluster;
       for (      String clusterName : db.getClusterNames()) {
-        cluster=db.getStorage().getClusterById(db.getClusterIdByName(clusterName));
+        try {
+          cluster=db.getStorage().getClusterById(db.getClusterIdByName(clusterName));
+        }
+ catch (        IllegalArgumentException e) {
+          OLogManager.instance().error(this,"Cluster '%s' does not exist in database",clusterName);
+          continue;
+        }
         try {
           json.beginObject();
           json.writeAttribute("id",cluster.getId());
           json.writeAttribute("name",clusterName);
-          json.writeAttribute("type",cluster.getType());
           json.writeAttribute("records",cluster.getEntries() - cluster.getTombstonesCount());
-          if (cluster instanceof OClusterLocal) {
-            json.writeAttribute("size",((OClusterLocal)cluster).getSize());
-            json.writeAttribute("filled",((OClusterLocal)cluster).getFilledUpTo());
-            json.writeAttribute("maxSize",((OClusterLocal)cluster).getConfig().getMaxSize());
-            json.writeAttribute("files",Arrays.toString(((OClusterLocal)cluster).getConfig().getInfoFiles()));
-          }
- else {
-            json.writeAttribute("size","-");
-            json.writeAttribute("filled","-");
-            json.writeAttribute("maxSize","-");
-            json.writeAttribute("files","-");
-          }
+          json.writeAttribute("size","-");
+          json.writeAttribute("filled","-");
+          json.writeAttribute("maxSize","-");
+          json.writeAttribute("files","-");
         }
  catch (        Exception e) {
           json.writeAttribute("records","? (Unauthorized)");
         }
         json.endObject();
       }
-      json.endCollection();
-    }
-    if (db.getStorage() instanceof OStorageLocal) {
-      json.beginCollection("txSegment");
-      final OTxSegment txSegment=((OStorageLocal)db.getStorage()).getTxManager().getTxSegment();
-      json.beginObject();
-      json.writeAttribute("size",txSegment.getSize());
-      json.writeAttribute("filled",txSegment.getFilledUpTo());
-      json.writeAttribute("maxSize",txSegment.getConfig().maxSize);
-      json.writeAttribute("file",txSegment.getConfig().path);
-      json.endObject();
       json.endCollection();
     }
     if (db.getUser() != null) {
@@ -126,9 +96,23 @@
       }
       json.endCollection();
     }
+    final OIndexManagerProxy idxManager=db.getMetadata().getIndexManager();
+    json.beginCollection("indexes");
+    for (    OIndex<?> index : idxManager.getIndexes()) {
+      json.beginObject();
+      try {
+        json.writeAttribute("name",index.getName());
+        json.writeAttribute("configuration",index.getConfiguration());
+      }
+ catch (      Exception e) {
+        OLogManager.instance().error(this,"Cannot serialize index configuration",e);
+      }
+      json.endObject();
+    }
+    json.endCollection();
     json.beginObject("config");
     json.beginCollection("values");
-    json.writeObjects(null,new Object[]{"name","dateFormat","value",db.getStorage().getConfiguration().dateFormat},new Object[]{"name","dateTimeFormat","value",db.getStorage().getConfiguration().dateTimeFormat},new Object[]{"name","localeCountry","value",db.getStorage().getConfiguration().getLocaleCountry()},new Object[]{"name","localeLanguage","value",db.getStorage().getConfiguration().getLocaleLanguage()},new Object[]{"name","charSet","value",db.getStorage().getConfiguration().getCharset()},new Object[]{"name","timezone","value",db.getStorage().getConfiguration().getTimeZone().getID()},new Object[]{"name","definitionVersion","value",db.getStorage().getConfiguration().version});
+    json.writeObjects(null,new Object[]{"name","dateFormat","value",db.getStorage().getConfiguration().dateFormat},new Object[]{"name","dateTimeFormat","value",db.getStorage().getConfiguration().dateTimeFormat},new Object[]{"name","localeCountry","value",db.getStorage().getConfiguration().getLocaleCountry()},new Object[]{"name","localeLanguage","value",db.getStorage().getConfiguration().getLocaleLanguage()},new Object[]{"name","charSet","value",db.getStorage().getConfiguration().getCharset()},new Object[]{"name","timezone","value",db.getStorage().getConfiguration().getTimeZone().getID()},new Object[]{"name","definitionVersion","value",db.getStorage().getConfiguration().version},new Object[]{"name","clusterSelection","value",db.getStorage().getConfiguration().getClusterSelection()},new Object[]{"name","minimumClusters","value",db.getStorage().getConfiguration().getMinimumClusters()});
     json.endCollection();
     json.beginCollection("properties");
     if (db.getStorage().getConfiguration().properties != null)     for (    OStorageEntryConfiguration entry : db.getStorage().getConfiguration().properties) {

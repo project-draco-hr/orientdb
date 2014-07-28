@@ -1,9 +1,19 @@
 {
   acquireSharedLock();
   try {
-    return size;
-  }
+    diskCache.loadPinnedPage(hashStateEntry);
+    try {
+      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,ODurablePage.TrackMode.NONE,false);
+      return metadataPage.getRecordsCount();
+    }
   finally {
+      diskCache.release(hashStateEntry);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during index size request.",e);
+  }
+ finally {
     releaseSharedLock();
   }
 }

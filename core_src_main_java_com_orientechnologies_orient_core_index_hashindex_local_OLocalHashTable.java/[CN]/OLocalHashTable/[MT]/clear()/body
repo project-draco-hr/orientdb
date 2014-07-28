@@ -1,16 +1,36 @@
 {
   acquireExclusiveLock();
   try {
-    for (int i=0; i < filesMetadata.length; i++) {
-      if (filesMetadata[i] != null)       diskCache.truncateFile(fileLevelIds[i]);
+    startAtomicOperation();
+    diskCache.loadPinnedPage(hashStateEntry);
+    hashStateEntry.acquireExclusiveLock();
+    try {
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        if (!page.isRemoved(i)) {
+          diskCache.truncateFile(page.getFileId(i));
+          page.setBucketsCount(i,0);
+          page.setTombstoneIndex(i,-1);
+        }
+      }
+      hashStateEntry.markDirty();
+      logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
     }
-    bucketTombstonePointer=-1;
-    metadataStore.truncate();
-    treeStateStore.truncate();
+  finally {
+      hashStateEntry.releaseExclusiveLock();
+      diskCache.release(hashStateEntry);
+    }
+    if (nullKeyIsSupported)     diskCache.truncateFile(nullBucketFileId);
     initHashTreeState();
+    endAtomicOperation(false);
   }
  catch (  IOException e) {
+    rollback();
     throw new OIndexException("Error during hash table clear",e);
+  }
+catch (  RuntimeException e) {
+    rollback();
+    throw e;
   }
  finally {
     releaseExclusiveLock();

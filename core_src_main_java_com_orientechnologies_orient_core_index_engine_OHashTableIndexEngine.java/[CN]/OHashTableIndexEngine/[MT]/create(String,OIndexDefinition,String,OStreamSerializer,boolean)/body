@@ -1,0 +1,24 @@
+{
+  OBinarySerializer keySerializer;
+  if (indexDefinition != null) {
+    if (indexDefinition instanceof ORuntimeKeyIndexDefinition) {
+      keySerializer=((ORuntimeKeyIndexDefinition)indexDefinition).getSerializer();
+    }
+ else {
+      if (indexDefinition.getTypes().length > 1) {
+        keySerializer=OCompositeKeySerializer.INSTANCE;
+      }
+ else {
+        keySerializer=OBinarySerializerFactory.getInstance().getObjectSerializer(indexDefinition.getTypes()[0]);
+      }
+    }
+  }
+ else   keySerializer=new OSimpleKeySerializer();
+  final ODatabaseRecord database=getDatabase();
+  final ORecordBytes identityRecord=new ORecordBytes();
+  final OAbstractPaginatedStorage storageLocalAbstract=(OAbstractPaginatedStorage)database.getStorage();
+  database.save(identityRecord,clusterIndexName);
+  identity=identityRecord.getIdentity();
+  hashFunction.setValueSerializer(keySerializer);
+  hashTable.create(indexName,keySerializer,(OBinarySerializer<V>)valueSerializer,indexDefinition != null ? indexDefinition.getTypes() : null,storageLocalAbstract,indexDefinition != null && !indexDefinition.isNullValuesIgnored());
+}

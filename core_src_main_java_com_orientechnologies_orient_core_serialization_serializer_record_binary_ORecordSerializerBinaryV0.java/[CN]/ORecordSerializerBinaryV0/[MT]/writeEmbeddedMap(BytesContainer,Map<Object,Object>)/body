@@ -1,0 +1,26 @@
+{
+  int[] pos=new int[map.size()];
+  int i=0;
+  Entry<Object,Object> values[]=new Entry[map.size()];
+  int fullPos=OVarIntSerializer.write(bytes,map.size());
+  for (  Entry<Object,Object> entry : map.entrySet()) {
+    OType type=OType.STRING;
+    writeOType(bytes,bytes.alloc(1),type);
+    writeString(bytes,entry.getKey().toString());
+    pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE + 1);
+    values[i]=entry;
+    i++;
+  }
+  for (i=0; i < values.length; i++) {
+    int pointer=0;
+    Object value=values[i].getValue();
+    if (value != null) {
+      OType type=getTypeFromValue(value,true);
+      if (type == null)       continue;
+      pointer=writeSingleValue(bytes,value,type,null);
+      OIntegerSerializer.INSTANCE.serialize(pointer,bytes.bytes,pos[i]);
+      writeOType(bytes,(pos[i] + OIntegerSerializer.INT_SIZE),type);
+    }
+  }
+  return fullPos;
+}

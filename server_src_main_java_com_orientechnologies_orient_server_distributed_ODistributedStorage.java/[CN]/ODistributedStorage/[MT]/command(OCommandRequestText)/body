@@ -25,7 +25,18 @@
       task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.UNION);
       nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
       if (iCommand instanceof ODistributedCommand)       nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
-      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()))       return wrapped.command(iCommand);
+      boolean executeLocally=false;
+      if (exec.isIdempotent()) {
+        int maxReadQuorum;
+        if (involvedClusters.isEmpty())         maxReadQuorum=dbCfg.getReadQuorum(null);
+ else {
+          maxReadQuorum=0;
+          for (          String cl : involvedClusters)           maxReadQuorum=Math.max(maxReadQuorum,dbCfg.getReadQuorum(cl));
+        }
+        if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && maxReadQuorum <= 1)         executeLocally=true;
+      }
+ else       if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()))       executeLocally=true;
+      if (executeLocally)       return wrapped.command(iCommand);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
       if (result instanceof Map) {
         if (executor instanceof OCommandExecutorSQLDelegate && ((OCommandExecutorSQLDelegate)executor).getDelegate() instanceof OCommandExecutorSQLSelect) {

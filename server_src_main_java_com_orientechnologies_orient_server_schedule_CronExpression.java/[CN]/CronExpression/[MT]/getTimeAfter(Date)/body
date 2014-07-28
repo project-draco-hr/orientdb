@@ -1,0 +1,337 @@
+{
+  Calendar cl=new java.util.GregorianCalendar(getTimeZone());
+  afterTime=new Date(afterTime.getTime() + 1000);
+  cl.setTime(afterTime);
+  cl.set(Calendar.MILLISECOND,0);
+  boolean gotOne=false;
+  while (!gotOne) {
+    if (cl.get(Calendar.YEAR) > 2999) {
+      return null;
+    }
+    SortedSet<Integer> st=null;
+    int t=0;
+    int sec=cl.get(Calendar.SECOND);
+    int min=cl.get(Calendar.MINUTE);
+    st=seconds.tailSet(sec);
+    if (st != null && st.size() != 0) {
+      sec=st.first();
+    }
+ else {
+      sec=seconds.first();
+      min++;
+      cl.set(Calendar.MINUTE,min);
+    }
+    cl.set(Calendar.SECOND,sec);
+    min=cl.get(Calendar.MINUTE);
+    int hr=cl.get(Calendar.HOUR_OF_DAY);
+    t=-1;
+    st=minutes.tailSet(min);
+    if (st != null && st.size() != 0) {
+      t=min;
+      min=st.first();
+    }
+ else {
+      min=minutes.first();
+      hr++;
+    }
+    if (min != t) {
+      cl.set(Calendar.SECOND,0);
+      cl.set(Calendar.MINUTE,min);
+      setCalendarHour(cl,hr);
+      continue;
+    }
+    cl.set(Calendar.MINUTE,min);
+    hr=cl.get(Calendar.HOUR_OF_DAY);
+    int day=cl.get(Calendar.DAY_OF_MONTH);
+    t=-1;
+    st=hours.tailSet(hr);
+    if (st != null && st.size() != 0) {
+      t=hr;
+      hr=st.first();
+    }
+ else {
+      hr=hours.first();
+      day++;
+    }
+    if (hr != t) {
+      cl.set(Calendar.SECOND,0);
+      cl.set(Calendar.MINUTE,0);
+      cl.set(Calendar.DAY_OF_MONTH,day);
+      setCalendarHour(cl,hr);
+      continue;
+    }
+    cl.set(Calendar.HOUR_OF_DAY,hr);
+    day=cl.get(Calendar.DAY_OF_MONTH);
+    int mon=cl.get(Calendar.MONTH) + 1;
+    t=-1;
+    int tmon=mon;
+    boolean dayOfMSpec=!daysOfMonth.contains(NO_SPEC);
+    boolean dayOfWSpec=!daysOfWeek.contains(NO_SPEC);
+    if (dayOfMSpec && !dayOfWSpec) {
+      st=daysOfMonth.tailSet(day);
+      if (lastdayOfMonth) {
+        if (!nearestWeekday) {
+          t=day;
+          day=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+          day-=lastdayOffset;
+          if (t > day) {
+            mon++;
+            if (mon > 12) {
+              mon=1;
+              tmon=3333;
+              cl.add(Calendar.YEAR,1);
+            }
+            day=1;
+          }
+        }
+ else {
+          t=day;
+          day=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+          day-=lastdayOffset;
+          java.util.Calendar tcal=java.util.Calendar.getInstance(getTimeZone());
+          tcal.set(Calendar.SECOND,0);
+          tcal.set(Calendar.MINUTE,0);
+          tcal.set(Calendar.HOUR_OF_DAY,0);
+          tcal.set(Calendar.DAY_OF_MONTH,day);
+          tcal.set(Calendar.MONTH,mon - 1);
+          tcal.set(Calendar.YEAR,cl.get(Calendar.YEAR));
+          int ldom=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+          int dow=tcal.get(Calendar.DAY_OF_WEEK);
+          if (dow == Calendar.SATURDAY && day == 1) {
+            day+=2;
+          }
+ else           if (dow == Calendar.SATURDAY) {
+            day-=1;
+          }
+ else           if (dow == Calendar.SUNDAY && day == ldom) {
+            day-=2;
+          }
+ else           if (dow == Calendar.SUNDAY) {
+            day+=1;
+          }
+          tcal.set(Calendar.SECOND,sec);
+          tcal.set(Calendar.MINUTE,min);
+          tcal.set(Calendar.HOUR_OF_DAY,hr);
+          tcal.set(Calendar.DAY_OF_MONTH,day);
+          tcal.set(Calendar.MONTH,mon - 1);
+          Date nTime=tcal.getTime();
+          if (nTime.before(afterTime)) {
+            day=1;
+            mon++;
+          }
+        }
+      }
+ else       if (nearestWeekday) {
+        t=day;
+        day=daysOfMonth.first();
+        java.util.Calendar tcal=java.util.Calendar.getInstance(getTimeZone());
+        tcal.set(Calendar.SECOND,0);
+        tcal.set(Calendar.MINUTE,0);
+        tcal.set(Calendar.HOUR_OF_DAY,0);
+        tcal.set(Calendar.DAY_OF_MONTH,day);
+        tcal.set(Calendar.MONTH,mon - 1);
+        tcal.set(Calendar.YEAR,cl.get(Calendar.YEAR));
+        int ldom=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+        int dow=tcal.get(Calendar.DAY_OF_WEEK);
+        if (dow == Calendar.SATURDAY && day == 1) {
+          day+=2;
+        }
+ else         if (dow == Calendar.SATURDAY) {
+          day-=1;
+        }
+ else         if (dow == Calendar.SUNDAY && day == ldom) {
+          day-=2;
+        }
+ else         if (dow == Calendar.SUNDAY) {
+          day+=1;
+        }
+        tcal.set(Calendar.SECOND,sec);
+        tcal.set(Calendar.MINUTE,min);
+        tcal.set(Calendar.HOUR_OF_DAY,hr);
+        tcal.set(Calendar.DAY_OF_MONTH,day);
+        tcal.set(Calendar.MONTH,mon - 1);
+        Date nTime=tcal.getTime();
+        if (nTime.before(afterTime)) {
+          day=daysOfMonth.first();
+          mon++;
+        }
+      }
+ else       if (st != null && st.size() != 0) {
+        t=day;
+        day=st.first();
+        int lastDay=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+        if (day > lastDay) {
+          day=daysOfMonth.first();
+          mon++;
+        }
+      }
+ else {
+        day=daysOfMonth.first();
+        mon++;
+      }
+      if (day != t || mon != tmon) {
+        cl.set(Calendar.SECOND,0);
+        cl.set(Calendar.MINUTE,0);
+        cl.set(Calendar.HOUR_OF_DAY,0);
+        cl.set(Calendar.DAY_OF_MONTH,day);
+        cl.set(Calendar.MONTH,mon - 1);
+        continue;
+      }
+    }
+ else     if (dayOfWSpec && !dayOfMSpec) {
+      if (lastdayOfWeek) {
+        int dow=daysOfWeek.first();
+        int cDow=cl.get(Calendar.DAY_OF_WEEK);
+        int daysToAdd=0;
+        if (cDow < dow) {
+          daysToAdd=dow - cDow;
+        }
+        if (cDow > dow) {
+          daysToAdd=dow + (7 - cDow);
+        }
+        int lDay=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+        if (day + daysToAdd > lDay) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,1);
+          cl.set(Calendar.MONTH,mon);
+          continue;
+        }
+        while ((day + daysToAdd + 7) <= lDay) {
+          daysToAdd+=7;
+        }
+        day+=daysToAdd;
+        if (daysToAdd > 0) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,day);
+          cl.set(Calendar.MONTH,mon - 1);
+          continue;
+        }
+      }
+ else       if (nthdayOfWeek != 0) {
+        int dow=daysOfWeek.first();
+        int cDow=cl.get(Calendar.DAY_OF_WEEK);
+        int daysToAdd=0;
+        if (cDow < dow) {
+          daysToAdd=dow - cDow;
+        }
+ else         if (cDow > dow) {
+          daysToAdd=dow + (7 - cDow);
+        }
+        boolean dayShifted=false;
+        if (daysToAdd > 0) {
+          dayShifted=true;
+        }
+        day+=daysToAdd;
+        int weekOfMonth=day / 7;
+        if (day % 7 > 0) {
+          weekOfMonth++;
+        }
+        daysToAdd=(nthdayOfWeek - weekOfMonth) * 7;
+        day+=daysToAdd;
+        if (daysToAdd < 0 || day > getLastDayOfMonth(mon,cl.get(Calendar.YEAR))) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,1);
+          cl.set(Calendar.MONTH,mon);
+          continue;
+        }
+ else         if (daysToAdd > 0 || dayShifted) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,day);
+          cl.set(Calendar.MONTH,mon - 1);
+          continue;
+        }
+      }
+ else {
+        int cDow=cl.get(Calendar.DAY_OF_WEEK);
+        int dow=daysOfWeek.first();
+        st=daysOfWeek.tailSet(cDow);
+        if (st != null && st.size() > 0) {
+          dow=st.first();
+        }
+        int daysToAdd=0;
+        if (cDow < dow) {
+          daysToAdd=dow - cDow;
+        }
+        if (cDow > dow) {
+          daysToAdd=dow + (7 - cDow);
+        }
+        int lDay=getLastDayOfMonth(mon,cl.get(Calendar.YEAR));
+        if (day + daysToAdd > lDay) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,1);
+          cl.set(Calendar.MONTH,mon);
+          continue;
+        }
+ else         if (daysToAdd > 0) {
+          cl.set(Calendar.SECOND,0);
+          cl.set(Calendar.MINUTE,0);
+          cl.set(Calendar.HOUR_OF_DAY,0);
+          cl.set(Calendar.DAY_OF_MONTH,day + daysToAdd);
+          cl.set(Calendar.MONTH,mon - 1);
+          continue;
+        }
+      }
+    }
+ else {
+      throw new UnsupportedOperationException("Support for specifying both a day-of-week AND a day-of-month parameter is not implemented.");
+    }
+    cl.set(Calendar.DAY_OF_MONTH,day);
+    mon=cl.get(Calendar.MONTH) + 1;
+    int year=cl.get(Calendar.YEAR);
+    t=-1;
+    if (year > MAX_YEAR) {
+      return null;
+    }
+    st=months.tailSet(mon);
+    if (st != null && st.size() != 0) {
+      t=mon;
+      mon=st.first();
+    }
+ else {
+      mon=months.first();
+      year++;
+    }
+    if (mon != t) {
+      cl.set(Calendar.SECOND,0);
+      cl.set(Calendar.MINUTE,0);
+      cl.set(Calendar.HOUR_OF_DAY,0);
+      cl.set(Calendar.DAY_OF_MONTH,1);
+      cl.set(Calendar.MONTH,mon - 1);
+      cl.set(Calendar.YEAR,year);
+      continue;
+    }
+    cl.set(Calendar.MONTH,mon - 1);
+    year=cl.get(Calendar.YEAR);
+    t=-1;
+    st=years.tailSet(year);
+    if (st != null && st.size() != 0) {
+      t=year;
+      year=st.first();
+    }
+ else {
+      return null;
+    }
+    if (year != t) {
+      cl.set(Calendar.SECOND,0);
+      cl.set(Calendar.MINUTE,0);
+      cl.set(Calendar.HOUR_OF_DAY,0);
+      cl.set(Calendar.DAY_OF_MONTH,1);
+      cl.set(Calendar.MONTH,0);
+      cl.set(Calendar.YEAR,year);
+      continue;
+    }
+    cl.set(Calendar.YEAR,year);
+    gotOne=true;
+  }
+  return cl.getTime();
+}

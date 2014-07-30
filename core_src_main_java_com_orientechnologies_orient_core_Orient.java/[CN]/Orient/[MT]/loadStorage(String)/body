@@ -4,7 +4,7 @@
   int pos=iURL.indexOf(':');
   if (pos <= 0)   throw new OConfigurationException("Error in database URL: the engine was not specified. Syntax is: " + URL_SYNTAX + ". URL was: "+ iURL);
   final String engineName=iURL.substring(0,pos);
-  getLock().lock();
+  engineLock.readLock().lock();
   try {
     final OEngine engine=engines.get(engineName.toLowerCase());
     if (engine == null)     throw new OConfigurationException("Error on opening database: the engine '" + engineName + "' was not found. URL was: "+ iURL+ ". Registered engines are: "+ engines.keySet());
@@ -31,7 +31,8 @@
       storage=storages.get(dbName);
       if (storage == null) {
         storage=engine.createStorage(dbPath,parameters);
-        storages.put(dbName,storage);
+        final OStorage oldStorage=storages.putIfAbsent(dbName,storage);
+        if (oldStorage != null)         storage=oldStorage;
       }
     }
  else {
@@ -42,6 +43,6 @@
     return storage;
   }
   finally {
-    getLock().unlock();
+    engineLock.readLock().unlock();
   }
 }

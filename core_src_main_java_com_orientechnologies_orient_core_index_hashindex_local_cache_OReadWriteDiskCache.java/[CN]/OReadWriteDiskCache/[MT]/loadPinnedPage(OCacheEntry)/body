@@ -1,5 +1,21 @@
 {
-synchronized (syncObject) {
-    cacheEntry.usagesCount++;
+  cacheLock.readLock().lock();
+  try {
+    fileLockManager.acquireLock(this,cacheEntry.fileId,OLockManager.LOCK.SHARED);
+    try {
+      pageLockManager.acquireLock(this,new PageKey(cacheEntry.fileId,cacheEntry.pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      try {
+        cacheEntry.usagesCount++;
+      }
+  finally {
+        pageLockManager.releaseLock(this,new PageKey(cacheEntry.fileId,cacheEntry.pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  finally {
+      fileLockManager.releaseLock(this,cacheEntry.fileId,OLockManager.LOCK.SHARED);
+    }
+  }
+  finally {
+    cacheLock.readLock().unlock();
   }
 }

@@ -1,7 +1,17 @@
 {
-synchronized (syncObject) {
-    if (isOpen(fileId))     truncateFile(fileId);
-    writeCache.deleteFile(fileId);
-    filePages.remove(fileId);
+  cacheLock.readLock().lock();
+  try {
+    fileLockManager.acquireLock(this,fileId,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      if (isOpen(fileId))       truncateFile(fileId);
+      writeCache.deleteFile(fileId);
+      filePages.remove(fileId);
+    }
+  finally {
+      fileLockManager.releaseLock(this,fileId,OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+  finally {
+    cacheLock.readLock().unlock();
   }
 }

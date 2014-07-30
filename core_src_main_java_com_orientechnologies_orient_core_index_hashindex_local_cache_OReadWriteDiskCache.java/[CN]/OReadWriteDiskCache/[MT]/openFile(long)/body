@@ -1,7 +1,17 @@
 {
-synchronized (syncObject) {
-    if (writeCache.isOpen(fileId))     return;
-    writeCache.openFile(fileId);
-    filePages.put(fileId,new HashSet<Long>());
+  cacheLock.readLock().lock();
+  try {
+    fileLockManager.acquireLock(this,fileId,OLockManager.LOCK.EXCLUSIVE);
+    try {
+      if (writeCache.isOpen(fileId))       return;
+      writeCache.openFile(fileId);
+      filePages.put(fileId,Collections.newSetFromMap(new ConcurrentHashMap<Long,Boolean>()));
+    }
+  finally {
+      fileLockManager.releaseLock(this,fileId,OLockManager.LOCK.EXCLUSIVE);
+    }
+  }
+  finally {
+    cacheLock.readLock().unlock();
   }
 }

@@ -1,9 +1,13 @@
 {
-synchronized (syncObject) {
+  cacheLock.writeLock().lock();
+  try {
     long existingFileId=writeCache.isOpen(fileName);
     if (fileId == existingFileId)     return;
  else     if (existingFileId >= 0)     throw new OStorageException("File with given name already exists but has different id " + existingFileId + " vs. proposed "+ fileId);
     writeCache.openFile(fileName,fileId);
-    filePages.put(fileId,new HashSet<Long>());
+    filePages.put(fileId,Collections.newSetFromMap(new ConcurrentHashMap<Long,Boolean>()));
+  }
+  finally {
+    cacheLock.writeLock().unlock();
   }
 }

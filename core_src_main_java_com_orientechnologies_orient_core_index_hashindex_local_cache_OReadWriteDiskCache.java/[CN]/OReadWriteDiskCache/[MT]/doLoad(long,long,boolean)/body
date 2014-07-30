@@ -1,0 +1,30 @@
+{
+  boolean removeColdPages=false;
+  OCacheEntry cacheEntry=null;
+  cacheLock.readLock().lock();
+  try {
+    fileLockManager.acquireLock(this,fileId,OLockManager.LOCK.SHARED);
+    try {
+      pageLockManager.acquireLock(this,new PageKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      try {
+        if (checkPinnedPages)         cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
+        if (cacheEntry == null) {
+          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex);
+          cacheEntry=cacheResult.cacheEntry;
+          removeColdPages=cacheResult.removeColdPages;
+        }
+        cacheEntry.usagesCount++;
+      }
+  finally {
+        pageLockManager.releaseLock(this,new PageKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      }
+    }
+  finally {
+      fileLockManager.releaseLock(this,fileId,OLockManager.LOCK.SHARED);
+    }
+  }
+  finally {
+    cacheLock.readLock().unlock();
+  }
+  return new UpdateCacheResult(removeColdPages,cacheEntry);
+}

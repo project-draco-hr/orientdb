@@ -6,6 +6,7 @@
       final OrientVertexType clientType=graphNoTx.createVertexType("Client");
       for (int i=0; i < serverInstance.size(); ++i)       clientType.addCluster("client_" + i);
       graphNoTx.createVertexType("Product");
+      graphNoTx.createEdgeType("Knows");
       graphNoTx.createEdgeType("Buy");
     }
   finally {
@@ -23,7 +24,8 @@
         vertices[i].setProperty("name","shard_" + i);
         vertices[i].setProperty("amount",i * 10000);
         System.out.println("Create vertex, class: " + vertices[i].getLabel() + ", cluster: "+ clId+ " -> "+ vertices[i].getRecord());
-        vertices[i].addEdge("Buy",product);
+        if (i > 1)         vertices[i].addEdge("Knows",vertices[i - 1]);
+        final Edge edge=vertices[i].addEdge("Buy",product,new Object[]{"price",1000 * i});
       }
     }
   finally {
@@ -39,9 +41,12 @@
           Assert.assertTrue("Error on query against 'cluster_" + cluster + "' on server '"+ server+ "': "+ query,result.iterator().hasNext());
           OrientVertex v=result.iterator().next();
           Assert.assertEquals("Returned vertices name property is != shard_" + cluster + " on server "+ server,"shard_" + cluster,v.getProperty("name"));
-          final Iterable<Vertex> outV=v.getVertices(Direction.OUT,"Buy");
-          Assert.assertTrue(outV.iterator().hasNext());
-          Assert.assertEquals(outV.iterator().next(),product);
+          final Iterable<Vertex> knows=v.getVertices(Direction.OUT,"Knows");
+          final Iterable<Vertex> boughtV=v.getVertices(Direction.OUT,"Buy");
+          Assert.assertTrue(boughtV.iterator().hasNext());
+          Assert.assertEquals(boughtV.iterator().next(),product);
+          final Iterable<Edge> boughtE=v.getEdges(Direction.OUT,"Buy");
+          Assert.assertNotNull(boughtE.iterator().next().getProperty("price"));
         }
       }
   finally {
@@ -72,9 +77,12 @@
         int count=0;
         for (        OrientVertex v : result) {
           count++;
-          final Iterable<Vertex> outV=v.getVertices(Direction.OUT,"Buy");
-          Assert.assertTrue(outV.iterator().hasNext());
-          Assert.assertEquals(outV.iterator().next(),product);
+          final Iterable<Vertex> knows=v.getVertices(Direction.OUT,"Knows");
+          final Iterable<Vertex> boughtV=v.getVertices(Direction.OUT,"Buy");
+          Assert.assertTrue(boughtV.iterator().hasNext());
+          Assert.assertEquals(boughtV.iterator().next(),product);
+          final Iterable<Edge> boughtE=v.getEdges(Direction.OUT,"Buy");
+          Assert.assertNotNull(boughtE.iterator().next().getProperty("price"));
         }
         Assert.assertEquals("Returned wrong vertices count on server " + server,3,count);
       }

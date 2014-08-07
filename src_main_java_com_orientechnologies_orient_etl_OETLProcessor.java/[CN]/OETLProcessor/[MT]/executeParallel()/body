@@ -1,0 +1,65 @@
+{
+  try {
+    begin();
+    if (source != null) {
+      final Reader reader=source.read();
+      if (reader != null)       extractor.extract(reader);
+    }
+    final LinkedBlockingQueue<Object> queue=new LinkedBlockingQueue<Object>(threads.length * 500){
+      @Override public boolean offer(      Object e){
+        try {
+          put(e);
+          return true;
+        }
+ catch (        InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+        return false;
+      }
+    }
+;
+    final AtomicLong counter=new AtomicLong();
+    final AtomicBoolean extractionFinished=new AtomicBoolean(false);
+    for (int i=0; i < threads.length; ++i) {
+      threads[i]=new Thread(new Runnable(){
+        @Override public void run(){
+          final OETLPipeline pipeline=new OETLPipeline(transformers,loader,context);
+          pipeline.begin();
+          while (!extractionFinished.get() || counter.get() > 0) {
+            try {
+              final Object content=queue.take();
+              try {
+                pipeline.execute(content);
+              }
+  finally {
+                counter.decrementAndGet();
+              }
+            }
+ catch (            InterruptedException e) {
+            }
+          }
+        }
+      }
+,"OrientDB ETL pipeline-" + i);
+      threads[i].start();
+    }
+    while (extractor.hasNext()) {
+      final Object current=extractor.next();
+      queue.offer(current);
+      counter.incrementAndGet();
+    }
+    extractionFinished.set(true);
+    while (counter.get() > 0) {
+      out(true,"Waiting for the pipeline to finish, remaining: " + counter.get());
+      try {
+        Thread.sleep(500);
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+    end();
+  }
+ catch (  OETLProcessHaltedException e) {
+    out(false,"ETL process halted: " + e);
+  }
+}

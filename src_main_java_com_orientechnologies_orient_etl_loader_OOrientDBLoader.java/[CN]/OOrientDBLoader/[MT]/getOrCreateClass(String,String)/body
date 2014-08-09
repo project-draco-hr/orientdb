@@ -1,0 +1,42 @@
+{
+  OClass cls;
+  if (dbType == DB_TYPE.DOCUMENT) {
+    final ODatabaseDocumentTx documentDatabase=pipeline.getDocumentDatabase();
+    if (documentDatabase.getMetadata().getSchema().existsClass(iClassName))     cls=documentDatabase.getMetadata().getSchema().getClass(iClassName);
+ else {
+      if (iSuperClass != null) {
+        final OClass superClass=documentDatabase.getMetadata().getSchema().getClass(iSuperClass);
+        if (superClass == null)         throw new OLoaderException("Cannot find super class '" + iSuperClass + "'");
+        cls=documentDatabase.getMetadata().getSchema().createClass(iClassName,superClass);
+        log("- OrientDBLoader: created class '%s' extends '%s'",iClassName,iSuperClass);
+      }
+ else {
+        cls=documentDatabase.getMetadata().getSchema().createClass(iClassName);
+        log("- OrientDBLoader: created class '%s'",iClassName);
+      }
+    }
+  }
+ else {
+    final OrientBaseGraph graphDatabase=pipeline.getGraphDatabase();
+    cls=graphDatabase.getVertexType(iClassName);
+    if (cls == null) {
+      if (iSuperClass != null) {
+        final OClass superClass=graphDatabase.getRawGraph().getMetadata().getSchema().getClass(iSuperClass);
+        if (superClass == null)         throw new OLoaderException("Cannot find super class '" + iSuperClass + "'");
+        if (graphDatabase.getVertexBaseType().isSuperClassOf(superClass)) {
+          cls=graphDatabase.createVertexType(iClassName,superClass);
+          log("- OrientDBLoader: created vertex class '%s' extends '%s'",iClassName,iSuperClass);
+        }
+ else {
+          cls=graphDatabase.createEdgeType(iClassName,superClass);
+          log("- OrientDBLoader: created edge class '%s' extends '%s'",iClassName,iSuperClass);
+        }
+      }
+ else {
+        cls=graphDatabase.createVertexType(iClassName);
+        log("- OrientDBLoader: created vertex class '%s'",iClassName);
+      }
+    }
+  }
+  return cls;
+}

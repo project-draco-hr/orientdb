@@ -1,41 +1,28 @@
 {
-  if (db == null)   db=pipeline.getDocumentDatabase();
   Object joinRuntimeValue=null;
   if (joinFieldName != null)   joinRuntimeValue=((ODocument)input).field(joinFieldName);
  else   if (joinValue != null)   joinRuntimeValue=resolve(joinValue);
-  if (joinRuntimeValue != null) {
-    Object result=null;
-    if (sqlQuery == null && index == null) {
-      if (lookup.toUpperCase().startsWith("SELECT"))       sqlQuery=new OSQLSynchQuery<ODocument>(lookup);
- else       index=db.getMetadata().getIndexManager().getIndex(lookup);
-    }
-    if (sqlQuery != null)     result=db.query(sqlQuery,joinRuntimeValue);
- else {
-      final OType idxFieldType=index.getDefinition().getTypes()[0];
-      joinRuntimeValue=idxFieldType.convert(joinRuntimeValue,idxFieldType.getDefaultJavaType());
-      result=index.get(joinRuntimeValue);
-    }
-    if (result != null) {
-      if (linkFieldType != null) {
-        if (linkFieldType == OType.LINK) {
-          if (result instanceof Collection<?>) {
-            if (!((Collection)result).isEmpty())             result=((Collection)result).iterator().next();
- else             result=null;
-          }
+  Object result=lookup(joinRuntimeValue);
+  if (result != null) {
+    if (linkFieldType != null) {
+      if (linkFieldType == OType.LINK) {
+        if (result instanceof Collection<?>) {
+          if (!((Collection)result).isEmpty())           result=((Collection)result).iterator().next();
+ else           result=null;
         }
- else         if (linkFieldType == OType.LINKSET) {
-          if (!(result instanceof Collection)) {
-            final Set<OIdentifiable> res=new HashSet<OIdentifiable>();
-            res.add((OIdentifiable)result);
-            result=res;
-          }
+      }
+ else       if (linkFieldType == OType.LINKSET) {
+        if (!(result instanceof Collection)) {
+          final Set<OIdentifiable> res=new HashSet<OIdentifiable>();
+          res.add((OIdentifiable)result);
+          result=res;
         }
- else         if (linkFieldType == OType.LINKLIST) {
-          if (!(result instanceof Collection)) {
-            final List<OIdentifiable> res=new ArrayList<OIdentifiable>();
-            res.add((OIdentifiable)result);
-            result=res;
-          }
+      }
+ else       if (linkFieldType == OType.LINKLIST) {
+        if (!(result instanceof Collection)) {
+          final List<OIdentifiable> res=new ArrayList<OIdentifiable>();
+          res.add((OIdentifiable)result);
+          result=res;
         }
       }
     }
@@ -65,7 +52,7 @@ case HALT:
 throw new OETLProcessHaltedException("[Link transformer] Cannot resolve join for value '" + joinRuntimeValue + "'");
 }
 }
- else ((ODocument)input).field(linkFieldName,result);
 }
+((ODocument)input).field(linkFieldName,result);
 return input;
 }

@@ -1,8 +1,20 @@
 {
-  for (  OTransformer t : transformers) {
-    current=t.transform(current);
-    if (current == null)     break;
+  int retry=0;
+  do {
+    try {
+      Object current=source;
+      for (      OTransformer t : transformers) {
+        current=t.transform(current);
+        if (current == null)         break;
+      }
+      if (current != null)       loader.load(current,context);
+      return current;
+    }
+ catch (    ONeedRetryException e) {
+      retry++;
+      processor.out(true,"Error in pipeline execution, retry = %d/%d",retry,maxRetries);
+    }
   }
-  if (current != null)   loader.load(current,context);
+ while (retry < maxRetries);
   return this;
 }

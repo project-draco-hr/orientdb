@@ -1,11 +1,13 @@
 {
   boolean removeColdPages=false;
   OCacheEntry cacheEntry=null;
+  Lock fileLock;
+  Lock pageLock;
   cacheLock.readLock().lock();
   try {
-    fileLockManager.acquireLock(this,fileId,OLockManager.LOCK.SHARED);
+    fileLock=fileLockManager.acquireSharedLock(fileId);
     try {
-      pageLockManager.acquireLock(this,new PageKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+      pageLock=pageLockManager.acquireExclusiveLock(new PageKey(fileId,pageIndex));
       try {
         if (checkPinnedPages)         cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
         if (cacheEntry == null) {
@@ -16,11 +18,11 @@
         cacheEntry.usagesCount++;
       }
   finally {
-        pageLockManager.releaseLock(this,new PageKey(fileId,pageIndex),OLockManager.LOCK.EXCLUSIVE);
+        pageLockManager.releaseLock(pageLock);
       }
     }
   finally {
-      fileLockManager.releaseLock(this,fileId,OLockManager.LOCK.SHARED);
+      fileLockManager.releaseLock(fileLock);
     }
   }
   finally {

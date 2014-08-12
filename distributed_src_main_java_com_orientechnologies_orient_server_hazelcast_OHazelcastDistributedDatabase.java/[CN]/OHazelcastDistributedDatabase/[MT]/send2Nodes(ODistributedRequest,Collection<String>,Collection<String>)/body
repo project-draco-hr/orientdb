@@ -35,12 +35,12 @@
  else   groupByResponse=true;
   final boolean waitLocalNode=waitForLocalNode(cfg,iClusterNames,iNodes);
   final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize),groupByResponse);
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sending request %s",iRequest);
   final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
   try {
     requestLock.lock();
     try {
       iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sending request %s",iRequest);
       msgService.registerRequest(iRequest.getId(),currentResponseMgr);
       for (      IQueue<ODistributedRequest> queue : reqQueues) {
         if (queue != null)         queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
@@ -49,11 +49,11 @@
   finally {
       requestLock.unlock();
     }
-    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sent request %s",iRequest.getTask());
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sent request %d (%s)",iRequest.getId(),iRequest.getTask());
     Orient.instance().getProfiler().updateCounter("distributed.db." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.db.*.msgSent");
     return waitForResponse(iRequest,currentResponseMgr);
   }
  catch (  Throwable e) {
-    throw new ODistributedException("Error on sending distributed request against database '" + databaseName + (iClusterNames != null ? "." + iClusterNames : "")+ "' to nodes "+ iNodes,e);
+    throw new ODistributedException("Error on sending distributed request " + iRequest.getId() + " against database '"+ databaseName+ (iClusterNames != null ? "." + iClusterNames : "")+ "' to nodes "+ iNodes,e);
   }
 }

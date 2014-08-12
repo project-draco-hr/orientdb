@@ -1,14 +1,14 @@
 {
   final String executorNode=response.getExecutorNodeName();
-  if (!responses.containsKey(executorNode)) {
-    ODistributedServerLog.warn(this,response.getSenderNodeName(),executorNode,DIRECTION.IN,"received response for request %s from unexpected node. Expected are: %s",request,getExpectedNodes());
-    Orient.instance().getProfiler().updateCounter("distributed.node.unexpectedNodeResponse","Number of responses from unexpected nodes",+1);
-    return false;
-  }
-  Orient.instance().getProfiler().stopChrono("distributed.node.latency","Latency of distributed messages",sentOn,"distributed.node.latency");
-  Orient.instance().getProfiler().stopChrono("distributed.node." + executorNode + ".latency","Latency of distributed messages per node",sentOn,"distributed.node.*.latency");
-  boolean completed=false;
-synchronized (responseGroups) {
+synchronized (responseLock) {
+    if (!responses.containsKey(executorNode)) {
+      ODistributedServerLog.warn(this,response.getSenderNodeName(),executorNode,DIRECTION.IN,"received response for request %s from unexpected node. Expected are: %s",request,getExpectedNodes());
+      Orient.instance().getProfiler().updateCounter("distributed.node.unexpectedNodeResponse","Number of responses from unexpected nodes",+1);
+      return false;
+    }
+    Orient.instance().getProfiler().stopChrono("distributed.node.latency","Latency of distributed messages",sentOn,"distributed.node.latency");
+    Orient.instance().getProfiler().stopChrono("distributed.node." + executorNode + ".latency","Latency of distributed messages per node",sentOn,"distributed.node.*.latency");
+    boolean completed=false;
     responses.put(executorNode,response);
     receivedResponses++;
     if (waitForLocalNode && response.isExecutedOnLocalNode())     receivedCurrentNode=true;
@@ -41,6 +41,6 @@ synchronized (responseGroups) {
         }
       }
     }
+    return completed;
   }
-  return completed;
 }

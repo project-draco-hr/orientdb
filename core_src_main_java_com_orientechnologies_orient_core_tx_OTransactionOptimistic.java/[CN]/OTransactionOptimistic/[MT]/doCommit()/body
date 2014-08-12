@@ -1,14 +1,14 @@
 {
   if (status == TXSTATUS.ROLLED_BACK || status == TXSTATUS.ROLLBACKING)   throw new ORollbackException("Given transaction was rolled back and can not be used.");
   status=TXSTATUS.COMMITTING;
-  if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED && !(database.getStorage() instanceof OStorageEmbedded))   database.getStorage().commit(this,null);
+  if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED && !(database.getStorage().getUnderlying() instanceof OStorageEmbedded))   database.getStorage().commit(this,null);
  else {
     List<OIndexAbstract<?>> lockedIndexes=acquireIndexLocks();
     try {
       final Map<String,OIndex<?>> indexes=new HashMap<String,OIndex<?>>();
       for (      OIndex<?> index : database.getMetadata().getIndexManager().getIndexes())       indexes.put(index.getName(),index);
       final Runnable callback=new CommitIndexesCallback(indexes);
-      final String storageType=database.getStorage().getType();
+      final String storageType=database.getStorage().getUnderlying().getType();
       if (storageType.equals(OEngineLocalPaginated.NAME) || storageType.equals(OEngineMemory.NAME))       database.getStorage().commit(OTransactionOptimistic.this,callback);
  else {
         database.getStorage().callInLock(new Callable<Object>(){

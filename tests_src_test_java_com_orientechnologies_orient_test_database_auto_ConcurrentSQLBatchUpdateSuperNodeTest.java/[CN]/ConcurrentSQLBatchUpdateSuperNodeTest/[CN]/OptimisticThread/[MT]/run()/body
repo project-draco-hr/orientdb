@@ -1,4 +1,5 @@
 {
+  final OrientGraphNoTx graph=new OrientGraphNoTx(url);
   try {
     String cmd="";
     for (int i=0; i < OPTIMISTIC_CYCLES; ++i) {
@@ -8,10 +9,20 @@
       cmd+="commit retry " + MAX_RETRIES + ";";
       cmd+="return $transactionRetries;";
       final OCommandRequest command=graph.command(new OCommandScript("sql",cmd));
-      int retries=(Integer)command.execute();
-      counter.incrementAndGet();
-      totalRetries.addAndGet(retries);
+      final Object res=command.execute();
+      if (res instanceof Integer) {
+        int retries=(Integer)res;
+        counter.incrementAndGet();
+        totalRetries.addAndGet(retries);
+      }
+ else       if (res instanceof OrientDynaElementIterable) {
+        System.out.println("RETURNED ITER");
+        OrientDynaElementIterable it=(OrientDynaElementIterable)res;
+        for (        Object o : it)         System.out.println("RETURNED: " + o);
+      }
     }
+    System.out.println("Thread " + threadId + " completed");
+    graph.shutdown();
   }
  catch (  Throwable e) {
     e.printStackTrace();

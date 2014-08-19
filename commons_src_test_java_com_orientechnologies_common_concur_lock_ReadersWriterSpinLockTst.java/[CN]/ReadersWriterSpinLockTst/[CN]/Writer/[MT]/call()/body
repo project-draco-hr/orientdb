@@ -1,0 +1,42 @@
+{
+  latch.await();
+  try {
+    while (!stop) {
+      spinLock.acquireWriteLock();
+      try {
+        spinLock.acquireWriteLock();
+        try {
+          spinLock.acquireReadLock();
+          try {
+            writers.incrementAndGet();
+            writersCounter.incrementAndGet();
+            Assert.assertEquals(readersCounter.get(),0);
+            long rCounter=readersCounter.get();
+            long wCounter=writersCounter.get();
+            Assert.assertEquals(rCounter,0);
+            Assert.assertEquals(wCounter,1);
+            consumeCPU(1000);
+            Assert.assertEquals(rCounter,readersCounter.get());
+            Assert.assertEquals(wCounter,writersCounter.get());
+            writersCounter.decrementAndGet();
+          }
+  finally {
+            spinLock.releaseReadLock();
+          }
+        }
+  finally {
+          spinLock.releaseWriteLock();
+        }
+      }
+  finally {
+        spinLock.releaseWriteLock();
+      }
+      consumeCPU(1000);
+    }
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw new RuntimeException(e);
+  }
+  return null;
+}

@@ -1,0 +1,50 @@
+{
+  final Object out;
+  Object found=iFromVertex.field(iFieldName);
+  final OClass linkClass=iFromVertex.getSchemaClass();
+  if (linkClass == null)   throw new IllegalArgumentException("Class ot found in source vertex: " + iFromVertex);
+  final OProperty prop=linkClass.getProperty(iFieldName);
+  final OType propType=prop != null && prop.getType() != OType.ANY ? prop.getType() : null;
+  if (found == null) {
+    if (iGraph.isAutoScaleEdgeType() && (prop == null || propType == OType.LINK || "true".equalsIgnoreCase(prop.getCustom("ordered")))) {
+      out=iTo;
+    }
+ else     if (propType == OType.LINKLIST || (prop != null && "true".equalsIgnoreCase(prop.getCustom("ordered")))) {
+      final Collection coll=new OTrackedList<Object>(iFromVertex);
+      coll.add(iTo);
+      out=coll;
+    }
+ else     if (propType == null || propType == OType.LINKBAG) {
+      final ORidBag bag=new ORidBag(iGraph.getEdgeContainerEmbedded2TreeThreshold(),iGraph.getEdgeContainerEmbedded2TreeThreshold());
+      bag.add(iTo);
+      out=bag;
+    }
+ else     throw new IllegalStateException("Type of field provided in schema '" + prop.getType() + " can not be used for link creation.");
+  }
+ else   if (found instanceof OIdentifiable) {
+    if (prop != null && propType == OType.LINK)     throw new IllegalStateException("Type of field provided in schema '" + prop.getType() + " can not be used for creation to hold several links.");
+    if (prop != null && "true".equalsIgnoreCase(prop.getCustom("ordered"))) {
+      final Collection coll=new OTrackedList<Object>(iFromVertex);
+      coll.add(found);
+      coll.add(iTo);
+      out=coll;
+    }
+ else {
+      final ORidBag bag=new ORidBag(iGraph.getEdgeContainerEmbedded2TreeThreshold(),iGraph.getEdgeContainerEmbedded2TreeThreshold());
+      bag.add((OIdentifiable)found);
+      bag.add(iTo);
+      out=bag;
+    }
+  }
+ else   if (found instanceof ORidBag) {
+    out=null;
+    ((ORidBag)found).add(iTo);
+  }
+ else   if (found instanceof Collection<?>) {
+    out=null;
+    ((Collection<Object>)found).add(iTo);
+  }
+ else   throw new IllegalStateException("Relationship content is invalid on field " + iFieldName + ". Found: "+ found);
+  if (out != null)   iFromVertex.field(iFieldName,out);
+  return out;
+}

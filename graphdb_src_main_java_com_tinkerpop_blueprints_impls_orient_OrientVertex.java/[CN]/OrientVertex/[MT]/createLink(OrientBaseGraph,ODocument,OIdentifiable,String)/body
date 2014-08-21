@@ -4,22 +4,25 @@
   final OClass linkClass=iFromVertex.getSchemaClass();
   if (linkClass == null)   throw new IllegalArgumentException("Class ot found in source vertex: " + iFromVertex);
   final OProperty prop=linkClass.getProperty(iFieldName);
+  final OType propType=prop != null && prop.getType() != OType.ANY ? prop.getType() : null;
   if (found == null) {
-    if (prop == null || prop.getType().equals(OType.LINK) || "true".equalsIgnoreCase(prop.getCustom("ordered")))     out=iTo;
- else     if (prop.getType().equals(OType.LINKBAG)) {
-      final ORidBag bag=new ORidBag();
-      bag.add(iTo);
-      out=bag;
+    if (iGraph.isAutoScaleEdgeType() && (prop == null || propType == OType.LINK || "true".equalsIgnoreCase(prop.getCustom("ordered")))) {
+      out=iTo;
     }
- else     if (prop.getType().equals(OType.LINKLIST)) {
+ else     if (propType == OType.LINKLIST || (prop != null && "true".equalsIgnoreCase(prop.getCustom("ordered")))) {
       final Collection coll=new OTrackedList<Object>(iFromVertex);
       coll.add(iTo);
       out=coll;
     }
+ else     if (propType == null || propType == OType.LINKBAG) {
+      final ORidBag bag=new ORidBag(iGraph.getEdgeContainerEmbedded2TreeThreshold(),iGraph.getEdgeContainerEmbedded2TreeThreshold());
+      bag.add(iTo);
+      out=bag;
+    }
  else     throw new IllegalStateException("Type of field provided in schema '" + prop.getType() + " can not be used for link creation.");
   }
  else   if (found instanceof OIdentifiable) {
-    if (prop != null && prop.getType().equals(OType.LINK))     throw new IllegalStateException("Type of field provided in schema '" + prop.getType() + " can not be used for creation to hold several links.");
+    if (prop != null && propType == OType.LINK)     throw new IllegalStateException("Type of field provided in schema '" + prop.getType() + " can not be used for creation to hold several links.");
     if (prop != null && "true".equalsIgnoreCase(prop.getCustom("ordered"))) {
       final Collection coll=new OTrackedList<Object>(iFromVertex);
       coll.add(found);
@@ -27,7 +30,7 @@
       out=coll;
     }
  else {
-      final ORidBag bag=new ORidBag();
+      final ORidBag bag=new ORidBag(iGraph.getEdgeContainerEmbedded2TreeThreshold(),iGraph.getEdgeContainerEmbedded2TreeThreshold());
       bag.add((OIdentifiable)found);
       bag.add(iTo);
       out=bag;

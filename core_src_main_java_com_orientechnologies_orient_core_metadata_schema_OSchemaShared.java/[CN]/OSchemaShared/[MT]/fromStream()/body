@@ -7,18 +7,20 @@
       OLogManager.instance().error(this,"Database's schema is empty! Recreating the system classes and allow the opening of the database but double check the integrity of the database");
       return;
     }
- else     if (schemaVersion != CURRENT_VERSION_NUMBER) {
+ else     if (schemaVersion != CURRENT_VERSION_NUMBER && VERSION_NUMBER_V4 != schemaVersion) {
       throw new OConfigurationException("Database schema is different. Please export your old database with the previous version of OrientDB and reimport it using the current one.");
     }
     properties.clear();
     propertiesByNameType.clear();
     List<ODocument> globalProperties=document.field("globalProperties");
-    for (    ODocument oDocument : globalProperties) {
-      OGlobalPropertyImpl prop=new OGlobalPropertyImpl();
-      prop.fromDocument(oDocument);
-      ensurePropertiesSize(prop.getId());
-      properties.set(prop.getId(),prop);
-      propertiesByNameType.put(prop.getName() + "|" + prop.getType().name(),prop);
+    if (globalProperties != null) {
+      for (      ODocument oDocument : globalProperties) {
+        OGlobalPropertyImpl prop=new OGlobalPropertyImpl();
+        prop.fromDocument(oDocument);
+        ensurePropertiesSize(prop.getId());
+        properties.set(prop.getId(),prop);
+        propertiesByNameType.put(prop.getName() + "|" + prop.getType().name(),prop);
+      }
     }
     clustersToClasses.clear();
     final Map<String,OClass> newClasses=new HashMap<String,OClass>();
@@ -47,6 +49,9 @@
         if (superClass == null)         throw new OConfigurationException("Super class '" + superClassName + "' was declared in class '"+ cls.getName()+ "' but was not found in schema. Remove the dependency or create the class to continue.");
         cls.setSuperClassInternal(superClass);
       }
+    }
+    if (schemaVersion == VERSION_NUMBER_V4) {
+      if (getDatabase().getStorage().getUnderlying() instanceof OStorageEmbedded)       saveInternal();
     }
   }
   finally {

@@ -3,7 +3,10 @@
   if (propertyName == null || propertyName.length() == 0)   throw new OSchemaException("Property name is null or empty");
   if (Character.isDigit(propertyName.charAt(0)))   throw new OSchemaException("Found invalid property name. Cannot start with numbers");
   if (getDatabase().getTransaction().isActive())   throw new OSchemaException("Cannot create a new property inside a transaction");
-  getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
+  final ODatabaseRecord database=getDatabase();
+  database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_UPDATE);
+  checkPersistentPropertyType(database,propertyName,type);
+  OProperty property=null;
   acquireSchemaWriteLock();
   try {
     final StringBuilder cmd=new StringBuilder("create property ");
@@ -20,7 +23,6 @@
       cmd.append(' ');
       cmd.append(linkedClass.getName());
     }
-    final ODatabaseRecord database=getDatabase();
     final OStorage storage=database.getStorage();
     if (storage instanceof OStorageProxy) {
       database.command(new OCommandSQL(cmd.toString())).execute();
@@ -31,11 +33,13 @@
       final OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
       database.command(commandSQL).execute();
-      return addPropertyInternal(propertyName,type,linkedType,linkedClass);
+      property=addPropertyInternal(propertyName,type,linkedType,linkedClass);
     }
- else     return addPropertyInternal(propertyName,type,linkedType,linkedClass);
+ else     property=addPropertyInternal(propertyName,type,linkedType,linkedClass);
   }
   finally {
     releaseSchemaWriteLock();
   }
+  if (property != null)   fireDatabaseMigration(database,propertyName,type);
+  return property;
 }

@@ -2,11 +2,20 @@
   if (document.getClassName() != null)   writeString(bytes,document.getClassName());
  else   writeEmptyString(bytes);
   int[] pos=new int[document.fields()];
+  OProperty[] properties=new OProperty[document.fields()];
   int i=0;
   Entry<String,?> values[]=new Entry[document.fields()];
   for (  Entry<String,Object> entry : document) {
-    writeString(bytes,entry.getKey());
-    pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE + 1);
+    properties[i]=getSchemaProperty(document,entry.getKey());
+    if (properties[i] != null) {
+      OVarIntSerializer.write(bytes,(properties[i].getId() + 1) * -1);
+      if (properties[i].getType() != OType.ANY)       pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE);
+ else       pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE + 1);
+    }
+ else {
+      writeString(bytes,entry.getKey());
+      pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE + 1);
+    }
     values[i]=entry;
     i++;
   }
@@ -19,7 +28,7 @@
       if (type == null)       continue;
       pointer=writeSingleValue(bytes,value,type,getLinkedType(document,type,values[i].getKey()));
       OIntegerSerializer.INSTANCE.serialize(pointer,bytes.bytes,pos[i]);
-      writeOType(bytes,(pos[i] + OIntegerSerializer.INT_SIZE),type);
+      if (properties[i] == null || properties[i].getType() == OType.ANY)       writeOType(bytes,(pos[i] + OIntegerSerializer.INT_SIZE),type);
     }
   }
 }

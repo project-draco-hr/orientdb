@@ -1,7 +1,7 @@
 {
   try {
     begin();
-    out(true,"Started parallel execution with %d threads",threads.length);
+    out(LOG_LEVELS.INFO,"Started parallel execution with %d threads",threads.length);
     if (source != null) {
       final Reader reader=source.read();
       if (reader != null)       extractor.extract(reader);
@@ -25,7 +25,7 @@
     for (int i=0; i < threads.length; ++i) {
       threads[i]=new Thread(new Runnable(){
         @Override public void run(){
-          final OETLPipeline pipeline=new OETLPipeline(processor,transformers,loader,verbose,maxRetries);
+          final OETLPipeline pipeline=new OETLPipeline(processor,transformers,loader,logLevel,maxRetries);
           pipeline.begin();
           while (!extractionFinished.get() || counter.get() > 0) {
             try {
@@ -47,14 +47,13 @@
       threads[i].start();
     }
     while (extractor.hasNext()) {
-      final Object payload=extractor.next();
-      final OExtractedItem current=new OExtractedItem(extractor.getProgress(),payload);
+      final OExtractedItem current=extractor.next();
       queue.offer(current);
       counter.incrementAndGet();
     }
     extractionFinished.set(true);
     while (counter.get() > 0) {
-      out(true,"Waiting for the pipeline to finish, remaining " + counter.get() + " entries to process");
+      out(LOG_LEVELS.INFO,"Waiting for the pipeline to finish, remaining " + counter.get() + " entries to process");
       try {
         Thread.sleep(500);
       }
@@ -64,6 +63,6 @@
     end();
   }
  catch (  OETLProcessHaltedException e) {
-    out(false,"ETL process halted: " + e);
+    out(LOG_LEVELS.ERROR,"ETL process halted: " + e);
   }
 }

@@ -3,6 +3,7 @@
   if (joinFieldName != null)   joinRuntimeValue=((ODocument)input).field(joinFieldName);
  else   if (joinValue != null)   joinRuntimeValue=resolve(joinValue);
   Object result=lookup(joinRuntimeValue);
+  log(OETLProcessor.LOG_LEVELS.DEBUG,"joinRuntimeValue=%s, lookupResult=%s",joinRuntimeValue,result);
   if (result != null) {
     if (linkFieldType != null) {
       if (linkFieldType == OType.LINK) {
@@ -34,17 +35,18 @@ case CREATE:
           final ODocument linkedDoc=new ODocument(lookupParts[0]);
           linkedDoc.field(lookupParts[1],joinRuntimeValue);
           linkedDoc.save();
+          log(OETLProcessor.LOG_LEVELS.DEBUG,"created new document=%s",linkedDoc.getRecord());
           result=linkedDoc;
         }
  else         throw new OConfigurationException("Cannot create linked document because target class is unknown. Use 'lookup' field");
       break;
 case ERROR:
     processor.getStats().incrementErrors();
-  log("%s: ERROR Cannot resolve join for value '%s'",getName(),joinRuntimeValue);
+  log(OETLProcessor.LOG_LEVELS.ERROR,"%s: ERROR Cannot resolve join for value '%s'",getName(),joinRuntimeValue);
 break;
 case WARNING:
 processor.getStats().incrementWarnings();
-log("%s: WARN Cannot resolve join for value '%s'",getName(),joinRuntimeValue);
+log(OETLProcessor.LOG_LEVELS.INFO,"%s: WARN Cannot resolve join for value '%s'",getName(),joinRuntimeValue);
 break;
 case SKIP:
 return null;
@@ -54,5 +56,6 @@ throw new OETLProcessHaltedException("[Link transformer] Cannot resolve join for
 }
 }
 ((ODocument)input).field(linkFieldName,result);
+log(OETLProcessor.LOG_LEVELS.DEBUG,"set %s=%s in document=%s",linkFieldName,result,input);
 return input;
 }

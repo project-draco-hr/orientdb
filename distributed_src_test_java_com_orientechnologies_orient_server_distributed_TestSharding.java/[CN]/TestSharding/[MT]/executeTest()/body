@@ -1,10 +1,13 @@
 {
   try {
-    OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
-    OrientGraphNoTx graphNoTx=factory.getNoTx();
+    OrientGraphFactory localFactory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
+    OrientGraphNoTx graphNoTx=localFactory.getNoTx();
     try {
       final OrientVertexType clientType=graphNoTx.createVertexType("Client");
-      for (int i=0; i < serverInstance.size(); ++i)       clientType.addCluster("client_" + i);
+      for (int i=1; i < serverInstance.size(); ++i) {
+        final String serverName=serverInstance.get(i).getServerInstance().getDistributedManager().getLocalNodeName();
+        clientType.addCluster("client_" + serverName);
+      }
       graphNoTx.createVertexType("Product");
       graphNoTx.createVertexType("Hobby");
       graphNoTx.createEdgeType("Knows");
@@ -16,49 +19,67 @@
     }
     final OrientVertex product;
     final OrientVertex fishing;
-    OrientBaseGraph graph=factory.getTx();
+    OrientBaseGraph graph=localFactory.getTx();
     try {
       product=graph.addVertex("class:Product");
       fishing=graph.addVertex("class:Hobby");
       fishing.setProperty("name","Fishing");
-      vertices=new OrientVertex[serverInstance.size()];
-      for (int i=0; i < vertices.length; ++i) {
-        vertices[i]=graph.addVertex("class:Client,cluster:client_" + i);
+    }
+  finally {
+      graph.shutdown();
+    }
+    vertices=new OrientVertex[serverInstance.size()];
+    for (int i=0; i < vertices.length; ++i) {
+      final String nodeName=serverInstance.get(i).getServerInstance().getDistributedManager().getLocalNodeName();
+      OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + i + "/databases/"+ getDatabaseName());
+      graph=factory.getNoTx();
+      try {
+        vertices[i]=graph.addVertex("class:Client");
         final int clId=vertices[i].getIdentity().getClusterId();
-        Assert.assertEquals("Error on assigning cluster client_" + i,clId,graph.getRawGraph().getClusterIdByName("client_" + i));
+        if (i == 0)         Assert.assertEquals("Error on assigning cluster client",clId,graph.getRawGraph().getClusterIdByName("client"));
+ else {
+          final int clusterId=graph.getRawGraph().getClusterIdByName("client_" + nodeName);
+          Assert.assertEquals("Error on assigning cluster client_" + nodeName,clId,clusterId);
+        }
         vertices[i].setProperty("name","shard_" + i);
         vertices[i].setProperty("amount",i * 10000);
         System.out.println("Create vertex, class: " + vertices[i].getLabel() + ", cluster: "+ clId+ " -> "+ vertices[i].getRecord());
         if (i > 1)         vertices[i].addEdge("Knows",vertices[i - 1]);
         final Edge edge=vertices[i].addEdge("Buy",product,new Object[]{"price",1000 * i});
       }
-    }
   finally {
-      graph.shutdown();
+        graph.shutdown();
+      }
     }
-    graph=factory.getNoTx();
-    try {
-      for (int i=0; i < vertices.length; ++i)       System.out.println("Created vertex " + i + ": "+ vertices[i].getRecord());
-      for (int i=0; i < vertices.length; ++i) {
+    for (int i=0; i < vertices.length; ++i)     System.out.println("Created vertex " + i + ": "+ vertices[i].getRecord());
+    for (int i=0; i < vertices.length; ++i) {
+      OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + i + "/databases/"+ getDatabaseName());
+      graph=factory.getNoTx();
+      try {
         Iterable<OrientEdge> result=graph.command(new OCommandSQL("create edge Loves from " + vertices[i].getIdentity() + " to "+ fishing.getIdentity()+ " set real = true")).execute();
         Assert.assertTrue(result.iterator().hasNext());
         OrientEdge e=result.iterator().next();
         Assert.assertEquals(e.getProperty("real"),true);
+        final OrientVertex explain=graph.command(new OCommandSQL("explain select from " + e.getIdentity())).execute();
+        System.out.println("explain select from " + e.getIdentity() + " -> "+ ((ODocument)explain.getRecord()).field("servers"));
         result=graph.command(new OCommandSQL("select from " + e.getIdentity())).execute();
         Assert.assertTrue(result.iterator().hasNext());
         OrientEdge e2=result.iterator().next();
         Assert.assertEquals(e2.getProperty("real"),true);
       }
-    }
   finally {
-      graph.shutdown();
+        graph.shutdown();
+      }
     }
     for (int server=0; server < vertices.length; ++server) {
       OrientGraphFactory f=new OrientGraphFactory("plocal:target/server" + server + "/databases/"+ getDatabaseName());
       OrientGraphNoTx g=f.getNoTx();
+      System.out.println("Query from server " + server + "...");
       try {
         for (int cluster=0; cluster < vertices.length; ++cluster) {
           final String query="select from cluster:client_" + cluster;
+          final OrientVertex explain=g.command(new OCommandSQL("explain " + query)).execute();
+          System.out.println("explain " + query + " -> "+ ((ODocument)explain.getRecord()).field("servers"));
           Iterable<OrientVertex> result=g.command(new OCommandSQL(query)).execute();
           Assert.assertTrue("Error on query against 'cluster_" + cluster + "' on server '"+ server+ "': "+ query,result.iterator().hasNext());
           OrientVertex v=result.iterator().next();

@@ -1,0 +1,36 @@
+{
+  boolean executeLastPendingRequest=false;
+  if (task instanceof ODeleteRecordTask) {
+    executeLastPendingRequest=((ODeleteRecordTask)task).getRid().getRecord() != null;
+  }
+ else   if (task instanceof OUpdateRecordTask) {
+    final ORecord<?> rec=((OUpdateRecordTask)task).getRid().getRecord();
+    if (rec == null)     ODistributedServerLog.warn(this,getLocalNodeName(),lastPendingRequest.getSenderNodeName(),DIRECTION.IN,"- cannot update deleted record %s, database could be not aligned",((OUpdateRecordTask)task).getRid());
+ else     executeLastPendingRequest=!rec.getRecordVersion().equals(((OUpdateRecordTask)task).getVersion());
+  }
+ else   if (task instanceof OCreateRecordTask) {
+    executeLastPendingRequest=((OCreateRecordTask)task).getRid().getRecord() == null;
+  }
+ else   if (task instanceof OSQLCommandTask) {
+    if (!task.isIdempotent()) {
+      hotAlignmentError(lastPendingRequest,"Not able to assure last command has been completed before last crash. Command='%s'",((OSQLCommandTask)task).getPayload());
+    }
+  }
+ else   if (task instanceof OResurrectRecordTask) {
+    if (((OResurrectRecordTask)task).getRid().getRecord() == null)     hotAlignmentError(lastPendingRequest,"Not able to resurrect deleted record '%s'",((OResurrectRecordTask)task).getRid());
+  }
+ else   if (task instanceof OTxTask) {
+    for (    OAbstractRemoteTask t : ((OTxTask)task).getTasks()) {
+      executeLastPendingRequest=checkIfOperationHasBeenExecuted(lastPendingRequest,t);
+      if (executeLastPendingRequest)       return true;
+    }
+  }
+ else   if (task instanceof OFixTxTask) {
+    for (    OAbstractRemoteTask t : ((OFixTxTask)task).getTasks()) {
+      executeLastPendingRequest=checkIfOperationHasBeenExecuted(lastPendingRequest,t);
+      if (executeLastPendingRequest)       return true;
+    }
+  }
+ else   hotAlignmentError(lastPendingRequest,"Not able to assure last operation has been completed before last crash. Task='%s'",task);
+  return executeLastPendingRequest;
+}

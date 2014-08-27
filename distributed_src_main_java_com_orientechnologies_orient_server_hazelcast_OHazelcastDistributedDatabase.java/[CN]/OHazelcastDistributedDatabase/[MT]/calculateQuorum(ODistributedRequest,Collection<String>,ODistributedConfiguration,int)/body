@@ -1,0 +1,28 @@
+{
+  if (iAvailableNodes == 0)   throw new ODistributedException("Quorum cannot be reached because there are no nodes available");
+  final String clusterName=clusterNames == null || clusterNames.isEmpty() ? null : clusterNames.iterator().next();
+  int quorum=0;
+  final OAbstractRemoteTask.QUORUM_TYPE quorumType=iRequest.getTask().getQuorumType();
+switch (quorumType) {
+case NONE:
+    break;
+case READ:
+  quorum=cfg.getReadQuorum(clusterName);
+break;
+case WRITE:
+quorum=cfg.getWriteQuorum(clusterName);
+break;
+case ALL:
+quorum=iAvailableNodes;
+break;
+}
+if (quorum > iAvailableNodes) {
+final boolean failureAvailableNodesLessQuorum=cfg.getFailureAvailableNodesLessQuorum(clusterName);
+if (failureAvailableNodesLessQuorum) throw new ODistributedException("Quorum cannot be reached because it is major than available nodes and failureAvailableNodesLessQuorum=true");
+ else {
+ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"quorum less then available nodes, downgrade quorum to %d",iAvailableNodes);
+quorum=iAvailableNodes;
+}
+}
+return quorum;
+}

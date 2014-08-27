@@ -1,0 +1,60 @@
+{
+  final String dbUrl=OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
+  if (dbUrl.startsWith("plocal:")) {
+    final String dbDirectory=serverInstance.getDatabaseDirectory();
+    if (!dbUrl.substring("plocal:".length()).startsWith(dbDirectory))     return;
+  }
+ else   if (dbUrl.startsWith("remote:"))   return;
+synchronized (cachedDatabaseConfiguration) {
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
+    if (cfg == null)     return;
+    if (iDatabase instanceof ODatabaseComplex<?> && !(iDatabase.getStorage() instanceof ODistributedStorage)) {
+      ODistributedStorage storage=storages.get(iDatabase.getURL());
+      if (storage == null) {
+        storage=new ODistributedStorage(serverInstance,(OStorageEmbedded)iDatabase.getStorage());
+        final ODistributedStorage oldStorage=storages.putIfAbsent(iDatabase.getURL(),storage);
+        if (oldStorage != null)         storage=oldStorage;
+      }
+      iDatabase.replaceStorage(storage);
+      final String nodeName=getLocalNodeName();
+      final ODistributedConfiguration dbCfg=getDatabaseConfiguration(iDatabase.getName());
+      final OSchema schema=((ODatabaseComplex)iDatabase).getDatabaseOwner().getMetadata().getSchema();
+      final Set<String> cfgClusterNames=new HashSet<String>();
+      for (      String c : cfg.getClusterNames())       cfgClusterNames.add(c);
+      boolean distribCfgDirty=false;
+      for (      OClass c : schema.getClasses()) {
+        ((OClassImpl)c).setClusterSelectionInternal(new OLocalClusterStrategy(this,iDatabase.getName(),c));
+        if (!c.isAbstract()) {
+          final int[] clusterIds=c.getClusterIds();
+          final List<String> clusterNames=new ArrayList<String>(clusterIds.length);
+          for (          int clusterId : clusterIds)           clusterNames.add(iDatabase.getClusterNameById(clusterId));
+          String bestCluster=cfg.getLocalCluster(clusterNames,nodeName);
+          if (bestCluster == null) {
+            distribCfgDirty=true;
+            final String newClusterName=(c.getName() + "_" + getLocalNodeName()).toLowerCase();
+            if (cfgClusterNames.contains(newClusterName)) {
+              OLogManager.instance().warn(this,"class %s, change mastership of cluster '%s' to local node '%s'",c,newClusterName,nodeName);
+              cfg.setMasterServer(newClusterName,nodeName);
+            }
+ else {
+              OLogManager.instance().warn(this,"class %s, creation of new local cluster '%s'",c,newClusterName);
+              OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.DEFAULT);
+              try {
+                c.addCluster(newClusterName);
+              }
+  finally {
+                OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
+              }
+              OLogManager.instance().warn(this,"class %s, set mastership of cluster '%s' to '%s'",c,newClusterName,nodeName);
+              cfg.setMasterServer(newClusterName,nodeName);
+            }
+          }
+        }
+      }
+      if (distribCfgDirty) {
+        OLogManager.instance().warn(this,"Distributed configuration modified");
+        updateCachedDatabaseConfiguration(iDatabase.getName(),cfg.serialize(),true,true);
+      }
+    }
+  }
+}

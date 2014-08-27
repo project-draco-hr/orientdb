@@ -1,0 +1,35 @@
+{
+  final int queuedMsg=requestQueue.size();
+  for (long processedMessages=0; !Thread.interrupted(); processedMessages++) {
+    if (restoringMessages && processedMessages >= queuedMsg) {
+      ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"executed all pending tasks in queue (%d), set restoringMessages=false and database '%s' as online...",queuedMsg,databaseName);
+      restoringMessages=false;
+      break;
+    }
+    String senderNode=null;
+    ODistributedRequest message=null;
+    try {
+      message=readRequest();
+      if (message != null) {
+        senderNode=message.getSenderNodeName();
+        onMessage(message);
+      }
+    }
+ catch (    InterruptedException e) {
+      Thread.interrupted();
+      break;
+    }
+catch (    DistributedObjectDestroyedException e) {
+      Thread.interrupted();
+      break;
+    }
+catch (    HazelcastInstanceNotActiveException e) {
+      Thread.interrupted();
+      break;
+    }
+catch (    Throwable e) {
+      ODistributedServerLog.error(this,getLocalNodeName(),senderNode,DIRECTION.IN,"error on executing distributed request %d: %s",e,message.getId(),message != null ? message.getTask() : "-");
+    }
+  }
+  ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"end of reading requests for database %s",databaseName);
+}

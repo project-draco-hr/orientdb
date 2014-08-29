@@ -7,27 +7,33 @@
  else {
         final OTxTask txTask=new OTxTask();
         final Set<String> involvedClusters=new HashSet<String>();
-        for (        ORecordOperation op : iTx.getCurrentRecordEntries()) {
-          final OAbstractRecordReplicatedTask task;
-          final ORecordInternal<?> record=op.getRecord();
-          final ORecordId rid=(ORecordId)op.record.getIdentity();
+        final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
+        ((OTransactionOptimistic)iTx).setStatus(OTransaction.TXSTATUS.BEGUN);
+        while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
+          for (          ORecordOperation txEntry : iTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
+          iTx.clearRecordEntries();
+          for (          ORecordOperation op : tmpEntries) {
+            final OAbstractRecordReplicatedTask task;
+            final ORecordInternal<?> record=op.getRecord();
+            final ORecordId rid=(ORecordId)op.record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-            task=new OCreateRecordTask(rid,record.toStream(),record.getRecordVersion(),record.getRecordType());
-          break;
+              task=new OCreateRecordTask(rid,record.toStream(),record.getRecordVersion(),record.getRecordType());
+            break;
 case ORecordOperation.UPDATED:
-        final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-      if (previousContent.getResult() == null)       throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-    task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
-  break;
+          final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+        if (previousContent.getResult() == null)         throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+      task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+    break;
 case ORecordOperation.DELETED:
-task=new ODeleteRecordTask(rid,record.getRecordVersion());
+  task=new ODeleteRecordTask(rid,record.getRecordVersion());
 break;
 default :
 continue;
 }
 involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
+}
 }
 final Collection<String> nodes=dbCfg.getServers(involvedClusters);
 final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);

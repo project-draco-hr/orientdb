@@ -1,7 +1,17 @@
 {
   dbUrl=iUrl.replace("jdbc:orient:","");
   info=iInfo;
-  String username=iInfo.getProperty("user","admin");
-  String password=iInfo.getProperty("password","admin");
-  database=OGraphDatabasePool.global().acquire(dbUrl,username,password);
+  final String username=iInfo.getProperty("user","admin");
+  final String password=iInfo.getProperty("password","admin");
+  usePool=Boolean.parseBoolean(iInfo.getProperty("db.usePool","false"));
+  if (usePool) {
+    final int poolMinSize=Integer.parseInt(iInfo.getProperty("db.pool.min","" + OGlobalConfiguration.DB_POOL_MAX));
+    final int poolMaxSize=Integer.parseInt(iInfo.getProperty("db.pool.max","" + OGlobalConfiguration.DB_POOL_MAX));
+    database=ODatabaseDocumentPool.global(poolMinSize,poolMaxSize).acquire(dbUrl,username,password);
+  }
+ else {
+    database=new ODatabaseDocumentTx(dbUrl);
+    database.open(username,password);
+  }
+  status=ODatabase.STATUS.OPEN;
 }

@@ -1,0 +1,29 @@
+{
+  final int tableSize=tables.length >> 1;
+  while (true) {
+    EntryHolder src=tables[entryIndex].get();
+    while (initiator && !src.markedForRelocation) {
+      if (entryIsEmpty(src))       return true;
+      tables[entryIndex].compareAndSet(src,new EntryHolder(src.counter,src.entry,true));
+      src=tables[entryIndex].get();
+    }
+    if (!src.markedForRelocation)     return true;
+    final int destinationIndex=entryIndex < tableSize ? secondSubTableIndex(src.entry.hashCodes,tables.length) : firstSubTableIndex(src.entry.hashCodes,tables.length);
+    final EntryHolder destinationHolder=tables[destinationIndex].get();
+    if (entryIsEmpty(destinationHolder)) {
+      final long newCounter=destinationHolder.counter > src.counter ? destinationHolder.counter + 1 : src.counter + 1;
+      if (src != tables[entryIndex].get())       continue;
+      if (tables[destinationIndex].compareAndSet(destinationHolder,new EntryHolder(newCounter,src.entry,false))) {
+        tables[entryIndex].compareAndSet(src,new EntryHolder(src.counter + 1,null,false));
+        return true;
+      }
+ else       continue;
+    }
+    if (destinationHolder.entry == src.entry) {
+      tables[entryIndex].compareAndSet(src,new EntryHolder(src.counter + 1,null,false));
+      return true;
+    }
+    tables[entryIndex].compareAndSet(src,new EntryHolder(src.counter,src.entry,false));
+    return false;
+  }
+}

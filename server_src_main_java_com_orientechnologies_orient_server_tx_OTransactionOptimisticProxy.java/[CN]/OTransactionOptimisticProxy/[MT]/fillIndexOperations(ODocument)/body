@@ -16,13 +16,21 @@
       final List<ODocument> operations=entry.field("ops");
       if (operations == null)       continue;
       final Object key;
-      final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
       try {
-        if (serializedKey.equals("*"))         key=null;
+        ODocument keyContainer;
+        if (protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_24) {
+          final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
+          if (serializedKey.equals("*"))           keyContainer=null;
  else {
-          final ODocument keyContainer=new ODocument();
-          keyContainer.setLazyLoad(false);
-          ORecordSerializerSchemaAware2CSV.INSTANCE.fromString(serializedKey,keyContainer,null);
+            keyContainer=new ODocument();
+            keyContainer.setLazyLoad(false);
+            ORecordSerializerSchemaAware2CSV.INSTANCE.fromString(serializedKey,keyContainer,null);
+          }
+        }
+ else {
+          keyContainer=entry.field("k");
+        }
+        if (keyContainer != null) {
           final Object storedKey=keyContainer.field("key");
           if (storedKey instanceof List)           key=new OCompositeKey((List<? extends Comparable<?>>)storedKey);
  else           if (Boolean.TRUE.equals(keyContainer.field("binary"))) {
@@ -30,6 +38,7 @@
           }
  else           key=storedKey;
         }
+ else         key=null;
       }
  catch (      IOException ioe) {
         throw new OTransactionException("Error during index changes deserialization. ",ioe);

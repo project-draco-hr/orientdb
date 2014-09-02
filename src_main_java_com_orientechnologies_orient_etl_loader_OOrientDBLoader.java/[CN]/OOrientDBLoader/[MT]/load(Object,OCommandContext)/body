@@ -1,5 +1,52 @@
 {
   if (input == null)   return;
+  if (dbAutoCreateProperties) {
+    if (dbType == DB_TYPE.DOCUMENT) {
+      if (input instanceof ODocument) {
+        final ODocument doc=(ODocument)input;
+        final ODatabaseDocumentTx documentDatabase=pipeline.getDocumentDatabase();
+        final OClass cls;
+        if (className != null)         cls=getOrCreateClass(className,null);
+ else         cls=doc.getSchemaClass();
+        for (        String f : doc.fieldNames()) {
+          final String newName=transformFieldName(f);
+          final String fName=newName != null ? newName : f;
+          OProperty p=cls.getProperty(fName);
+          if (p == null) {
+            final Object fValue=doc.field(f);
+            createProperty(cls,fName,fValue);
+            if (newName != null) {
+              doc.removeField(f);
+              doc.field(newName,fValue);
+            }
+          }
+        }
+      }
+    }
+ else     if (dbType == DB_TYPE.GRAPH) {
+      if (input instanceof OrientElement) {
+        final OrientElement element=(OrientElement)input;
+        final OrientBaseGraph graph=pipeline.getGraphDatabase();
+        final OClass cls;
+        final String clsName=className != null ? className : element.getLabel();
+        if (clsName != null)         cls=getOrCreateClass(clsName,element.getBaseClassName());
+ else         throw new IllegalArgumentException("No class defined on graph element: " + input);
+        for (        String f : element.getPropertyKeys()) {
+          final String newName=transformFieldName(f);
+          final String fName=newName != null ? newName : f;
+          OProperty p=cls.getProperty(fName);
+          if (p == null) {
+            final Object fValue=element.getProperty(f);
+            createProperty(cls,fName,fValue);
+            if (newName != null) {
+              element.removeProperty(f);
+              element.setProperty(newName,fValue);
+            }
+          }
+        }
+      }
+    }
+  }
   if (tx && dbType == DB_TYPE.DOCUMENT) {
     final ODatabaseDocumentTx documentDatabase=pipeline.getDocumentDatabase();
     if (!documentDatabase.getTransaction().isActive())     documentDatabase.begin();

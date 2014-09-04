@@ -6,14 +6,23 @@
     final byte[] paramBuffer=buffer.getAsByteArray();
     final ODocument param=new ODocument();
     param.fromStream(paramBuffer);
-    Map<String,Object> params=param.field("params");
+    Map<Object,Object> params=param.field("params");
     parameters=new HashMap<Object,Object>();
-    for (    Entry<String,Object> p : params.entrySet()) {
-      final Object value;
-      if (p.getValue() instanceof String)       value=ORecordSerializerStringAbstract.getTypeValue((String)p.getValue());
- else       value=p.getValue();
-      if (Character.isDigit(p.getKey().charAt(0)))       parameters.put(Integer.parseInt(p.getKey()),value);
- else       parameters.put(p.getKey(),value);
+    if (params != null) {
+      for (      Entry<Object,Object> p : params.entrySet()) {
+        final Object value;
+        if (p.getValue() instanceof String)         value=ORecordSerializerStringAbstract.getTypeValue((String)p.getValue());
+ else         value=p.getValue();
+        if (p.getKey() instanceof String && Character.isDigit(((String)p.getKey()).charAt(0)))         parameters.put(Integer.parseInt((String)p.getKey()),value);
+ else         parameters.put(p.getKey(),value);
+      }
+    }
+ else {
+      params=param.field("parameters");
+      for (      Entry<Object,Object> p : params.entrySet()) {
+        if (p.getKey() instanceof String && Character.isDigit(((String)p.getKey()).charAt(0)))         parameters.put(Integer.parseInt((String)p.getKey()),p.getValue());
+ else         parameters.put(p.getKey(),p.getValue());
+      }
     }
   }
   final boolean compositeKeyParamsPresent=buffer.getAsBoolean();
@@ -21,12 +30,19 @@
     final byte[] paramBuffer=buffer.getAsByteArray();
     final ODocument param=new ODocument();
     param.fromStream(paramBuffer);
-    final Map<String,Object> compositeKeyParams=param.field("compositeKeyParams");
+    final Map<Object,Object> compositeKeyParams=param.field("compositeKeyParams");
     if (parameters == null)     parameters=new HashMap<Object,Object>();
-    for (    final Entry<String,Object> p : compositeKeyParams.entrySet()) {
-      final Object value=OCompositeKeySerializer.INSTANCE.deserialize(OStringSerializerHelper.getBinaryContent(p.getValue()),0);
-      if (Character.isDigit(p.getKey().charAt(0)))       parameters.put(Integer.parseInt(p.getKey()),value);
- else       parameters.put(p.getKey(),value);
+    for (    final Entry<Object,Object> p : compositeKeyParams.entrySet()) {
+      if (p.getValue() instanceof List) {
+        final OCompositeKey compositeKey=new OCompositeKey((List<?>)p.getValue());
+        if (p.getKey() instanceof String && Character.isDigit(((String)p.getKey()).charAt(0)))         parameters.put(Integer.parseInt((String)p.getKey()),compositeKey);
+ else         parameters.put(p.getKey(),compositeKey);
+      }
+ else {
+        final Object value=OCompositeKeySerializer.INSTANCE.deserialize(OStringSerializerHelper.getBinaryContent(p.getValue()),0);
+        if (p.getKey() instanceof String && Character.isDigit(((String)p.getKey()).charAt(0)))         parameters.put(Integer.parseInt((String)p.getKey()),value);
+ else         parameters.put(p.getKey(),value);
+      }
     }
   }
 }

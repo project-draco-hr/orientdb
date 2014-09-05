@@ -1,10 +1,29 @@
 {
-  final ODatabaseDocumentTx db=getDatabase();
-  db.close();
-  if (pool != null) {
-    pool.close();
+  closePool();
+  pool=new OResourcePool<String,OrientBaseGraph>(iMax,new OResourcePoolListener<String,OrientBaseGraph>(){
+    @Override public OrientBaseGraph createNewResource(    final String iKey,    final Object... iAdditionalArgs){
+      final OrientBaseGraph g;
+      if (transactional)       g=(OrientGraph)new OrientGraph(getDatabase(),user,password){
+        @Override public void shutdown(){
+          release(this);
+        }
+      }
+.configure(settings);
+ else       g=(OrientGraphNoTx)new OrientGraphNoTx(getDatabase(),user,password){
+        @Override public void shutdown(){
+          release(this);
+        }
+      }
+.configure(settings);
+      initGraph(g);
+      return g;
+    }
+    @Override public boolean reuseResource(    final String iKey,    final Object[] iAdditionalArgs,    final OrientBaseGraph iValue){
+      iValue.getContext(true);
+      ODatabaseRecordThreadLocal.INSTANCE.set(iValue.getRawGraph());
+      return true;
+    }
   }
-  pool=new ODatabaseDocumentPool(url,user,password);
-  pool.setup(iMin,iMax);
+);
   return this;
 }

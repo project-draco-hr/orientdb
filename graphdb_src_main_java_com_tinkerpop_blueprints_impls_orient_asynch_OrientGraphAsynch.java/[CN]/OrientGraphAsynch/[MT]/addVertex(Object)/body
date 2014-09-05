@@ -1,14 +1,16 @@
 {
-  final long operationId=beginGraphUpdate();
+  final long operationId=operationStarted.incrementAndGet();
   return new OrientVertexFuture(Orient.instance().getWorkers().submit(new Callable<OrientVertex>(){
     @Override public OrientVertex call() throws Exception {
       final OrientBaseGraph g=acquire();
       try {
-        return g.addVertex(id);
+        final OrientVertex v=g.addVertex(id);
+        if (vertexCache != null)         vertexCache.put(v.getIdentity(),v);
+        return v;
       }
   finally {
-        endGraphUpdate(operationId);
-        release(g);
+        g.shutdown();
+        asynchOperationCompleted();
       }
     }
   }

@@ -1,5 +1,5 @@
 {
-  final long operationId=beginGraphUpdate();
+  final long operationId=operationStarted.incrementAndGet();
   return new OrientEdgeFuture(Orient.instance().getWorkers().submit(new Callable<OrientEdge>(){
     @Override public OrientEdge call() throws Exception {
       final OrientBaseGraph g=acquire();
@@ -13,18 +13,18 @@
             return g.addEdge(id,vOut,vIn,label);
           }
  catch (          Exception e) {
-            if (retry < 20) {
-              OLogManager.instance().debug(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying "+ retry);
-              vOut.getRecord().reload();
-              vIn.getRecord().reload();
+            if (retry < maxRetries) {
+              if (OLogManager.instance().isDebugEnabled())               OLogManager.instance().debug(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ")");
+              vOut.getRecord().reload(null,true);
+              vIn.getRecord().reload(null,true);
             }
  else             throw e;
           }
         }
       }
   finally {
-        endGraphUpdate(operationId);
-        release(g);
+        g.shutdown();
+        asynchOperationCompleted();
       }
     }
   }

@@ -3,19 +3,28 @@
   final Map<String,Object> fieldsToUpdate=new HashMap<String,Object>();
   for (  Map.Entry<String,Object> fieldEntry : _fieldValues.entrySet()) {
     final Object fieldValue=fieldEntry.getValue();
+    if (!(fieldValue instanceof Collection<?>) && !(fieldValue instanceof Map<?,?>))     continue;
+    if (fieldValue instanceof OTrackedMultiValue) {
+      addCollectionChangeListener(fieldEntry.getKey(),(OTrackedMultiValue<Object,Object>)fieldValue);
+      continue;
+    }
     OType fieldType=fieldType(fieldEntry.getKey());
     if (fieldType == null && _clazz != null) {
       final OProperty prop=_clazz.getProperty(fieldEntry.getKey());
       fieldType=prop != null ? prop.getType() : null;
     }
     if (fieldType == null || !(OType.EMBEDDEDLIST.equals(fieldType) || OType.EMBEDDEDMAP.equals(fieldType) || OType.EMBEDDEDSET.equals(fieldType)|| OType.LINKSET.equals(fieldType)|| OType.LINKLIST.equals(fieldType)|| OType.LINKMAP.equals(fieldType)))     continue;
-    if (fieldValue instanceof List && fieldType.equals(OType.EMBEDDEDLIST) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new OTrackedList<Object>(this,(List<?>)fieldValue,null));
- else     if (fieldValue instanceof Set && fieldType.equals(OType.EMBEDDEDSET) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new OTrackedSet<Object>(this,(Set<OIdentifiable>)fieldValue,null));
- else     if (fieldValue instanceof Map && fieldType.equals(OType.EMBEDDEDMAP) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new OTrackedMap<OIdentifiable>(this,(Map<Object,OIdentifiable>)fieldValue,null));
- else     if (fieldValue instanceof Set && fieldType.equals(OType.LINKSET) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new OMVRBTreeRIDSet(this,(Collection<OIdentifiable>)fieldValue));
- else     if (fieldValue instanceof List && fieldType.equals(OType.LINKLIST) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new ORecordLazyList(this,(List<OIdentifiable>)fieldValue));
- else     if (fieldValue instanceof Map && fieldType.equals(OType.LINKMAP) && !(fieldValue instanceof OTrackedMultiValue))     fieldsToUpdate.put(fieldEntry.getKey(),new ORecordLazyMap(this,(Map<Object,OIdentifiable>)fieldValue));
+    Object newValue=null;
+    if (fieldValue instanceof List && fieldType.equals(OType.EMBEDDEDLIST))     newValue=new OTrackedList<Object>(this,(List<?>)fieldValue,null);
+ else     if (fieldValue instanceof Set && fieldType.equals(OType.EMBEDDEDSET))     newValue=new OTrackedSet<Object>(this,(Set<OIdentifiable>)fieldValue,null);
+ else     if (fieldValue instanceof Map && fieldType.equals(OType.EMBEDDEDMAP))     newValue=new OTrackedMap<OIdentifiable>(this,(Map<Object,OIdentifiable>)fieldValue,null);
+ else     if (fieldValue instanceof Set && fieldType.equals(OType.LINKSET))     newValue=new ORecordLazySet(this,(Collection<OIdentifiable>)fieldValue);
+ else     if (fieldValue instanceof List && fieldType.equals(OType.LINKLIST))     newValue=new ORecordLazyList(this,(List<OIdentifiable>)fieldValue);
+ else     if (fieldValue instanceof Map && fieldType.equals(OType.LINKMAP))     newValue=new ORecordLazyMap(this,(Map<Object,OIdentifiable>)fieldValue);
+    if (newValue != null) {
+      addCollectionChangeListener(fieldEntry.getKey(),(OTrackedMultiValue<Object,Object>)newValue);
+      fieldsToUpdate.put(fieldEntry.getKey(),newValue);
+    }
   }
   _fieldValues.putAll(fieldsToUpdate);
-  addAllMultiValueChangeListeners();
 }

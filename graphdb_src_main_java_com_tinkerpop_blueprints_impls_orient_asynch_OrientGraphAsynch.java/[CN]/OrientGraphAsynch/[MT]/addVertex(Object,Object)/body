@@ -5,30 +5,28 @@
       final OrientBaseGraph g=acquire();
       try {
         try {
-          final OrientVertex v=g.addVertex(id,prop);
+          OrientVertex v=getFromCache(id);
+          if (v != null)           return v;
+          v=g.addVertex(id,prop);
+          verticesCreated.incrementAndGet();
           addInCache(id,v);
           return v;
         }
  catch (        ORecordDuplicatedException e) {
           for (int retry=0; ; retry++) {
-            if (OLogManager.instance().isDebugEnabled())             OLogManager.instance().debug(this,"Vertex already created, merge it and retry again (retry=" + retry + "/"+ maxRetries+ ")");
-            boolean modified=false;
+            indexUniqueException.incrementAndGet();
+            OLogManager.instance().warn(this,"Vertex %s already created, merge it and retry again (retry=%d/%d)",id,retry,maxRetries);
             final ODocument existent=e.getRid().getRecord();
-            for (int i=0; i < prop.length; i+=2) {
-              final String pName=prop[i].toString();
-              final Object pValue=prop[i + 1];
-              final Object fieldValue=existent.field(pName);
-              if (fieldValue == null || (!fieldValue.equals(pValue))) {
-                existent.field(pName,fieldValue);
-                modified=true;
-              }
-            }
-            if (modified) {
+            if (mergeRecords(existent,prop)) {
               try {
                 existent.save();
               }
  catch (              ONeedRetryException ex) {
-                if (retry < maxRetries)                 existent.reload(null,true);
+                concurrentException.incrementAndGet();
+                if (retry < maxRetries) {
+                  verticesReloaded.incrementAndGet();
+                  existent.reload(null,true);
+                }
  else                 throw e;
               }
             }

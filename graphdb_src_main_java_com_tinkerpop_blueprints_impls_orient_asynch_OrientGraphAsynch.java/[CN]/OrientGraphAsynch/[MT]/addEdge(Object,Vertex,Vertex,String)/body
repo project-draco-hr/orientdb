@@ -10,15 +10,30 @@
         vIn.attach(g);
         for (int retry=0; ; retry++) {
           try {
-            return g.addEdge(id,vOut,vIn,label);
+            final OrientEdge e=g.addEdge(id,vOut,vIn,label);
+            edgesCreated.incrementAndGet();
+            return e;
           }
- catch (          Exception e) {
+ catch (          OConcurrentModificationException e) {
+            concurrentException.incrementAndGet();
             if (retry < maxRetries) {
-              if (OLogManager.instance().isDebugEnabled())               OLogManager.instance().debug(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ")");
-              vOut.getRecord().reload(null,true);
-              vIn.getRecord().reload(null,true);
+              OLogManager.instance().warn(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ "). Cause: "+ e);
+              if (e.getRid().equals(vOut.getIdentity())) {
+                vOut.reload();
+                addInCache(vOut.getProperty(keyFieldName),vOut);
+              }
+ else {
+                vIn.reload();
+                addInCache(vIn.getProperty(keyFieldName),vIn);
+              }
+              verticesReloaded.incrementAndGet();
             }
  else             throw e;
+          }
+catch (          Exception e) {
+            unknownException.incrementAndGet();
+            OLogManager.instance().warn(this,"Error on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ")");
+            e.printStackTrace();
           }
         }
       }

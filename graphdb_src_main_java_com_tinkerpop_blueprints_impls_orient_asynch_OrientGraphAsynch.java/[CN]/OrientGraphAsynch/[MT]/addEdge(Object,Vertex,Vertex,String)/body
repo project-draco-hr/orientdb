@@ -8,17 +8,31 @@
         OrientVertex vIn=inVertex instanceof OrientVertexFuture ? ((OrientVertexFuture)inVertex).get() : (OrientVertex)inVertex;
         vOut.attach(g);
         vIn.attach(g);
+        boolean reloaded=false;
         for (int retry=0; ; retry++) {
           try {
-            return g.addEdge(id,vOut,vIn,label);
-          }
- catch (          Exception e) {
-            if (retry < maxRetries) {
-              if (OLogManager.instance().isDebugEnabled())               OLogManager.instance().debug(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ")");
-              vOut.getRecord().reload(null,true);
-              vIn.getRecord().reload(null,true);
+            final OrientEdge e=g.addEdge(id,vOut,vIn,label);
+            if (reloaded) {
+              addInCache(vOut.getProperty(keyFieldName),vOut);
+              addInCache(vIn.getProperty(keyFieldName),vIn);
             }
- else             throw e;
+            edgesCreated.incrementAndGet();
+            return e;
+          }
+ catch (          OConcurrentModificationException e) {
+            concurrentException.incrementAndGet();
+            reloadVertices(vOut,vIn,retry,e);
+            reloaded=true;
+          }
+catch (          ORecordDuplicatedException e) {
+            indexUniqueException.incrementAndGet();
+            reloadVertices(vOut,vIn,retry,e);
+            reloaded=true;
+          }
+catch (          Exception e) {
+            unknownException.incrementAndGet();
+            OLogManager.instance().warn(this,"Error on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ")");
+            e.printStackTrace();
           }
         }
       }
@@ -26,6 +40,23 @@
         g.shutdown();
         asynchOperationCompleted();
       }
+    }
+    protected void reloadVertices(    final OrientVertex vOut,    final OrientVertex vIn,    final int retry,    final OException e){
+      if (retry < maxRetries) {
+        if (OLogManager.instance().isDebugEnabled())         OLogManager.instance().debug(this,"Conflict on addEdge(" + id + ","+ outVertex+ ","+ inVertex+ ","+ label+ "), retrying (retry="+ retry+ "/"+ maxRetries+ "). Cause: "+ e);
+        if (e instanceof OConcurrentModificationException) {
+          if (((OConcurrentModificationException)e).getRid().equals(vOut.getIdentity()))           vOut.reload();
+ else           vIn.reload();
+          verticesReloaded.incrementAndGet();
+        }
+ else {
+          vOut.reload();
+          verticesReloaded.incrementAndGet();
+          vIn.reload();
+          verticesReloaded.incrementAndGet();
+        }
+      }
+ else       throw e;
     }
   }
 ));

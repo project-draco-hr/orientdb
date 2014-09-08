@@ -2,15 +2,21 @@
   setDataCommandInfo("RidBag get size");
   OBonsaiCollectionPointer collectionPointer=OCollectionNetworkSerializer.INSTANCE.readCollectionPointer(channel);
   final byte[] changeStream=channel.readBytes();
-  OSBTreeBonsai<OIdentifiable,Integer> tree=connection.database.getSbTreeCollectionManager().loadSBTree(collectionPointer);
-  final Map<OIdentifiable,OSBTreeRidBag.Change> changes=OSBTreeRidBag.ChangeSerializationHelper.INSTANCE.deserializeChanges(changeStream,0);
-  int realSize=tree.getRealBagSize(changes);
-  beginResponse();
+  final OSBTreeCollectionManager sbTreeCollectionManager=connection.database.getSbTreeCollectionManager();
+  final OSBTreeBonsai<OIdentifiable,Integer> tree=sbTreeCollectionManager.loadSBTree(collectionPointer);
   try {
-    sendOk(clientTxId);
-    channel.writeInt(realSize);
+    final Map<OIdentifiable,OSBTreeRidBag.Change> changes=OSBTreeRidBag.ChangeSerializationHelper.INSTANCE.deserializeChanges(changeStream,0);
+    int realSize=tree.getRealBagSize(changes);
+    beginResponse();
+    try {
+      sendOk(clientTxId);
+      channel.writeInt(realSize);
+    }
+  finally {
+      endResponse();
+    }
   }
   finally {
-    endResponse();
+    sbTreeCollectionManager.releaseSBTree(collectionPointer);
   }
 }

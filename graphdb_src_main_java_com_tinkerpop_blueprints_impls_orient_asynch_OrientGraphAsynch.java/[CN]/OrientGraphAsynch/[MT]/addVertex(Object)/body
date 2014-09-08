@@ -1,17 +1,23 @@
 {
-  final long operationId=operationStarted.incrementAndGet();
+  operationStarted.incrementAndGet();
   return new OrientVertexFuture(Orient.instance().getWorkers().submit(new Callable<OrientVertex>(){
     @Override public OrientVertex call() throws Exception {
-      final OrientBaseGraph g=acquire();
+      lockValue(id);
       try {
-        final OrientVertex v=g.addVertex(id);
-        verticesCreated.incrementAndGet();
-        addInCache(id,v);
-        return v;
+        final OrientBaseGraph g=acquire();
+        try {
+          final OrientVertex v=g.addVertex(id);
+          verticesCreated.incrementAndGet();
+          addInCache(id,v);
+          return v;
+        }
+  finally {
+          g.shutdown();
+          asynchOperationCompleted();
+        }
       }
   finally {
-        g.shutdown();
-        asynchOperationCompleted();
+        unlockValue(id);
       }
     }
   }

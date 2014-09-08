@@ -10,34 +10,31 @@
             MERGE_RESULT result=mergeAndSaveRecord(retry,v.getRecord(),prop);
 switch (result) {
 case MERGED:
-              addInCache(id,v);
-            return v;
+              return v;
 case ERROR:
-          throw new ORecordDuplicatedException("Cannot create a new vertices",v.getIdentity());
+            throw new ORecordDuplicatedException("Cannot create a new vertices",v.getIdentity());
 case RETRY:
-        if (retry > maxRetries)         break;
+          if (retry > maxRetries)           break;
+      }
     }
   }
-}
-v=g.addVertex(id,prop);
-verticesCreated.incrementAndGet();
-addInCache(id,v);
-return v;
+  v=g.addVertex(id,prop);
+  verticesCreated.incrementAndGet();
+  return v;
 }
  catch (ORecordDuplicatedException e) {
-System.out.printf("\n*** Vertex already exists key=%d, v=%s",id,e.getRid());
-for (int retry=0; ; retry++) {
-  indexUniqueException.incrementAndGet();
-  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"Vertex %s already created, merge it and retry again (retry=%d/%d)",id,retry,maxRetries);
-  final ODocument existent=e.getRid().getRecord();
-  final MERGE_RESULT result=mergeAndSaveRecord(retry,existent,prop);
+  System.out.printf("\n*** Vertex already exists key=%d, v=%s",id,e.getRid());
+  for (int retry=0; ; retry++) {
+    indexUniqueException.incrementAndGet();
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Vertex %s already created, merge it and retry again (retry=%d/%d)",id,retry,maxRetries);
+    final ODocument existent=e.getRid().getRecord();
+    final MERGE_RESULT result=mergeAndSaveRecord(retry,existent,prop);
 switch (result) {
 case MERGED:
-    OrientVertex v=(OrientVertex)getVertex(existent);
-  addInCache(id,v);
-return v;
+      OrientVertex v=(OrientVertex)getVertex(existent);
+    return v;
 case RETRY:
-break;
+  break;
 case ERROR:
 throw e;
 }

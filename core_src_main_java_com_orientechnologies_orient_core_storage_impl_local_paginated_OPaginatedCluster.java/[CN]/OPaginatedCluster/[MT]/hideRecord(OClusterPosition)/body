@@ -8,12 +8,18 @@
       long pageIndex=positionEntry.getPageIndex();
       if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
       startAtomicOperation();
-      lockTillAtomicOperationCompletes();
-      final OClusterPage.TrackMode trackMode=getTrackMode();
-      updateClusterState(trackMode,-1,0);
-      clusterPositionMap.remove(position);
-      endAtomicOperation(false);
-      return true;
+      try {
+        lockTillAtomicOperationCompletes();
+        final OClusterPage.TrackMode trackMode=getTrackMode();
+        updateClusterState(trackMode,-1,0);
+        clusterPositionMap.remove(position);
+        endAtomicOperation(false);
+        return true;
+      }
+ catch (      Throwable e) {
+        endAtomicOperation(true);
+        throw new OStorageException(null,e);
+      }
     }
   finally {
       releaseExclusiveLock();

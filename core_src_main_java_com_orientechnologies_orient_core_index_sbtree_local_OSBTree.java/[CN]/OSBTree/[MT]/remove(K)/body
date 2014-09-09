@@ -21,7 +21,11 @@
         endAtomicOperation(false);
         return value;
       }
-  finally {
+ catch (      Throwable e) {
+        rollback(transaction);
+        throw new OSBTreeException(e);
+      }
+ finally {
         keyBucketCacheEntry.releaseExclusiveLock();
         diskCache.release(keyBucketCacheEntry);
       }
@@ -29,24 +33,30 @@
  else {
       if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
       startAtomicOperation();
-      V removedValue=null;
-      OCacheEntry nullCacheEntry=diskCache.load(nullBucketFileId,0,false);
-      nullCacheEntry.acquireExclusiveLock();
       try {
-        ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getTrackMode(),valueSerializer,false);
-        OSBTreeValue<V> treeValue=nullBucket.getValue();
-        if (treeValue == null)         return null;
-        removedValue=readValue(treeValue);
-        nullBucket.removeValue();
-        logPageChanges(nullBucket,nullBucketFileId,0,false);
-      }
+        V removedValue=null;
+        OCacheEntry nullCacheEntry=diskCache.load(nullBucketFileId,0,false);
+        nullCacheEntry.acquireExclusiveLock();
+        try {
+          ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getTrackMode(),valueSerializer,false);
+          OSBTreeValue<V> treeValue=nullBucket.getValue();
+          if (treeValue == null)           return null;
+          removedValue=readValue(treeValue);
+          nullBucket.removeValue();
+          logPageChanges(nullBucket,nullBucketFileId,0,false);
+        }
   finally {
-        nullCacheEntry.releaseExclusiveLock();
-        diskCache.release(nullCacheEntry);
+          nullCacheEntry.releaseExclusiveLock();
+          diskCache.release(nullCacheEntry);
+        }
+        if (removedValue != null)         setSize(size() - 1);
+        endAtomicOperation(false);
+        return removedValue;
       }
-      if (removedValue != null)       setSize(size() - 1);
-      endAtomicOperation(false);
-      return removedValue;
+ catch (      Throwable e) {
+        rollback(transaction);
+        throw new OSBTreeException(e);
+      }
     }
   }
  catch (  IOException e) {

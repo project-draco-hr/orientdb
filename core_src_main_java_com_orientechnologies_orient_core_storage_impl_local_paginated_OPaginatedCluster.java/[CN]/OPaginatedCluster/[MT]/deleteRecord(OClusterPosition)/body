@@ -1,5 +1,6 @@
 {
   externalModificationLock.requestModificationLock();
+  boolean operationStarted=false;
   try {
     acquireExclusiveLock();
     try {
@@ -24,6 +25,7 @@
           }
  else           if (removedContentSize == 0) {
             startAtomicOperation();
+            operationStarted=true;
             lockTillAtomicOperationCompletes();
           }
           byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
@@ -47,7 +49,11 @@
       endAtomicOperation(false);
       return true;
     }
-  finally {
+ catch (    Throwable e) {
+      if (operationStarted)       endAtomicOperation(true);
+      throw new OStorageException(null,e);
+    }
+ finally {
       releaseExclusiveLock();
     }
   }

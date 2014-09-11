@@ -5,8 +5,10 @@
     do {
       if (iTimeout <= 0)       acquireReadLock();
  else       if (!getLockRead().tryAcquireLock(iTimeout,TimeUnit.MILLISECONDS))       throw new OTimeoutException("Cannot acquire read lock against channel: " + this);
+      boolean readLock=true;
       if (!isConnected()) {
         releaseReadLock();
+        readLock=false;
         throw new IOException("Channel is closed");
       }
       if (!channelRead) {
@@ -20,6 +22,7 @@
           channelRead=false;
           readCondition.signalAll();
           releaseReadLock();
+          readLock=false;
           throw e;
         }
       }
@@ -28,11 +31,13 @@
         if (debug)         OLogManager.instance().debug(this,"%s - Session %d skip response, it is for %d",socket.getLocalAddress(),iRequesterId,currentSessionId);
         if (iTimeout > 0 && (System.currentTimeMillis() - startClock) > iTimeout) {
           close();
+          readLock=false;
           throw new OTimeoutException("Timeout on reading response from the server " + (socket != null ? socket.getRemoteSocketAddress() : "") + " for the request "+ iRequesterId);
         }
         if (unreadResponse > maxUnreadResponses) {
           if (debug)           OLogManager.instance().info(this,"Unread responses %d > %d, consider the buffer as dirty: clean it",unreadResponse,maxUnreadResponses);
           close();
+          readLock=false;
           throw new IOException("Timeout on reading response");
         }
         readCondition.signalAll();
@@ -47,7 +52,7 @@
         Thread.currentThread().interrupt();
       }
  finally {
-        releaseReadLock();
+        if (readLock)         releaseReadLock();
       }
     }
  while (true);

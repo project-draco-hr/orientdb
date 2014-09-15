@@ -1,0 +1,38 @@
+{
+  final ODocument doc=getRecord();
+  final OrientVertex newVertex=graph.addVertex(iClassName != null ? iClassName : doc.getClassName());
+  for (  String fieldName : doc.fieldNames()) {
+    if (!fieldName.startsWith(CONNECTION_OUT_PREFIX) && !fieldName.startsWith(CONNECTION_IN_PREFIX)) {
+      newVertex.getRecord().field(fieldName,doc.field(fieldName));
+    }
+  }
+  final ORID oldIdentity=getIdentity();
+  final ORID newIdentity=newVertex.getIdentity();
+  final Iterable<Edge> outEdges=getEdges(Direction.OUT);
+  for (  Edge e : outEdges) {
+    final OrientEdge oe=(OrientEdge)e;
+    if (oe.isLightweight()) {
+      final OrientVertex inV=oe.getVertex(Direction.IN);
+      final String inFieldName=OrientVertex.getConnectionFieldName(Direction.IN,oe.getLabel(),graph.isUseVertexFieldsForEdgeLabels());
+      replaceLinks(inV.getRecord(),inFieldName,oldIdentity,newIdentity);
+    }
+ else {
+      oe.vOut=newVertex.getIdentity();
+    }
+  }
+  final Iterable<Edge> inEdges=getEdges(Direction.IN);
+  for (  Edge e : inEdges) {
+    final OrientEdge oe=(OrientEdge)e;
+    if (oe.isLightweight()) {
+      final OrientVertex outV=oe.getVertex(Direction.OUT);
+      final String outFieldName=OrientVertex.getConnectionFieldName(Direction.OUT,oe.getLabel(),graph.isUseVertexFieldsForEdgeLabels());
+      replaceLinks(outV.getRecord(),outFieldName,oldIdentity,newIdentity);
+    }
+ else {
+      oe.vIn=newVertex.getIdentity();
+    }
+  }
+  if (iClusterName != null)   newVertex.save(iClusterName);
+ else   newVertex.save();
+  return newVertex;
+}

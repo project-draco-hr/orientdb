@@ -1,0 +1,32 @@
+{
+  final ODatabaseRecord database=getDatabase();
+  init((OCommandRequestText)iRequest);
+  parserRequiredKeyword("MOVE");
+  parserRequiredKeyword("VERTEX");
+  source=parserRequiredWord(false,"Syntax error"," =><,\r\n");
+  if (source == null)   throw new OCommandSQLParsingException("Cannot find source");
+  parserRequiredKeyword("TO");
+  String temp=parseOptionalWord(true);
+  while (temp != null) {
+    if (temp.startsWith("CLUSTER:")) {
+      if (className != null)       throw new OCommandSQLParsingException("Cannot define multiple sources. Found both cluster and class.");
+      clusterName=temp.substring("CLUSTER:".length());
+      if (database.getClusterIdByName(clusterName) == -1)       throw new OCommandSQLParsingException("Cluster '" + clusterName + "' was not found");
+    }
+ else     if (temp.startsWith("CLASS:")) {
+      if (clusterName != null)       throw new OCommandSQLParsingException("Cannot define multiple sources. Found both cluster and class.");
+      className=temp.substring("CLASS:".length());
+      if (!database.getMetadata().getSchema().existsClass(className))       throw new OCommandSQLParsingException("Class " + className + " was not found");
+    }
+ else     if (temp.equals(KEYWORD_SET)) {
+      fields=new LinkedHashMap<String,Object>();
+      parseSetFields(fields);
+    }
+ else     if (temp.equals(KEYWORD_MERGE)) {
+      merge=parseJSON();
+    }
+    temp=parserOptionalWord(true);
+    if (parserIsEnded())     break;
+  }
+  return this;
+}

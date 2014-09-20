@@ -18,10 +18,10 @@ case ORecordOperation.UPDATED:
   ORecordVersion version=channel.readVersion();
 byte[] bytes=channel.readBytes();
 oNetworkProtocolBinary.fillRecord(rid,bytes,version,entry.getRecord(),database);
-if (protocolVersion >= 23) entry.getRecord().setContentChanged(channel.readBoolean());
+if (protocolVersion >= 23) ORecordInternal.setContentChanged(entry.getRecord(),channel.readBoolean());
 break;
 case ORecordOperation.DELETED:
-entry.getRecord().fill(rid,channel.readVersion(),null,false);
+ORecordInternal.fill(entry.getRecord(),rid,channel.readVersion(),null,false);
 break;
 default :
 throw new OTransactionException("Unrecognized tx command: " + recordStatus);
@@ -33,10 +33,10 @@ final ODocument remoteIndexEntries=new ODocument(channel.readBytes());
 fillIndexOperations(remoteIndexEntries);
 for (Entry<ORID,ORecordOperation> entry : tempEntries.entrySet()) {
 if (entry.getValue().type == ORecordOperation.UPDATED) {
-final ORecordInternal record=entry.getValue().record.getRecord();
-final ORecordInternal loadedRecord=record.getIdentity().copy().getRecord();
+final ORecord record=entry.getValue().record.getRecord();
+final ORecord loadedRecord=record.getIdentity().copy().getRecord();
 if (loadedRecord == null) throw new ORecordNotFoundException(record.getIdentity().toString());
-if (loadedRecord.getRecordType() == ODocument.RECORD_TYPE && loadedRecord.getRecordType() == record.getRecordType()) {
+if (ORecordInternal.getRecordType(loadedRecord) == ODocument.RECORD_TYPE && ORecordInternal.getRecordType(loadedRecord) == ORecordInternal.getRecordType(record)) {
 ((ODocument)loadedRecord).merge((ODocument)record,false,false);
 loadedRecord.getRecordVersion().copyFrom(record.getRecordVersion());
 entry.getValue().record=loadedRecord;
@@ -47,7 +47,7 @@ addRecord(entry.getValue().getRecord(),entry.getValue().type,null);
 }
 tempEntries.clear();
 for (ORecord record : createdRecords.values()) unmarshallRecord(record);
-for (ORecordInternal record : updatedRecords.values()) unmarshallRecord(record);
+for (ORecord record : updatedRecords.values()) unmarshallRecord(record);
 }
  catch (IOException e) {
 rollback();

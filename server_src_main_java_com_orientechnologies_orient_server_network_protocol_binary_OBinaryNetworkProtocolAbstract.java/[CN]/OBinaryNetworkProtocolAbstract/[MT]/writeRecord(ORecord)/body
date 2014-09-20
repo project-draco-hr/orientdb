@@ -1,0 +1,26 @@
+{
+  channel.writeShort((short)0);
+  channel.writeByte(ORecordInternal.getRecordType(iRecord));
+  channel.writeRID(iRecord.getIdentity());
+  channel.writeVersion(iRecord.getRecordVersion());
+  try {
+    final byte[] stream=getRecordBytes(iRecord);
+    int realLength=stream.length;
+    final ODatabaseRecordInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+    if (db != null && db instanceof ODatabaseDocument) {
+      if (db.getSerializer() instanceof ORecordSerializerSchemaAware2CSV) {
+        for (int i=stream.length - 1; i > -1; --i) {
+          if (stream[i] == 32)           --realLength;
+ else           break;
+        }
+      }
+    }
+    channel.writeBytes(stream,realLength);
+  }
+ catch (  Exception e) {
+    channel.writeBytes(null);
+    final String message="Error on unmarshalling record " + iRecord.getIdentity().toString() + " ("+ e+ ")";
+    OLogManager.instance().error(this,message,e);
+    throw new OSerializationException(message,e);
+  }
+}

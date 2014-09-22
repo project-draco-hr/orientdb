@@ -7,6 +7,7 @@
     boolean removed=false;
     for (    final String word : words) {
       acquireExclusiveLock();
+      startStorageAtomicOperation();
       try {
         final Set<OIdentifiable> recs=indexEngine.get(word);
         if (recs != null && !recs.isEmpty()) {
@@ -16,8 +17,13 @@
             removed=true;
           }
         }
+        commitStorageAtomicOperation();
       }
-  finally {
+ catch (      RuntimeException e) {
+        rollbackStorageAtomicOperation();
+        throw new OIndexException("Error during removal of entry by key and value",e);
+      }
+ finally {
         releaseExclusiveLock();
       }
     }

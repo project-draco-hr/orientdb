@@ -7,6 +7,7 @@
     final Set<String> words=splitIntoWords(key.toString());
     for (    final String word : words) {
       acquireExclusiveLock();
+      startStorageAtomicOperation();
       try {
         Set<OIdentifiable> refs;
         refs=indexEngine.get(word);
@@ -21,8 +22,13 @@
         }
         refs.add(iSingleValue);
         indexEngine.put(word,refs);
+        commitStorageAtomicOperation();
       }
-  finally {
+ catch (      RuntimeException e) {
+        rollbackStorageAtomicOperation();
+        throw new OIndexException("Error during put of key - value entry",e);
+      }
+ finally {
         releaseExclusiveLock();
       }
     }

@@ -39,17 +39,11 @@
   final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize),groupByResponse);
   final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
   try {
-    requestLock.lock();
-    try {
-      iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
-      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sending request %s",iRequest);
-      msgService.registerRequest(iRequest.getId(),currentResponseMgr);
-      for (      IQueue<ODistributedRequest> queue : reqQueues) {
-        if (queue != null)         queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
-      }
-    }
-  finally {
-      requestLock.unlock();
+    iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sending request %s",iRequest);
+    msgService.registerRequest(iRequest.getId(),currentResponseMgr);
+    for (    IQueue<ODistributedRequest> queue : reqQueues) {
+      if (queue != null)       queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
     }
     if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sent request %s",iRequest);
     Orient.instance().getProfiler().updateCounter("distributed.db." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.db.*.msgSent");

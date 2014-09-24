@@ -1,25 +1,29 @@
 {
-  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   wrapped.commit(iTx,callback);
- else {
-    try {
-      final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-      if (!dbCfg.isReplicationActive(null,dManager.getLocalNodeName()))       wrapped.commit(iTx,callback);
- else {
-        final OTxTask txTask=new OTxTask();
-        final Set<String> involvedClusters=new HashSet<String>();
-        for (        ORecordOperation op : iTx.getCurrentRecordEntries()) {
-          final OAbstractRecordReplicatedTask task;
-          final ORecord record=op.getRecord();
-          final ORecordId rid=(ORecordId)op.record.getIdentity();
+  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED) {
+    wrapped.commit(iTx,callback);
+    return;
+  }
+  final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+  if (!dbCfg.isReplicationActive(null,dManager.getLocalNodeName())) {
+    wrapped.commit(iTx,callback);
+    return;
+  }
+  try {
+    final OTxTask txTask=new OTxTask();
+    final Set<String> involvedClusters=new HashSet<String>();
+    for (    ORecordOperation op : iTx.getCurrentRecordEntries()) {
+      final OAbstractRecordReplicatedTask task;
+      final ORecord record=op.getRecord();
+      final ORecordId rid=(ORecordId)op.record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-            task=new OCreateRecordTask(rid,record.toStream(),record.getRecordVersion(),ORecordInternal.getRecordType(record));
-          break;
+        task=new OCreateRecordTask(rid,record.toStream(),record.getRecordVersion(),ORecordInternal.getRecordType(record));
+      break;
 case ORecordOperation.UPDATED:
-        final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-      if (previousContent.getResult() == null)       throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-    task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
-  break;
+    final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+  if (previousContent.getResult() == null)   throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+break;
 case ORecordOperation.DELETED:
 task=new ODeleteRecordTask(rid,record.getRecordVersion());
 break;
@@ -30,6 +34,9 @@ involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
 }
 final Set<String> nodes=dbCfg.getServers(involvedClusters);
+Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
+if (executionModeSynch == null) executionModeSynch=Boolean.TRUE;
+if (executionModeSynch && !iTx.hasRecordCreation()) {
 final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
 if (result instanceof List<?>) {
 final List<Object> list=(List<Object>)result;
@@ -58,10 +65,16 @@ throw new OTransactionException("Error on committing distributed transaction",(T
 if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
 throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
 }
+return;
+}
+wrapped.commit(iTx,callback);
+nodes.remove(dManager.getLocalNodeName());
+if (!nodes.isEmpty()) {
+if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
+ else asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask));
 }
 }
  catch (Exception e) {
 handleDistributedException("Cannot route TX operation against distributed node",e);
-}
 }
 }

@@ -1,0 +1,39 @@
+{
+  final HazelcastInstance hz=Hazelcast.newHazelcastInstance();
+  final IQueue<Object> queue=hz.getQueue("test");
+  final long start=System.currentTimeMillis();
+  long lastLap=start;
+  Thread t=new Thread(){
+    long lastLap=start;
+    @Override public void run(){
+      System.out.println((System.currentTimeMillis() - lastLap) + " Start receiving msgs");
+      for (int i=1; i < TOTAL + 1; ++i) {
+        try {
+          Object msg=queue.take();
+          if (i % LAP == 0) {
+            final long lapTime=System.currentTimeMillis() - lastLap;
+            System.out.printf("<- messages %d/%d = %dms (%f msg/sec)\n",i,TOTAL,lapTime,((float)LAP * 1000 / lapTime));
+            lastLap=System.currentTimeMillis();
+          }
+        }
+ catch (        InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+;
+  t.start();
+  System.out.println((System.currentTimeMillis() - lastLap) + " Start sending msgs");
+  for (int i=1; i < TOTAL + 1; ++i) {
+    queue.offer(i);
+    if (i % LAP == 0) {
+      final long lapTime=System.currentTimeMillis() - lastLap;
+      System.out.printf("-> messages %d/%d = %dms (%f msg/sec)\n",i,TOTAL,lapTime,((float)LAP * 1000 / lapTime));
+      lastLap=System.currentTimeMillis();
+    }
+  }
+  System.out.println((System.currentTimeMillis() - start) + " Finished sending msgs");
+  t.join();
+  System.out.println((System.currentTimeMillis() - start) + " Test finished");
+}

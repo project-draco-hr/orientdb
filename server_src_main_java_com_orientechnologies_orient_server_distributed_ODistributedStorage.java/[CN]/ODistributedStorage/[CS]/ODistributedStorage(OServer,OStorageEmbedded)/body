@@ -25,4 +25,23 @@
   }
 ;
   Orient.instance().getTimer().schedule(purgeDeletedRecordsTask,OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong());
+  asynchronousOperationsQueue=new ArrayBlockingQueue<OAsynchDistributedOperation>(10000);
+  asynchWorker=new Thread(){
+    @Override public void run(){
+      while (running) {
+        try {
+          final OAsynchDistributedOperation operation=asynchronousOperationsQueue.take();
+          dManager.sendRequest(operation.getDatabaseName(),operation.getClusterNames(),operation.getNodes(),operation.getTask(),EXECUTION_MODE.NO_RESPONSE);
+        }
+ catch (        InterruptedException e) {
+          Thread.interrupted();
+        }
+catch (        Throwable e) {
+          ODistributedServerLog.error(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.OUT,"Error on executing asynch operation",e);
+        }
+      }
+    }
+  }
+;
+  asynchWorker.start();
 }

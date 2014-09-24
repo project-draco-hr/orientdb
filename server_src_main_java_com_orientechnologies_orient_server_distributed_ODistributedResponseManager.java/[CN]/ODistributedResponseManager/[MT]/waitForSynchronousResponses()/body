@@ -11,8 +11,19 @@
       currentTimeout=synchTimeout - elapsed;
       final long lastClusterChange=dManager.getLastClusterChangeOn();
       if (lastClusterChange > 0 && now - lastClusterChange < (synchTimeout * 2)) {
+        int missingActiveNodes=0;
+synchronized (responseLock) {
+          for (Iterator<Map.Entry<String,Object>> iter=responses.entrySet().iterator(); iter.hasNext(); ) {
+            final Map.Entry<String,Object> curr=iter.next();
+            if (curr.getValue() == NO_RESPONSE)             if (dManager.isNodeAvailable(curr.getKey(),getDatabaseName()))             missingActiveNodes++;
+          }
+        }
+        if (missingActiveNodes == 0) {
+          ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"no more active nodes to wait for request (%s): anticipate timeout (saved %d ms)",request,currentTimeout);
+          break;
+        }
         currentTimeout+=synchTimeout;
-        ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"cluster shape changed during request %s: enlarge timeout +%dms, wait again for %dms",request,synchTimeout,currentTimeout);
+        ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"cluster shape changed during request (%s): enlarge timeout +%dms, wait again for %dms",request,synchTimeout,currentTimeout);
       }
     }
     return receivedResponses >= expectedSynchronousResponses;

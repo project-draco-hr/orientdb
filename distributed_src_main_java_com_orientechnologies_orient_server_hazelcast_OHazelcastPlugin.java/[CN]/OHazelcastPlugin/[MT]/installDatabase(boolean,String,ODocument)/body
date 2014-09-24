@@ -12,17 +12,19 @@
   }
   final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
   try {
-    Thread.sleep(5000);
+    Thread.sleep(2000 * activeNodes.size());
   }
  catch (  InterruptedException e) {
+    e.printStackTrace();
   }
-  final String queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName);
+  String queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName);
+  messageService.getQueue(queueName);
+  queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName + OCreateRecordTask.SUFFIX_QUEUE_NAME);
   messageService.getQueue(queueName);
   final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
-  final Collection<String> nodes=cfg.getServers();
-  nodes.remove(getLocalNodeName());
+  final Collection<String> nodes=cfg.getServers(null,getLocalNodeName());
   ODistributedServerLog.warn(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"requesting deploy of database '%s' on local server...",databaseName);
-  final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,nodes,new ODeployDatabaseTask(),EXECUTION_MODE.RESPONSE);
+  final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,nodes,new ODeployDatabaseTask(null),EXECUTION_MODE.RESPONSE);
   ODistributedServerLog.warn(this,getLocalNodeName(),nodes.toString(),DIRECTION.OUT,"deploy returned: %s",results);
   for (  Entry<String,Object> r : results.entrySet()) {
     final Object value=r.getValue();

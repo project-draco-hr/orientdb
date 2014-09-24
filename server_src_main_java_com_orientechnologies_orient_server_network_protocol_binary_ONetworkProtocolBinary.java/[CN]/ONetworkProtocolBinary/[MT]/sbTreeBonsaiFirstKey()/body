@@ -1,24 +1,30 @@
 {
   setDataCommandInfo("SB-Tree bonsai get first key");
   OBonsaiCollectionPointer collectionPointer=OCollectionNetworkSerializer.INSTANCE.readCollectionPointer(channel);
-  OSBTreeBonsai<OIdentifiable,Integer> tree=connection.database.getSbTreeCollectionManager().loadSBTree(collectionPointer);
-  OIdentifiable result=tree.firstKey();
-  final OBinarySerializer<? super OIdentifiable> keySerializer;
-  if (result == null) {
-    keySerializer=ONullSerializer.INSTANCE;
-  }
- else {
-    keySerializer=tree.getKeySerializer();
-  }
-  byte[] stream=new byte[OByteSerializer.BYTE_SIZE + keySerializer.getObjectSize(result)];
-  OByteSerializer.INSTANCE.serialize(keySerializer.getId(),stream,0);
-  keySerializer.serialize(result,stream,OByteSerializer.BYTE_SIZE);
-  beginResponse();
+  final OSBTreeCollectionManager sbTreeCollectionManager=connection.database.getSbTreeCollectionManager();
+  final OSBTreeBonsai<OIdentifiable,Integer> tree=sbTreeCollectionManager.loadSBTree(collectionPointer);
   try {
-    sendOk(clientTxId);
-    channel.writeBytes(stream);
+    OIdentifiable result=tree.firstKey();
+    final OBinarySerializer<? super OIdentifiable> keySerializer;
+    if (result == null) {
+      keySerializer=ONullSerializer.INSTANCE;
+    }
+ else {
+      keySerializer=tree.getKeySerializer();
+    }
+    byte[] stream=new byte[OByteSerializer.BYTE_SIZE + keySerializer.getObjectSize(result)];
+    OByteSerializer.INSTANCE.serialize(keySerializer.getId(),stream,0);
+    keySerializer.serialize(result,stream,OByteSerializer.BYTE_SIZE);
+    beginResponse();
+    try {
+      sendOk(clientTxId);
+      channel.writeBytes(stream);
+    }
+  finally {
+      endResponse();
+    }
   }
   finally {
-    endResponse();
+    sbTreeCollectionManager.releaseSBTree(collectionPointer);
   }
 }

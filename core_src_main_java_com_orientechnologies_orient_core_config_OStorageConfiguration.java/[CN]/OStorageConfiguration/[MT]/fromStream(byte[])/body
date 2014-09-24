@@ -15,6 +15,9 @@
     timeZone=TimeZone.getTimeZone(read(values[index++]));
     charset=read(values[index++]);
   }
+  final ORecordConflictStrategyFactory conflictStrategyFactory=Orient.instance().getRecordConflictStrategy();
+  if (version >= 12)   conflictStrategy=conflictStrategyFactory.getStrategy(read(values[index++])).getName();
+ else   conflictStrategy=conflictStrategyFactory.getDefaultStrategy();
   if (version > 1)   index=phySegmentFromStream(values,index,fileTemplate);
   int size=Integer.parseInt(read(values[index++]));
   clusters.clear();
@@ -46,7 +49,10 @@
       final float aa=Float.valueOf(read(values[index++]));
       final String clusterCompression=read(values[index++]);
       if (determineStorageCompression == null)       determineStorageCompression=clusterCompression;
-      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,cc,bb,aa,clusterCompression);
+      final String clusterConflictStrategy;
+      if (version >= 12)       clusterConflictStrategy=read(values[index++]);
+ else       clusterConflictStrategy=null;
+      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,cc,bb,aa,clusterCompression,clusterConflictStrategy);
     }
  else     throw new IllegalArgumentException("Unsupported cluster type: " + clusterType);
     for (int c=clusters.size(); c <= clusterId; ++c)     clusters.add(null);

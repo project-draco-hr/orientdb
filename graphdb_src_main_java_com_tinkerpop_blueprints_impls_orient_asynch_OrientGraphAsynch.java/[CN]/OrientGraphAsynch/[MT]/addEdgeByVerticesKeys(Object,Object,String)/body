@@ -1,0 +1,42 @@
+{
+  beginAsynchOperation();
+  return new OrientEdgeFuture(Orient.instance().getWorkers().submit(new Callable<OrientEdge>(){
+    @Override public OrientEdge call() throws Exception {
+      final OrientBaseGraph g=acquire();
+      try {
+        final OrientExtendedVertex vOut=getOrAddVertex(iOutVertex);
+        final OrientExtendedVertex vIn=getOrAddVertex(iInVertex);
+        boolean reloaded=false;
+        for (int retry=0; ; retry++) {
+          try {
+            final OrientEdge e=g.addEdge(null,vOut,vIn,iEdgeLabel);
+            addInCache(vOut.getProperty(keyFieldName),vOut.getVertexInstance());
+            addInCache(vIn.getProperty(keyFieldName),vIn.getVertexInstance());
+            edgesCreated.incrementAndGet();
+            return e;
+          }
+ catch (          OConcurrentModificationException e) {
+            concurrentException.incrementAndGet();
+            reloadVertices(vOut,vIn,iEdgeLabel,retry,e);
+            reloaded=true;
+          }
+catch (          ORecordDuplicatedException e) {
+            indexUniqueException.incrementAndGet();
+            reloadVertices(vOut,vIn,iEdgeLabel,retry,e);
+            reloaded=true;
+          }
+catch (          Exception e) {
+            unknownException.incrementAndGet();
+            OLogManager.instance().warn(this,"Error on addEdge(" + iOutVertex + ","+ iInVertex+ ","+ iEdgeLabel+ "), retrying (retry="+ retry+ "/"+ maxRetries+ ") Thread: "+ Thread.currentThread().getId());
+            e.printStackTrace();
+          }
+        }
+      }
+  finally {
+        g.shutdown();
+        endAsynchOperation();
+      }
+    }
+  }
+));
+}

@@ -16,8 +16,13 @@
             if (callback != null)             callback.call(rid,recordVersion);
             return new OStorageOperationResult<ORecordVersion>(recordVersion);
           }
+          boolean contentModified=false;
           if (updateContent) {
-            checkAndIncrementVersion(rid,version,ppos);
+            final byte[] newContent=checkAndIncrementVersion(cluster,rid,version,ppos.recordVersion,content,recordType);
+            if (newContent != null) {
+              contentModified=true;
+              content=newContent;
+            }
           }
           makeStorageDirty();
           atomicOperationsManager.startAtomicOperation();
@@ -27,12 +32,16 @@
             if (context != null)             context.executeOperations(this);
             atomicOperationsManager.endAtomicOperation(false);
           }
- catch (          RuntimeException e) {
+ catch (          Throwable e) {
             atomicOperationsManager.endAtomicOperation(true);
-            throw e;
+            OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",e);
+            final ORecordVersion recordVersion=OVersionFactory.instance().createUntrackedVersion();
+            if (callback != null)             callback.call(rid,recordVersion);
+            return new OStorageOperationResult<ORecordVersion>(recordVersion);
           }
           if (callback != null)           callback.call(rid,ppos.recordVersion);
-          return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
+          if (contentModified)           return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion,content,false);
+ else           return new OStorageOperationResult<ORecordVersion>(ppos.recordVersion);
         }
   finally {
           lockManager.releaseLock(recordLock);

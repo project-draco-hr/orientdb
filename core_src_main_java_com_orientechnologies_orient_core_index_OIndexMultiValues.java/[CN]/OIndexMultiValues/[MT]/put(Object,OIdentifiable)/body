@@ -5,6 +5,7 @@
   try {
     checkForKeyType(key);
     acquireExclusiveLock();
+    startStorageAtomicOperation();
     try {
       Set<OIdentifiable> values=indexEngine.get(key);
       if (values == null) {
@@ -16,12 +17,17 @@
           ((OMVRBTreeRIDSet)values).setAutoConvertToRecord(false);
         }
       }
-      if (!iSingleValue.getIdentity().isValid())       ((ORecord<?>)iSingleValue).save();
+      if (!iSingleValue.getIdentity().isValid())       ((ORecord)iSingleValue).save();
       values.add(iSingleValue.getIdentity());
       indexEngine.put(key,values);
+      commitStorageAtomicOperation();
       return this;
     }
-  finally {
+ catch (    RuntimeException e) {
+      rollbackStorageAtomicOperation();
+      throw new OIndexException("Error during insertion of key in index",e);
+    }
+ finally {
       releaseExclusiveLock();
     }
   }

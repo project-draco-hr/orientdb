@@ -1,0 +1,26 @@
+{
+  final OType[] types=getKeyTypes(hints);
+  final List<Object> keys=compositeKey.getKeys();
+  final int keysSize=keys.size();
+  final long oldStartOffset=offset;
+  offset+=OIntegerSerializer.INT_SIZE;
+  pointer.setInt(offset,keysSize);
+  offset+=OIntegerSerializer.INT_SIZE;
+  final OBinarySerializerFactory factory=OBinarySerializerFactory.getInstance();
+  for (int i=0; i < keys.size(); i++) {
+    final Object key=keys.get(i);
+    OBinarySerializer<Object> binarySerializer;
+    if (key != null) {
+      final OType type;
+      if (types.length > i)       type=types[i];
+ else       type=OType.getTypeByClass(key.getClass());
+      binarySerializer=factory.getObjectSerializer(type);
+    }
+ else     binarySerializer=ONullSerializer.INSTANCE;
+    pointer.setByte(offset,binarySerializer.getId());
+    offset+=OBinarySerializerFactory.TYPE_IDENTIFIER_SIZE;
+    binarySerializer.serializeInDirectMemoryObject(key,pointer,offset);
+    offset+=binarySerializer.getObjectSize(key);
+  }
+  pointer.setInt(oldStartOffset,(int)(offset - oldStartOffset));
+}

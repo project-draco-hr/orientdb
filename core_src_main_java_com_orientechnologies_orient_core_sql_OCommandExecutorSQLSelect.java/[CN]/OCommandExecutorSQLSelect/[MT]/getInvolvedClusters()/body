@@ -3,24 +3,27 @@
   if (parsedTarget != null) {
     final ODatabaseRecord db=getDatabase();
     if (parsedTarget.getTargetQuery() != null) {
-      clusters.addAll(parsedTarget.getTargetQuery().getInvolvedClusters());
+      final Set<String> clIds=parsedTarget.getTargetQuery().getInvolvedClusters();
+      for (      String c : clIds)       if (checkClusterAccess(db,c))       clusters.add(c);
     }
  else     if (parsedTarget.getTargetRecords() != null) {
       for (      OIdentifiable identifiable : parsedTarget.getTargetRecords()) {
-        clusters.add(db.getClusterNameById(identifiable.getIdentity().getClusterId()).toLowerCase());
+        final String c=db.getClusterNameById(identifiable.getIdentity().getClusterId()).toLowerCase();
+        if (checkClusterAccess(db,c))         clusters.add(c);
       }
     }
     if (parsedTarget.getTargetClasses() != null) {
       for (      String clazz : parsedTarget.getTargetClasses().values()) {
         final OClass cls=db.getMetadata().getSchema().getClass(clazz);
         if (cls != null)         for (        int clId : cls.getClusterIds()) {
-          clusters.add(db.getClusterNameById(clId).toLowerCase());
+          if (clId > -1 && checkClusterAccess(db,db.getClusterNameById(clId)))           clusters.add(db.getClusterNameById(clId).toLowerCase());
         }
       }
     }
     if (parsedTarget.getTargetClusters() != null) {
       for (      String cluster : parsedTarget.getTargetClusters().keySet()) {
-        clusters.add(cluster.toLowerCase());
+        final String c=cluster.toLowerCase();
+        if (checkClusterAccess(db,c))         clusters.add(c);
       }
     }
     if (parsedTarget.getTargetIndex() != null) {

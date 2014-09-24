@@ -1,0 +1,24 @@
+{
+  OrientVertex v1=graph.addVertex("class:Customer").setProperties("name","Jay1","test","testMoveSingleRecordToAnotherCluster");
+  OrientVertex v2=graph.addVertex("class:Customer").setProperties("name","Jay2","test","testMoveSingleRecordToAnotherCluster");
+  OrientVertex v3=graph.addVertex("class:Customer").setProperties("name","Jay3","test","testMoveSingleRecordToAnotherCluster");
+  v1.addEdge("self",v1);
+  v1.addEdge("other",v2);
+  v1.addEdge("knows",v3);
+  v2.addEdge("knows",v1);
+  Assert.assertEquals(v1.getIdentity().getClusterId(),customer.getDefaultClusterId());
+  Iterable<OrientVertex> result=graph.command(new OCommandSQL("MOVE VERTEX " + v1.getIdentity() + " TO CLUSTER:Customer_genius")).execute();
+  int tot=0;
+  for (  OrientVertex v : result) {
+    tot++;
+    ODocument fromTo=v.getRecord();
+    OIdentifiable from=fromTo.field("old");
+    OIdentifiable to=fromTo.field("new");
+    Assert.assertEquals(from,v1.getIdentity());
+    Assert.assertEquals(to.getIdentity().getClusterId(),customerGeniusCluster);
+    ODocument newDocument=to.getRecord();
+    Assert.assertEquals(newDocument.field("name"),"Jay1");
+    Assert.assertEquals(newDocument.field("test"),"testMoveSingleRecordToAnotherCluster");
+  }
+  Assert.assertEquals(tot,1);
+}

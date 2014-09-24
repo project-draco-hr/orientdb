@@ -1,9 +1,22 @@
 {
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-  final List<String> foundPartition=cfg.addNewNodeInServerList(manager.getLocalNodeName());
+  boolean distribCfgDirty=false;
+  final List<String> foundPartition=cfg.addNewNodeInServerList(getLocalNodeName());
   if (foundPartition != null) {
-    manager.setDatabaseStatus(databaseName,ODistributedServerManager.DB_STATUS.OFFLINE);
-    ODistributedServerLog.info(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: db=%s %s",manager.getLocalNodeName(),databaseName,foundPartition);
-    manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+    manager.setDatabaseStatus(getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.OFFLINE);
+    ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: db=%s %s",getLocalNodeName(),databaseName,foundPartition);
+    distribCfgDirty=true;
   }
+  final String suffix2Search="_" + getLocalNodeName();
+  for (  String c : cfg.getClusterNames()) {
+    if (c.endsWith(suffix2Search)) {
+      final String currentMaster=cfg.getMasterServer(c);
+      if (!getLocalNodeName().equals(currentMaster)) {
+        ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"changing mastership of cluster '%s' from node '%s' to '%s'",c,currentMaster,getLocalNodeName());
+        cfg.setMasterServer(c,getLocalNodeName());
+        distribCfgDirty=true;
+      }
+    }
+  }
+  if (distribCfgDirty)   manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
 }

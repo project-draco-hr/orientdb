@@ -1,24 +1,14 @@
 {
-  databaseDocumentTx=new ODatabaseDocumentTx(url);
-  if (!url.contains("remote:") && databaseDocumentTx.exists()) {
-    databaseDocumentTx.open("admin","admin");
-    databaseDocumentTx.drop();
-    databaseDocumentTx.create();
-  }
- else {
-    databaseDocumentTx.create();
-  }
+  databaseDocumentTx.close();
+  databaseDocumentTx.open("admin","admin");
   OSchema schema=databaseDocumentTx.getMetadata().getSchema();
-  if (schema.getClass("City") == null) {
-    OClass oClass=schema.createClass("City");
-    oClass.createProperty("name",OType.STRING);
-    oClass.createIndex("City.name","FULLTEXT",null,null,"LUCENE",new String[]{"name"});
-  }
+  schema.reload();
   databaseDocumentTx.begin();
   ODocument doc=new ODocument("City");
   doc.field("name","Rome");
   databaseDocumentTx.save(doc);
   OIndex idx=schema.getClass("City").getClassIndex("City.name");
+  Assert.assertNotNull(idx);
   Collection<?> coll=(Collection<?>)idx.get("Rome");
   Assert.assertEquals(coll.size(),1);
   databaseDocumentTx.rollback();
@@ -31,5 +21,4 @@
   databaseDocumentTx.commit();
   coll=(Collection<?>)idx.get("Rome");
   Assert.assertEquals(coll.size(),1);
-  databaseDocumentTx.drop();
 }

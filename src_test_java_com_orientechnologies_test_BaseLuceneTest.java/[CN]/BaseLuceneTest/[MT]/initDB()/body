@@ -3,11 +3,24 @@
   if (buildDirectory == null)   buildDirectory=".";
   if (remote) {
     try {
-      System.setProperty("ORIENTDB_HOME",buildDirectory);
-      server=OServerMain.create();
-      server.startup(ClassLoader.getSystemResourceAsStream("orientdb-server-config.xml"));
-      server.activate();
-      Orient.instance().getDatabaseFactory().createDatabase("graph",getStoragePath(getDatabaseName(),"plocal")).create();
+      final String finalBuildDirectory=buildDirectory;
+      Future<Boolean> iServer=pool.submit(new Callable<Boolean>(){
+        @Override public Boolean call() throws Exception {
+          System.setProperty("ORIENTDB_HOME",finalBuildDirectory);
+          server=OServerMain.create();
+          server.startup(ClassLoader.getSystemResourceAsStream("orientdb-server-config.xml"));
+          server.activate();
+          serverDatabase=Orient.instance().getDatabaseFactory().createDatabase("graph",getStoragePath(getDatabaseName(),"plocal"));
+          if (serverDatabase.exists()) {
+            serverDatabase.open("admin","admin");
+            serverDatabase.drop();
+          }
+          serverDatabase.create();
+          return true;
+        }
+      }
+);
+      iServer.get();
       url="remote:localhost/" + getDatabaseName();
       databaseDocumentTx=new ODatabaseDocumentTx(url);
       databaseDocumentTx.open("admin","admin");

@@ -1,19 +1,30 @@
 {
   if (remoteCreationAllowed) {
     OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+    OChannelBinaryAsynchClient client=null;
     try {
-      OChannelBinaryAsynchClient client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI);
+      client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CREATE_SBTREE_BONSAI);
       client.writeInt(clusterId);
       storage.endRequest(client);
-      storage.beginResponse(client);
-      OBonsaiCollectionPointer pointer=networkSerializer.readCollectionPointer(client);
-      storage.endResponse(client);
+      OBonsaiCollectionPointer pointer;
+      try {
+        storage.beginResponse(client);
+        pointer=networkSerializer.readCollectionPointer(client);
+      }
+  finally {
+        storage.endResponse(client);
+      }
       OBinarySerializer<OIdentifiable> keySerializer=OLinkSerializer.INSTANCE;
       OBinarySerializer<Integer> valueSerializer=OIntegerSerializer.INSTANCE;
       return new OSBTreeBonsaiRemote<OIdentifiable,Integer>(pointer,keySerializer,valueSerializer);
     }
  catch (    IOException e) {
+      storage.getEngine().getConnectionManager().remove(client);
       throw new ODatabaseException("Can't create sb-tree bonsai.",e);
+    }
+catch (    RuntimeException e2) {
+      storage.getEngine().getConnectionManager().release(client);
+      throw e2;
     }
   }
  else {

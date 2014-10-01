@@ -2,7 +2,15 @@
   Object joinRuntimeValue=null;
   if (joinFieldName != null)   joinRuntimeValue=((ODocument)input).field(joinFieldName);
  else   if (joinValue != null)   joinRuntimeValue=resolve(joinValue);
-  Object result=lookup(joinRuntimeValue);
+  Object result;
+  if (OMultiValue.isMultiValue(joinRuntimeValue)) {
+    result=new ArrayList<Object>();
+    for (    Object o : OMultiValue.getMultiValueIterable(joinRuntimeValue)) {
+      final Object r=lookup(o);
+      ((List<Object>)result).add(r);
+    }
+  }
+ else   result=lookup(joinRuntimeValue);
   log(OETLProcessor.LOG_LEVELS.DEBUG,"joinRuntimeValue=%s, lookupResult=%s",joinRuntimeValue,result);
   if (result != null) {
     if (linkFieldType != null) {
@@ -55,7 +63,7 @@ throw new OETLProcessHaltedException("[Link transformer] Cannot resolve join for
 }
 }
 }
-((ODocument)input).field(linkFieldName,result);
+((ODocument)((OIdentifiable)input).getRecord()).field(linkFieldName,result);
 log(OETLProcessor.LOG_LEVELS.DEBUG,"set %s=%s in document=%s",linkFieldName,result,input);
 return input;
 }

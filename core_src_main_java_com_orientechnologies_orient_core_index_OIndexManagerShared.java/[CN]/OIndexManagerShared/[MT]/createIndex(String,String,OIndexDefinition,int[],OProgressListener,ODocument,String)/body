@@ -2,7 +2,7 @@
   if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot create a new index inside a transaction");
   final Character c=OSchemaShared.checkNameIfValid(iName);
   if (c != null)   throw new IllegalArgumentException("Invalid index name '" + iName + "'. Character '"+ c+ "' is invalid");
-  ODatabase database=getDatabase();
+  ODatabaseInternal database=getDatabase();
   OStorage storage=database.getStorage();
   algorithm=chooseTreeAlgorithm(algorithm);
   final String valueContainerAlgorithm=chooseContainerAlgorithm(iType);
@@ -10,6 +10,12 @@
   acquireExclusiveLock();
   try {
     if (indexes.containsKey(iName.toLowerCase()))     throw new OIndexException("Index with name " + iName.toLowerCase() + " already exists.");
+    if (clusterIdsToIndex == null || clusterIdsToIndex.length == 0) {
+      if (metadata == null)       metadata=new ODocument();
+      Object durable=metadata.field("durableInNonTxMode");
+      if (!(durable instanceof Boolean))       metadata.field("durableInNonTxMode",true);
+      if (metadata.field("trackMode") == null)       metadata.field("trackMode","FULL");
+    }
     index=OIndexes.createIndex(getDatabase(),iType,algorithm,valueContainerAlgorithm,metadata);
     final String clusterName=indexDefinition != null && indexDefinition.getClassName() != null ? defaultClusterName : manualClusterName;
     if (progressListener == null)     progressListener=new OIndexRebuildOutputListener(index);

@@ -7,12 +7,15 @@
     final Set<String> words=splitIntoWords(key.toString());
     for (    final String word : words) {
       acquireExclusiveLock();
+      startStorageAtomicOperation();
       try {
         Set<OIdentifiable> refs;
         refs=indexEngine.get(word);
         if (refs == null) {
           if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-            refs=new OIndexRIDContainer(getName());
+            boolean durable=false;
+            if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))             durable=true;
+            refs=new OIndexRIDContainer(getName(),durable);
           }
  else {
             refs=new OMVRBTreeRIDSet();
@@ -21,8 +24,13 @@
         }
         refs.add(iSingleValue);
         indexEngine.put(word,refs);
+        commitStorageAtomicOperation();
       }
-  finally {
+ catch (      RuntimeException e) {
+        rollbackStorageAtomicOperation();
+        throw new OIndexException("Error during put of key - value entry",e);
+      }
+ finally {
         releaseExclusiveLock();
       }
     }

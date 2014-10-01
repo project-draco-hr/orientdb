@@ -1,0 +1,60 @@
+{
+  nodeName=OSystemVariableResolver.resolveVariable(NODE_NAME_ENV);
+  if (nodeName != null) {
+    nodeName=nodeName.trim();
+    if (nodeName.isEmpty())     nodeName=null;
+  }
+  if (nodeName == null) {
+    try {
+      Thread.sleep(1000);
+    }
+ catch (    InterruptedException e) {
+    }
+    System.out.println();
+    System.out.println();
+    System.out.println("+----------------------------------------------------+");
+    System.out.println("|    WARNING: FIRST DISTRIBUTED RUN CONFIGURATION    |");
+    System.out.println("+----------------------------------------------------+");
+    System.out.println("| This is the first time that the server is running  |");
+    System.out.println("| as distributed. Please type the name you want      |");
+    System.out.println("| to assign to the current server node.              |");
+    System.out.println("+----------------------------------------------------+");
+    System.out.print("\nNode name [BLANK=auto generate it]: ");
+    OConsoleReader reader=new DefaultConsoleReader();
+    try {
+      nodeName=reader.readLine();
+    }
+ catch (    IOException e) {
+    }
+    if (nodeName != null) {
+      nodeName=nodeName.trim();
+      if (nodeName.isEmpty())       nodeName=null;
+    }
+  }
+  if (nodeName == null)   this.nodeName="node" + System.currentTimeMillis();
+  OLogManager.instance().warn(this,"Assigning distributed node name: %s",this.nodeName);
+  boolean found=false;
+  final OServerConfiguration cfg=serverInstance.getConfiguration();
+  for (  OServerHandlerConfiguration h : cfg.handlers) {
+    if (h.clazz.equals(getClass().getName())) {
+      for (      OServerParameterConfiguration p : h.parameters) {
+        if (p.name.equals("nodeName")) {
+          found=true;
+          p.value=this.nodeName;
+          break;
+        }
+      }
+      if (!found) {
+        h.parameters=OArrays.copyOf(h.parameters,h.parameters.length + 1);
+        h.parameters[h.parameters.length - 1]=new OServerParameterConfiguration("nodeName",this.nodeName);
+      }
+      try {
+        serverInstance.saveConfiguration();
+      }
+ catch (      IOException e) {
+        throw new OConfigurationException("Cannot save server configuration",e);
+      }
+      break;
+    }
+  }
+}

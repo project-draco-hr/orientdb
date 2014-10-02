@@ -1,0 +1,51 @@
+{
+  initDB();
+  OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  OClass v=schema.getClass("V");
+  OClass oClass=schema.createClass("Place");
+  oClass.setSuperClass(v);
+  oClass.createProperty("latitude",OType.DOUBLE);
+  oClass.createProperty("longitude",OType.DOUBLE);
+  oClass.createProperty("name",OType.STRING);
+  databaseDocumentTx.command(new OCommandSQL("CREATE INDEX Place.l_lon ON Place(latitude,longitude) SPATIAL ENGINE LUCENE")).execute();
+  try {
+    ZipFile zipFile=new ZipFile(new File(ClassLoader.getSystemResource("location.csv.zip").getPath()));
+    Enumeration<? extends ZipEntry> entries=zipFile.entries();
+    databaseDocumentTx.declareIntent(new OIntentMassiveInsert());
+    while (entries.hasMoreElements()) {
+      ZipEntry entry=entries.nextElement();
+      if (entry.getName().equals("location.csv")) {
+        InputStream stream=zipFile.getInputStream(entry);
+        LineNumberReader lnr=new LineNumberReader(new InputStreamReader(stream));
+        String line;
+        int i=0;
+        while ((line=lnr.readLine()) != null) {
+          String[] nextLine=line.split(",");
+          ODocument doc=new ODocument("Place");
+          doc.field("name",nextLine[3]);
+          doc.field("country",nextLine[1]);
+          try {
+            Double lat=((Double)OType.convert(nextLine[5],Double.class)).doubleValue();
+            Double lng=((Double)OType.convert(nextLine[6],Double.class)).doubleValue();
+            doc.field("latitude",lat);
+            doc.field("longitude",lng);
+          }
+ catch (          Exception e) {
+            continue;
+          }
+          doc.save();
+          if (i % 100000 == 0) {
+            OLogManager.instance().info(this,"Imported: [%d] records",i);
+            databaseDocumentTx.commit();
+            databaseDocumentTx.begin();
+          }
+          i++;
+        }
+        databaseDocumentTx.commit();
+      }
+      databaseDocumentTx.declareIntent(null);
+    }
+  }
+ catch (  Exception e) {
+  }
+}

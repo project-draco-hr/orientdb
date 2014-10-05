@@ -1,15 +1,24 @@
 {
-  final OClass result;
-  acquireSchemaWriteLock();
-  try {
-    final Class<?> superClass=clazz.getSuperclass();
-    final OClass cls;
-    if (superClass != null && superClass != Object.class && existsClass(superClass.getSimpleName()))     cls=getClass(superClass.getSimpleName());
- else     cls=null;
-    result=createClass(clazz.getSimpleName(),cls,iDefaultClusterId);
-  }
+  OClass result;
+  int[] clusterIds=new int[]{iDefaultClusterId};
+  int retry=0;
+  while (true)   try {
+    acquireSchemaWriteLock();
+    try {
+      final Class<?> superClass=clazz.getSuperclass();
+      final OClass cls;
+      if (superClass != null && superClass != Object.class && existsClass(superClass.getSimpleName()))       cls=getClass(superClass.getSimpleName());
+ else       cls=null;
+      result=doCreateClass(clazz.getSimpleName(),cls,clusterIds,retry);
+    }
   finally {
-    releaseSchemaWriteLock();
+      releaseSchemaWriteLock();
+    }
+    break;
+  }
+ catch (  ClusterIdsAreEmptyException e) {
+    clusterIds=createClusters(clazz.getSimpleName());
+    retry++;
   }
   return result;
 }

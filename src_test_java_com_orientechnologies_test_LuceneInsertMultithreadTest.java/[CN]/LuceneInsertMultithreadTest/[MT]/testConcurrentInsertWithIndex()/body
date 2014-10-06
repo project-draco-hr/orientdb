@@ -14,14 +14,11 @@
     oClass.createProperty("name",OType.STRING);
     oClass.createIndex("City.name","FULLTEXT",null,null,"LUCENE",new String[]{"name"});
   }
-  LuceneInsertThread[] opts=new LuceneInsertThread[THREADS];
-  for (int i=0; i < THREADS; ++i)   opts[i]=new LuceneInsertThread(CYCLE);
-  Thread read=new Thread(new LuceneReadThread(CYCLE));
-  Thread[] threads=new Thread[THREADS + 1];
-  for (int i=0; i < THREADS; ++i)   threads[i]=new Thread(opts[i],"ConcurrentTest" + i);
-  threads[THREADS]=read;
-  for (int i=0; i < THREADS + 1; ++i)   threads[i].start();
-  for (int i=0; i < THREADS + 1; ++i)   threads[i].join();
+  Thread[] threads=new Thread[THREADS + RTHREADS];
+  for (int i=0; i < THREADS; ++i)   threads[i]=new Thread(new LuceneInsertThread(CYCLE),"ConcurrentWriteTest" + i);
+  for (int i=THREADS; i < THREADS + RTHREADS; ++i)   threads[i]=new Thread(new LuceneReadThread(CYCLE),"ConcurrentReadTest" + i);
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].start();
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].join();
   OIndex idx=schema.getClass("City").getClassIndex("City.name");
   Assert.assertEquals(idx.getSize(),THREADS * CYCLE);
   databaseDocumentTx.drop();

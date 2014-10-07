@@ -8,16 +8,25 @@
     releaseSchemaReadLock();
   }
   OClass cls;
-  acquireSchemaWriteLock();
-  try {
-    cls=classes.get(className.toLowerCase());
-    if (cls != null)     return cls;
-    cls=createClass(className,superClass);
-    if (superClass != null && !cls.isSubClassOf(superClass))     throw new IllegalArgumentException("Class '" + className + "' is not an instance of "+ superClass.getShortName());
-    addClusterClassMap(cls);
-  }
+  int[] clusterIds=null;
+  int retry=0;
+  while (true)   try {
+    acquireSchemaWriteLock();
+    try {
+      cls=classes.get(className.toLowerCase());
+      if (cls != null)       return cls;
+      cls=doCreateClass(className,superClass,clusterIds,retry);
+      if (superClass != null && !cls.isSubClassOf(superClass))       throw new IllegalArgumentException("Class '" + className + "' is not an instance of "+ superClass.getShortName());
+      addClusterClassMap(cls);
+    }
   finally {
-    releaseSchemaWriteLock();
+      releaseSchemaWriteLock();
+    }
+    break;
+  }
+ catch (  ClusterIdsAreEmptyException e) {
+    clusterIds=createClusters(className);
+    retry++;
   }
   return cls;
 }

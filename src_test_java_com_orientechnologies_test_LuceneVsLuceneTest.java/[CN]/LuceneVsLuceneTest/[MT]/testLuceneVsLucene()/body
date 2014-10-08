@@ -1,0 +1,26 @@
+{
+  InputStream stream=ClassLoader.getSystemResourceAsStream("testLuceneIndex.sql");
+  databaseDocumentTx.command(new OCommandScript("sql",getScriptFromStream(stream))).execute();
+  for (  ODocument oDocument : databaseDocumentTx.browseClass("Song")) {
+    String title=oDocument.field("title");
+    if (title != null) {
+      Document d=new Document();
+      d.add(new Field("title",title,Field.Store.NO,Field.Index.ANALYZED));
+      indexWriter.addDocument(d);
+    }
+  }
+  indexWriter.close();
+  IndexReader reader=DirectoryReader.open(getDirectory());
+  IndexSearcher searcher=new IndexSearcher(reader);
+  Query query=new MultiFieldQueryParser(OLuceneIndexManagerAbstract.LUCENE_VERSION,new String[]{"title"},new StandardAnalyzer(OLuceneIndexManagerAbstract.LUCENE_VERSION)).parse("down the");
+  final TopDocs docs=searcher.search(query,Integer.MAX_VALUE);
+  ScoreDoc[] hits=docs.scoreDocs;
+  List<ODocument> oDocs=databaseDocumentTx.query(new OSQLSynchQuery<ODocument>("select *,$score from Song where title LUCENE \"down the\""));
+  Assert.assertEquals(oDocs.size(),hits.length);
+  int i=0;
+  for (  ScoreDoc hit : hits) {
+    Assert.assertEquals(oDocs.get(i).field("$score"),hit.score);
+    i++;
+  }
+  reader.close();
+}

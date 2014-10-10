@@ -1,56 +1,112 @@
 {
+  this.foundResults.clear();
   final ODatabaseRecord database=getDatabase();
   database.checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_READ,iSchemaClass.getName().toLowerCase());
-  if (compiledFilter == null)   if (orderedFields.size() == 0)   return false;
- else   return optimizeSort(iSchemaClass);
-  final List<OIndexSearchResult> indexSearchResults=filterAnalyzer.analyzeCondition(compiledFilter.getRootCondition(),iSchemaClass,context);
-  for (  final OIndexSearchResult searchResult : indexSearchResults) {
-    final List<OIndex<?>> involvedIndexes=filterAnalyzer.getInvolvedIndexes(iSchemaClass,searchResult);
-    Collections.sort(involvedIndexes,new IndexComparator());
-    for (    final OIndex index : involvedIndexes) {
-      if (index.isRebuiding())       continue;
-      final OIndexDefinition indexDefinition=index.getDefinition();
-      if (searchResult.containsNullValues && indexDefinition.isNullValuesIgnored())       continue;
-      final OQueryOperator operator=searchResult.lastOperator;
-      if (!OIndexSearchResult.isIndexEqualityOperator(operator)) {
-        final String lastFiled=searchResult.lastField.getItemName(searchResult.lastField.getItemCount() - 1);
-        final String relatedIndexField=indexDefinition.getFields().get(searchResult.fieldValuePairs.size());
-        if (!lastFiled.equals(relatedIndexField))         continue;
-      }
-      final int searchResultFieldsCount=searchResult.fields().size();
-      final List<Object> keyParams=new ArrayList<Object>(searchResultFieldsCount);
-      for (      final String fieldName : indexDefinition.getFields().subList(0,searchResultFieldsCount)) {
-        final Object fieldValue=searchResult.fieldValuePairs.get(fieldName);
-        if (fieldValue instanceof OSQLQuery<?>)         return false;
-        if (fieldValue != null)         keyParams.add(fieldValue);
+  if (compiledFilter == null) {
+    if (orderedFields.size() == 0) {
+      return false;
+    }
  else {
-          if (searchResult.lastValue instanceof OSQLQuery<?>)           return false;
-          keyParams.add(searchResult.lastValue);
-        }
-      }
-      metricRecorder.recordInvolvedIndexesMetric(index);
-      OIndexCursor cursor;
-      final boolean indexIsUsedInOrderBy=orderByOptimizer.canBeUsedByOrderBy(index,orderedFields) && !(index.getInternal() instanceof OChainedIndexProxy);
-      try {
-        boolean ascSortOrder=!indexIsUsedInOrderBy || orderedFields.get(0).getValue().equals(KEYWORD_ASC);
-        if (indexIsUsedInOrderBy)         fullySortedByIndex=indexDefinition.getFields().size() >= orderedFields.size();
-        context.setVariable("$limit",limit);
-        cursor=operator.executeIndexQuery(context,index,keyParams,ascSortOrder);
-      }
- catch (      OIndexEngineException e) {
-        throw e;
-      }
-catch (      Exception e) {
-        OLogManager.instance().error(this,"Error on using index %s in query '%s'. Probably you need to rebuild indexes. Now executing query using cluster scan",e,index.getName(),request != null && request.getText() != null ? request.getText() : "");
-        fullySortedByIndex=false;
-        return false;
-      }
-      if (cursor == null)       continue;
-      filterOptimizer.optimize(compiledFilter,searchResult);
-      fetchValuesFromIndexCursor(cursor);
-      metricRecorder.recordOrderByOptimizationMetric(indexIsUsedInOrderBy,this.fullySortedByIndex);
-      return true;
+      return optimizeSort(iSchemaClass);
     }
   }
-  return false;
+  final List<List<OIndexSearchResult>> conditionHierarchy=filterAnalyzer.analyzeMainCondition(compiledFilter.getRootCondition(),iSchemaClass,context);
+  List<OIndexCursor> cursors=new ArrayList<OIndexCursor>();
+  boolean indexIsUsedInOrderBy=false;
+  List<IndexUsageLog> indexUseAttempts=new ArrayList<IndexUsageLog>();
+  try {
+    OIndexSearchResult lastSearchResult=null;
+    for (    List<OIndexSearchResult> indexSearchResults : conditionHierarchy) {
+      boolean indexUsed=false;
+      for (      final OIndexSearchResult searchResult : indexSearchResults) {
+        lastSearchResult=searchResult;
+        final List<OIndex<?>> involvedIndexes=filterAnalyzer.getInvolvedIndexes(iSchemaClass,searchResult);
+        Collections.sort(involvedIndexes,new IndexComparator());
+        for (        final OIndex index : involvedIndexes) {
+          if (index.isRebuiding()) {
+            continue;
+          }
+          final OIndexDefinition indexDefinition=index.getDefinition();
+          if (searchResult.containsNullValues && indexDefinition.isNullValuesIgnored()) {
+            continue;
+          }
+          final OQueryOperator operator=searchResult.lastOperator;
+          if (!OIndexSearchResult.isIndexEqualityOperator(operator)) {
+            final String lastFiled=searchResult.lastField.getItemName(searchResult.lastField.getItemCount() - 1);
+            final String relatedIndexField=indexDefinition.getFields().get(searchResult.fieldValuePairs.size());
+            if (!lastFiled.equals(relatedIndexField)) {
+              continue;
+            }
+          }
+          final int searchResultFieldsCount=searchResult.fields().size();
+          final List<Object> keyParams=new ArrayList<Object>(searchResultFieldsCount);
+          for (          final String fieldName : indexDefinition.getFields().subList(0,searchResultFieldsCount)) {
+            final Object fieldValue=searchResult.fieldValuePairs.get(fieldName);
+            if (fieldValue instanceof OSQLQuery<?>) {
+              return false;
+            }
+            if (fieldValue != null) {
+              keyParams.add(fieldValue);
+            }
+ else {
+              if (searchResult.lastValue instanceof OSQLQuery<?>) {
+                return false;
+              }
+              keyParams.add(searchResult.lastValue);
+            }
+          }
+          metricRecorder.recordInvolvedIndexesMetric(index);
+          OIndexCursor cursor;
+          indexIsUsedInOrderBy=orderByOptimizer.canBeUsedByOrderBy(index,orderedFields) && !(index.getInternal() instanceof OChainedIndexProxy);
+          try {
+            boolean ascSortOrder=!indexIsUsedInOrderBy || orderedFields.get(0).getValue().equals(KEYWORD_ASC);
+            if (indexIsUsedInOrderBy) {
+              fullySortedByIndex=indexDefinition.getFields().size() >= orderedFields.size() && conditionHierarchy.size() == 1;
+            }
+            context.setVariable("$limit",limit);
+            cursor=operator.executeIndexQuery(context,index,keyParams,ascSortOrder);
+          }
+ catch (          OIndexEngineException e) {
+            throw e;
+          }
+catch (          Exception e) {
+            OLogManager.instance().error(this,"Error on using index %s in query '%s'. Probably you need to rebuild indexes. Now executing query using cluster scan",e,index.getName(),request != null && request.getText() != null ? request.getText() : "");
+            fullySortedByIndex=false;
+            cursors.clear();
+            return false;
+          }
+          if (cursor == null) {
+            continue;
+          }
+          cursors.add(cursor);
+          indexUseAttempts.add(new IndexUsageLog(index,keyParams,indexDefinition));
+          indexUsed=true;
+          break;
+        }
+        if (indexUsed) {
+          break;
+        }
+      }
+      if (!indexUsed) {
+        return false;
+      }
+    }
+    if (cursors.size() == 0 || lastSearchResult == null) {
+      return false;
+    }
+    if (cursors.size() == 1 && canOptimize(conditionHierarchy)) {
+      filterOptimizer.optimize(compiledFilter,lastSearchResult);
+    }
+    for (    OIndexCursor cursor : cursors) {
+      fetchValuesFromIndexCursor(cursor);
+    }
+    metricRecorder.recordOrderByOptimizationMetric(indexIsUsedInOrderBy,this.fullySortedByIndex);
+    indexUseAttempts.clear();
+    return true;
+  }
+  finally {
+    for (    IndexUsageLog wastedIndexUsage : indexUseAttempts) {
+      revertProfiler(context,wastedIndexUsage.index,wastedIndexUsage.keyParams,wastedIndexUsage.indexDefinition);
+    }
+  }
 }

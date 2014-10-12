@@ -13,18 +13,22 @@
   System.out.println("Creating Writers and Readers threads...");
   final ExecutorService writerExecutors=Executors.newCachedThreadPool();
   final ExecutorService readerExecutors=Executors.newCachedThreadPool();
-  int i=0;
+  runningWriters=new CountDownLatch(serverInstance.size() * writerCount);
+  expected=writerCount * count * serverInstance.size() + beginInstances;
+  int serverId=0;
+  int threadId=0;
   List<Callable<Void>> writerWorkers=new ArrayList<Callable<Void>>();
   for (  ServerRun server : serverInstance) {
     for (int j=0; j < writerCount; j++) {
-      Writer writer=new Writer(i++,getDatabaseURL(server));
+      Callable writer=createWriter(serverId,threadId++,getDatabaseURL(server));
       writerWorkers.add(writer);
     }
+    serverId++;
   }
   List<Future<Void>> futures=writerExecutors.invokeAll(writerWorkers);
-  List<Reader> readerWorkers=new ArrayList<Reader>();
+  List<Callable<Void>> readerWorkers=new ArrayList<Callable<Void>>();
   for (  ServerRun server : serverInstance) {
-    Reader reader=new Reader(getDatabaseURL(server));
+    Callable<Void> reader=createReader(getDatabaseURL(server));
     readerWorkers.add(reader);
   }
   List<Future<Void>> rFutures=readerExecutors.invokeAll(readerWorkers);
@@ -35,14 +39,11 @@
   writerExecutors.shutdown();
   Assert.assertTrue(writerExecutors.awaitTermination(1,TimeUnit.MINUTES));
   System.out.println("All writer threads have finished, shutting down readers");
-  readerExecutors.shutdown();
-  for (  Reader r : readerWorkers) {
-    r.running=false;
-  }
   for (  Future<Void> future : rFutures) {
-    future.cancel(true);
+    future.get();
   }
-  Assert.assertTrue(writerExecutors.awaitTermination(1,TimeUnit.MINUTES));
+  readerExecutors.shutdown();
+  Assert.assertTrue(readerExecutors.awaitTermination(1,TimeUnit.MINUTES));
   System.out.println("All threads have finished, shutting down server instances");
   for (  ServerRun server : serverInstance) {
     printStats(getDatabaseURL(server));

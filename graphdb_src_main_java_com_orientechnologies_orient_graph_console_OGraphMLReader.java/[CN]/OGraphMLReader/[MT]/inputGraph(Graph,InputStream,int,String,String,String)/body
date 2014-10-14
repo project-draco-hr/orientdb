@@ -3,9 +3,10 @@
   try {
     XMLStreamReader reader=inputFactory.createXMLStreamReader(graphMLInputStream);
     final OrientBaseGraph graph=(OrientBaseGraph)inputGraph;
+    if (storeVertexIds)     graph.setSaveOriginalIds(storeVertexIds);
     Map<String,String> keyIdMap=new HashMap<String,String>();
     Map<String,String> keyTypesMaps=new HashMap<String,String>();
-    Map<String,String> vertexMappedIdMap=new HashMap<String,String>();
+    Map<String,ORID> vertexMappedIdMap=new HashMap<String,ORID>();
     String vertexId=null;
     Map<String,Object> vertexProps=null;
     boolean inVertex=false;
@@ -33,9 +34,9 @@
           if (vertexLabel != null) {
             if (vertexLabel.startsWith(":"))             vertexLabel=vertexLabel.substring(1);
             final String[] vertexLabels=vertexLabel.split(":");
-            vertexLabel="class:" + vertexLabels[vertexLabelIndex];
+            vertexLabel=vertexId + ",class:" + vertexLabels[vertexLabelIndex];
           }
-          if (vertexIdKey != null)           vertexMappedIdMap.put(vertexId,vertexId);
+ else           vertexLabel=vertexId;
           inVertex=true;
           vertexProps=new HashMap<String,Object>();
         }
@@ -49,15 +50,17 @@
           edgeEndVertices=new Vertex[2];
           for (int i=0; i < 2; i++) {
             if (vertexIdKey == null) {
-              edgeEndVertices[i]=graph.getVertex(vertexIds[i]);
+              edgeEndVertices[i]=null;
             }
  else {
               edgeEndVertices[i]=graph.getVertex(vertexMappedIdMap.get(vertexIds[i]));
             }
             if (null == edgeEndVertices[i]) {
               edgeEndVertices[i]=graph.addVertex(vertexLabel);
+              if (vertexIdKey != null) {
+                mapId(vertexMappedIdMap,vertexIds[i],(ORID)edgeEndVertices[i].getId());
+              }
               bufferCounter++;
-              if (vertexIdKey != null)               vertexMappedIdMap.put(vertexIds[i],vertexIds[i]);
             }
           }
           inEdge=true;
@@ -71,7 +74,6 @@
             String value=reader.getElementText();
             if (inVertex == true) {
               if ((vertexIdKey != null) && (key.equals(vertexIdKey))) {
-                vertexMappedIdMap.put(vertexId,value);
                 vertexId=value;
               }
  else               vertexProps.put(attributeName,typeCastValue(key,value,keyTypesMaps));
@@ -87,9 +89,11 @@
  else       if (eventType.equals(XMLEvent.END_ELEMENT)) {
         String elementName=reader.getName().getLocalPart();
         if (elementName.equals(GraphMLTokens.NODE)) {
-          Vertex currentVertex=graph.getVertex(vertexId);
+          ORID currentVertex=null;
+          if (vertexIdKey != null)           vertexMappedIdMap.get(vertexId);
           if (currentVertex == null) {
-            graph.addVertex(vertexLabel,vertexProps);
+            final OrientVertex v=graph.addVertex(vertexLabel,vertexProps);
+            if (vertexIdKey != null)             mapId(vertexMappedIdMap,vertexId,v.getIdentity());
             bufferCounter++;
           }
           vertexId=null;

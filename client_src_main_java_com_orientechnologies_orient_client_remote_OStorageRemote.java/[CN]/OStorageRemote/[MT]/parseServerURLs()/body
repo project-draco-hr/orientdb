@@ -1,15 +1,20 @@
 {
+  String lastHost=null;
   int dbPos=url.indexOf('/');
   if (dbPos == -1) {
     addHost(url);
+    lastHost=url;
     name=url;
   }
  else {
     name=url.substring(url.lastIndexOf("/") + 1);
-    for (    String host : url.substring(0,dbPos).split(ADDRESS_SEPARATOR))     addHost(host);
+    for (    String host : url.substring(0,dbPos).split(ADDRESS_SEPARATOR)) {
+      lastHost=host;
+      addHost(host);
+    }
   }
   if (serverURLs.size() == 1 && OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_ENABLED.getValueAsBoolean()) {
-    final String primaryServer=serverURLs.get(0);
+    final String primaryServer=lastHost;
     OLogManager.instance().debug(this,"Retrieving URLs from DNS '%s' (timeout=%d)...",primaryServer,OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsInteger());
     try {
       final Hashtable<String,String> env=new Hashtable<String,String>();
@@ -20,14 +25,16 @@
       final Attributes attrs=ictx.getAttributes(hostName,new String[]{"TXT"});
       final Attribute attr=attrs.get("TXT");
       if (attr != null) {
-        String configuration=(String)attr.get();
-        if (configuration.startsWith(""))         configuration=configuration.substring(1,configuration.length() - 1);
-        if (configuration != null) {
-          serverURLs.clear();
-          final String[] parts=configuration.split(" ");
-          for (          String part : parts) {
-            if (part.startsWith("s=")) {
-              addHost(part.substring("s=".length()));
+        for (int i=0; i < attr.size(); ++i) {
+          String configuration=(String)attr.get(i);
+          if (configuration.startsWith("\""))           configuration=configuration.substring(1,configuration.length() - 1);
+          if (configuration != null) {
+            serverURLs.clear();
+            final String[] parts=configuration.split(" ");
+            for (            String part : parts) {
+              if (part.startsWith("s=")) {
+                addHost(part.substring("s=".length()));
+              }
             }
           }
         }

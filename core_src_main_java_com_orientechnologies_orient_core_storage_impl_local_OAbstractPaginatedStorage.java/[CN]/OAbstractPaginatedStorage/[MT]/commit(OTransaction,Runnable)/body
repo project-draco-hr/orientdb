@@ -1,5 +1,11 @@
 {
   checkLowDiskSpace();
+  final ODatabaseRecordInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
+  OImmutableSchema immutableSchema=null;
+  if (databaseRecord != null) {
+    OSchemaProxy schemaProxy=(OSchemaProxy)databaseRecord.getMetadata().getSchema();
+    immutableSchema=schemaProxy.updateSchemaCache();
+  }
   modificationLock.requestModificationLock();
   List<Lock> locks=new ArrayList<Lock>();
   try {
@@ -20,7 +26,7 @@
         while (clientTx.getCurrentRecordEntries().iterator().hasNext()) {
           for (          ORecordOperation txEntry : clientTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
           clientTx.clearRecordEntries();
-          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry);
+          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry,immutableSchema);
         }
         if (callback != null)         callback.run();
         endStorageTx();

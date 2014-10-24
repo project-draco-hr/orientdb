@@ -1,10 +1,7 @@
 {
   checkLowDiskSpace();
   final ODatabaseRecordInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
-  OImmutableSchema immutableSchema=null;
-  if (databaseRecord != null) {
-    immutableSchema=databaseRecord.getMetadata().getImmutableSchemaSnapshot();
-  }
+  if (databaseRecord != null)   databaseRecord.getMetadata().makeThreadLocalSchemaSnapshot();
   modificationLock.requestModificationLock();
   List<Lock> locks=new ArrayList<Lock>();
   try {
@@ -25,7 +22,7 @@
         while (clientTx.getCurrentRecordEntries().iterator().hasNext()) {
           for (          ORecordOperation txEntry : clientTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
           clientTx.clearRecordEntries();
-          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry,immutableSchema);
+          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry);
         }
         if (callback != null)         callback.run();
         endStorageTx();
@@ -47,6 +44,7 @@
     }
   }
   finally {
+    if (databaseRecord != null)     databaseRecord.getMetadata().clearThreadLocalSchemaSnapshot();
     for (    Lock lock : locks) {
       try {
         lock.unlock();

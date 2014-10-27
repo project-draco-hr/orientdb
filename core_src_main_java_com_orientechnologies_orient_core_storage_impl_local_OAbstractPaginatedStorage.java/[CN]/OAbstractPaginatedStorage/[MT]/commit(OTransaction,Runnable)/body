@@ -9,7 +9,26 @@
     for (    ORecordOperation txEntry : clientTx.getCurrentRecordEntries()) {
       if (!txEntry.getRecord().getIdentity().isNew())       allToLock.add(txEntry.getRecord());
     }
-    for (    ORecord oRecord : allToLock)     locks.add(lockManager.acquireExclusiveLock(oRecord.getIdentity()));
+    boolean allLocked=false;
+    lockLoop:     while (!allLocked) {
+      try {
+        for (        ORecord oRecord : allToLock) {
+          final Lock lock=lockManager.tryAcquireExclusiveLock(oRecord.getIdentity(),TX_RECORD_LOCK_TIMEOUT);
+          if (lock == null) {
+            for (            Lock rlock : locks)             rlock.unlock();
+            locks.clear();
+            continue lockLoop;
+          }
+ else           locks.add(lock);
+        }
+        allLocked=true;
+      }
+ catch (      InterruptedException e) {
+        for (        Lock lock : locks)         lock.unlock();
+        locks.clear();
+        throw new OStorageException("tx commit was interrupted",e);
+      }
+    }
     try {
       lock.acquireExclusiveLock();
       try {

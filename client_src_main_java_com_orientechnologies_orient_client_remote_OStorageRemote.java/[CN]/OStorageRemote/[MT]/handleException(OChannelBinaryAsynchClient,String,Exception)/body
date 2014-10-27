@@ -1,5 +1,8 @@
 {
-  if (exception instanceof OException) {
+  if (exception instanceof OIOException) {
+    exception=(Exception)exception.getCause();
+  }
+ else   if (exception instanceof OException) {
     if (iNetwork != null)     engine.getConnectionManager().release(iNetwork);
     throw (OException)exception;
   }
@@ -8,24 +11,25 @@
     throw new OStorageException(message,exception);
   }
   if (status != STATUS.OPEN)   return;
-  OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception);
-  try {
-    engine.getConnectionManager().remove(iNetwork);
+  if (iNetwork != null) {
+    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception);
+    try {
+      engine.getConnectionManager().remove(iNetwork);
+    }
+ catch (    Exception e) {
+    }
   }
- catch (  Exception e) {
-  }
+ else   OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",exception);
   final long lostConnectionTime=System.currentTimeMillis();
   final int currentMaxRetry;
   final int currentRetryDelay;
-synchronized (clusterConfiguration) {
-    if (!clusterConfiguration.isEmpty()) {
-      currentMaxRetry=1;
-      currentRetryDelay=0;
-    }
+  if (serverURLs.size() > 1) {
+    currentMaxRetry=1;
+    currentRetryDelay=0;
+  }
  else {
-      currentMaxRetry=connectionRetry;
-      currentRetryDelay=connectionRetryDelay;
-    }
+    currentMaxRetry=connectionRetry;
+    currentRetryDelay=connectionRetryDelay;
   }
   for (int retry=0; retry < currentMaxRetry; ++retry) {
     if (retry > 0 && currentRetryDelay > 0)     try {

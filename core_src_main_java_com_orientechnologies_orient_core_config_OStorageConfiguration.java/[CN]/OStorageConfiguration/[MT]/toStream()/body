@@ -1,5 +1,5 @@
 {
-  final StringBuilder buffer=new StringBuilder();
+  final StringBuilder buffer=new StringBuilder(8192);
   write(buffer,CURRENT_VERSION);
   write(buffer,name);
   write(buffer,schemaRecordId);
@@ -11,6 +11,7 @@
   write(buffer,dateTimeFormat);
   write(buffer,timeZone.getID());
   write(buffer,charset);
+  write(buffer,conflictStrategy);
   phySegmentToStream(buffer,fileTemplate);
   write(buffer,clusters.size());
   for (  OStorageClusterConfiguration c : clusters) {
@@ -21,37 +22,17 @@
     write(buffer,c.getId());
     write(buffer,c.getName());
     write(buffer,c.getDataSegmentId());
-    if (c instanceof OStoragePhysicalClusterConfigurationLocal) {
-      write(buffer,"p");
-      phySegmentToStream(buffer,(OStoragePhysicalClusterConfigurationLocal)c);
-      OStorageFileConfiguration holeFile=((OStoragePhysicalClusterConfigurationLocal)c).getHoleFile();
-      if (holeFile == null)       write(buffer,"e");
- else       write(buffer,"f");
-      if (holeFile != null)       fileToStream(buffer,holeFile);
-    }
- else     if (c instanceof OStoragePaginatedClusterConfiguration) {
+    if (c instanceof OStoragePaginatedClusterConfiguration) {
       write(buffer,"d");
       final OStoragePaginatedClusterConfiguration paginatedClusterConfiguration=(OStoragePaginatedClusterConfiguration)c;
       write(buffer,paginatedClusterConfiguration.useWal);
       write(buffer,paginatedClusterConfiguration.recordOverflowGrowFactor);
       write(buffer,paginatedClusterConfiguration.recordGrowFactor);
       write(buffer,paginatedClusterConfiguration.compression);
+      write(buffer,paginatedClusterConfiguration.conflictStrategy);
+      write(buffer,paginatedClusterConfiguration.getStatus().name().toString());
     }
   }
-  write(buffer,dataSegments.size());
-  for (  OStorageDataConfiguration d : dataSegments) {
-    if (d == null) {
-      write(buffer,-1);
-      continue;
-    }
-    write(buffer,d.id);
-    write(buffer,d.name);
-    phySegmentToStream(buffer,d);
-    fileToStream(buffer,d.holeFile);
-  }
-  fileToStream(buffer,txSegment);
-  write(buffer,txSegment.isSynchRecord());
-  write(buffer,txSegment.isSynchTx());
   write(buffer,properties.size());
   for (  OStorageEntryConfiguration e : properties)   entryToStream(buffer,e);
   write(buffer,binaryFormatVersion);

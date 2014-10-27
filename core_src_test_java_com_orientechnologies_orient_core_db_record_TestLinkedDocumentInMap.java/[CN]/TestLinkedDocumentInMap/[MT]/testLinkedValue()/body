@@ -1,0 +1,19 @@
+{
+  db.getMetadata().getSchema().createClass("PersonTest");
+  db.command(new OCommandSQL("delete from PersonTest")).execute();
+  ODocument jaimeDoc=new ODocument("PersonTest");
+  jaimeDoc.field("name","jaime");
+  jaimeDoc.save();
+  ODocument tyrionDoc=new ODocument("PersonTest");
+  tyrionDoc.fromJSON("{\"@type\":\"d\",\"name\":\"tyrion\",\"emergency_contact\":[{\"relationship\":\"brother\",\"contact\":" + jaimeDoc.toJSON() + "}]}");
+  tyrionDoc.save();
+  List<Map<String,OIdentifiable>> res=tyrionDoc.field("emergency_contact");
+  Map<String,OIdentifiable> doc=res.get(0);
+  Assert.assertTrue(doc.get("contact").getIdentity().isValid());
+  db.close();
+  db.open("admin","admin");
+  List<ODocument> result=db.query(new OSQLSynchQuery<ODocument>("select from " + tyrionDoc.getIdentity()));
+  res=result.get(0).field("emergency_contact");
+  doc=res.get(0);
+  Assert.assertTrue(doc.get("contact").getIdentity().isValid());
+}

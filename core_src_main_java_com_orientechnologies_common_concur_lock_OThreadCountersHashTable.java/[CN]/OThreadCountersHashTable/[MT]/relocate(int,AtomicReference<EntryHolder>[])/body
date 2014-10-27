@@ -1,0 +1,49 @@
+{
+  int startLevel=0;
+  final int tableSize=tables.length >> 1;
+  path_discovery:   while (true) {
+    if (startLevel >= THRESHOLD)     startLevel=0;
+    boolean found=false;
+    final int[] route=new int[10];
+    int depth=startLevel;
+    do {
+      EntryHolder entryHolder=tables[entryIndex].get();
+      while (entryHolder.markedForRelocation) {
+        helpRelocate(entryIndex,false,tables);
+        entryHolder=tables[entryIndex].get();
+      }
+      if (!entryIsEmpty(entryHolder)) {
+        route[depth]=entryIndex;
+        if (entryIndex < tableSize)         entryIndex=secondSubTableIndex(entryHolder.entry.hashCodes,tables.length);
+ else         entryIndex=firstSubTableIndex(entryHolder.entry.hashCodes,tables.length);
+        depth++;
+      }
+ else       found=true;
+    }
+ while (!found && depth < THRESHOLD);
+    if (found) {
+      for (int i=depth - 1; i >= 0; i--) {
+        final int index=route[i];
+        EntryHolder entryHolder=tables[index].get();
+        if (entryHolder.markedForRelocation) {
+          helpRelocate(index,false,tables);
+          entryHolder=tables[index].get();
+        }
+        if (entryIsEmpty(entryHolder))         continue;
+        final int destinationIndex=index < tableSize ? secondSubTableIndex(entryHolder.entry.hashCodes,tables.length) : firstSubTableIndex(entryHolder.entry.hashCodes,tables.length);
+        EntryHolder destinationEntry=tables[destinationIndex].get();
+        if (!entryIsEmpty(destinationEntry)) {
+          startLevel=i + 1;
+          entryIndex=destinationIndex;
+          continue path_discovery;
+        }
+        if (!helpRelocate(index,true,tables)) {
+          startLevel=i + 1;
+          entryIndex=destinationIndex;
+          continue path_discovery;
+        }
+      }
+    }
+    return found;
+  }
+}

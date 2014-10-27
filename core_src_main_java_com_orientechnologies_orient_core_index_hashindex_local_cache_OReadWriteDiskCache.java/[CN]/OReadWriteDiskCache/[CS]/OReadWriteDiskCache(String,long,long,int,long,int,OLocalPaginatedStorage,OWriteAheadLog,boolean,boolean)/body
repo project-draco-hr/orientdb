@@ -1,15 +1,20 @@
 {
-  this.storageName=storageName;
-  this.pageSize=pageSize;
-  initProfiler();
-  this.filePages=new HashMap<Long,Set<Long>>();
-  maxSize=normalizeMemory(readCacheMaxMemory,pageSize);
-  if (checkMinSize && maxSize < MIN_CACHE_SIZE)   maxSize=MIN_CACHE_SIZE;
-  this.writeCache=new OWOWCache(syncOnPageFlush,pageSize,writeGroupTTL,writeAheadLog,pageFlushInterval,normalizeMemory(writeCacheMaxMemory,pageSize),storageLocal,checkMinSize);
-  K_IN=maxSize >> 2;
-  K_OUT=maxSize >> 1;
-  am=new LRUList();
-  a1out=new LRUList();
-  a1in=new LRUList();
-  syncObject=new Object();
+  cacheLock.acquireWriteLock();
+  try {
+    this.storageName=storageName;
+    this.pageSize=pageSize;
+    initProfiler();
+    this.filePages=new ConcurrentHashMap<Long,Set<Long>>();
+    maxSize=normalizeMemory(readCacheMaxMemory,pageSize);
+    if (checkMinSize && maxSize < MIN_CACHE_SIZE)     maxSize=MIN_CACHE_SIZE;
+    this.writeCache=new OWOWCache(syncOnPageFlush,pageSize,writeGroupTTL,writeAheadLog,pageFlushInterval,normalizeMemory(writeCacheMaxMemory,pageSize),storageLocal,checkMinSize);
+    K_IN=maxSize >> 2;
+    K_OUT=maxSize >> 1;
+    am=new ConcurrentLRUList();
+    a1out=new ConcurrentLRUList();
+    a1in=new ConcurrentLRUList();
+  }
+  finally {
+    cacheLock.releaseWriteLock();
+  }
 }

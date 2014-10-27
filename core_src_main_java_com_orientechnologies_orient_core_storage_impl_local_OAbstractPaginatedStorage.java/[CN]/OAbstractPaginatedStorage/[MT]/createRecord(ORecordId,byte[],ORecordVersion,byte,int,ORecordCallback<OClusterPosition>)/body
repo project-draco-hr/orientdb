@@ -1,0 +1,65 @@
+{
+  checkOpeness();
+  checkLowDiskSpace();
+  final long timer=Orient.instance().getProfiler().startChrono();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  cluster.getExternalModificationLock().requestModificationLock();
+  try {
+    modificationLock.requestModificationLock();
+    try {
+      checkOpeness();
+      if (content == null)       throw new IllegalArgumentException("Record is null");
+      OPhysicalPosition ppos=new OPhysicalPosition(recordType);
+      try {
+        lock.acquireSharedLock();
+        try {
+          if (recordVersion.getCounter() > -1)           recordVersion.increment();
+ else           recordVersion=OVersionFactory.instance().createVersion();
+          makeStorageDirty();
+          atomicOperationsManager.startAtomicOperation();
+          try {
+            ppos=cluster.createRecord(content,recordVersion,recordType);
+            rid.clusterPosition=ppos.clusterPosition;
+            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+            if (context != null)             context.executeOperations(this);
+            atomicOperationsManager.endAtomicOperation(false);
+          }
+ catch (          Throwable throwable) {
+            atomicOperationsManager.endAtomicOperation(true);
+            if (throwable instanceof OOfflineClusterException)             throw (OOfflineClusterException)throwable;
+            OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,throwable);
+            try {
+              if (ppos.clusterPosition != null && ppos.clusterPosition.compareTo(OClusterPosition.INVALID_POSITION) != 0)               cluster.deleteRecord(ppos.clusterPosition);
+            }
+ catch (            IOException e) {
+              OLogManager.instance().error(this,"Error on removing record in cluster: " + cluster,e);
+            }
+            return null;
+          }
+          if (callback != null)           callback.call(rid,ppos.clusterPosition);
+          return new OStorageOperationResult<OPhysicalPosition>(ppos);
+        }
+  finally {
+          lock.releaseSharedLock();
+        }
+      }
+ catch (      IOException ioe) {
+        try {
+          if (ppos.clusterPosition != null && ppos.clusterPosition.compareTo(OClusterPosition.INVALID_POSITION) != 0)           cluster.deleteRecord(ppos.clusterPosition);
+        }
+ catch (        IOException e) {
+          OLogManager.instance().error(this,"Error on removing record in cluster: " + cluster,e);
+        }
+        OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,ioe);
+        return null;
+      }
+    }
+  finally {
+      modificationLock.releaseModificationLock();
+    }
+  }
+  finally {
+    cluster.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in database",timer,"db.*.createRecord");
+  }
+}

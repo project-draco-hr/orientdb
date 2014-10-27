@@ -1,11 +1,11 @@
 {
-  final ORecordInternal<?> rec=txEntry.getRecord();
+  final ORecord rec=txEntry.getRecord();
   if (txEntry.type != ORecordOperation.DELETED && !rec.isDirty())   return;
   final ORecordId rid=(ORecordId)rec.getIdentity();
   ORecordSerializationContext.pushContext();
   try {
-    if (rid.clusterId == ORID.CLUSTER_ID_INVALID && rec instanceof ODocument && ((ODocument)rec).getSchemaClass() != null) {
-      rid.clusterId=((ODocument)rec).getSchemaClass().getDefaultClusterId();
+    if (rid.clusterId == ORID.CLUSTER_ID_INVALID && rec instanceof ODocument && ((ODocument)rec).getImmutableSchemaClass() != null) {
+      rid.clusterId=((ODocument)rec).getImmutableSchemaClass().getDefaultClusterId();
     }
     final OCluster cluster=getClusterById(rid.clusterId);
     if (cluster.getName().equals(OMetadataDefault.CLUSTER_INDEX_NAME) || cluster.getName().equals(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME))     return;
@@ -24,13 +24,13 @@ case ORecordOperation.CREATED:
       if (rid.isNew()) {
         rid.clusterId=cluster.getId();
         final OPhysicalPosition ppos;
-        ppos=createRecord(-1,rid,stream,rec.getRecordVersion(),rec.getRecordType(),-1,null).getResult();
+        ppos=createRecord(rid,stream,rec.getRecordVersion(),ORecordInternal.getRecordType(rec),-1,null).getResult();
         rid.clusterPosition=ppos.clusterPosition;
         rec.getRecordVersion().copyFrom(ppos.recordVersion);
         clientTx.updateIdentityAfterCommit(oldRID,rid);
       }
  else {
-        rec.getRecordVersion().copyFrom(updateRecord(rid,rec.isContentChanged(),stream,rec.getRecordVersion(),rec.getRecordType(),-1,null).getResult());
+        rec.getRecordVersion().copyFrom(updateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getRecordVersion(),ORecordInternal.getRecordType(rec),-1,null).getResult());
       }
       break;
     }
@@ -41,7 +41,7 @@ case ORecordOperation.UPDATED:
       OLogManager.instance().warn(this,"Null serialization on committing updated record %s in transaction",rid);
       break;
     }
-    rec.getRecordVersion().copyFrom(updateRecord(rid,rec.isContentChanged(),stream,rec.getRecordVersion(),rec.getRecordType(),-1,null).getResult());
+    rec.getRecordVersion().copyFrom(updateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getRecordVersion(),ORecordInternal.getRecordType(rec),-1,null).getResult());
     break;
   }
 case ORecordOperation.DELETED:
@@ -54,6 +54,6 @@ case ORecordOperation.DELETED:
   finally {
 ORecordSerializationContext.pullContext();
 }
-rec.unsetDirty();
+ORecordInternal.unsetDirty(rec);
 if (rec instanceof OTxListener) ((OTxListener)rec).onEvent(txEntry,OTxListener.EVENT.AFTER_COMMIT);
 }

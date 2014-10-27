@@ -1,6 +1,24 @@
 {
-synchronized (syncObject) {
-    remove(cacheEntry.fileId,cacheEntry.pageIndex);
-    pinnedPages.put(new PinnedPage(cacheEntry.fileId,cacheEntry.pageIndex),cacheEntry);
+  Lock fileLock;
+  Lock pageLock;
+  cacheLock.acquireReadLock();
+  try {
+    fileLock=fileLockManager.acquireSharedLock(cacheEntry.fileId);
+    try {
+      pageLock=pageLockManager.acquireExclusiveLock(new PageKey(cacheEntry.fileId,cacheEntry.pageIndex));
+      try {
+        remove(cacheEntry.fileId,cacheEntry.pageIndex);
+        pinnedPages.put(new PinnedPage(cacheEntry.fileId,cacheEntry.pageIndex),cacheEntry);
+      }
+  finally {
+        pageLockManager.releaseLock(pageLock);
+      }
+    }
+  finally {
+      fileLockManager.releaseLock(fileLock);
+    }
+  }
+  finally {
+    cacheLock.releaseReadLock();
   }
 }

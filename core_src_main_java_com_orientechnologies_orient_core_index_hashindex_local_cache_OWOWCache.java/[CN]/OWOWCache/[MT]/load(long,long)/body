@@ -1,7 +1,8 @@
 {
-synchronized (syncObject) {
+  filesLock.acquireReadLock();
+  try {
     final GroupKey groupKey=new GroupKey(fileId,pageIndex >>> 4);
-    lockManager.acquireLock(Thread.currentThread(),groupKey,OLockManager.LOCK.SHARED);
+    Lock groupLock=lockManager.acquireSharedLock(groupKey);
     try {
       final WriteGroup writeGroup=writeGroups.get(groupKey);
       OCachePointer pagePointer;
@@ -17,7 +18,10 @@ synchronized (syncObject) {
       return pagePointer;
     }
   finally {
-      lockManager.releaseLock(Thread.currentThread(),groupKey,OLockManager.LOCK.SHARED);
+      lockManager.releaseLock(groupLock);
     }
+  }
+  finally {
+    filesLock.releaseReadLock();
   }
 }

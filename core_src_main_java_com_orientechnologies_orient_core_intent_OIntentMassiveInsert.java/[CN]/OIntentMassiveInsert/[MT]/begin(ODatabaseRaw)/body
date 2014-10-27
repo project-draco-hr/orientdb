@@ -1,0 +1,24 @@
+{
+  currentUser=iDatabase.getDatabaseOwner().getUser();
+  iDatabase.getDatabaseOwner().setUser(null);
+  ODatabaseComplexInternal<?> ownerDb=iDatabase.getDatabaseOwner();
+  if (ownerDb instanceof ODatabaseRecord) {
+    previousRetainRecords=((ODatabaseRecord)ownerDb).isRetainRecords();
+    ((ODatabaseRecord)ownerDb).setRetainRecords(false);
+    previousValidation=((ODatabaseRecord)ownerDb).isValidationEnabled();
+    if (previousValidation)     ((ODatabaseRecord)ownerDb).setValidationEnabled(false);
+  }
+  while (ownerDb.getDatabaseOwner() != ownerDb)   ownerDb=ownerDb.getDatabaseOwner();
+  if (ownerDb instanceof ODatabaseObject) {
+    previousRetainObjects=((ODatabaseObject)ownerDb).isRetainObjects();
+    ((ODatabaseObject)ownerDb).setRetainObjects(false);
+  }
+  removedHooks=new HashMap<ORecordHook,ORecordHook.HOOK_POSITION>();
+  HashMap<ORecordHook,ORecordHook.HOOK_POSITION> hooks=new HashMap<ORecordHook,ORecordHook.HOOK_POSITION>(ownerDb.getHooks());
+  for (  Map.Entry<ORecordHook,ORecordHook.HOOK_POSITION> hook : hooks.entrySet()) {
+    if (!(hook.getKey() instanceof OClassIndexManager)) {
+      removedHooks.put(hook.getKey(),hook.getValue());
+      ownerDb.unregisterHook(hook.getKey());
+    }
+  }
+}

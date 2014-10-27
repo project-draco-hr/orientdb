@@ -1,11 +1,18 @@
 {
   final Object key;
   if (entry.field("k") != null) {
-    final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
+    Object serKey=entry.field("k");
     try {
-      final ODocument keyContainer=new ODocument();
-      keyContainer.setLazyLoad(false);
-      ORecordSerializerSchemaAware2CSV.INSTANCE.fromString(serializedKey,keyContainer,null);
+      ODocument keyContainer=null;
+      if (serKey instanceof String) {
+        final String serializedKey=OStringSerializerHelper.decode((String)serKey);
+        keyContainer=new ODocument();
+        keyContainer.setLazyLoad(false);
+        ORecordSerializerSchemaAware2CSV.INSTANCE.fromString(serializedKey,keyContainer,null);
+      }
+ else       if (serKey instanceof ODocument) {
+        keyContainer=(ODocument)serKey;
+      }
       final Object storedKey=keyContainer.field("key");
       if (storedKey instanceof List)       key=new OCompositeKey((List<? extends Comparable<?>>)storedKey);
  else       if (Boolean.TRUE.equals(keyContainer.field("binary"))) {
@@ -21,8 +28,9 @@
   final List<ODocument> operations=entry.field("ops");
   if (operations != null) {
     for (    final ODocument op : operations) {
+      op.setLazyLoad(false);
       final int operation=(Integer)op.rawField("o");
-      final OIdentifiable value=op.field("v",OType.LINK);
+      final OIdentifiable value=op.field("v");
       if (operation == OPERATION.PUT.ordinal())       putInSnapshot(key,value,snapshot);
  else       if (operation == OPERATION.REMOVE.ordinal()) {
         if (value == null)         removeFromSnapshot(key,snapshot);

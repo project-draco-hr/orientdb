@@ -1,6 +1,7 @@
 {
   requestType=-1;
   clientTxId=0;
+  okSent=false;
   long timer=0;
   try {
     requestType=channel.readByte();
@@ -11,7 +12,7 @@
       if (!executeRequest()) {
         OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
         channel.clearInput();
-        sendError(clientTxId,new ONetworkProtocolException("Request not supported. Code: " + requestType));
+        sendErrorOrDropConnection(clientTxId,new ONetworkProtocolException("Request not supported. Code: " + requestType));
       }
     }
   finally {
@@ -23,13 +24,13 @@
     sendShutdown();
   }
 catch (  OException e) {
-    sendError(clientTxId,e);
+    sendErrorOrDropConnection(clientTxId,e);
   }
 catch (  RuntimeException e) {
-    sendError(clientTxId,e);
+    sendErrorOrDropConnection(clientTxId,e);
   }
 catch (  Throwable t) {
-    sendError(clientTxId,t);
+    sendErrorOrDropConnection(clientTxId,t);
   }
  finally {
     Orient.instance().getProfiler().stopChrono("server.network.requests","Total received requests",timer,"server.network.requests");

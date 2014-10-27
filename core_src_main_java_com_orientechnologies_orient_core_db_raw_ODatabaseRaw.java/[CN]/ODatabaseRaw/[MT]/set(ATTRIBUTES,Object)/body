@@ -1,6 +1,6 @@
 {
   if (iAttribute == null)   throw new IllegalArgumentException("attribute is null");
-  final String stringValue=iValue != null ? iValue.toString() : null;
+  final String stringValue=OStringSerializerHelper.getStringContent(iValue != null ? iValue.toString() : null);
 switch (iAttribute) {
 case STATUS:
     if (stringValue == null)     throw new IllegalArgumentException("DB status can't be null");
@@ -15,10 +15,12 @@ break;
 case TYPE:
 throw new IllegalArgumentException("Database type property is not supported");
 case DATEFORMAT:
+new SimpleDateFormat(stringValue).format(new Date());
 storage.getConfiguration().dateFormat=stringValue;
 storage.getConfiguration().update();
 break;
 case DATETIMEFORMAT:
+new SimpleDateFormat(stringValue).format(new Date());
 storage.getConfiguration().dateTimeFormat=stringValue;
 storage.getConfiguration().update();
 break;
@@ -40,16 +42,18 @@ storage.getConfiguration().setCharset(stringValue);
 storage.getConfiguration().update();
 break;
 case CUSTOM:
-if (iValue == null) throw new IllegalArgumentException("CUSTOM attribute value can't be null. expected <name> = <value> or clear");
-if (!iValue.toString().contains("=")) {
-if (iValue.toString().equalsIgnoreCase("clear")) {
+int indx=stringValue != null ? stringValue.indexOf('=') : -1;
+if (indx < 0) {
+if ("clear".equalsIgnoreCase(stringValue)) {
 clearCustomInternal();
 }
  else throw new IllegalArgumentException("Syntax error: expected <name> = <value> or clear, instead found: " + iValue);
 }
  else {
-final List<String> words=OStringSerializerHelper.smartSplit(iValue.toString(),'=');
-setCustomInternal(words.get(0).trim(),words.get(1).trim());
+String customName=stringValue.substring(0,indx).trim();
+String customValue=stringValue.substring(indx + 1).trim();
+if (customValue.isEmpty()) removeCustomInternal(customName);
+ else setCustomInternal(customName,customValue);
 }
 break;
 case CLUSTERSELECTION:
@@ -62,6 +66,10 @@ if (iValue instanceof Number) storage.getConfiguration().setMinimumClusters(((Nu
  else storage.getConfiguration().setMinimumClusters(Integer.parseInt(stringValue));
 }
  else storage.getConfiguration().setMinimumClusters(1);
+storage.getConfiguration().update();
+break;
+case CONFLICTSTRATEGY:
+storage.getConfiguration().setConflictStrategy(stringValue);
 storage.getConfiguration().update();
 break;
 default :

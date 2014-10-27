@@ -2,7 +2,7 @@
   if (limit == 0)   return Collections.emptyList();
   if (((OrientBaseGraph)graph).getRawGraph().getTransaction().isActive())   return new OrientGraphQueryIterable<Edge>(false,labels);
   if (((OrientBaseGraph)graph).isUseLightweightEdges())   return new OrientGraphQueryIterable<Edge>(false,labels);
-  final StringBuilder text=new StringBuilder();
+  final StringBuilder text=new StringBuilder(512);
   text.append(QUERY_SELECT_FROM);
   if (((OrientBaseGraph)graph).isUseClassForEdgeLabel() && labels != null && labels.length > 0) {
     if (labels.length == 1)     text.append(OrientBaseGraph.encodeClassName(labels[0]));
@@ -11,11 +11,10 @@
     }
   }
  else   text.append(OrientEdgeType.CLASS_NAME);
-  text.append(QUERY_WHERE);
-  manageFilters(text);
-  if (!((OrientBaseGraph)graph).isUseClassForEdgeLabel())   manageLabels(text);
+  final boolean usedWhere=manageFilters(text);
+  if (!((OrientBaseGraph)graph).isUseClassForEdgeLabel())   manageLabels(usedWhere,text);
   final OSQLSynchQuery<OIdentifiable> query=new OSQLSynchQuery<OIdentifiable>(text.toString());
   if (fetchPlan != null)   query.setFetchPlan(fetchPlan);
-  if (limit > 0 && limit < Long.MAX_VALUE)   query.setLimit((int)limit);
+  if (limit > 0 && limit < Integer.MAX_VALUE)   query.setLimit((int)limit);
   return new OrientElementIterable<Edge>(((OrientBaseGraph)graph),((OrientBaseGraph)graph).getRawGraph().query(query));
 }

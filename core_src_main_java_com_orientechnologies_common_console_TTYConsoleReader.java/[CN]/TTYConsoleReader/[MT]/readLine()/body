@@ -1,0 +1,230 @@
+{
+  String consoleInput="";
+  StringBuffer buffer=new StringBuffer();
+  currentPos=0;
+  historyBuffer=null;
+  int historyNum=history.size();
+  boolean hintedHistory=false;
+  while (true) {
+    boolean escape=false;
+    boolean ctrl=false;
+    int next=inStream.read();
+    if (next == 27) {
+      escape=true;
+      inStream.read();
+      next=inStream.read();
+    }
+    if (escape) {
+      if (next == 49) {
+        inStream.read();
+        next=inStream.read();
+      }
+      if (next == 53) {
+        ctrl=true;
+        next=inStream.read();
+      }
+      if (ctrl) {
+        if (next == RIGHT_CHAR) {
+          currentPos=buffer.indexOf(" ",currentPos) + 1;
+          if (currentPos == 0)           currentPos=buffer.length();
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+ else         if (next == LEFT_CHAR) {
+          if (currentPos > 1 && currentPos < buffer.length() && buffer.charAt(currentPos - 1) == ' ') {
+            currentPos=buffer.lastIndexOf(" ",(currentPos - 2)) + 1;
+          }
+ else {
+            currentPos=buffer.lastIndexOf(" ",currentPos) + 1;
+          }
+          if (currentPos < 0)           currentPos=0;
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+ else {
+        }
+      }
+ else {
+        if (next == UP_CHAR && !history.isEmpty()) {
+          if (history.size() > 0) {
+            StringBuffer cleaner=new StringBuffer();
+            for (int i=0; i < buffer.length(); i++) {
+              cleaner.append(" ");
+            }
+            rewriteConsole(cleaner,true);
+            if (!hintedHistory && (historyNum == history.size() || !buffer.toString().equals(history.get(historyNum)))) {
+              if (buffer.length() > 0) {
+                hintedHistory=true;
+                historyBuffer=buffer.toString();
+              }
+ else {
+                historyBuffer=null;
+              }
+            }
+            historyNum=getHintedHistoryIndexUp(historyNum);
+            if (historyNum > -1) {
+              buffer=new StringBuffer(history.get(historyNum));
+            }
+ else {
+              buffer=new StringBuffer(historyBuffer);
+            }
+            currentPos=buffer.length();
+            rewriteConsole(buffer,false);
+          }
+        }
+ else         if (next == DOWN_CHAR && !history.isEmpty()) {
+          if (history.size() > 0) {
+            StringBuffer cleaner=new StringBuffer();
+            for (int i=0; i < buffer.length(); i++) {
+              cleaner.append(" ");
+            }
+            rewriteConsole(cleaner,true);
+            historyNum=getHintedHistoryIndexDown(historyNum);
+            if (historyNum == history.size()) {
+              if (historyBuffer != null) {
+                buffer=new StringBuffer(historyBuffer);
+              }
+ else {
+                buffer=new StringBuffer("");
+              }
+            }
+ else {
+              buffer=new StringBuffer(history.get(historyNum));
+            }
+            currentPos=buffer.length();
+            rewriteConsole(buffer,false);
+          }
+        }
+ else         if (next == RIGHT_CHAR) {
+          if (currentPos < buffer.length()) {
+            currentPos++;
+            StringBuffer cleaner=new StringBuffer();
+            for (int i=0; i < buffer.length(); i++) {
+              cleaner.append(" ");
+            }
+            rewriteConsole(cleaner,true);
+            rewriteConsole(buffer,false);
+          }
+        }
+ else         if (next == LEFT_CHAR) {
+          if (currentPos > 0) {
+            currentPos--;
+            StringBuffer cleaner=new StringBuffer();
+            for (int i=0; i < buffer.length(); i++) {
+              cleaner.append(" ");
+            }
+            rewriteConsole(cleaner,true);
+            rewriteConsole(buffer,false);
+          }
+        }
+ else         if (next == END_CHAR) {
+          currentPos=buffer.length();
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+ else         if (next == BEGIN_CHAR) {
+          currentPos=0;
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+ else {
+        }
+      }
+    }
+ else {
+      if (next == NEW_LINE_CHAR) {
+        outStream.println();
+        break;
+      }
+ else       if (next == BACKSPACE_CHAR) {
+        if (buffer.length() > 0 && currentPos > 0) {
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          buffer.deleteCharAt(currentPos - 1);
+          currentPos--;
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+      }
+ else       if (next == DEL_CHAR) {
+        if (buffer.length() > 0 && currentPos >= 0 && currentPos < buffer.length()) {
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          buffer.deleteCharAt(currentPos);
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+      }
+ else       if (next == HORIZONTAL_TAB_CHAR) {
+        StringBuffer cleaner=new StringBuffer();
+        for (int i=0; i < buffer.length(); i++) {
+          cleaner.append(" ");
+        }
+        buffer=writeHint(buffer);
+        rewriteConsole(cleaner,true);
+        rewriteConsole(buffer,false);
+        currentPos=buffer.length();
+      }
+ else {
+        if ((next > UNIT_SEPARATOR_CHAR && next < BACKSPACE_CHAR) || next > BACKSPACE_CHAR) {
+          StringBuffer cleaner=new StringBuffer();
+          for (int i=0; i < buffer.length(); i++) {
+            cleaner.append(" ");
+          }
+          if (currentPos == buffer.length()) {
+            buffer.append((char)next);
+          }
+ else {
+            buffer.insert(currentPos,(char)next);
+          }
+          currentPos++;
+          rewriteConsole(cleaner,true);
+          rewriteConsole(buffer,false);
+        }
+ else {
+          outStream.println();
+          outStream.print(buffer);
+        }
+      }
+      historyNum=history.size();
+      hintedHistory=false;
+    }
+  }
+  consoleInput=buffer.toString();
+  history.remove(consoleInput);
+  history.add(consoleInput);
+  historyNum=history.size();
+  writeHistory(historyNum);
+  if (consoleInput.equals("clear")) {
+    outStream.flush();
+    for (int i=0; i < 150; i++) {
+      outStream.println();
+    }
+    outStream.print("\r");
+    outStream.print(console.getPrompt());
+    return readLine();
+  }
+ else {
+    return consoleInput;
+  }
+}

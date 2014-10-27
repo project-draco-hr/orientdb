@@ -1,0 +1,22 @@
+{
+  final String dbUrl=OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
+  if (dbUrl.startsWith("plocal:")) {
+    final String dbDirectory=serverInstance.getDatabaseDirectory();
+    if (!dbUrl.substring("plocal:".length()).startsWith(dbDirectory))     return;
+  }
+ else   if (dbUrl.startsWith("remote:"))   return;
+synchronized (cachedDatabaseConfiguration) {
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
+    if (cfg == null)     return;
+    if (iDatabase instanceof ODatabaseComplex<?> && !(iDatabase.getStorage() instanceof ODistributedStorage)) {
+      ODistributedStorage storage=storages.get(iDatabase.getURL());
+      if (storage == null) {
+        storage=new ODistributedStorage(serverInstance,(OStorageEmbedded)iDatabase.getStorage());
+        final ODistributedStorage oldStorage=storages.putIfAbsent(iDatabase.getURL(),storage);
+        if (oldStorage != null)         storage=oldStorage;
+      }
+      iDatabase.replaceStorage(storage);
+      installDbClustersLocalStrategy(iDatabase);
+    }
+  }
+}

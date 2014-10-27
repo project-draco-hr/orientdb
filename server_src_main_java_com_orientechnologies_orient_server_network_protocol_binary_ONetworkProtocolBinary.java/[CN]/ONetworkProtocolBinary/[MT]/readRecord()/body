@@ -23,7 +23,7 @@
     }
   }
  else {
-    final ORecordInternal<?> record=connection.database.load(rid,fetchPlanString,ignoreCache,loadTombstones,OStorage.LOCKING_STRATEGY.DEFAULT);
+    final ORecord record=connection.database.load(rid,fetchPlanString,ignoreCache,loadTombstones,OStorage.LOCKING_STRATEGY.DEFAULT);
     beginResponse();
     try {
       sendOk(clientTxId);
@@ -31,21 +31,21 @@
         channel.writeByte((byte)1);
         channel.writeBytes(getRecordBytes(record));
         channel.writeVersion(record.getRecordVersion());
-        channel.writeByte(record.getRecordType());
+        channel.writeByte(ORecordInternal.getRecordType(record));
         if (fetchPlanString.length() > 0) {
           if (record instanceof ODocument) {
-            final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
-            final Set<ORecord<?>> recordsToSend=new HashSet<ORecord<?>>();
+            final OFetchPlan fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
+            final Set<ORecord> recordsToSend=new HashSet<ORecord>();
             final ODocument doc=(ODocument)record;
             final OFetchListener listener=new ORemoteFetchListener(){
-              @Override protected void sendRecord(              ORecord<?> iLinked){
+              @Override protected void sendRecord(              ORecord iLinked){
                 recordsToSend.add(iLinked);
               }
             }
 ;
             final OFetchContext context=new ORemoteFetchContext();
             OFetchHelper.fetch(doc,doc,fetchPlan,listener,context,"");
-            for (            ORecord<?> d : recordsToSend) {
+            for (            ORecord d : recordsToSend) {
               if (d.getIdentity().isValid()) {
                 channel.writeByte((byte)2);
                 writeIdentifiable(d);

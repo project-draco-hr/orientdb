@@ -5,7 +5,9 @@
     graph.autoStartTransaction();
   }
   final ODocument outDocument=getRecord();
+  if (outDocument == null)   throw new IllegalArgumentException("source vertex is invalid (rid=" + getIdentity() + ")");
   final ODocument inDocument=inVertex.getRecord();
+  if (inDocument == null)   throw new IllegalArgumentException("destination vertex is invalid (rid=" + inVertex.getIdentity() + ")");
   final OrientEdge edge;
   OIdentifiable to;
   OIdentifiable from;
@@ -17,7 +19,8 @@
   if (canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
     from=rawElement;
     to=inDocument;
-    edge=new OrientEdge(graph,from,to,label);
+    if (settings.keepInMemoryReferences)     edge=new OrientEdge(graph,from.getIdentity(),to.getIdentity(),label);
+ else     edge=new OrientEdge(graph,from,to,label);
   }
  else {
     edge=new OrientEdge(graph,label,fields);
@@ -30,8 +33,8 @@
     from=from.getIdentity();
     to=to.getIdentity();
   }
-  createLink(outDocument,to,outFieldName);
-  createLink(inDocument,from,inFieldName);
+  createLink(graph,outDocument,to,outFieldName);
+  createLink(graph,inDocument,from,inFieldName);
   if (graph != null) {
     edge.save(iClusterName);
     inDocument.save();

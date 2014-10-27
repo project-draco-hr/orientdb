@@ -1,33 +1,74 @@
 {
+  checkLowDiskSpace();
+  final ODatabaseRecordInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
+  if (databaseRecord != null)   databaseRecord.getMetadata().makeThreadLocalSchemaSnapshot();
   modificationLock.requestModificationLock();
+  List<Lock> locks=new ArrayList<Lock>();
   try {
-    lock.acquireExclusiveLock();
-    try {
-      if (writeAheadLog == null)       throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
-      makeStorageDirty();
-      startStorageTx(clientTx);
-      final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
-      while (clientTx.getCurrentRecordEntries().iterator().hasNext()) {
-        for (        ORecordOperation txEntry : clientTx.getCurrentRecordEntries())         tmpEntries.add(txEntry);
-        clientTx.clearRecordEntries();
-        for (        ORecordOperation txEntry : tmpEntries)         commitEntry(clientTx,txEntry);
+    Set<ORecord> allToLock=new TreeSet<ORecord>();
+    for (    ORecordOperation txEntry : clientTx.getCurrentRecordEntries()) {
+      if (!txEntry.getRecord().getIdentity().isNew())       allToLock.add(txEntry.getRecord());
+    }
+    boolean allLocked=false;
+    lockLoop:     while (!allLocked) {
+      try {
+        for (        ORecord oRecord : allToLock) {
+          final Lock lock=lockManager.tryAcquireExclusiveLock(oRecord.getIdentity(),TX_RECORD_LOCK_TIMEOUT);
+          if (lock == null) {
+            for (            Lock rlock : locks)             rlock.unlock();
+            locks.clear();
+            continue lockLoop;
+          }
+ else           locks.add(lock);
+        }
+        allLocked=true;
       }
-      if (callback != null)       callback.run();
-      endStorageTx();
-      OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),false);
+ catch (      InterruptedException e) {
+        for (        Lock lock : locks)         lock.unlock();
+        locks.clear();
+        throw new OStorageException("tx commit was interrupted",e);
+      }
     }
- catch (    Exception e) {
-      OLogManager.instance().debug(this,"Error during transaction commit, transaction will be rolled back (tx-id=%d)",e,clientTx.getId());
-      rollback(clientTx);
-      if (e instanceof OException)       throw ((OException)e);
- else       throw new OStorageException("Error during transaction commit.",e);
-    }
+    try {
+      lock.acquireExclusiveLock();
+      try {
+        if (writeAheadLog == null)         throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
+        makeStorageDirty();
+        startStorageTx(clientTx);
+        final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
+        while (clientTx.getCurrentRecordEntries().iterator().hasNext()) {
+          for (          ORecordOperation txEntry : clientTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
+          clientTx.clearRecordEntries();
+          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry);
+        }
+        if (callback != null)         callback.run();
+        endStorageTx();
+        OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
+      }
+ catch (      Exception e) {
+        OLogManager.instance().debug(this,"Error during transaction commit, transaction will be rolled back (tx-id=%d)",e,clientTx.getId());
+        rollback(clientTx);
+        if (e instanceof OException)         throw ((OException)e);
+ else         throw new OStorageException("Error during transaction commit.",e);
+      }
  finally {
-      transaction.set(null);
-      lock.releaseExclusiveLock();
+        transaction.set(null);
+        lock.releaseExclusiveLock();
+      }
+    }
+  finally {
+      modificationLock.releaseModificationLock();
     }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (databaseRecord != null)     databaseRecord.getMetadata().clearThreadLocalSchemaSnapshot();
+    for (    Lock lock : locks) {
+      try {
+        lock.unlock();
+      }
+ catch (      Exception e) {
+        OLogManager.instance().debug(this,"Error on record unlock",e);
+      }
+    }
   }
 }

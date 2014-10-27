@@ -1,0 +1,95 @@
+{
+  iText=iText.trim();
+  final ArrayList<String> fields=new ArrayList<String>();
+  final StringBuilder buffer=new StringBuilder(64);
+  char stringBeginChar=' ';
+  char c;
+  int openBraket=0;
+  int openGraph=0;
+  boolean charFound;
+  boolean escape=false;
+  for (int i=0; i < iText.length(); ++i) {
+    c=iText.charAt(i);
+    if (!escape && c == '\\' && ((i + 1) < iText.length())) {
+      final char nextChar=iText.charAt(i + 1);
+      if (nextChar == 'u') {
+        i=readUnicode(iText,i + 2,buffer);
+      }
+ else       if (nextChar == 'n') {
+        buffer.append(stringBeginChar == ' ' ? "\n" : "\\\n");
+        i++;
+      }
+ else       if (nextChar == 'r') {
+        buffer.append(stringBeginChar == ' ' ? "\r" : "\\\r");
+        i++;
+      }
+ else       if (nextChar == 't') {
+        buffer.append(stringBeginChar == ' ' ? "\t" : "\\\t");
+        i++;
+      }
+ else       if (nextChar == 'f') {
+        buffer.append(stringBeginChar == ' ' ? "\f" : "\\\f");
+        i++;
+      }
+ else       if (stringBeginChar != ' ' && nextChar == '\'' || nextChar == '"') {
+        buffer.append('\\');
+        buffer.append(nextChar);
+        i++;
+      }
+ else       escape=true;
+      continue;
+    }
+    if (!escape && (c == '\'' || c == '"')) {
+      if (stringBeginChar != ' ') {
+        if (stringBeginChar == c) {
+          stringBeginChar=' ';
+          if (iIncludeStringSep)           buffer.append(c);
+          continue;
+        }
+      }
+ else {
+        stringBeginChar=c;
+        if (iIncludeStringSep)         buffer.append(c);
+        continue;
+      }
+    }
+ else     if (stringBeginChar == ' ') {
+      if (c == '[')       openBraket++;
+ else       if (c == ']')       openBraket--;
+ else       if (c == '{')       openGraph++;
+ else       if (c == '}')       openGraph--;
+ else       if (openBraket == 0 && openGraph == 0) {
+        charFound=false;
+        for (int sepIndex=0; sepIndex < iSeparatorChars.length(); ++sepIndex) {
+          if (iSeparatorChars.charAt(sepIndex) == c) {
+            charFound=true;
+            if (buffer.length() > 0) {
+              fields.add(buffer.toString());
+              buffer.setLength(0);
+            }
+            break;
+          }
+        }
+        if (charFound)         continue;
+      }
+      if (stringBeginChar == ' ') {
+        charFound=false;
+        for (int jumpIndex=0; jumpIndex < iJumpChars.length(); ++jumpIndex) {
+          if (iJumpChars.charAt(jumpIndex) == c) {
+            charFound=true;
+            break;
+          }
+        }
+        if (charFound)         continue;
+      }
+    }
+    buffer.append(c);
+    if (escape)     escape=false;
+  }
+  if (buffer.length() > 0) {
+    fields.add(buffer.toString());
+  }
+  String[] result=new String[fields.size()];
+  fields.toArray(result);
+  return result;
+}

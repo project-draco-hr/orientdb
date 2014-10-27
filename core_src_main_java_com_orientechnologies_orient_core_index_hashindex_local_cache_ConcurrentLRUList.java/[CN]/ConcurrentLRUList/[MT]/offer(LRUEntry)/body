@@ -1,0 +1,25 @@
+{
+  lruEntry.removeLock.readLock().lock();
+  try {
+    if (lruEntry.removed)     return;
+    ListNode tail=tailReference.get();
+    if (!lruEntry.equals(tail.entry)) {
+      final ListNode oldNode=lruEntry.listNode.get();
+      ListNode newNode=new ListNode(lruEntry,false);
+      if (lruEntry.listNode.compareAndSet(oldNode,newNode)) {
+        while (true) {
+          newNode.previous.set(tail);
+          if (tail.next.compareAndSet(null,newNode)) {
+            tailReference.compareAndSet(tail,newNode);
+            break;
+          }
+          tail=tailReference.get();
+        }
+        if (oldNode != null)         addToTrash(oldNode);
+      }
+    }
+  }
+  finally {
+    lruEntry.removeLock.readLock().unlock();
+  }
+}

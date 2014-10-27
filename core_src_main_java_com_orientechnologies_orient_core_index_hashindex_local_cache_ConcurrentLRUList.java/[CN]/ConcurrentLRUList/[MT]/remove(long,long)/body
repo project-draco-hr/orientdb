@@ -1,0 +1,17 @@
+{
+  CacheKey key=new CacheKey(fileId,pageIndex);
+  final LRUEntry valueToRemove=cache.remove(key);
+  if (valueToRemove == null)   return null;
+  valueToRemove.removeLock.writeLock().lock();
+  try {
+    valueToRemove.removed=true;
+    ListNode node=valueToRemove.listNode.get();
+    valueToRemove.listNode.lazySet(null);
+    if (node != null)     addToTrash(node);
+  }
+  finally {
+    valueToRemove.removeLock.writeLock().unlock();
+  }
+  purge();
+  return valueToRemove.entry;
+}

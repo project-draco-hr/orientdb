@@ -1,0 +1,21 @@
+{
+  final long fileId=LONG_SERIALIZER.deserializeFromDirectMemory(pointer,offset + FILE_ID_OFFSET);
+  final boolean durable=BOOLEAN_SERIALIZER.deserializeFromDirectMemory(pointer,offset + DURABLE_OFFSET);
+  if (BOOLEAN_SERIALIZER.deserializeFromDirectMemory(pointer,offset + EMBEDDED_OFFSET)) {
+    final int size=INT_SERIALIZER.deserializeFromDirectMemory(pointer,offset + EMBEDDED_SIZE_OFFSET);
+    final Set<OIdentifiable> underlying=new HashSet<OIdentifiable>(Math.max((int)(size / .75f) + 1,16));
+    long p=offset + EMBEDDED_VALUES_OFFSET;
+    for (int i=0; i < size; i++) {
+      underlying.add(LINK_SERIALIZER.deserializeFromDirectMemoryObject(pointer,p));
+      p+=RID_SIZE;
+    }
+    return new OIndexRIDContainer(fileId,underlying,durable);
+  }
+ else {
+    final long pageIndex=LONG_SERIALIZER.deserializeFromDirectMemory(pointer,offset + SBTREE_ROOTINDEX_OFFSET);
+    final int pageOffset=INT_SERIALIZER.deserializeFromDirectMemory(pointer,offset + SBTREE_ROOTOFFSET_OFFSET);
+    final OBonsaiBucketPointer rootPointer=new OBonsaiBucketPointer(pageIndex,pageOffset);
+    final OIndexRIDContainerSBTree underlying=new OIndexRIDContainerSBTree(fileId,rootPointer,durable);
+    return new OIndexRIDContainer(fileId,underlying,durable);
+  }
+}

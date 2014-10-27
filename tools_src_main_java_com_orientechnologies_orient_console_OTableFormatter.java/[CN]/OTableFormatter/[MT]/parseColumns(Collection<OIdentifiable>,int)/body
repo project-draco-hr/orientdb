@@ -1,9 +1,10 @@
 {
   final Map<String,Integer> columns=new LinkedHashMap<String,Integer>();
   for (  String c : prefixedColumns)   columns.put(c,minColumnSize);
+  boolean tempRids=false;
   int fetched=0;
   for (  OIdentifiable id : resultSet) {
-    ORecord<?> rec=id.getRecord();
+    ORecord rec=id.getRecord();
     for (    String c : prefixedColumns)     columns.put(c,getColumnSize(fetched,rec,c,columns.get(c)));
     if (rec instanceof ODocument) {
       ((ODocument)rec).setLazyLoad(false);
@@ -15,8 +16,10 @@
  else     if (rec instanceof ORecordBytes) {
       columns.put("value",maxWidthSize - 15);
     }
+    if (!tempRids && !rec.getIdentity().isPersistent())     tempRids=true;
     if (limit > -1 && fetched++ >= limit)     break;
   }
+  if (tempRids)   columns.remove("@RID");
   int width=0;
   for (  Entry<String,Integer> col : columns.entrySet())   width+=col.getValue();
   if (width > maxWidthSize) {
@@ -45,5 +48,6 @@
     Collections.reverse(orderedColumns);
     for (    Entry<String,Integer> col : orderedColumns)     columns.put(col.getKey(),col.getValue());
   }
+  if (tempRids)   columns.remove("@RID");
   return columns;
 }

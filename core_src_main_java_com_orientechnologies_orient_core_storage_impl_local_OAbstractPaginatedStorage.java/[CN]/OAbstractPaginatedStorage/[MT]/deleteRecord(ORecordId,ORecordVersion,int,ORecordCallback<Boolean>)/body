@@ -1,14 +1,15 @@
 {
   checkOpeness();
+  checkLowDiskSpace();
   final long timer=Orient.instance().getProfiler().startChrono();
   final OCluster cluster=getClusterById(rid.clusterId);
   cluster.getExternalModificationLock().requestModificationLock();
   try {
     modificationLock.requestModificationLock();
     try {
-      lock.acquireSharedLock();
+      Lock recordLock=lockManager.acquireExclusiveLock(rid);
       try {
-        lockManager.acquireLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+        lock.acquireSharedLock();
         try {
           final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
           if (ppos == null)           return new OStorageOperationResult<Boolean>(false);
@@ -22,17 +23,19 @@
             cluster.deleteRecord(ppos.clusterPosition);
             atomicOperationsManager.endAtomicOperation(false);
           }
- catch (          RuntimeException e) {
+ catch (          Throwable e) {
             atomicOperationsManager.endAtomicOperation(true);
+            OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
+            return new OStorageOperationResult<Boolean>(false);
           }
           return new OStorageOperationResult<Boolean>(true);
         }
   finally {
-          lockManager.releaseLock(Thread.currentThread(),rid,OLockManager.LOCK.EXCLUSIVE);
+          lock.releaseSharedLock();
         }
       }
   finally {
-        lock.releaseSharedLock();
+        lockManager.releaseLock(recordLock);
       }
     }
  catch (    IOException e) {

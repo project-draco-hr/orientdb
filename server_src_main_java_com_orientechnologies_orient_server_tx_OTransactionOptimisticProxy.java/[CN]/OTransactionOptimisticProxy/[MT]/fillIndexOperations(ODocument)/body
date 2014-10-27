@@ -16,13 +16,21 @@
       final List<ODocument> operations=entry.field("ops");
       if (operations == null)       continue;
       final Object key;
-      final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
       try {
-        if (serializedKey.equals("*"))         key=null;
+        ODocument keyContainer;
+        if (protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_24) {
+          final String serializedKey=OStringSerializerHelper.decode((String)entry.field("k"));
+          if (serializedKey.equals("*"))           keyContainer=null;
  else {
-          final ODocument keyContainer=new ODocument();
-          keyContainer.setLazyLoad(false);
-          keyContainer.fromString(serializedKey);
+            keyContainer=new ODocument();
+            keyContainer.setLazyLoad(false);
+            ORecordSerializerSchemaAware2CSV.INSTANCE.fromString(serializedKey,keyContainer,null);
+          }
+        }
+ else {
+          keyContainer=entry.field("k");
+        }
+        if (keyContainer != null) {
           final Object storedKey=keyContainer.field("key");
           if (storedKey instanceof List)           key=new OCompositeKey((List<? extends Comparable<?>>)storedKey);
  else           if (Boolean.TRUE.equals(keyContainer.field("binary"))) {
@@ -30,6 +38,7 @@
           }
  else           key=storedKey;
         }
+ else         key=null;
       }
  catch (      IOException ioe) {
         throw new OTransactionException("Error during index changes deserialization. ",ioe);
@@ -37,7 +46,7 @@
       for (      final ODocument op : operations) {
         final int operation=(Integer)op.rawField("o");
         final OTransactionIndexChanges.OPERATION indexOperation=OTransactionIndexChanges.OPERATION.values()[operation];
-        final OIdentifiable value=op.field("v",OType.LINK);
+        final OIdentifiable value=op.field("v");
         transactionIndexChanges.getChangesPerKey(key).add(value,indexOperation);
         if (value == null)         continue;
         final ORID rid=value.getIdentity();

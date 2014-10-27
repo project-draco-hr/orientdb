@@ -1,10 +1,11 @@
 {
   lock();
   try {
-    final OReentrantResourcePool<String,DB> pool=pools.get(iPoolName);
+    final OReentrantResourcePool<String,DB> pool=pools.remove(iPoolName);
     if (pool != null) {
       for (      DB db : pool.getResources()) {
-        if (db.getStorage().getStatus() == OStorage.STATUS.OPEN)         try {
+        final OStorage stg=db.getStorage();
+        if (stg != null && stg.getStatus() == OStorage.STATUS.OPEN)         try {
           OLogManager.instance().debug(this,"Closing pooled database '%s'...",db.getName());
           ((ODatabasePooled)db).forceClose();
           OLogManager.instance().debug(this,"OK",db.getName());
@@ -14,7 +15,6 @@
         }
       }
       pool.close();
-      pools.remove(iPoolName);
     }
   }
   finally {

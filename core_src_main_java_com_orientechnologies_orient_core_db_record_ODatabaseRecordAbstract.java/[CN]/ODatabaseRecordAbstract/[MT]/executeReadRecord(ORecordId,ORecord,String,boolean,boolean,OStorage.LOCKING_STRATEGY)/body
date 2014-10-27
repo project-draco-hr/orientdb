@@ -1,0 +1,45 @@
+{
+  checkOpeness();
+  getMetadata().makeThreadLocalSchemaSnapshot();
+  ORecordSerializationContext.pushContext();
+  try {
+    checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_READ,getClusterNameById(rid.getClusterId()));
+    ORecord record=getTransaction().getRecord(rid);
+    if (record == OTransactionRealAbstract.DELETED_RECORD)     return null;
+    if (record == null && !iIgnoreCache)     record=getLocalCache().findRecord(rid);
+    if (record != null) {
+      if (iRecord != null) {
+        iRecord.fromStream(record.toStream());
+        iRecord.getRecordVersion().copyFrom(record.getRecordVersion());
+        record=iRecord;
+      }
+      OFetchHelper.checkFetchPlanValid(iFetchPlan);
+      if (callbackHooks(TYPE.BEFORE_READ,record) == ORecordHook.RESULT.SKIP)       return null;
+      if (record.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)       record.reload();
+      if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK)       record.lock(false);
+ else       if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK)       record.lock(true);
+      callbackHooks(TYPE.AFTER_READ,record);
+      return (RET)record;
+    }
+    final ORawBuffer recordBuffer=underlying.read(rid,iFetchPlan,iIgnoreCache,loadTombstones,iLockingStrategy).getResult();
+    if (recordBuffer == null)     return null;
+    if (iRecord == null || ORecordInternal.getRecordType(iRecord) != recordBuffer.recordType)     iRecord=Orient.instance().getRecordFactoryManager().newInstance(recordBuffer.recordType);
+    ORecordInternal.fill(iRecord,rid,recordBuffer.version,recordBuffer.buffer,false);
+    if (iRecord.getRecordVersion().isTombstone())     return (RET)iRecord;
+    if (callbackHooks(TYPE.BEFORE_READ,iRecord) == RESULT.SKIP)     return null;
+    iRecord.fromStream(recordBuffer.buffer);
+    callbackHooks(TYPE.AFTER_READ,iRecord);
+    if (!iIgnoreCache)     getLocalCache().updateRecord(iRecord);
+    return (RET)iRecord;
+  }
+ catch (  OException e) {
+    throw e;
+  }
+catch (  Exception e) {
+    throw new ODatabaseException("Error on retrieving record " + rid,e);
+  }
+ finally {
+    ORecordSerializationContext.pullContext();
+    getMetadata().clearThreadLocalSchemaSnapshot();
+  }
+}

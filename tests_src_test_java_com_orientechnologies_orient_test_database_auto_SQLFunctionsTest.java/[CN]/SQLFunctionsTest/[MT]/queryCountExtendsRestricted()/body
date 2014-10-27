@@ -1,0 +1,34 @@
+{
+  OClass restricted=database.getMetadata().getSchema().getClass("ORestricted");
+  Assert.assertNotNull(restricted);
+  database.getMetadata().getSchema().createClass("QueryCountExtendsRestrictedClass",restricted);
+  OUser admin=database.getMetadata().getSecurity().getUser("admin");
+  OUser reader=database.getMetadata().getSecurity().getUser("reader");
+  ORole byPassRestrictedRole=database.getMetadata().getSecurity().createRole("byPassRestrictedRole",ORole.ALLOW_MODES.DENY_ALL_BUT);
+  byPassRestrictedRole.addRule(ODatabaseSecurityResources.BYPASS_RESTRICTED,ORole.PERMISSION_READ);
+  database.getMetadata().getSecurity().createUser("superReader","superReader","reader","byPassRestrictedRole");
+  ODocument docAdmin=new ODocument("QueryCountExtendsRestrictedClass");
+  docAdmin.field("_allowRead",new HashSet<OIdentifiable>(Arrays.asList(admin.getDocument().getIdentity())));
+  docAdmin.save();
+  ODocument docReader=new ODocument("QueryCountExtendsRestrictedClass");
+  docReader.field("_allowRead",new HashSet<OIdentifiable>(Arrays.asList(reader.getDocument().getIdentity())));
+  docReader.save();
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select count(*) from QueryCountExtendsRestrictedClass"));
+  ODocument count=result.get(0);
+  Assert.assertEquals(2L,count.field("count"));
+  database.close();
+  database.open("admin","admin");
+  result=database.query(new OSQLSynchQuery<ODocument>("select count(*) from QueryCountExtendsRestrictedClass"));
+  count=result.get(0);
+  Assert.assertEquals(2L,count.field("count"));
+  database.close();
+  database.open("reader","reader");
+  result=database.query(new OSQLSynchQuery<ODocument>("select count(*) from QueryCountExtendsRestrictedClass"));
+  count=result.get(0);
+  Assert.assertEquals(1L,count.field("count"));
+  database.close();
+  database.open("superReader","superReader");
+  result=database.query(new OSQLSynchQuery<ODocument>("select count(*) from QueryCountExtendsRestrictedClass"));
+  count=result.get(0);
+  Assert.assertEquals(2L,count.field("count"));
+}

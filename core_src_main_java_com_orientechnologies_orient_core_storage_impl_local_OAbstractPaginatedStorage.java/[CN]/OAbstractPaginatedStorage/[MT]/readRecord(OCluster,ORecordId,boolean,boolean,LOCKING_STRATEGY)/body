@@ -4,7 +4,6 @@
   final long timer=Orient.instance().getProfiler().startChrono();
   clusterSegment.getExternalModificationLock().requestModificationLock();
   try {
-    if (atomicLock)     lock.acquireSharedLock();
     try {
 switch (iLockingStrategy) {
 case DEFAULT:
@@ -16,27 +15,33 @@ case NONE:
 case KEEP_EXCLUSIVE_LOCK:
   rid.lock(true);
 }
+ORawBuffer buff;
+if (atomicLock) lock.acquireSharedLock();
 try {
-return clusterSegment.readRecord(rid.clusterPosition);
+buff=clusterSegment.readRecord(rid.clusterPosition);
 }
   finally {
+if (atomicLock) lock.releaseSharedLock();
+}
 switch (iLockingStrategy) {
 case DEFAULT:
-  rid.unlock();
+rid.unlock();
 break;
 case KEEP_EXCLUSIVE_LOCK:
 case NONE:
 case KEEP_SHARED_LOCK:
 break;
 }
-}
+return buff;
 }
  catch (IOException e) {
 OLogManager.instance().error(this,"Error on reading record " + rid + " (cluster: "+ clusterSegment+ ')',e);
+rid.unlock();
 return null;
 }
- finally {
-if (atomicLock) lock.releaseSharedLock();
+catch (RuntimeException e) {
+rid.unlock();
+throw e;
 }
 }
   finally {

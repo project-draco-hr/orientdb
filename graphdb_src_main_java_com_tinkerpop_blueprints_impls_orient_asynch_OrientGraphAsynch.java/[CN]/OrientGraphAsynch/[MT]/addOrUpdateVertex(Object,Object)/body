@@ -1,0 +1,50 @@
+{
+  beginAsynchOperation();
+  return new OrientVertexFuture(Orient.instance().getWorkers().submit(new Callable<OrientVertex>(){
+    @Override public OrientVertex call() throws Exception {
+      final OrientBaseGraph g=acquire();
+      try {
+        OrientVertex v=(OrientVertex)getVertex(id);
+        if (v != null) {
+          for (int retry=0; ; retry++) {
+            MERGE_RESULT result=mergeAndSaveRecord(retry,v.getRecord(),prop);
+switch (result) {
+case MERGED:
+              return v;
+case ERROR:
+            throw new ORecordDuplicatedException("Cannot create a new vertices",v.getIdentity());
+case RETRY:
+          if (retry > maxRetries)           break;
+      }
+    }
+  }
+  v=g.addVertex(id,prop);
+  verticesCreated.incrementAndGet();
+  return v;
+}
+ catch (ORecordDuplicatedException e) {
+  System.out.printf("\n*** Vertex already exists key=%d, v=%s",id,e.getRid());
+  for (int retry=0; ; retry++) {
+    indexUniqueException.incrementAndGet();
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Vertex %s already created, merge it and retry again (retry=%d/%d)",id,retry,maxRetries);
+    final ODocument existent=e.getRid().getRecord();
+    final MERGE_RESULT result=mergeAndSaveRecord(retry,existent,prop);
+switch (result) {
+case MERGED:
+      OrientVertex v=(OrientVertex)getVertex(existent);
+    return v;
+case RETRY:
+  break;
+case ERROR:
+throw e;
+}
+}
+}
+ finally {
+g.shutdown();
+endAsynchOperation();
+}
+}
+}
+));
+}

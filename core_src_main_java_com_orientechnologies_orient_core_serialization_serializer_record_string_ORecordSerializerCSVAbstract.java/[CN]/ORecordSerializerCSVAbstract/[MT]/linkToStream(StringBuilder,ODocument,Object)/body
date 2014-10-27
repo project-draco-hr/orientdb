@@ -1,0 +1,46 @@
+{
+  if (iLinked == null)   return null;
+  OIdentifiable resultRid=null;
+  ORID rid;
+  if (iLinked instanceof ORID) {
+    rid=(ORID)iLinked;
+    if (rid.isValid() && rid.isNew()) {
+      final ORecord record=rid.getRecord();
+      final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
+      if (database.getTransaction().isActive()) {
+        database.save((ORecord)record);
+      }
+ else       database.save((ORecord)record);
+      if (record != null)       rid=record.getIdentity();
+      resultRid=rid;
+    }
+  }
+ else {
+    if (iLinked instanceof String)     iLinked=new ORecordId((String)iLinked);
+ else     if (!(iLinked instanceof ORecord)) {
+      final String boundDocumentField=OObjectSerializerHelperManager.getInstance().getDocumentBoundField(iLinked.getClass());
+      if (boundDocumentField != null)       iLinked=OObjectSerializerHelperManager.getInstance().getFieldValue(iLinked,boundDocumentField);
+    }
+    if (!(iLinked instanceof OIdentifiable))     throw new IllegalArgumentException("Invalid object received. Expected a OIdentifiable but received type=" + iLinked.getClass().getName() + " and value="+ iLinked);
+    ORecord iLinkedRecord=((OIdentifiable)iLinked).getRecord();
+    rid=iLinkedRecord.getIdentity();
+    if ((rid.isNew() && !rid.isTemporary()) || iLinkedRecord.isDirty()) {
+      final ODatabaseRecordInternal database=ODatabaseRecordThreadLocal.INSTANCE.get();
+      if (iLinkedRecord instanceof ODocument) {
+        final OClass schemaClass=((ODocument)iLinkedRecord).getImmutableSchemaClass();
+        database.save(iLinkedRecord,schemaClass != null ? database.getClusterNameById(schemaClass.getClusterForNewInstance()) : null);
+      }
+ else       database.save(iLinkedRecord);
+      final ODatabaseComplex<?> dbOwner=database.getDatabaseOwner();
+      dbOwner.registerUserObjectAfterLinkSave(iLinkedRecord);
+      resultRid=iLinkedRecord;
+    }
+    final ODatabaseRecord database=ODatabaseRecordThreadLocal.INSTANCE.get();
+    if (iParentRecord != null && database instanceof ODatabaseRecord) {
+      final ODatabaseRecord db=database;
+      if (!db.isRetainRecords())       resultRid=iLinkedRecord.getIdentity();
+    }
+  }
+  if (rid.isValid())   rid.toString(buffer);
+  return resultRid;
+}

@@ -1,10 +1,17 @@
 {
   if (key == null)   return null;
-  if (key.equals("_class"))   return (T)getRecord().getSchemaClass().getName();
+  if (key.equals("_class"))   return (T)getRecord().getImmutableSchemaClass().getName();
  else   if (key.equals("_version"))   return (T)new Integer(getRecord().getVersion());
  else   if (key.equals("_rid"))   return (T)rawElement.getIdentity().toString();
   final Object fieldValue=getRecord().field(key);
-  if (fieldValue instanceof OIdentifiable)   return (T)graph.getElement(fieldValue);
- else   if (OMultiValue.isMultiValue(fieldValue) && OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable)   return (T)new OrientElementIterable<OrientElement>(graph,OMultiValue.getMultiValueIterable(fieldValue));
+  if (fieldValue instanceof OIdentifiable && !(((OIdentifiable)fieldValue).getRecord() instanceof ORecordBytes))   return (T)graph.getElement(fieldValue);
+ else   if (OMultiValue.isMultiValue(fieldValue) && OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable) {
+    final OIdentifiable firstValue=(OIdentifiable)OMultiValue.getFirstValue(fieldValue);
+    if (firstValue instanceof ODocument) {
+      final ODocument document=(ODocument)firstValue;
+      if (document.isEmbedded())       return (T)fieldValue;
+    }
+    return (T)new OrientElementIterable<OrientElement>(graph,OMultiValue.getMultiValueIterable(fieldValue));
+  }
   return (T)fieldValue;
 }

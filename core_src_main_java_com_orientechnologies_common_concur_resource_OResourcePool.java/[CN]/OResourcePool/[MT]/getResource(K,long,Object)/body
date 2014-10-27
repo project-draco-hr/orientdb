@@ -1,0 +1,34 @@
+{
+  try {
+    if (!sem.tryAcquire(maxWaitMillis,TimeUnit.MILLISECONDS))     throw new OLockException("No more resources available in pool. Requested resource: " + key);
+  }
+ catch (  InterruptedException e) {
+    Thread.currentThread().interrupt();
+    throw new OInterruptedException(e);
+  }
+  V res;
+  do {
+    res=resources.poll();
+    if (res != null) {
+      if (listener.reuseResource(key,additionalArgs,res)) {
+        break;
+      }
+ else       res=null;
+    }
+  }
+ while (!resources.isEmpty());
+  try {
+    if (res == null)     res=listener.createNewResource(key,additionalArgs);
+    resourcesOut.add(res);
+    created++;
+    return res;
+  }
+ catch (  RuntimeException e) {
+    sem.release();
+    throw e;
+  }
+catch (  Exception e) {
+    sem.release();
+    throw new OLockException("Error on creation of the new resource in the pool",e);
+  }
+}

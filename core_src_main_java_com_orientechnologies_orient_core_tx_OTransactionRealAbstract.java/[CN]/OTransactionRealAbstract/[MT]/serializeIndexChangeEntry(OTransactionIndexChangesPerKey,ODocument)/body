@@ -1,6 +1,5 @@
 {
-  final String key;
-  final ODocument keyContainer=new ODocument();
+  ODocument keyContainer=new ODocument();
   try {
     if (entry.key != null) {
       if (entry.key instanceof OCompositeKey) {
@@ -16,9 +15,8 @@
         keyContainer.field("key",entry.key);
         keyContainer.field("binary",false);
       }
-      key=ORecordSerializerSchemaAware2CSV.INSTANCE.toString(keyContainer,null,false).toString();
     }
- else     key=null;
+ else     keyContainer=null;
   }
  catch (  IOException ioe) {
     throw new OTransactionException("Error during index changes serialization. ",ioe);
@@ -26,16 +24,19 @@
   final List<ODocument> operations=new ArrayList<ODocument>();
   if (entry.entries != null && !entry.entries.isEmpty()) {
     for (    OTransactionIndexEntry e : entry.entries) {
-      final ODocument changeDoc=new ODocument().addOwner(indexDoc).setAllowChainedAccess(false);
+      final ODocument changeDoc=new ODocument().setAllowChainedAccess(false);
+      ODocumentInternal.addOwner((ODocument)changeDoc,indexDoc);
       changeDoc.field("o",e.operation.ordinal());
-      if (e.value instanceof ORecord<?> && e.value.getIdentity().isNew()) {
-        final ORecord<?> saved=temp2persistent.get(e.value.getIdentity());
+      if (e.value instanceof ORecord && e.value.getIdentity().isNew()) {
+        final ORecord saved=temp2persistent.get(e.value.getIdentity());
         if (saved != null)         e.value=saved;
- else         ((ORecord<?>)e.value).save();
+ else         ((ORecord)e.value).save();
       }
       changeDoc.field("v",e.value != null ? e.value.getIdentity() : null);
       operations.add(changeDoc);
     }
   }
-  return new ODocument().addOwner(indexDoc).setAllowChainedAccess(false).field("k",key != null ? OStringSerializerHelper.encode(key) : null).field("ops",operations,OType.EMBEDDEDLIST);
+  ODocument res=new ODocument();
+  ODocumentInternal.addOwner(res,indexDoc);
+  return res.setAllowChainedAccess(false).field("k",keyContainer,OType.EMBEDDED).field("ops",operations,OType.EMBEDDEDLIST);
 }

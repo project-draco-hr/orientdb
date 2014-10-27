@@ -5,23 +5,31 @@
   try {
     checkForKeyType(key);
     acquireExclusiveLock();
+    startStorageAtomicOperation();
     try {
       Set<OIdentifiable> values=indexEngine.get(key);
       if (values == null) {
         if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-          values=new OIndexRIDContainer(getName());
+          boolean durable=false;
+          if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))           durable=true;
+          values=new OIndexRIDContainer(getName(),durable);
         }
  else {
           values=new OMVRBTreeRIDSet(OGlobalConfiguration.MVRBTREE_RID_BINARY_THRESHOLD.getValueAsInteger());
           ((OMVRBTreeRIDSet)values).setAutoConvertToRecord(false);
         }
       }
-      if (!iSingleValue.getIdentity().isValid())       ((ORecord<?>)iSingleValue).save();
+      if (!iSingleValue.getIdentity().isValid())       ((ORecord)iSingleValue).save();
       values.add(iSingleValue.getIdentity());
       indexEngine.put(key,values);
+      commitStorageAtomicOperation();
       return this;
     }
-  finally {
+ catch (    RuntimeException e) {
+      rollbackStorageAtomicOperation();
+      throw new OIndexException("Error during insertion of key in index",e);
+    }
+ finally {
       releaseExclusiveLock();
     }
   }

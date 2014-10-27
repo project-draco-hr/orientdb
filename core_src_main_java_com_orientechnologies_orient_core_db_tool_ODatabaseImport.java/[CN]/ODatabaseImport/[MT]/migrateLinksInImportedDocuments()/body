@@ -6,23 +6,24 @@
     if (OMetadataDefault.CLUSTER_INDEX_NAME.equals(clusterName) || OMetadataDefault.CLUSTER_INTERNAL_NAME.equals(clusterName) || OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME.equals(clusterName))     continue;
     long documents=0;
     listener.onMessage("\n- Cluster " + clusterName + "...");
-    int clusterId=database.getClusterIdByName(clusterName);
+    final int clusterId=database.getClusterIdByName(clusterName);
+    final long clusterRecords=database.countClusterElements(clusterId);
     OStorage storage=database.getStorage();
     OPhysicalPosition[] positions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(0)));
     while (positions.length > 0) {
       for (      OPhysicalPosition position : positions) {
-        ORecord<?> record=database.load(new ORecordId(clusterId,position.clusterPosition));
+        ORecord record=database.load(new ORecordId(clusterId,position.clusterPosition));
         if (record instanceof ODocument) {
           ODocument document=(ODocument)record;
           rewriteLinksInDocument(document);
           documents++;
           totalDocuments++;
-          if (documents % 10000 == 0)           listener.onMessage("\n" + documents + " documents were processed...");
+          if (documents % 10000 == 0)           listener.onMessage("\n  - " + String.format("%,d",documents) + "/"+ String.format("%,d",clusterRecords)+ " "+ String.format("%.2f",(float)((float)documents * 100 / (float)clusterRecords))+ " documents processed...");
         }
       }
       positions=storage.higherPhysicalPositions(clusterId,positions[positions.length - 1]);
     }
-    listener.onMessage(" Processed: " + documents);
+    listener.onMessage(" Processed: " + String.format("%,d",documents));
   }
   listener.onMessage("\nTotal links updated: " + totalDocuments);
 }

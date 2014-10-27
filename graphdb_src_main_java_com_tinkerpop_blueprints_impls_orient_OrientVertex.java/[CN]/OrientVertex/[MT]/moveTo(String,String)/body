@@ -1,0 +1,38 @@
+{
+  final ORID oldIdentity=getIdentity().copy();
+  final ODocument doc=((ODocument)rawElement.getRecord()).copy();
+  final Iterable<Edge> outEdges=getEdges(Direction.OUT);
+  final Iterable<Edge> inEdges=getEdges(Direction.IN);
+  if (iClassName != null)   doc.setClassName(iClassName);
+  doc.setDirty();
+  ORecordInternal.setIdentity(doc,new ORecordId());
+  if (iClusterName != null)   doc.save(iClusterName);
+ else   doc.save();
+  final ORID newIdentity=doc.getIdentity();
+  for (  Edge e : outEdges) {
+    final OrientEdge oe=(OrientEdge)e;
+    if (oe.isLightweight()) {
+      final OrientVertex inV=oe.getVertex(Direction.IN);
+      final String inFieldName=OrientVertex.getConnectionFieldName(Direction.IN,oe.getLabel(),graph.isUseVertexFieldsForEdgeLabels());
+      replaceLinks(inV.getRecord(),inFieldName,oldIdentity,newIdentity);
+    }
+ else {
+      oe.vOut=newIdentity;
+    }
+  }
+  for (  Edge e : inEdges) {
+    final OrientEdge oe=(OrientEdge)e;
+    if (oe.isLightweight()) {
+      final OrientVertex outV=oe.getVertex(Direction.OUT);
+      final String outFieldName=OrientVertex.getConnectionFieldName(Direction.OUT,oe.getLabel(),graph.isUseVertexFieldsForEdgeLabels());
+      replaceLinks(outV.getRecord(),outFieldName,oldIdentity,newIdentity);
+    }
+ else {
+      oe.vIn=newIdentity;
+    }
+  }
+  doc.save();
+  final ORecord oldRecord=oldIdentity.getRecord();
+  if (oldRecord != null)   oldRecord.delete();
+  return newIdentity;
+}

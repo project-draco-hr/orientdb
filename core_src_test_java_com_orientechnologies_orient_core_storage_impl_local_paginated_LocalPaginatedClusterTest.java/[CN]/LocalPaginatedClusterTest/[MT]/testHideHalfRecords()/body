@@ -3,7 +3,7 @@
   long seed=System.currentTimeMillis();
   MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(seed);
   System.out.println("testHideHalfRecords seed : " + seed);
-  Map<OClusterPosition,byte[]> positionRecordMap=new HashMap<OClusterPosition,byte[]>();
+  Map<Long,byte[]> positionRecordMap=new HashMap<Long,byte[]>();
   ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
   recordVersion.increment();
   recordVersion.increment();
@@ -16,10 +16,10 @@
   }
   int hiddenRecords=0;
   Assert.assertEquals(records,paginatedCluster.getEntries());
-  Set<OClusterPosition> hiddenPositions=new HashSet<OClusterPosition>();
-  Iterator<OClusterPosition> positionIterator=positionRecordMap.keySet().iterator();
+  Set<Long> hiddenPositions=new HashSet<Long>();
+  Iterator<Long> positionIterator=positionRecordMap.keySet().iterator();
   while (positionIterator.hasNext()) {
-    OClusterPosition clusterPosition=positionIterator.next();
+    long clusterPosition=positionIterator.next();
     if (mersenneTwisterFast.nextBoolean()) {
       hiddenPositions.add(clusterPosition);
       Assert.assertTrue(paginatedCluster.hideRecord(clusterPosition));
@@ -29,11 +29,11 @@
     }
   }
   Assert.assertEquals(paginatedCluster.getEntries(),records - hiddenRecords);
-  for (  OClusterPosition deletedPosition : hiddenPositions) {
+  for (  long deletedPosition : hiddenPositions) {
     Assert.assertNull(paginatedCluster.readRecord(deletedPosition));
     Assert.assertFalse(paginatedCluster.hideRecord(deletedPosition));
   }
-  for (  Map.Entry<OClusterPosition,byte[]> entry : positionRecordMap.entrySet()) {
+  for (  Map.Entry<Long,byte[]> entry : positionRecordMap.entrySet()) {
     ORawBuffer rawBuffer=paginatedCluster.readRecord(entry.getKey());
     Assert.assertNotNull(rawBuffer);
     Assert.assertEquals(rawBuffer.version,recordVersion);

@@ -1,0 +1,40 @@
+{
+  if (content == null)   throw new IllegalArgumentException("Record is null");
+  try {
+    if (recordVersion.getCounter() > -1)     recordVersion.increment();
+ else     recordVersion=OVersionFactory.instance().createVersion();
+    makeStorageDirty();
+    atomicOperationsManager.startAtomicOperation();
+    try {
+      ppos=cluster.createRecord(content,recordVersion,recordType);
+      rid.clusterPosition=ppos.clusterPosition;
+      final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+      if (context != null)       context.executeOperations(this);
+      atomicOperationsManager.endAtomicOperation(false);
+    }
+ catch (    Throwable throwable) {
+      atomicOperationsManager.endAtomicOperation(true);
+      if (throwable instanceof OOfflineClusterException)       throw (OOfflineClusterException)throwable;
+      OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,throwable);
+      try {
+        if (ppos.clusterPosition != ORID.CLUSTER_POS_INVALID)         cluster.deleteRecord(ppos.clusterPosition);
+      }
+ catch (      IOException e) {
+        OLogManager.instance().error(this,"Error on removing record in cluster: " + cluster,e);
+      }
+      return null;
+    }
+    if (callback != null)     callback.call(rid,ppos.clusterPosition);
+    return new OStorageOperationResult<OPhysicalPosition>(ppos);
+  }
+ catch (  IOException ioe) {
+    try {
+      if (ppos.clusterPosition != ORID.CLUSTER_POS_INVALID)       cluster.deleteRecord(ppos.clusterPosition);
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,e);
+    }
+    OLogManager.instance().error(this,"Error on creating record in cluster: " + cluster,ioe);
+    throw new OStorageException("Error during record deletion",ioe);
+  }
+}

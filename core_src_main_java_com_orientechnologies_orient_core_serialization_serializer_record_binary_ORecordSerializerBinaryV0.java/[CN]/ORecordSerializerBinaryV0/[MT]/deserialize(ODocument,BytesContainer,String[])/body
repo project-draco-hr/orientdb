@@ -3,10 +3,13 @@
   if (className.length() != 0)   document.setClassNameIfExists(className);
   int last=0;
   String field;
+  int unmarshalledFields=0;
   while (true) {
     OGlobalProperty prop=null;
     final int len=OVarIntSerializer.readAsInteger(bytes);
-    if (len == 0)     break;
+    if (len == 0) {
+      break;
+    }
  else     if (len > 0) {
       final String res=new String(bytes.bytes,bytes.offset,len,utf8);
       bytes.skip(len);
@@ -36,7 +39,18 @@
       document.field(field,value,type);
     }
  else     document.field(field,(Object)null);
+    boolean exit=false;
+    if (iFields != null) {
+      for (int i=0; i < iFields.length; ++i) {
+        if (field.equals(iFields[i])) {
+          unmarshalledFields++;
+          if (unmarshalledFields >= iFields.length)           exit=true;
+          break;
+        }
+      }
+      if (exit)       break;
+    }
   }
-  ORecordInternal.clearSource(document);
+  if (iFields == null || iFields.length == 0)   ORecordInternal.clearSource(document);
   if (last > bytes.offset)   bytes.offset=last;
 }

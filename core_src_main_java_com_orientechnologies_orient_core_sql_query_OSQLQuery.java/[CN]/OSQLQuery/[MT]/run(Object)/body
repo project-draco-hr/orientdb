@@ -1,6 +1,12 @@
 {
   final ODatabaseRecordInternal database=ODatabaseRecordThreadLocal.INSTANCE.get();
   if (database == null)   throw new OQueryParsingException("No database configured");
-  setParameters(iArgs);
-  return (List<T>)database.getStorage().command(this);
+  database.getMetadata().makeThreadLocalSchemaSnapshot();
+  try {
+    setParameters(iArgs);
+    return (List<T>)database.getStorage().command(this);
+  }
+  finally {
+    database.getMetadata().clearThreadLocalSchemaSnapshot();
+  }
 }

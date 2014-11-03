@@ -1,12 +1,19 @@
 {
   try {
     if (status == STATUS.OPEN)     throw new IllegalStateException("Database " + getName() + " is already open");
-    if (storage == null)     storage=Orient.instance().loadStorage(url);
-    storage.open(iUserName,iUserPassword,properties);
+    if (storage.isClosed()) {
+      storage.open(iUserName,iUserPassword,properties);
+    }
+ else     if (storage instanceof OStorageProxy) {
+      final String name=((OStorageProxy)storage).getUserName();
+      if (!name.equals(iUserName)) {
+        storage.close();
+        storage.open(iUserName,iUserPassword,properties);
+      }
+    }
     status=STATUS.OPEN;
   }
  catch (  OStorageException e) {
-    Orient.instance().unregisterStorage(storage);
     throw e;
   }
 catch (  OException e) {

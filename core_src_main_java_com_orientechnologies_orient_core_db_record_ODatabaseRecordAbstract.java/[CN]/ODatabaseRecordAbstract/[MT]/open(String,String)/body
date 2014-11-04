@@ -4,9 +4,14 @@
     super.open(iUserName,iUserPassword);
     initAtFirstOpen(iUserName,iUserPassword);
     if (!(getStorage() instanceof OStorageProxy)) {
-      user=metadata.getSecurity().authenticate(iUserName,iUserPassword);
+      final OSchemaProxy schema=getMetadata().getSchema();
+      if (user == null || user.getVersion() != schema.getVersion() || !user.getName().equalsIgnoreCase(iUserName)) {
+        final OUser usr=metadata.getSecurity().authenticate(iUserName,iUserPassword);
+        if (usr != null)         user=new OImmutableUser(schema.getVersion(),usr);
+ else         user=null;
+        checkSecurity(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);
+      }
     }
-    checkSecurity(ODatabaseSecurityResources.DATABASE,ORole.PERMISSION_READ);
     callOnOpenListeners();
   }
  catch (  OException e) {

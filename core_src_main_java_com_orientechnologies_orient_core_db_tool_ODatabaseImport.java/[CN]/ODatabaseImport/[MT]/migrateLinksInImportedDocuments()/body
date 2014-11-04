@@ -1,10 +1,14 @@
 {
-  listener.onMessage("\nStarted migration of links (-migrateLinks=true). Links are going to be updated according to new RIDs:");
+  listener.onMessage("\n\nStarted migration of links (-migrateLinks=true). Links are going to be updated according to new RIDs:");
+  final long begin=System.currentTimeMillis();
+  long last=begin;
+  long documentsLastLap=0;
   long totalDocuments=0;
   Collection<String> clusterNames=database.getClusterNames();
   for (  String clusterName : clusterNames) {
     if (OMetadataDefault.CLUSTER_INDEX_NAME.equals(clusterName) || OMetadataDefault.CLUSTER_INTERNAL_NAME.equals(clusterName) || OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME.equals(clusterName))     continue;
     long documents=0;
+    String prefix="";
     listener.onMessage("\n- Cluster " + clusterName + "...");
     final int clusterId=database.getClusterIdByName(clusterName);
     final long clusterRecords=database.countClusterElements(clusterId);
@@ -17,13 +21,20 @@
           ODocument document=(ODocument)record;
           rewriteLinksInDocument(document);
           documents++;
+          documentsLastLap++;
           totalDocuments++;
-          if (documents % 10000 == 0)           listener.onMessage("\n  - " + String.format("%,d",documents) + "/"+ String.format("%,d",clusterRecords)+ " "+ String.format("%.2f",(float)((float)documents * 100 / (float)clusterRecords))+ " documents processed...");
+          final long now=System.currentTimeMillis();
+          if (now - last > IMPORT_RECORD_DUMP_LAP_EVERY_MS) {
+            listener.onMessage(String.format("\n--- Migrated %,d of %,d records (%,.2f/sec)",documents,clusterRecords,(float)documentsLastLap * 1000 / (float)IMPORT_RECORD_DUMP_LAP_EVERY_MS));
+            last=now;
+            documentsLastLap=0;
+            prefix="\n---";
+          }
         }
       }
       positions=storage.higherPhysicalPositions(clusterId,positions[positions.length - 1]);
     }
-    listener.onMessage(" Processed: " + String.format("%,d",documents));
+    listener.onMessage(String.format("%s Completed migration of %,d records in current cluster",prefix,documents));
   }
-  listener.onMessage("\nTotal links updated: " + totalDocuments);
+  listener.onMessage(String.format("\nTotal links updated: %,d",totalDocuments));
 }

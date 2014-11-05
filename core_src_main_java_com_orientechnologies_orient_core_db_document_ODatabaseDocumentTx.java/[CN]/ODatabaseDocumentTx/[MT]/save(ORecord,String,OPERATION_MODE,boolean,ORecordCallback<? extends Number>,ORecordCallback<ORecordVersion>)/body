@@ -1,11 +1,14 @@
 {
   checkOpeness();
-  if (!(iRecord instanceof ODocument))   return (RET)super.save(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  if (!(iRecord instanceof ODocument))   return (RET)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
   ODocument doc=(ODocument)iRecord;
   if (iForceCreate || !doc.getIdentity().isValid()) {
     if (doc.getClassName() != null)     checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_CREATE,doc.getClassName());
     final OClass schemaClass=doc.getImmutableSchemaClass();
-    if (iClusterName == null && schemaClass != null)     iClusterName=getClusterNameById(schemaClass.getClusterForNewInstance(doc));
+    if (iClusterName == null && schemaClass != null) {
+      if (schemaClass.isAbstract())       throw new OSchemaException("Document belongs to abstract class " + schemaClass.getName() + " and can not be saved");
+      iClusterName=getClusterNameById(schemaClass.getClusterForNewInstance(doc));
+    }
     int id=getClusterIdByName(iClusterName);
     if (id == -1)     throw new IllegalArgumentException("Cluster name " + iClusterName + " is not configured");
     final int[] clusterIds;
@@ -22,6 +25,6 @@
   }
   doc.validate();
   ODocumentInternal.convertAllMultiValuesToTrackedVersions(doc);
-  doc=super.save(doc,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  doc=(ODocument)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
   return (RET)doc;
 }

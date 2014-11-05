@@ -1,0 +1,51 @@
+{
+  setCurrentDatabaseinThreadLocal();
+  try {
+    if (status == STATUS.OPEN)     throw new IllegalStateException("Database " + getName() + " is already open");
+    if (storage == null)     storage=Orient.instance().loadStorage(url);
+    if (iInitialSettings != null) {
+      final OContextConfiguration ctxCfg=storage.getConfiguration().getContextConfiguration();
+      for (      Map.Entry<OGlobalConfiguration,Object> e : iInitialSettings.entrySet()) {
+        ctxCfg.setValue(e.getKey(),e.getValue());
+      }
+    }
+    storage.create(properties);
+    status=STATUS.OPEN;
+    componentsFactory=getStorage().getComponentsFactory();
+    sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
+      @Override public OSBTreeCollectionManager call() throws Exception {
+        Class<? extends OSBTreeCollectionManager> managerClass=getStorage().getCollectionManagerClass();
+        if (managerClass == null) {
+          OLogManager.instance().warn(this,"Current implementation of storage does not support sbtree collections");
+          return null;
+        }
+ else {
+          return managerClass.newInstance();
+        }
+      }
+    }
+));
+    localCache.startup();
+    getStorage().getConfiguration().setRecordSerializer(getSerializer().toString());
+    getStorage().getConfiguration().setRecordSerializerVersion(getSerializer().getCurrentVersion());
+    getStorage().getConfiguration().update();
+    if (!(getStorage() instanceof OStorageProxy))     installHooks();
+    metadata=new OMetadataDefault();
+    metadata.create();
+    registerHook(new OSecurityTrackerHook(metadata.getSecurity()),ORecordHook.HOOK_POSITION.LAST);
+    final OUser usr=getMetadata().getSecurity().getUser(OUser.ADMIN);
+    if (usr == null)     user=null;
+ else     user=new OImmutableUser(getMetadata().getSecurity().getVersion(),usr);
+    if (!metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))     metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
+    for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreate(getDatabaseOwner());
+    for (    ODatabaseListener listener : browseListeners())     try {
+      listener.onCreate(this);
+    }
+ catch (    Throwable ignore) {
+    }
+  }
+ catch (  Exception e) {
+    throw new ODatabaseException("Cannot create database",e);
+  }
+  return (DB)this;
+}

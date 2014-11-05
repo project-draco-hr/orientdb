@@ -21,7 +21,12 @@
       callbackHooks(TYPE.AFTER_READ,record);
       return (RET)record;
     }
-    final ORawBuffer recordBuffer=underlying.read(rid,iFetchPlan,iIgnoreCache,loadTombstones,iLockingStrategy).getResult();
+    final ORawBuffer recordBuffer;
+    if (!rid.isValid())     recordBuffer=null;
+ else {
+      OFetchHelper.checkFetchPlanValid(iFetchPlan);
+      recordBuffer=storage.readRecord(rid,iFetchPlan,iIgnoreCache,null,loadTombstones,iLockingStrategy).getResult();
+    }
     if (recordBuffer == null)     return null;
     if (iRecord == null || ORecordInternal.getRecordType(iRecord) != recordBuffer.recordType)     iRecord=Orient.instance().getRecordFactoryManager().newInstance(recordBuffer.recordType);
     ORecordInternal.fill(iRecord,rid,recordBuffer.version,recordBuffer.buffer,false);
@@ -32,11 +37,12 @@
     if (!iIgnoreCache)     getLocalCache().updateRecord(iRecord);
     return (RET)iRecord;
   }
- catch (  OException e) {
-    throw e;
+ catch (  OOfflineClusterException t) {
+    throw t;
   }
-catch (  Exception e) {
-    throw new ODatabaseException("Error on retrieving record " + rid,e);
+catch (  Throwable t) {
+    if (rid.isTemporary())     throw new ODatabaseException("Error on retrieving record using temporary RecordId: " + rid,t);
+ else     throw new ODatabaseException("Error on retrieving record " + rid + " (cluster: "+ storage.getPhysicalClusterNameById(rid.clusterId)+ ")",t);
   }
  finally {
     ORecordSerializationContext.pullContext();

@@ -35,7 +35,18 @@
       if (!record.isDirty())       return (RET)record;
       final ORecordVersion realVersion=!mvcc || iVersion.isUntracked() ? OVersionFactory.instance().createUntrackedVersion() : record.getRecordVersion();
       try {
-        operationResult=underlying.save(rid,ORecordInternal.isContentChanged(record),stream == null ? new byte[0] : stream,realVersion,ORecordInternal.getRecordType(record),iMode.ordinal(),iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+        boolean updateContent=ORecordInternal.isContentChanged(record);
+        byte[] content=(stream == null) ? new byte[0] : stream;
+        byte recordType=ORecordInternal.getRecordType(record);
+        int mode=iMode.ordinal();
+        Orient.instance().getRecordFactoryManager().getRecordTypeClass(recordType);
+        if (iForceCreate || ORecordId.isNew(rid.clusterPosition)) {
+          final OStorageOperationResult<OPhysicalPosition> ppos=storage.createRecord(rid,content,iVersion,recordType,mode,(ORecordCallback<Long>)iRecordCreatedCallback);
+          operationResult=new OStorageOperationResult<ORecordVersion>(ppos.getResult().recordVersion,ppos.isMoved());
+        }
+ else {
+          operationResult=storage.updateRecord(rid,updateContent,content,iVersion,recordType,mode,iRecordUpdatedCallback);
+        }
         final ORecordVersion version=operationResult.getResult();
         if (isNew) {
           ((ORecordId)record.getIdentity()).copyFrom(rid);

@@ -1,7 +1,18 @@
 {
   setCurrentDatabaseinThreadLocal();
   try {
-    super.open(iUserName,iUserPassword);
+    if (status == STATUS.OPEN)     throw new IllegalStateException("Database " + getName() + " is already open");
+    if (storage.isClosed()) {
+      storage.open(iUserName,iUserPassword,properties);
+    }
+ else     if (storage instanceof OStorageProxy) {
+      final String name=((OStorageProxy)storage).getUserName();
+      if (!name.equals(iUserName)) {
+        storage.close();
+        storage.open(iUserName,iUserPassword,properties);
+      }
+    }
+    status=STATUS.OPEN;
     initAtFirstOpen(iUserName,iUserPassword);
     if (!(getStorage() instanceof OStorageProxy)) {
       final OSchemaProxy schema=getMetadata().getSchema();

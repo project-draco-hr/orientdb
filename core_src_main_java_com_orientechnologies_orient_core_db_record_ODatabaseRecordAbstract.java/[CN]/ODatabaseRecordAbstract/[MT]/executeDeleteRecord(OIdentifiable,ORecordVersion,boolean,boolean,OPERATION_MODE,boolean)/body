@@ -18,8 +18,16 @@
       final ORecordVersion realVersion=mvcc ? iVersion : OVersionFactory.instance().createUntrackedVersion();
       final OStorageOperationResult<Boolean> operationResult;
       try {
-        if (prohibitTombstones)         operationResult=new OStorageOperationResult<Boolean>(underlying.cleanOutRecord(rid,realVersion,iRequired,(byte)iMode.ordinal()));
- else         operationResult=underlying.delete(rid,realVersion,iRequired,(byte)iMode.ordinal());
+        if (prohibitTombstones) {
+          final boolean result=storage.cleanOutRecord(rid,iVersion,iMode.ordinal(),null);
+          if (!result && iRequired)           throw new ORecordNotFoundException("The record with id " + rid + " was not found");
+          operationResult=new OStorageOperationResult<Boolean>(result);
+        }
+ else {
+          final OStorageOperationResult<Boolean> result=storage.deleteRecord(rid,iVersion,iMode.ordinal(),null);
+          if (!result.getResult() && iRequired)           throw new ORecordNotFoundException("The record with id " + rid + " was not found");
+          operationResult=new OStorageOperationResult<Boolean>(result.getResult());
+        }
         if (iCallTriggers) {
           if (!operationResult.isMoved() && rec != null)           callbackHooks(TYPE.AFTER_DELETE,rec);
  else           if (rec != null)           callbackHooks(TYPE.DELETE_REPLICATED,rec);

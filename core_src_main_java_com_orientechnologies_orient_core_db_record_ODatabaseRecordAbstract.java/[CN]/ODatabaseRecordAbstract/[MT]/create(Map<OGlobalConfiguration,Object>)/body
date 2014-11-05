@@ -1,7 +1,16 @@
 {
   setCurrentDatabaseinThreadLocal();
   try {
-    super.create(iInitialSettings);
+    if (status == STATUS.OPEN)     throw new IllegalStateException("Database " + getName() + " is already open");
+    if (storage == null)     storage=Orient.instance().loadStorage(url);
+    if (iInitialSettings != null) {
+      final OContextConfiguration ctxCfg=storage.getConfiguration().getContextConfiguration();
+      for (      Map.Entry<OGlobalConfiguration,Object> e : iInitialSettings.entrySet()) {
+        ctxCfg.setValue(e.getKey(),e.getValue());
+      }
+    }
+    storage.create(properties);
+    status=STATUS.OPEN;
     componentsFactory=getStorage().getComponentsFactory();
     sbTreeCollectionManager=new OSBTreeCollectionManagerProxy(this,getStorage().getResource(OSBTreeCollectionManager.class.getSimpleName(),new Callable<OSBTreeCollectionManager>(){
       @Override public OSBTreeCollectionManager call() throws Exception {
@@ -29,8 +38,8 @@
  else     user=new OImmutableUser(getMetadata().getSecurity().getVersion(),usr);
     if (!metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))     metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
     for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreate(getDatabaseOwner());
-    for (    ODatabaseListener listener : underlying.browseListeners())     try {
-      listener.onCreate(underlying);
+    for (    ODatabaseListener listener : browseListeners())     try {
+      listener.onCreate(this);
     }
  catch (    Throwable ignore) {
     }

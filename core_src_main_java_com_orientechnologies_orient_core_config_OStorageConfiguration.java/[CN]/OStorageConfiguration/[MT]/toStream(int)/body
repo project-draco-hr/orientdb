@@ -1,0 +1,60 @@
+{
+  final StringBuilder buffer=new StringBuilder(8192);
+  write(buffer,CURRENT_VERSION);
+  write(buffer,name);
+  write(buffer,schemaRecordId);
+  write(buffer,dictionaryRecordId);
+  write(buffer,indexMgrRecordId);
+  write(buffer,localeLanguage);
+  write(buffer,localeCountry);
+  write(buffer,dateFormat);
+  write(buffer,dateTimeFormat);
+  write(buffer,timeZone.getID());
+  write(buffer,charset);
+  if (version > 24)   write(buffer,conflictStrategy);
+  phySegmentToStream(buffer,fileTemplate);
+  write(buffer,clusters.size());
+  for (  OStorageClusterConfiguration c : clusters) {
+    if (c == null) {
+      write(buffer,-1);
+      continue;
+    }
+    write(buffer,c.getId());
+    write(buffer,c.getName());
+    write(buffer,c.getDataSegmentId());
+    if (c instanceof OStoragePaginatedClusterConfiguration) {
+      write(buffer,"d");
+      final OStoragePaginatedClusterConfiguration paginatedClusterConfiguration=(OStoragePaginatedClusterConfiguration)c;
+      write(buffer,paginatedClusterConfiguration.useWal);
+      write(buffer,paginatedClusterConfiguration.recordOverflowGrowFactor);
+      write(buffer,paginatedClusterConfiguration.recordGrowFactor);
+      write(buffer,paginatedClusterConfiguration.compression);
+      if (version > 24)       write(buffer,paginatedClusterConfiguration.conflictStrategy);
+      if (version > 25)       write(buffer,paginatedClusterConfiguration.getStatus().name().toString());
+    }
+  }
+  if (version <= 25) {
+    write(buffer,0);
+    write(buffer,"");
+    write(buffer,"");
+    write(buffer,0);
+    write(buffer,false);
+    write(buffer,false);
+  }
+  write(buffer,properties.size());
+  for (  OStorageEntryConfiguration e : properties)   entryToStream(buffer,e);
+  write(buffer,binaryFormatVersion);
+  write(buffer,clusterSelection);
+  write(buffer,minimumClusters);
+  if (version > 24) {
+    write(buffer,recordSerializer);
+    write(buffer,recordSerializerVersion);
+    write(buffer,configuration.getContextSize());
+    for (    String k : configuration.getContextKeys()) {
+      write(buffer,k);
+      write(buffer,configuration.getValueAsString(OGlobalConfiguration.findByKey(k)));
+    }
+  }
+  buffer.append("|");
+  return buffer.toString().getBytes();
+}

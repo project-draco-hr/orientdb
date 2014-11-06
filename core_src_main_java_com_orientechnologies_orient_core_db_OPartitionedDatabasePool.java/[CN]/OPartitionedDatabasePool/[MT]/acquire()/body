@@ -1,0 +1,56 @@
+{
+  final AtomicReference<ConcurrentLinkedQueue<ODatabaseDocumentTx>>[] pts=partitions;
+  acquiredConnections.incrementAndGet();
+  try {
+    while (true) {
+      final int index=(pts.length - 1) & threadHashCode.get();
+      ConcurrentLinkedQueue<ODatabaseDocumentTx> queue=pts[index].get();
+      if (queue == null) {
+        if (poolBusy.compareAndSet(false,true)) {
+          if (pts == partitions) {
+            final AtomicReference<ConcurrentLinkedQueue<ODatabaseDocumentTx>> queueRef=pts[index];
+            if (queueRef.get() == null) {
+              queue=new ConcurrentLinkedQueue<ODatabaseDocumentTx>();
+              initQueue(url,minSize,queue);
+              queueRef.set(queue);
+            }
+          }
+          poolBusy.set(false);
+        }
+        continue;
+      }
+ else {
+        ODatabaseDocumentTx db=queue.poll();
+        if (db == null) {
+          if (pts.length < maxPartitions) {
+            if (poolBusy.compareAndSet(false,true)) {
+              if (pts == partitions) {
+                final AtomicReference<ConcurrentLinkedQueue<ODatabaseDocumentTx>>[] newPartitions=new AtomicReference[partitions.length << 1];
+                System.arraycopy(partitions,0,newPartitions,0,partitions.length);
+                for (int i=partitions.length - 1; i < newPartitions.length; i++)                 newPartitions[i]=new AtomicReference<ConcurrentLinkedQueue<ODatabaseDocumentTx>>();
+                partitions=newPartitions;
+              }
+              poolBusy.set(false);
+            }
+            continue;
+          }
+ else {
+            if (currentSize.get() >= maxSize)             throw new IllegalStateException("You have reached maximum pool size");
+            db=new ODatabaseDocumentTx(url);
+            db.open(userName,password);
+            currentSize.incrementAndGet();
+            return wrapDb(db,queue);
+          }
+        }
+ else {
+          db.open(userName,password);
+          return wrapDb(db,queue);
+        }
+      }
+    }
+  }
+ catch (  RuntimeException e) {
+    acquiredConnections.decrementAndGet();
+    throw e;
+  }
+}

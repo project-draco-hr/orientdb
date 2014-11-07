@@ -1,0 +1,35 @@
+{
+  ByteArrayOutputStream tokenByteOS=new ByteArrayOutputStream(1024);
+  JwtHeader header=new JwtHeader();
+  header.setAlgorithm("HS256");
+  header.setKeyId("");
+  header.setType("OrientDb");
+  OrientJwtPayload payload=new OrientJwtPayload();
+  payload.setAudience("OrientDb");
+  payload.setDbName(db.getName());
+  payload.setUserRid(user.getDocument().getIdentity().toString());
+  payload.setAudience("Orient");
+  long expiryMinutes=60000 * 10;
+  long currTime=System.currentTimeMillis();
+  Date issueTime=new Date(currTime);
+  Date expDate=new Date(currTime + expiryMinutes);
+  payload.setIssuedAt(issueTime.getTime());
+  payload.setNotBefore(issueTime.getTime());
+  payload.setSubject(user.getName());
+  payload.setTokenId(UUID.randomUUID().toString());
+  payload.setExpiry(expDate.getTime());
+  Mac mac=threadLocalMac.get();
+  try {
+    tokenByteOS.write(b64encoder.encode(mapper.writeValueAsBytes(header)));
+    tokenByteOS.write(JWT_DELIMITER);
+    tokenByteOS.write(b64encoder.encode(mapper.writeValueAsBytes(payload)));
+    byte[] unsignedToken=tokenByteOS.toByteArray();
+    tokenByteOS.write(JWT_DELIMITER);
+    mac.init(getKeyProvider().getKey(header));
+    tokenByteOS.write(b64encoder.encode(mac.doFinal(unsignedToken)));
+  }
+ catch (  Exception ex) {
+    OLogManager.instance().error(this,"Error signing token",ex);
+  }
+  return tokenByteOS.toByteArray();
+}

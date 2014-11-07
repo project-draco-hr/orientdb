@@ -1,0 +1,47 @@
+{
+  IToken token=null;
+  int firstDot=-1, secondDot=-1;
+  int x;
+  for (x=0; x < tokenBytes.length; x++) {
+    if (tokenBytes[x] == JWT_DELIMITER) {
+      firstDot=x;
+      break;
+    }
+  }
+  if (firstDot == -1)   return null;
+  for (x=firstDot + 1; x < tokenBytes.length; x++) {
+    if (tokenBytes[x] == JWT_DELIMITER) {
+      secondDot=x;
+      break;
+    }
+  }
+  if (secondDot == -1)   return null;
+  byte[] decodedHeader=b64decoder.decode(tokenBytes,0,firstDot);
+  JwtHeader header=mapper.readValue(decodedHeader,JwtHeader.class);
+  Mac mac=threadLocalMac.get();
+  try {
+    mac.init(getKeyProvider().getKey(header));
+    mac.update(tokenBytes,0,secondDot);
+    byte[] calculatedSignature=mac.doFinal();
+    byte[] decodedSignature=b64decoder.decode(tokenBytes,secondDot + 1,tokenBytes.length);
+    boolean signatureValid=Arrays.equals(calculatedSignature,decodedSignature);
+    if (signatureValid) {
+      byte[] decodedPayload=b64decoder.decode(tokenBytes,firstDot + 1,secondDot);
+      Class payloadClass=payloadClasses.get(header.getType());
+      if (payloadClass == null) {
+        throw new Exception("Payload class not registered:" + header.getType());
+      }
+      OrientJwtPayload payload=mapper.readValue(decodedPayload,OrientJwtPayload.class);
+      token=new JsonWebToken(header,payload);
+      token.setIsVerified(true);
+      return token;
+    }
+  }
+ catch (  Exception ex) {
+    OLogManager.instance().warn(this,"Error parsing token",ex);
+  }
+ finally {
+    mac.reset();
+  }
+  return token;
+}

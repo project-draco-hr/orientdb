@@ -10,12 +10,17 @@
       stgs++;
     }
   }
-  if (osMgmtBean != null) {
-    final long osTotalMem=osMgmtBean.getTotalPhysicalMemorySize();
-    final long osUsedMem=osTotalMem - osMgmtBean.getFreePhysicalMemorySize();
-    out.printf("OrientDB Memory profiler: Heap=%s of %s - DiskCache (%s dbs)=%s of %s - OS=%s of %s\n",OFileUtils.getSizeAsString(runtime.totalMemory() - runtime.freeMemory()),OFileUtils.getSizeAsString(runtime.maxMemory()),stgs,OFileUtils.getSizeAsString(diskCacheUsed),OFileUtils.getSizeAsString(diskCacheTotal),OFileUtils.getSizeAsString(osUsedMem),OFileUtils.getSizeAsString(osTotalMem));
+  try {
+    MBeanServer mbs=ManagementFactory.getPlatformMBeanServer();
+    ObjectName osMBeanName=ObjectName.getInstance(ManagementFactory.OPERATING_SYSTEM_MXBEAN_NAME);
+    if (mbs.isInstanceOf(osMBeanName,"com.sun.management.OperatingSystemMXBean")) {
+      final long osTotalMem=((Number)mbs.getAttribute(osMBeanName,"TotalPhysicalMemorySize")).longValue();
+      final long osUsedMem=((Number)mbs.getAttribute(osMBeanName,"FreePhysicalMemorySize")).longValue();
+      out.printf("OrientDB Memory profiler: Heap=%s of %s - DiskCache (%s dbs)=%s of %s - OS=%s of %s\n",OFileUtils.getSizeAsString(runtime.totalMemory() - runtime.freeMemory()),OFileUtils.getSizeAsString(runtime.maxMemory()),stgs,OFileUtils.getSizeAsString(diskCacheUsed),OFileUtils.getSizeAsString(diskCacheTotal),OFileUtils.getSizeAsString(osUsedMem),OFileUtils.getSizeAsString(osTotalMem));
+      return;
+    }
   }
- else {
-    out.printf("OrientDB Memory profiler: Heap=%s of %s - DiskCache (%s dbs)=%s of %s\n",OFileUtils.getSizeAsString(runtime.totalMemory() - runtime.freeMemory()),OFileUtils.getSizeAsString(runtime.maxMemory()),stgs,OFileUtils.getSizeAsString(diskCacheUsed),OFileUtils.getSizeAsString(diskCacheTotal));
+ catch (  Exception e) {
   }
+  out.printf("OrientDB Memory profiler: Heap=%s of %s - DiskCache (%s dbs)=%s of %s\n",OFileUtils.getSizeAsString(runtime.totalMemory() - runtime.freeMemory()),OFileUtils.getSizeAsString(runtime.maxMemory()),stgs,OFileUtils.getSizeAsString(diskCacheUsed),OFileUtils.getSizeAsString(diskCacheTotal));
 }

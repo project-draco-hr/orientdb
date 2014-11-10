@@ -1,0 +1,34 @@
+{
+  try {
+    if (iArgs != null) {
+      for (      Map.Entry<Object,Object> arg : iArgs.entrySet()) {
+        context.setVariable(arg.getKey().toString(),arg.getValue());
+      }
+    }
+    if (timeoutMs > 0) {
+      context.beginExecution(timeoutMs,timeoutStrategy);
+    }
+    Iterator<? extends OIdentifiable> target=getTargetIterator(context,request.isUseCache());
+    List<OIdentifiable> result=new ArrayList<OIdentifiable>();
+    boolean canContinue=true;
+    while (canContinue && target.hasNext()) {
+      OIdentifiable targetResult=target.next();
+      OIdentifiable projectionResult=this.calculateProjections(targetResult);
+      if (this.matchesFilters(projectionResult)) {
+        if (sync) {
+          return result.add(projectionResult);
+        }
+ else {
+          canContinue=listener.result(projectionResult);
+        }
+      }
+      canContinue=canContinue && checkTimeout();
+    }
+    return null;
+  }
+  finally {
+    if (listener != null) {
+      listener.end();
+    }
+  }
+}

@@ -1,40 +1,23 @@
 {
-  OToken token=null;
+  JsonWebToken token=null;
   int firstDot=-1, secondDot=-1;
-  int x;
-  for (x=0; x < tokenBytes.length; x++) {
+  for (int x=0; x < tokenBytes.length; x++) {
     if (tokenBytes[x] == JWT_DELIMITER) {
-      firstDot=x;
-      break;
+      if (firstDot == -1)       firstDot=x;
+ else {
+        secondDot=x;
+        break;
+      }
     }
   }
   if (firstDot == -1)   throw new RuntimeException("Token data too short missed header");
-  for (x=firstDot + 1; x < tokenBytes.length; x++) {
-    if (tokenBytes[x] == JWT_DELIMITER) {
-      secondDot=x;
-      break;
-    }
-  }
   if (secondDot == -1)   throw new RuntimeException("Token data too short missed signature");
   byte[] decodedHeader=OBase64Utils.decode(tokenBytes,0,firstDot,OBase64Utils.URL_SAFE);
+  byte[] decodedPayload=OBase64Utils.decode(tokenBytes,firstDot + 1,secondDot - (firstDot + 1),OBase64Utils.URL_SAFE);
+  byte[] decodedSignature=OBase64Utils.decode(tokenBytes,secondDot + 1,tokenBytes.length - (secondDot + 1),OBase64Utils.URL_SAFE);
   OrientJwtHeader header=deserializeWebHeader(decodedHeader);
-  Mac mac=threadLocalMac.get();
-  try {
-    mac.init(getKeyProvider().getKey(header));
-    mac.update(tokenBytes,0,secondDot);
-    byte[] calculatedSignature=mac.doFinal();
-    byte[] decodedSignature=OBase64Utils.decode(tokenBytes,secondDot + 1,tokenBytes.length - (secondDot + 1),OBase64Utils.URL_SAFE);
-    boolean signatureValid=Arrays.equals(calculatedSignature,decodedSignature);
-    byte[] decodedPayload=OBase64Utils.decode(tokenBytes,firstDot + 1,secondDot - (firstDot + 1),OBase64Utils.URL_SAFE);
-    token=new JsonWebToken(header,deserializeWebPayload(header.getType(),decodedPayload));
-    token.setIsVerified(signatureValid);
-  }
- catch (  Exception ex) {
-    OLogManager.instance().warn(this,"Error parsing token",ex);
-    throw new RuntimeException("Error parsing token",ex);
-  }
- finally {
-    mac.reset();
-  }
+  OJwtPayload deserializeWebPayload=deserializeWebPayload(header.getType(),decodedPayload);
+  token=new JsonWebToken(header,deserializeWebPayload);
+  token.setIsVerified(verifyTokenSignature(header,tokenBytes,0,secondDot,decodedSignature));
   return token;
 }

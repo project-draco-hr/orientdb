@@ -5,7 +5,6 @@
   header.setKeyId("");
   OJwtPayload payload=createPayload(db,user);
   header.setType(getPayloadType(payload));
-  Mac mac=threadLocalMac.get();
   try {
     byte[] bytes=serializeWebHeader(header);
     tokenByteOS.write(OBase64Utils.encodeBytesToBytes(bytes,0,bytes.length,OBase64Utils.URL_SAFE));
@@ -14,13 +13,11 @@
     tokenByteOS.write(OBase64Utils.encodeBytesToBytes(bytes,0,bytes.length,OBase64Utils.URL_SAFE));
     byte[] unsignedToken=tokenByteOS.toByteArray();
     tokenByteOS.write(JWT_DELIMITER);
-    mac.init(getKeyProvider().getKey(header));
-    bytes=mac.doFinal(unsignedToken);
+    bytes=signToken(header,unsignedToken);
     tokenByteOS.write(OBase64Utils.encodeBytesToBytes(bytes,0,bytes.length,OBase64Utils.URL_SAFE));
   }
  catch (  Exception ex) {
-    OLogManager.instance().error(this,"Error signing token",ex);
-    throw new OSecurityAccessException(db.getName(),"Error on token parsion",ex);
+    throw new OException("Error on token parsing",ex);
   }
   return tokenByteOS.toByteArray();
 }

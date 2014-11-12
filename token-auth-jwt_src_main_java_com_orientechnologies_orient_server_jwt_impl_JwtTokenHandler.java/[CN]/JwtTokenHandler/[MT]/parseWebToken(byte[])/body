@@ -17,7 +17,7 @@
   }
   if (secondDot == -1)   return null;
   byte[] decodedHeader=OBase64Utils.decode(tokenBytes,0,firstDot,OBase64Utils.URL_SAFE);
-  JwtHeader header=mapper.readValue(decodedHeader,JwtHeader.class);
+  JwtHeader header=deserializeWebHeader(decodedHeader);
   Mac mac=threadLocalMac.get();
   try {
     mac.init(getKeyProvider().getKey(header));
@@ -27,12 +27,7 @@
     boolean signatureValid=Arrays.equals(calculatedSignature,decodedSignature);
     if (signatureValid) {
       byte[] decodedPayload=OBase64Utils.decode(tokenBytes,firstDot + 1,secondDot,OBase64Utils.URL_SAFE);
-      Class<?> payloadClass=payloadClasses.get(header.getType());
-      if (payloadClass == null) {
-        throw new Exception("Payload class not registered:" + header.getType());
-      }
-      OrientJwtPayload payload=mapper.readValue(decodedPayload,OrientJwtPayload.class);
-      token=new JsonWebToken(header,payload);
+      token=new JsonWebToken(header,deserializeWebPayload(header.getType(),decodedPayload));
       token.setIsVerified(true);
       return token;
     }

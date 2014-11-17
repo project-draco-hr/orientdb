@@ -1,12 +1,19 @@
 {
   ByteArrayOutputStream baos=new ByteArrayOutputStream();
   try {
+    OBinaryToken token=new OBinaryToken();
+    long expiryMinutes=60000 * 10;
+    long currTime=System.currentTimeMillis();
     OrientJwtHeader header=new OrientJwtHeader();
-    header.setAlgorithm("HS256");
-    header.setKeyId("");
-    serializeBinaryHeader(header,baos);
-    OJwtPayload payload=createPayload(db,user);
-    serializeBinaryPayload(payload,baos);
+    header.setAlgorithm("HmacSHA256");
+    header.setKeyId("HmacSHA256");
+    header.setType("OrientDB");
+    token.setHeader(header);
+    token.setDatabase(db.getName());
+    token.setDatabaseType(db.getStorage().getType());
+    token.setUserRid(user.getIdentity().getIdentity());
+    token.setExpiry(currTime + expiryMinutes);
+    binarySerializer.serialize(token,baos);
     byte[] signature=signToken(header,baos.toByteArray());
     baos.write(signature);
   }

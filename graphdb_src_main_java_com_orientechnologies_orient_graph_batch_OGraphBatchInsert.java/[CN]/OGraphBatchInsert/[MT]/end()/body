@@ -1,0 +1,27 @@
+{
+  final OClass vClass=db.getMetadata().getSchema().getClass(vertexClass);
+  try {
+    runningThreads.set(parallel);
+    for (int i=0; i < parallel - 1; i++) {
+      Thread t=new BatchImporterJob(i,vClass,last);
+      t.start();
+    }
+    Thread t=new BatchImporterJob(parallel - 1,vClass,last);
+    t.run();
+    if (runningThreads.get() > 0) {
+synchronized (runningThreads) {
+        while (runningThreads.get() > 0) {
+          try {
+            runningThreads.wait();
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+    }
+  }
+  finally {
+    db.close();
+    if (walActive)     OGlobalConfiguration.USE_WAL.setValue(walActive);
+  }
+}

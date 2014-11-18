@@ -1,0 +1,33 @@
+{
+  String dbUrl="memory:test4";
+  OGraphBatchInsert batch=new OGraphBatchInsert(dbUrl,"admin","admin");
+  batch.begin();
+  batch.createEdge(0L,1L,null);
+  batch.createEdge(1L,2L,null);
+  batch.createEdge(2L,0L,null);
+  batch.createVertex(3L);
+  Map<String,Object> vertexProps=new HashMap<String,Object>();
+  vertexProps.put("foo","foo");
+  vertexProps.put("bar",3);
+  batch.setVertexProperties(0L,vertexProps);
+  batch.end();
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx(dbUrl);
+  db.open("admin","admin");
+  List<?> result=db.query(new OSQLSynchQuery<Object>("select from V"));
+  boolean found0=false;
+  for (  Object o : result) {
+    ODocument doc=((ODocument)o);
+    if (new Long(0).equals(doc.field("uid"))) {
+      found0=true;
+      assertEquals("foo",doc.field("foo"));
+      assertEquals(3,doc.field("bar"));
+    }
+ else {
+      assertNotSame("foo",doc.field("foo"));
+      assertNotSame(3,doc.field("bar"));
+    }
+  }
+  assertTrue(found0);
+  assertEquals(4,result.size());
+  db.close();
+}

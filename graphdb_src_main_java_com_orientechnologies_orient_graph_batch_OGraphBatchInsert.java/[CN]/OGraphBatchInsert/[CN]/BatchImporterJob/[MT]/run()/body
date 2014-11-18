@@ -1,0 +1,21 @@
+{
+  try {
+    ODatabaseDocumentTx db=new ODatabaseDocumentTx(dbUrl);
+    db.open(userName,password);
+    db.declareIntent(new OIntentMassiveInsert());
+    int clusterId=clusterIds[mod];
+    final String outField="E".equals(edgeClass) ? "out_" : ("out_" + edgeClass);
+    final String inField="E".equals(edgeClass) ? "in_" : ("in_" + edgeClass);
+    String clusterName=db.getStorage().getClusterById(clusterId).getName();
+    for (long i=nextVerticesToCreate[mod]; i <= last; i+=parallel) {
+      createVertex(db,i,inField,outField,clusterName,null);
+    }
+  }
+  finally {
+    runningThreads.decrementAndGet();
+synchronized (runningThreads) {
+      runningThreads.notifyAll();
+    }
+    db.close();
+  }
+}

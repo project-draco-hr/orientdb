@@ -1,20 +1,20 @@
 {
-  final OClass cls=iDocument.getSchemaClass();
+  final OClass cls=iDocument.getImmutableSchemaClass();
   if (cls != null && cls.isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME)) {
-    String fieldNames=((OClassImpl)cls).getCustom(OSecurityShared.ONCREATE_FIELD);
+    String fieldNames=cls.getCustom(OSecurityShared.ONCREATE_FIELD);
     if (fieldNames == null)     fieldNames=OSecurityShared.ALLOW_ALL_FIELD;
     final String[] fields=fieldNames.split(",");
-    String identityType=((OClassImpl)cls).getCustom(OSecurityShared.ONCREATE_IDENTITY_TYPE);
+    String identityType=cls.getCustom(OSecurityShared.ONCREATE_IDENTITY_TYPE);
     if (identityType == null)     identityType="user";
-    final ODatabaseRecord db=ODatabaseRecordThreadLocal.INSTANCE.get();
-    ODocument identity=null;
+    final ODatabaseDocument db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    OIdentifiable identity=null;
     if (identityType.equals("user")) {
-      final OUser user=db.getUser();
-      if (user != null)       identity=user.getDocument();
+      final OSecurityUser user=db.getUser();
+      if (user != null)       identity=user.getIdentity();
     }
  else     if (identityType.equals("role")) {
-      final Set<ORole> roles=db.getUser().getRoles();
-      if (!roles.isEmpty())       identity=roles.iterator().next().getDocument();
+      final Set<? extends OSecurityRole> roles=db.getUser().getRoles();
+      if (!roles.isEmpty())       identity=roles.iterator().next().getIdentity();
     }
  else     throw new OConfigurationException("Wrong custom field '" + OSecurityShared.ONCREATE_IDENTITY_TYPE + "' in class '"+ cls.getName()+ "' with value '"+ identityType+ "'. Supported ones are: 'user', 'role'");
     if (identity != null) {

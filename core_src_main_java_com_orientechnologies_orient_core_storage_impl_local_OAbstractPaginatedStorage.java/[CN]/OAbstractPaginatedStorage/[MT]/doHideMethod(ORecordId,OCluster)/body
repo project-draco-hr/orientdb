@@ -1,0 +1,24 @@
+{
+  try {
+    final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+    if (ppos == null)     return new OStorageOperationResult<Boolean>(false);
+    makeStorageDirty();
+    atomicOperationsManager.startAtomicOperation();
+    try {
+      final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+      if (context != null)       context.executeOperations(this);
+      cluster.hideRecord(ppos.clusterPosition);
+      atomicOperationsManager.endAtomicOperation(false);
+    }
+ catch (    Throwable e) {
+      atomicOperationsManager.endAtomicOperation(true);
+      OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
+      return new OStorageOperationResult<Boolean>(false);
+    }
+    return new OStorageOperationResult<Boolean>(true);
+  }
+ catch (  IOException ioe) {
+    OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",ioe);
+    throw new OStorageException("Error on deleting record " + rid + "( cluster: "+ cluster+ ")",ioe);
+  }
+}

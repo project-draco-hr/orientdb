@@ -1,0 +1,56 @@
+{
+  final String className=readString(bytes);
+  if (className.length() != 0)   document.setClassNameIfExists(className);
+  int last=0;
+  String field;
+  int unmarshalledFields=0;
+  while (true) {
+    OGlobalProperty prop=null;
+    final int len=OVarIntSerializer.readAsInteger(bytes);
+    if (len == 0) {
+      break;
+    }
+ else     if (len > 0) {
+      final String res=new String(bytes.bytes,bytes.offset,len,utf8);
+      bytes.skip(len);
+      field=res;
+    }
+ else {
+      ODatabaseDocument db=document.getDatabase();
+      if (db == null || db.isClosed())       throw new ODatabaseException("Impossible deserialize the document no database present");
+      prop=db.getMetadata().getImmutableSchemaSnapshot().getGlobalPropertyById((len * -1) - 1);
+      field=prop.getName();
+    }
+    if (ODocumentInternal.rawContainsField(document,field)) {
+      if (prop != null && prop.getType() != OType.ANY)       bytes.skip(OIntegerSerializer.INT_SIZE);
+ else       bytes.skip(OIntegerSerializer.INT_SIZE + 1);
+      continue;
+    }
+    final int valuePos=readInteger(bytes);
+    final OType type;
+    if (prop != null && prop.getType() != OType.ANY)     type=prop.getType();
+ else     type=readOType(bytes);
+    if (valuePos != 0) {
+      int headerCursor=bytes.offset;
+      bytes.offset=valuePos;
+      final Object value=readSingleValue(bytes,type,document);
+      if (bytes.offset > last)       last=bytes.offset;
+      bytes.offset=headerCursor;
+      ODocumentInternal.rawField(document,field,value,type);
+    }
+ else     ODocumentInternal.rawField(document,field,null,null);
+    boolean exit=false;
+    if (iFields != null) {
+      for (int i=0; i < iFields.length; ++i) {
+        if (field.equals(iFields[i])) {
+          unmarshalledFields++;
+          if (unmarshalledFields >= iFields.length)           exit=true;
+          break;
+        }
+      }
+      if (exit)       break;
+    }
+  }
+  if (iFields == null || iFields.length == 0)   ORecordInternal.clearSource(document);
+  if (last > bytes.offset)   bytes.offset=last;
+}

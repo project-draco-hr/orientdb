@@ -5,25 +5,16 @@
     if (Character.isDigit(className.charAt(0)))     throw new OSchemaException("Found invalid class name. Cannot start with numbers");
     final Character wrongCharacter=checkNameIfValid(className);
     if (wrongCharacter != null)     throw new OSchemaException("Found invalid class name. Character '" + wrongCharacter + "' cannot be used in class name.");
-    final ODatabaseRecordInternal database=getDatabase();
+    final ODatabaseDocumentInternal database=getDatabase();
     final OStorage storage=database.getStorage();
     checkEmbedded(storage);
     checkClustersAreAbsent(clusterIdsToAdd);
     final int[] clusterIds;
     if (clusterIdsToAdd == null || clusterIdsToAdd.length == 0) {
-      final int minimumClusters=storage.getConfiguration().getMinimumClusters();
-      clusterIds=new int[minimumClusters];
-      if (minimumClusters <= 1) {
-        clusterIds[0]=database.getClusterIdByName(className);
-        if (clusterIds[0] == -1)         clusterIds[0]=database.addCluster(className);
-      }
- else       for (int i=0; i < minimumClusters; ++i) {
-        clusterIds[i]=database.getClusterIdByName(className + "_" + i);
-        if (clusterIds[i] == -1)         clusterIds[i]=database.addCluster(className + "_" + i);
-      }
+      throw new ClusterIdsAreEmptyException();
     }
  else     clusterIds=clusterIdsToAdd;
-    database.checkSecurity(ODatabaseSecurityResources.SCHEMA,ORole.PERMISSION_CREATE);
+    database.checkSecurity(ORule.ResourceGeneric.SCHEMA,ORole.PERMISSION_CREATE);
     final String key=className.toLowerCase();
     if (classes.containsKey(key))     throw new OSchemaException("Class " + className + " already exists in current database");
     OClassImpl cls=new OClassImpl(this,className,clusterIds);
@@ -37,6 +28,7 @@
       for (      OIndex<?> index : superClass.getIndexes())       for (      String clusterName : clusterNames)       if (clusterName != null)       database.getMetadata().getIndexManager().addClusterToIndex(clusterName,index.getName());
     }
     addClusterClassMap(cls);
+    for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreateClass(database,cls);
     return cls;
   }
   finally {

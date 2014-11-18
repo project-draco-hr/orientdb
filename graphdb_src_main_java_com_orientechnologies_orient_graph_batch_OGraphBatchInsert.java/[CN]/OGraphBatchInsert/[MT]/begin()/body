@@ -1,0 +1,48 @@
+{
+  walActive=OGlobalConfiguration.USE_WAL.getValueAsBoolean();
+  if (walActive)   OGlobalConfiguration.USE_WAL.setValue(false);
+  if (averageEdgeNumberPerNode > 0) {
+    OGlobalConfiguration.RID_BAG_EMBEDDED_DEFAULT_SIZE.setValue(averageEdgeNumberPerNode);
+    OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD.setValue(bonsaiThreshold);
+  }
+  db=new ODatabaseDocumentTx(dbUrl);
+  if (db.exists()) {
+    db.open(userName,password);
+  }
+ else {
+    db.create();
+  }
+  if (this.useLightWeigthEdges == null) {
+    final List<OStorageEntryConfiguration> custom=(List<OStorageEntryConfiguration>)db.get(ODatabase.ATTRIBUTES.CUSTOM);
+    for (    OStorageEntryConfiguration c : custom) {
+      if (c.name.equals("useLightweightEdges")) {
+        this.useLightWeigthEdges=Boolean.parseBoolean(c.value);
+        break;
+      }
+    }
+    if (this.useLightWeigthEdges == null) {
+      this.useLightWeigthEdges=true;
+    }
+  }
+  createBaseSchema();
+  out=estimatedEntries > 0 ? new HashMap<Long,List<Object>>(estimatedEntries) : new HashMap<Long,List<Object>>();
+  in=estimatedEntries > 0 ? new HashMap<Long,List<Object>>(estimatedEntries) : new HashMap<Long,List<Object>>();
+  OClass vClass=db.getMetadata().getSchema().getClass(this.vertexClass);
+  int[] existingClusters=vClass.getClusterIds();
+  for (int c=existingClusters.length; c <= parallel; c++) {
+    vClass.addCluster(vClass.getName() + "_" + c);
+  }
+  clusterIds=vClass.getClusterIds();
+  lastClusterPositions=new long[clusterIds.length];
+  nextVerticesToCreate=new long[clusterIds.length];
+  for (int i=0; i < clusterIds.length; i++) {
+    int clusterId=clusterIds[i];
+    try {
+      nextVerticesToCreate[i]=i;
+      lastClusterPositions[i]=db.getStorage().getClusterById(clusterId).getLastPosition();
+    }
+ catch (    Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+}

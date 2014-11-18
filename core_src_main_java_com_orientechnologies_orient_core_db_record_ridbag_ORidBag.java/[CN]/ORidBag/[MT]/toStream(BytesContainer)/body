@@ -1,7 +1,7 @@
 {
   final ORecordSerializationContext context=ORecordSerializationContext.getContext();
   if (context != null) {
-    if (delegate.size() >= topThreshold && isEmbedded() && ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager() != null) {
+    if (isEmbedded() && ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager() != null && delegate.size() >= topThreshold) {
       ORidBagDelegate oldDelegate=delegate;
       delegate=new OSBTreeRidBag();
       boolean oldAutoConvert=oldDelegate.isAutoConvertToRecord();
@@ -9,11 +9,12 @@
       for (      OIdentifiable identifiable : oldDelegate)       delegate.add(identifiable);
       final ORecord owner=oldDelegate.getOwner();
       delegate.setOwner(owner);
+      for (      OMultiValueChangeListener<OIdentifiable,OIdentifiable> listener : oldDelegate.getChangeListeners())       delegate.addChangeListener(listener);
       owner.setDirty();
       oldDelegate.setAutoConvertToRecord(oldAutoConvert);
       oldDelegate.requestDelete();
     }
- else     if (delegate.size() <= bottomThreshold && !isEmbedded()) {
+ else     if (bottomThreshold >= 0 && !isEmbedded() && delegate.size() <= bottomThreshold) {
       ORidBagDelegate oldDelegate=delegate;
       boolean oldAutoConvert=oldDelegate.isAutoConvertToRecord();
       oldDelegate.setAutoConvertToRecord(false);
@@ -21,6 +22,7 @@
       for (      OIdentifiable identifiable : oldDelegate)       delegate.add(identifiable);
       final ORecord owner=oldDelegate.getOwner();
       delegate.setOwner(owner);
+      for (      OMultiValueChangeListener<OIdentifiable,OIdentifiable> listener : oldDelegate.getChangeListeners())       delegate.addChangeListener(listener);
       owner.setDirty();
       oldDelegate.setAutoConvertToRecord(oldAutoConvert);
       oldDelegate.requestDelete();
@@ -32,7 +34,7 @@
  else   uuid=null;
   boolean hasUuid=uuid != null;
   final int serializedSize=OByteSerializer.BYTE_SIZE + delegate.getSerializedSize() + ((hasUuid) ? OUUIDSerializer.UUID_SIZE : 0);
-  int pointer=bytesContainer.alloc((short)serializedSize);
+  int pointer=bytesContainer.alloc(serializedSize);
   int offset=pointer;
   final byte[] stream=bytesContainer.bytes;
   byte configByte=0;

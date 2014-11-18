@@ -1,0 +1,72 @@
+{
+  iOutput.append(iSet ? OStringSerializerHelper.SET_BEGIN : OStringSerializerHelper.LIST_BEGIN);
+  final Iterator<Object> iterator=OMultiValue.getMultiValueIterator(iValue);
+  OType linkedType=iLinkedType;
+  for (int i=0; iterator.hasNext(); ++i) {
+    final Object o=iterator.next();
+    if (i > 0)     iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
+    if (o == null) {
+      iOutput.append("null");
+      continue;
+    }
+    OIdentifiable id=null;
+    ODocument doc=null;
+    final OClass linkedClass;
+    if (!(o instanceof OIdentifiable)) {
+      final String fieldBound=OObjectSerializerHelperManager.getInstance().getDocumentBoundField(o.getClass());
+      if (fieldBound != null) {
+        OObjectSerializerHelperManager.getInstance().invokeCallback(o,null,OBeforeSerialization.class);
+        doc=(ODocument)OObjectSerializerHelperManager.getInstance().getFieldValue(o,fieldBound);
+        OObjectSerializerHelperManager.getInstance().invokeCallback(o,doc,OAfterSerialization.class);
+        id=doc;
+      }
+ else       if (iLinkedType == null)       linkedType=OType.getTypeByClass(o.getClass());
+      linkedClass=iLinkedClass;
+    }
+ else {
+      id=(OIdentifiable)o;
+      if (iLinkedType == null)       if (id.getIdentity().isValid())       linkedType=OType.LINK;
+ else       linkedType=OType.EMBEDDED;
+      if (id instanceof ODocument) {
+        doc=(ODocument)id;
+        if (id.getIdentity().isTemporary())         doc.save();
+        linkedClass=doc.getImmutableSchemaClass();
+      }
+ else       linkedClass=null;
+    }
+    if (id != null && linkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+    if (linkedType == OType.EMBEDDED && o instanceof OIdentifiable)     toString((ORecord)((OIdentifiable)o).getRecord(),iOutput,null);
+ else     if (linkedType != OType.LINK && (linkedClass != null || doc != null)) {
+      if (id == null) {
+        if (iDatabase == null && ODatabaseRecordThreadLocal.INSTANCE.isDefined())         iDatabase=ODatabaseRecordThreadLocal.INSTANCE.get();
+        id=OObjectSerializerHelperManager.getInstance().toStream(o,new ODocument(o.getClass().getSimpleName()),iDatabase instanceof ODatabaseObject ? ((ODatabaseObject)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+          public Object getUserObjectByRecord(          OIdentifiable iRecord,          final String iFetchPlan){
+            return iRecord;
+          }
+          public ORecord getRecordByUserObject(          Object iPojo,          boolean iCreateIfNotAvailable){
+            return new ODocument(linkedClass);
+          }
+          public boolean existsUserObjectByRID(          ORID iRID){
+            return false;
+          }
+          public void registerUserObject(          Object iObject,          ORecord iRecord){
+          }
+          public void registerUserObjectAfterLinkSave(          ORecord iRecord){
+          }
+        }
+,null,iSaveOnlyDirty);
+      }
+      toString(doc,iOutput,null,iObjHandler,iMarshalledRecords,false,true);
+    }
+ else {
+      if (iLinkedType == null) {
+        if (o != null)         linkedType=OType.getTypeByClass(o.getClass());
+      }
+ else       if (iLinkedType == OType.CUSTOM)       iOutput.append(OStringSerializerHelper.CUSTOM_TYPE);
+      fieldTypeToString(iOutput,linkedType,o);
+    }
+    if (id != null && linkedType != OType.LINK)     iOutput.append(OStringSerializerHelper.EMBEDDED_END);
+  }
+  iOutput.append(iSet ? OStringSerializerHelper.SET_END : OStringSerializerHelper.LIST_END);
+  return iOutput;
+}

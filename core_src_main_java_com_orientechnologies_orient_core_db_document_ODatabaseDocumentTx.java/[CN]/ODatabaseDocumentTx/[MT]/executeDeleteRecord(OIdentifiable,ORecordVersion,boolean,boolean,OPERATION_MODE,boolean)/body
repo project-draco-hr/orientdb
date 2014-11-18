@@ -1,0 +1,56 @@
+{
+  checkOpeness();
+  final ORecordId rid=(ORecordId)record.getIdentity();
+  if (rid == null)   throw new ODatabaseException("Cannot delete record because it has no identity. Probably was created from scratch or contains projections of fields rather than a full record");
+  if (!rid.isValid())   return;
+  record=record.getRecord();
+  if (record == null)   return;
+  checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_DELETE,getClusterNameById(rid.clusterId));
+  final Set<OIndex<?>> lockedIndexes=new HashSet<OIndex<?>>();
+  setCurrentDatabaseInThreadLocal();
+  ORecordSerializationContext.pushContext();
+  getMetadata().makeThreadLocalSchemaSnapshot();
+  try {
+    if (record instanceof ODocument)     acquireIndexModificationLock((ODocument)record,lockedIndexes);
+    try {
+      ORecord rec=record.getRecord();
+      if (iCallTriggers && rec != null)       callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,rec);
+      final ORecordVersion realVersion=mvcc ? iVersion : OVersionFactory.instance().createUntrackedVersion();
+      final OStorageOperationResult<Boolean> operationResult;
+      try {
+        if (prohibitTombstones) {
+          final boolean result=storage.cleanOutRecord(rid,iVersion,iMode.ordinal(),null);
+          if (!result && iRequired)           throw new ORecordNotFoundException("The record with id " + rid + " was not found");
+          operationResult=new OStorageOperationResult<Boolean>(result);
+        }
+ else {
+          final OStorageOperationResult<Boolean> result=storage.deleteRecord(rid,iVersion,iMode.ordinal(),null);
+          if (!result.getResult() && iRequired)           throw new ORecordNotFoundException("The record with id " + rid + " was not found");
+          operationResult=new OStorageOperationResult<Boolean>(result.getResult());
+        }
+        if (iCallTriggers) {
+          if (!operationResult.isMoved() && rec != null)           callbackHooks(ORecordHook.TYPE.AFTER_DELETE,rec);
+ else           if (rec != null)           callbackHooks(ORecordHook.TYPE.DELETE_REPLICATED,rec);
+        }
+      }
+ catch (      Throwable t) {
+        if (iCallTriggers)         callbackHooks(ORecordHook.TYPE.DELETE_FAILED,rec);
+        throw t;
+      }
+      if (!operationResult.isMoved()) {
+        getLocalCache().deleteRecord(rid);
+      }
+    }
+ catch (    OException e) {
+      throw e;
+    }
+catch (    Throwable t) {
+      throw new ODatabaseException("Error on deleting record in cluster #" + record.getIdentity().getClusterId(),t);
+    }
+  }
+  finally {
+    releaseIndexModificationLock(lockedIndexes);
+    ORecordSerializationContext.pullContext();
+    getMetadata().clearThreadLocalSchemaSnapshot();
+  }
+}

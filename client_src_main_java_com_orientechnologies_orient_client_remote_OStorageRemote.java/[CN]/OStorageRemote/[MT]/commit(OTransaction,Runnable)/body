@@ -10,20 +10,29 @@
         network.writeByte((byte)(iTx.isUsingLog() ? 1 : 0));
         final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
         if (iTx.getCurrentRecordEntries().iterator().hasNext()) {
+          for (          ORecordOperation txEntry : iTx.getCurrentRecordEntries())           committedEntries.add(txEntry);
           while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
             for (            ORecordOperation txEntry : iTx.getCurrentRecordEntries())             tmpEntries.add(txEntry);
             iTx.clearRecordEntries();
             if (tmpEntries.size() > 0) {
               for (              ORecordOperation txEntry : tmpEntries) {
                 commitEntry(network,txEntry);
-                committedEntries.add(txEntry);
               }
               tmpEntries.clear();
             }
           }
         }
  else         if (committedEntries.size() > 0) {
-          for (          ORecordOperation txEntry : committedEntries)           commitEntry(network,txEntry);
+          tmpEntries.addAll(committedEntries);
+          while (!tmpEntries.isEmpty()) {
+            iTx.clearRecordEntries();
+            for (            ORecordOperation txEntry : tmpEntries) {
+              ORecordInternal.clearSource(txEntry.getRecord());
+              commitEntry(network,txEntry);
+            }
+            tmpEntries.clear();
+            for (            ORecordOperation txEntry : iTx.getCurrentRecordEntries())             tmpEntries.add(txEntry);
+          }
         }
         network.writeByte((byte)0);
         network.writeBytes(iTx.getIndexChanges().toStream());
@@ -48,12 +57,12 @@
           ORecordOperation rop=iTx.getRecordEntry(rid);
           if (rop != null)           rop.getRecord().getRecordVersion().copyFrom(network.readVersion());
         }
-        committedEntries.clear();
         if (network.getSrvProtocolVersion() >= 20)         readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
       }
   finally {
         endResponse(network);
       }
+      committedEntries.clear();
       for (      ORecordOperation txEntry : iTx.getAllRecordEntries())       ORecordInternal.unsetDirty(txEntry.getRecord());
       OTransactionAbstract.updateCacheFromEntries(iTx,iTx.getAllRecordEntries(),false);
       break;

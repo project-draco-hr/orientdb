@@ -1,0 +1,38 @@
+{
+  String name=Integer.toString(serverId);
+  for (int i=0; i < count; i++) {
+    final ODatabaseDocumentTx database=poolFactory.get(databaseUrl,"admin","admin").acquire();
+    try {
+      if ((i + 1) % 100 == 0)       System.out.println("\nWriter " + database.getURL() + " managed "+ (i + 1)+ "/"+ count+ " records so far");
+      database.begin();
+      try {
+        ODocument person=createRecord(database,serverId,i);
+        updateRecord(database,person);
+        checkRecord(database,person);
+        database.commit();
+        Assert.assertTrue(person.getIdentity().isPersistent());
+      }
+ catch (      Exception e) {
+        database.rollback();
+        throw e;
+      }
+      Thread.sleep(delayWriter);
+    }
+ catch (    InterruptedException e) {
+      System.out.println("Writer received interrupt (db=" + database.getURL());
+      Thread.currentThread().interrupt();
+      break;
+    }
+catch (    Exception e) {
+      System.out.println("Writer received exception (db=" + database.getURL());
+      e.printStackTrace();
+      break;
+    }
+ finally {
+      runningWriters.countDown();
+      database.close();
+    }
+  }
+  System.out.println("\nWriter " + name + " END");
+  return null;
+}

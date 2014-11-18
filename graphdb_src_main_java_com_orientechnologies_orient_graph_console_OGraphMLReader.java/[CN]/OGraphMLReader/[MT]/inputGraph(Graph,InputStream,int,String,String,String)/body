@@ -1,0 +1,125 @@
+{
+  XMLInputFactory inputFactory=XMLInputFactory.newInstance();
+  try {
+    XMLStreamReader reader=inputFactory.createXMLStreamReader(graphMLInputStream);
+    final OrientBaseGraph graph=(OrientBaseGraph)inputGraph;
+    if (storeVertexIds)     graph.setSaveOriginalIds(storeVertexIds);
+    Map<String,String> keyIdMap=new HashMap<String,String>();
+    Map<String,String> keyTypesMaps=new HashMap<String,String>();
+    Map<String,ORID> vertexMappedIdMap=new HashMap<String,ORID>();
+    String vertexId=null;
+    Map<String,Object> vertexProps=null;
+    boolean inVertex=false;
+    String edgeId=null;
+    String edgeLabel=null;
+    String vertexLabel=null;
+    Vertex[] edgeEndVertices=null;
+    Map<String,Object> edgeProps=null;
+    boolean inEdge=false;
+    int bufferCounter=0;
+    while (reader.hasNext()) {
+      Integer eventType=reader.next();
+      if (eventType.equals(XMLEvent.START_ELEMENT)) {
+        String elementName=reader.getName().getLocalPart();
+        if (elementName.equals(GraphMLTokens.KEY)) {
+          String id=reader.getAttributeValue(null,GraphMLTokens.ID);
+          String attributeName=reader.getAttributeValue(null,GraphMLTokens.ATTR_NAME);
+          String attributeType=reader.getAttributeValue(null,GraphMLTokens.ATTR_TYPE);
+          keyIdMap.put(id,attributeName);
+          keyTypesMaps.put(id,attributeType);
+        }
+ else         if (elementName.equals(GraphMLTokens.NODE)) {
+          vertexId=reader.getAttributeValue(null,GraphMLTokens.ID);
+          vertexLabel=reader.getAttributeValue(null,LABELS);
+          if (vertexLabel != null) {
+            if (vertexLabel.startsWith(":"))             vertexLabel=vertexLabel.substring(1);
+            final String[] vertexLabels=vertexLabel.split(":");
+            vertexLabel=vertexId + ",class:" + vertexLabels[vertexLabelIndex];
+          }
+ else           vertexLabel=vertexId;
+          inVertex=true;
+          vertexProps=new HashMap<String,Object>();
+        }
+ else         if (elementName.equals(GraphMLTokens.EDGE)) {
+          edgeId=reader.getAttributeValue(null,GraphMLTokens.ID);
+          edgeLabel=reader.getAttributeValue(null,GraphMLTokens.LABEL);
+          edgeLabel=edgeLabel == null ? GraphMLTokens._DEFAULT : edgeLabel;
+          String[] vertexIds=new String[2];
+          vertexIds[0]=reader.getAttributeValue(null,GraphMLTokens.SOURCE);
+          vertexIds[1]=reader.getAttributeValue(null,GraphMLTokens.TARGET);
+          edgeEndVertices=new Vertex[2];
+          for (int i=0; i < 2; i++) {
+            if (vertexIdKey == null) {
+              edgeEndVertices[i]=null;
+            }
+ else {
+              edgeEndVertices[i]=graph.getVertex(vertexMappedIdMap.get(vertexIds[i]));
+            }
+            if (null == edgeEndVertices[i]) {
+              edgeEndVertices[i]=graph.addVertex(vertexLabel);
+              if (vertexIdKey != null) {
+                mapId(vertexMappedIdMap,vertexIds[i],(ORID)edgeEndVertices[i].getId());
+              }
+              bufferCounter++;
+            }
+          }
+          inEdge=true;
+          vertexLabel=null;
+          edgeProps=new HashMap<String,Object>();
+        }
+ else         if (elementName.equals(GraphMLTokens.DATA)) {
+          String key=reader.getAttributeValue(null,GraphMLTokens.KEY);
+          String attributeName=keyIdMap.get(key);
+          if (attributeName != null) {
+            String value=reader.getElementText();
+            if (inVertex == true) {
+              if ((vertexIdKey != null) && (key.equals(vertexIdKey))) {
+                vertexId=value;
+              }
+ else               vertexProps.put(attributeName,typeCastValue(key,value,keyTypesMaps));
+            }
+ else             if (inEdge == true) {
+              if ((edgeLabelKey != null) && (key.equals(edgeLabelKey)))               edgeLabel=value;
+ else               if ((edgeIdKey != null) && (key.equals(edgeIdKey)))               edgeId=value;
+ else               edgeProps.put(attributeName,typeCastValue(key,value,keyTypesMaps));
+            }
+          }
+        }
+      }
+ else       if (eventType.equals(XMLEvent.END_ELEMENT)) {
+        String elementName=reader.getName().getLocalPart();
+        if (elementName.equals(GraphMLTokens.NODE)) {
+          ORID currentVertex=null;
+          if (vertexIdKey != null)           vertexMappedIdMap.get(vertexId);
+          if (currentVertex == null) {
+            final OrientVertex v=graph.addVertex(vertexLabel,vertexProps);
+            if (vertexIdKey != null)             mapId(vertexMappedIdMap,vertexId,v.getIdentity());
+            bufferCounter++;
+          }
+          vertexId=null;
+          vertexLabel=null;
+          vertexProps=null;
+          inVertex=false;
+        }
+ else         if (elementName.equals(GraphMLTokens.EDGE)) {
+          Edge currentEdge=((OrientVertex)edgeEndVertices[0]).addEdge(null,(OrientVertex)edgeEndVertices[1],edgeLabel,null,edgeProps);
+          bufferCounter++;
+          edgeId=null;
+          edgeLabel=null;
+          edgeEndVertices=null;
+          edgeProps=null;
+          inEdge=false;
+        }
+      }
+      if (bufferCounter > bufferSize) {
+        graph.commit();
+        bufferCounter=0;
+      }
+    }
+    reader.close();
+    graph.commit();
+  }
+ catch (  XMLStreamException xse) {
+    throw new IOException(xse);
+  }
+}

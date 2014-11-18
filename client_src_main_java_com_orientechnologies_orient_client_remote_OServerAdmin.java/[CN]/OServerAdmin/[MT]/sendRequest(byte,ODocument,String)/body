@@ -1,27 +1,35 @@
 {
   boolean retry=true;
-  while (retry)   try {
-    final OChannelBinaryAsynchClient network=storage.beginRequest(iRequest);
+  while (retry) {
+    OChannelBinaryAsynchClient network=null;
     try {
-      network.writeBytes(iPayLoad.toStream());
-    }
+      network=storage.beginRequest(iRequest);
+      try {
+        network.writeBytes(iPayLoad.toStream());
+      }
   finally {
-      storage.endRequest(network);
-    }
-    retry=false;
-    try {
-      storage.beginResponse(network);
-      return new ODocument(network.readBytes());
-    }
+        storage.endRequest(network);
+      }
+      retry=false;
+      try {
+        storage.beginResponse(network);
+        return new ODocument(network.readBytes());
+      }
   finally {
-      storage.endResponse(network);
+        storage.endResponse(network);
+      }
     }
-  }
- catch (  OModificationOperationProhibitedException ompe) {
-    retry=handleDBFreeze();
-  }
-catch (  Exception e) {
-    throw new OStorageException("Error on executing  '" + iActivity + "'",e);
+ catch (    OModificationOperationProhibitedException ompe) {
+      retry=handleDBFreeze();
+    }
+catch (    IOException e) {
+      storage.getEngine().getConnectionManager().remove(network);
+      throw new OStorageException("Error on executing  '" + iActivity + "'",e);
+    }
+catch (    Exception e2) {
+      if (network != null)       storage.getEngine().getConnectionManager().release(network);
+      throw new OStorageException("Error on executing  '" + iActivity + "'",e2);
+    }
   }
   return null;
 }

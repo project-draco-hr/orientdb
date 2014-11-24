@@ -1,46 +1,44 @@
 {
   parserText=request.getText();
-  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
   final OFunction f=db.getMetadata().getFunctionLibrary().getFunction(parserText);
   db.checkSecurity(ORule.ResourceGeneric.FUNCTION,ORole.PERMISSION_READ,f.getName());
   final OScriptManager scriptManager=Orient.instance().getScriptManager();
-  final ScriptEngine scriptEngine=scriptManager.getEngine(f.getLanguage());
-  final Bindings binding=scriptManager.bind(scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE),(ODatabaseDocumentTx)db,iContext,iArgs);
+  final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),f.getLanguage());
   try {
-    final String lib=scriptManager.getLibrary(db,f.getLanguage());
-    if (lib != null)     try {
-      scriptEngine.eval(lib);
+    final Bindings binding=scriptManager.bind(scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE),(ODatabaseDocumentTx)db,iContext,iArgs);
+    try {
+      final Object result;
+      if (scriptEngine instanceof Invocable) {
+        final Invocable invocableEngine=(Invocable)scriptEngine;
+        Object[] args=null;
+        if (iArgs != null) {
+          args=new Object[iArgs.size()];
+          int i=0;
+          for (          Entry<Object,Object> arg : iArgs.entrySet())           args[i++]=arg.getValue();
+        }
+        result=invocableEngine.invokeFunction(parserText,args);
+      }
+ else {
+        final Object[] args=iArgs == null ? null : iArgs.values().toArray();
+        result=scriptEngine.eval(scriptManager.getFunctionInvoke(f,args),binding);
+      }
+      return OCommandExecutorUtility.transformResult(result);
     }
  catch (    ScriptException e) {
-      scriptManager.getErrorMessage(e,lib);
+      throw new OCommandScriptException("Error on execution of the script",request.getText(),e.getColumnNumber(),e);
     }
-    final Object result;
-    if (scriptEngine instanceof Invocable) {
-      final Invocable invocableEngine=(Invocable)scriptEngine;
-      Object[] args=null;
-      if (iArgs != null) {
-        args=new Object[iArgs.size()];
-        int i=0;
-        for (        Entry<Object,Object> arg : iArgs.entrySet())         args[i++]=arg.getValue();
-      }
-      result=invocableEngine.invokeFunction(parserText,args);
+catch (    NoSuchMethodException e) {
+      throw new OCommandScriptException("Error on execution of the script",request.getText(),0,e);
     }
- else {
-      final Object[] args=iArgs == null ? null : iArgs.values().toArray();
-      result=scriptEngine.eval(scriptManager.getFunctionInvoke(f,args),binding);
+catch (    OCommandScriptException e) {
+      throw e;
     }
-    return OCommandExecutorUtility.transformResult(result);
-  }
- catch (  ScriptException e) {
-    throw new OCommandScriptException("Error on execution of the script",request.getText(),e.getColumnNumber(),e);
-  }
-catch (  NoSuchMethodException e) {
-    throw new OCommandScriptException("Error on execution of the script",request.getText(),0,e);
-  }
-catch (  OCommandScriptException e) {
-    throw e;
-  }
  finally {
-    scriptManager.unbind(binding);
+      scriptManager.unbind(binding);
+    }
+  }
+  finally {
+    scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
   }
 }

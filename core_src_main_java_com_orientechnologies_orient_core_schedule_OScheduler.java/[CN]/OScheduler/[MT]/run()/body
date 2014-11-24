@@ -1,7 +1,8 @@
 {
+  if (this.function == null)   return;
   isRunning=true;
-  SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
-  Date date=new Date(System.currentTimeMillis());
+  final SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
+  final Date date=new Date(System.currentTimeMillis());
   OLogManager.instance().warn(this,"execute : " + this.toString() + " at "+ sdf.format(date));
   ODatabaseRecordThreadLocal.INSTANCE.set(db);
   this.document.field(PROP_STATUS,SCHEDULER_STATUS.RUNNING);
@@ -9,10 +10,9 @@
   this.document.save();
   OScriptManager scriptManager=null;
   Bindings binding=null;
+  scriptManager=Orient.instance().getScriptManager();
+  final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),function.getLanguage());
   try {
-    if (this.function == null)     return;
-    scriptManager=Orient.instance().getScriptManager();
-    final ScriptEngine scriptEngine=scriptManager.getEngine(this.function.getLanguage());
     binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
     for (    OScriptInjection i : scriptManager.getInjections())     i.bind(binding);
     binding.put("doc",this.document);
@@ -34,7 +34,7 @@
         scriptEngine.eval(funcStr);
       }
  catch (      ScriptException e) {
-        scriptManager.getErrorMessage(e,funcStr);
+        scriptManager.throwErrorMessage(e,funcStr);
       }
     }
     if (scriptEngine instanceof Invocable) {
@@ -62,6 +62,7 @@ catch (  Exception ex) {
   }
  finally {
     if (scriptManager != null && binding != null)     scriptManager.unbind(binding);
+    scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
     OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
     isRunning=false;
     this.document.field(PROP_STATUS,SCHEDULER_STATUS.WAITING);

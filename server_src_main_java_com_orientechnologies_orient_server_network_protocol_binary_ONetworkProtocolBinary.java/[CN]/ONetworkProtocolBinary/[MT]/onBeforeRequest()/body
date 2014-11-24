@@ -1,11 +1,36 @@
 {
   waitNodeIsOnline();
-  connection=OClientConnectionManager.instance().getConnection(clientTxId,this);
-  if (clientTxId < 0) {
-    short protocolId=0;
-    if (connection != null)     protocolId=connection.data.protocolVersion;
-    connection=OClientConnectionManager.instance().connect(this);
-    if (connection != null)     connection.data.protocolVersion=protocolId;
+  if (connection.data.protocolVersion >= 0 && connection.data.protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_26) {
+    connection=OClientConnectionManager.instance().getConnection(clientTxId,this);
+    if (clientTxId < 0) {
+      short protocolId=0;
+      if (connection != null)       protocolId=connection.data.protocolVersion;
+      connection=OClientConnectionManager.instance().connect(this);
+      if (connection != null)       connection.data.protocolVersion=protocolId;
+    }
+  }
+ else {
+    if (token != null) {
+      if (!tokenHandler.validateBinaryToken(token)) {
+      }
+      connection=new OClientConnection(clientTxId,this);
+      if (tokenHandler != null)       connection.data=tokenHandler.getProtocolDataFromToken(token);
+      String db=token.getDatabase();
+      String type=token.getDatabaseType();
+      if (db != null && type != null) {
+        final ODatabaseDocumentTx database=new ODatabaseDocumentTx(type + ":" + db);
+        if (connection.data.serverUser) {
+          database.resetInitialization();
+          database.setProperty(ODatabase.OPTIONS.SECURITY.toString(),Boolean.FALSE);
+          database.open(connection.data.serverUsername,null);
+        }
+ else         database.open(token);
+        connection.database=database;
+      }
+      if (connection.data.serverUser) {
+        connection.serverUser=server.serverLogin(connection.data.serverUsername,null,null);
+      }
+    }
   }
   if (connection != null) {
     ODatabaseRecordThreadLocal.INSTANCE.set(connection.database);

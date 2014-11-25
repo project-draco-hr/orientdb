@@ -1,48 +1,53 @@
 {
   if (func == null)   return RESULT.RECORD_NOT_CHANGED;
-  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
   final OScriptManager scriptManager=Orient.instance().getScriptManager();
-  final ScriptEngine scriptEngine=scriptManager.getEngine(func.getLanguage());
-  final Bindings binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
-  for (  OScriptInjection i : scriptManager.getInjections())   i.bind(binding);
-  binding.put("doc",iDocument);
-  if (db != null) {
-    binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseDocumentTx)db));
-    binding.put("orient",new OScriptOrientWrapper(db));
-  }
- else   binding.put("orient",new OScriptOrientWrapper());
-  String result=null;
+  final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),func.getLanguage());
   try {
-    if (func.getLanguage() == null)     throw new OConfigurationException("Database function '" + func.getName() + "' has no language");
-    final String funcStr=scriptManager.getFunctionDefinition(func);
-    if (funcStr != null) {
-      try {
-        scriptEngine.eval(funcStr);
+    final Bindings binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
+    for (    OScriptInjection i : scriptManager.getInjections())     i.bind(binding);
+    binding.put("doc",iDocument);
+    if (db != null) {
+      binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseDocumentTx)db));
+      binding.put("orient",new OScriptOrientWrapper(db));
+    }
+ else     binding.put("orient",new OScriptOrientWrapper());
+    String result=null;
+    try {
+      if (func.getLanguage() == null)       throw new OConfigurationException("Database function '" + func.getName() + "' has no language");
+      final String funcStr=scriptManager.getFunctionDefinition(func);
+      if (funcStr != null) {
+        try {
+          scriptEngine.eval(funcStr);
+        }
+ catch (        ScriptException e) {
+          scriptManager.throwErrorMessage(e,funcStr);
+        }
       }
- catch (      ScriptException e) {
-        scriptManager.getErrorMessage(e,funcStr);
+      if (scriptEngine instanceof Invocable) {
+        final Invocable invocableEngine=(Invocable)scriptEngine;
+        Object[] EMPTY=new Object[0];
+        result=(String)invocableEngine.invokeFunction(func.getName(),EMPTY);
       }
     }
-    if (scriptEngine instanceof Invocable) {
-      final Invocable invocableEngine=(Invocable)scriptEngine;
-      Object[] EMPTY=new Object[0];
-      result=(String)invocableEngine.invokeFunction(func.getName(),EMPTY);
+ catch (    ScriptException e) {
+      throw new OCommandScriptException("Error on execution of the script",func.getName(),e.getColumnNumber(),e);
     }
-  }
- catch (  ScriptException e) {
-    throw new OCommandScriptException("Error on execution of the script",func.getName(),e.getColumnNumber(),e);
-  }
-catch (  NoSuchMethodException e) {
-    throw new OCommandScriptException("Error on execution of the script",func.getName(),0,e);
-  }
-catch (  OCommandScriptException e) {
-    throw e;
-  }
+catch (    NoSuchMethodException e) {
+      throw new OCommandScriptException("Error on execution of the script",func.getName(),0,e);
+    }
+catch (    OCommandScriptException e) {
+      throw e;
+    }
  finally {
-    scriptManager.unbind(binding);
+      scriptManager.unbind(binding);
+    }
+    if (result == null) {
+      return RESULT.RECORD_NOT_CHANGED;
+    }
+    return RESULT.valueOf(result);
   }
-  if (result == null) {
-    return RESULT.RECORD_NOT_CHANGED;
+  finally {
+    scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
   }
-  return RESULT.valueOf(result);
 }

@@ -3,11 +3,12 @@
   if (database.exists())   ODatabaseHelper.deleteDatabase(database,getStorageType());
   ODatabaseHelper.createDatabase(database,url,getStorageType());
   database.close();
-  final AtomicInteger recordedChanges=new AtomicInteger();
   database.open("admin","admin");
-  database.begin(TXTYPE.OPTIMISTIC);
-  ODocument rec=database.newInstance().field("name","Jay").save();
-  database.commit();
+  OrientGraph g=new OrientGraph(database);
+  OrientVertex v=g.addVertex(null);
+  v.setProperty("name","Jay");
+  g.commit();
+  final AtomicInteger recordedChanges=new AtomicInteger();
   ODatabaseListener listener=new ODatabaseListener(){
     @Override public void onCreate(    ODatabase iDatabase){
     }
@@ -44,9 +45,8 @@
   }
 ;
   database.registerListener(listener);
-  database.begin(TXTYPE.OPTIMISTIC);
-  rec.field("surname","Miner").save();
-  database.commit();
+  v.setProperty("surname","Miner");
+  g.shutdown();
   database.unregisterListener(listener);
   Assert.assertEquals(recordedChanges.get(),1);
   ODatabaseHelper.deleteDatabase(database,getStorageType());

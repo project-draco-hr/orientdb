@@ -14,19 +14,7 @@
   final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),function.getLanguage());
   try {
     binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
-    for (    OScriptInjection i : scriptManager.getInjections())     i.bind(binding);
-    binding.put("doc",this.document);
-    if (db != null)     binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseDocumentTx)db));
-    binding.put("orient",new OScriptOrientWrapper(db));
-    if (iArgs != null) {
-      for (      Entry<Object,Object> a : iArgs.entrySet()) {
-        binding.put(a.getKey().toString(),a.getValue());
-      }
-      binding.put("params",iArgs.values().toArray());
-    }
- else {
-      binding.put("params",new Object[0]);
-    }
+    scriptManager.bind(binding,(ODatabaseDocumentTx)db,null,iArgs);
     if (this.function.getLanguage() == null)     throw new OConfigurationException("Database function '" + this.function.getName() + "' has no language");
     final String funcStr=scriptManager.getFunctionDefinition(this.function);
     if (funcStr != null) {
@@ -61,7 +49,7 @@ catch (  Exception ex) {
     throw new OCommandScriptException("Unknown Exception",this.function.getName(),0,ex);
   }
  finally {
-    if (scriptManager != null && binding != null)     scriptManager.unbind(binding);
+    if (scriptManager != null && binding != null)     scriptManager.unbind(binding,null,iArgs);
     scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
     OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
     isRunning=false;

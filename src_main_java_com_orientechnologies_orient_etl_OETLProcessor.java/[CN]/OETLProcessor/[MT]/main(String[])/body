@@ -1,11 +1,5 @@
 {
   ODocument cfgGlobal=null;
-  Collection<ODocument> cfgBegin=null;
-  ODocument cfgSource=null;
-  ODocument cfgExtract=null;
-  Collection<ODocument> cfgTransformers=null;
-  ODocument cfgLoader=null;
-  Collection<ODocument> cfgEnd=null;
   System.out.println("OrientDB etl v." + OConstants.getVersion() + " "+ OConstants.ORIENT_URL);
   if (args.length == 0) {
     System.out.println("Syntax error, missing configuration file.");
@@ -13,6 +7,7 @@
     System.exit(1);
   }
   final OBasicCommandContext context=createDefaultContext();
+  ODocument configuration=null;
   for (int i=0; i < args.length; ++i) {
     final String arg=args[i];
     if (arg.charAt(0) == '-') {
@@ -22,26 +17,18 @@
  else {
       try {
         final String config=OIOUtils.readFileAsString(new File(arg));
-        final ODocument cfg=new ODocument().fromJSON(config,"noMap");
-        cfgGlobal=cfg.field("config");
-        cfgBegin=cfg.field("begin");
-        cfgSource=cfg.field("source");
-        cfgExtract=cfg.field("extractor");
-        cfgTransformers=cfg.field("transformers");
-        cfgLoader=cfg.field("loader");
-        cfgEnd=cfg.field("end");
+        configuration=new ODocument().fromJSON(config,"noMap");
+        cfgGlobal=configuration.field("config");
       }
  catch (      IOException e) {
         throw new OConfigurationException("Error on loading config file: " + arg);
       }
     }
   }
-  if (cfgExtract == null)   throw new IllegalArgumentException("No Extractor configured");
   if (cfgGlobal != null) {
     for (    String f : cfgGlobal.fieldNames()) {
       context.setVariable(f,cfgGlobal.field(f));
     }
   }
-  final OETLProcessor processor=new OETLProcessor(cfgBegin,cfgSource,cfgExtract,cfgTransformers,cfgLoader,cfgEnd,context);
-  processor.execute();
+  new OETLProcessor().parse(configuration,context).execute();
 }

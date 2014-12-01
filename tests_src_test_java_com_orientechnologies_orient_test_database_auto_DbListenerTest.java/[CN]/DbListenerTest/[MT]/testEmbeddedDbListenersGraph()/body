@@ -8,47 +8,10 @@
   OrientVertex v=g.addVertex(null);
   v.setProperty("name","Jay");
   g.commit();
-  final AtomicInteger recordedChanges=new AtomicInteger();
-  ODatabaseListener listener=new ODatabaseListener(){
-    @Override public void onCreate(    ODatabase iDatabase){
-    }
-    @Override public void onDelete(    ODatabase iDatabase){
-    }
-    @Override public void onOpen(    ODatabase iDatabase){
-    }
-    @Override public void onBeforeTxBegin(    ODatabase iDatabase){
-    }
-    @Override public void onBeforeTxRollback(    ODatabase iDatabase){
-    }
-    @Override public void onAfterTxRollback(    ODatabase iDatabase){
-    }
-    @Override public void onBeforeTxCommit(    ODatabase iDatabase){
-      OTransaction tx=((ODatabaseDocumentTx)iDatabase).getTransaction();
-      Iterable<? extends ORecordOperation> recs=tx.getCurrentRecordEntries();
-      for (      ORecordOperation op : recs) {
-        ODocument doc=(ODocument)op.getRecord();
-        for (        String f : doc.getDirtyFields()) {
-          recordedChanges.incrementAndGet();
-          final Object oldValue=doc.getOriginalValue(f);
-          final Object newValue=doc.field(f);
-          System.out.println("Field " + f + " Old: "+ oldValue+ " -> "+ newValue);
-        }
-      }
-    }
-    @Override public void onAfterTxCommit(    ODatabase iDatabase){
-    }
-    @Override public void onClose(    ODatabase iDatabase){
-    }
-    @Override public boolean onCorruptionRepairDatabase(    ODatabase iDatabase,    String iReason,    String iWhatWillbeFixed){
-      return false;
-    }
-  }
-;
-  database.registerListener(listener);
+  final DocumentChangeListener cl=new DocumentChangeListener(g);
   v.setProperty("surname","Miner");
   g.shutdown();
-  database.unregisterListener(listener);
-  Assert.assertEquals(recordedChanges.get(),1);
+  Assert.assertEquals(cl.getChanges().size(),1);
   ODatabaseHelper.deleteDatabase(database,getStorageType());
   ODatabaseHelper.createDatabase(database,url,getStorageType());
 }

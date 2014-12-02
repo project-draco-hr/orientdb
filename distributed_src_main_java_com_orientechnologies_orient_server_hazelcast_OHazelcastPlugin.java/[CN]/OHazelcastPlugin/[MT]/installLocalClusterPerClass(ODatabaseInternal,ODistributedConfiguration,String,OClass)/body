@@ -15,17 +15,12 @@
       }
  else {
         ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"class %s, creation of new local cluster '%s' (id=%d)",iClass,newClusterName,iDatabase.getClusterIdByName(newClusterName));
-        if (OScenarioThreadLocal.INSTANCE.get() == OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED) {
-          final Future<?> result=Orient.instance().getWorkers().submit(new Runnable(){
-            @Override public void run(){
-              ODatabaseRecordThreadLocal.INSTANCE.set((com.orientechnologies.orient.core.db.ODatabaseDocumentInternal)iDatabase);
-              iClass.addCluster(newClusterName);
-              ODatabaseRecordThreadLocal.INSTANCE.remove();
-            }
-          }
-);
+        try {
+          iClass.addCluster(newClusterName);
         }
- else         iClass.addCluster(newClusterName);
+ catch (        OCommandSQLParsingException e) {
+          if (!e.getMessage().endsWith("already exists"))           throw e;
+        }
         ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"class %s, set mastership of cluster '%s' (id=%d) to '%s'",iClass,newClusterName,iDatabase.getClusterIdByName(newClusterName),nodeName);
         cfg.setMasterServer(newClusterName,nodeName);
       }

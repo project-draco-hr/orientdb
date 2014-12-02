@@ -1,0 +1,30 @@
+{
+  final Class<?> selfClass=self.getClass();
+  for (  String fieldName : doc.fieldNames()) {
+    final Field field=OObjectEntitySerializer.getField(fieldName,selfClass);
+    if (field != null) {
+      Object value=getValue(self,fieldName,false,null,true);
+      if (value instanceof OObjectLazyMultivalueElement) {
+        ((OObjectLazyMultivalueElement<?>)value).detachAll(nonProxiedInstance,alreadyDetached);
+        if (nonProxiedInstance)         value=((OObjectLazyMultivalueElement<?>)value).getNonOrientInstance();
+      }
+ else       if (value instanceof Proxy) {
+        OObjectProxyMethodHandler handler=(OObjectProxyMethodHandler)((ProxyObject)value).getHandler();
+        if (nonProxiedInstance) {
+          value=OObjectEntitySerializer.getNonProxiedInstance(value);
+        }
+        Object detachedValue=alreadyDetached.get(handler.doc.hashCode());
+        if (detachedValue != null) {
+          value=detachedValue;
+        }
+ else {
+          alreadyDetached.put(handler.doc.hashCode(),value);
+          handler.detachAll(value,nonProxiedInstance,alreadyDetached);
+        }
+      }
+      OObjectEntitySerializer.setFieldValue(field,self,value);
+    }
+  }
+  OObjectEntitySerializer.setIdField(selfClass,self,doc.getIdentity());
+  OObjectEntitySerializer.setVersionField(selfClass,self,doc.getRecordVersion().copy());
+}

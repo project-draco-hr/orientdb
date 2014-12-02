@@ -1,0 +1,30 @@
+{
+  final OClass vClass=db.getMetadata().getSchema().getClass(vertexClass);
+  try {
+    final String outField="E".equals(this.edgeClass) ? "out_" : ("out_" + this.edgeClass);
+    final String inField="E".equals(this.edgeClass) ? "in_" : ("in_" + this.edgeClass);
+    runningThreads=new AtomicInteger(parallel);
+    for (int i=0; i < parallel - 1; i++) {
+      Thread t=new BatchImporterJob(i,vClass);
+      t.start();
+    }
+    Thread t=new BatchImporterJob(parallel - 1,vClass);
+    t.run();
+    if (runningThreads.get() > 0) {
+synchronized (runningThreads) {
+        while (runningThreads.get() > 0) {
+          try {
+            runningThreads.wait();
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+    }
+  }
+  finally {
+    db.declareIntent(null);
+    db.close();
+    if (walActive)     OGlobalConfiguration.USE_WAL.setValue(walActive);
+  }
+}

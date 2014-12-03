@@ -1,14 +1,10 @@
 {
-  final Map<String,OProperty> props;
-  final OClass clazz=document.getImmutableSchemaClass();
-  if (clazz != null) {
-    writeString(bytes,clazz.getName());
-    props=clazz.propertiesMap();
-  }
- else {
+  final OClass clazz=serializeClass(document,bytes);
+  if (iClassOnly) {
     writeEmptyString(bytes);
-    props=null;
+    return;
   }
+  final Map<String,OProperty> props=clazz != null ? clazz.propertiesMap() : null;
   final String[] fields=document.fieldNames();
   final int[] pos=new int[fields.length];
   final OProperty[] properties=new OProperty[fields.length];
@@ -34,9 +30,7 @@
     final Object value=values[i].getValue();
     if (value != null) {
       final OType type=getFieldType(document,values[i].getKey(),value,props);
-      if (type == null) {
-        throw new OSerializationException("Impossible serialize value of type " + value.getClass() + " with the ODocument binary serializer");
-      }
+      if (type == null)       continue;
       pointer=writeSingleValue(bytes,value,type,getLinkedType(document,type,values[i].getKey()));
       OIntegerSerializer.INSTANCE.serializeLiteral(pointer,bytes.bytes,pos[i]);
       if (properties[i] == null || properties[i].getType() == OType.ANY)       writeOType(bytes,(pos[i] + OIntegerSerializer.INT_SIZE),type);

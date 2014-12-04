@@ -23,7 +23,8 @@
       if (rid.clusterId > -1 && iClusterName == null)       iClusterName=getClusterNameById(rid.clusterId);
       checkRecordClass(record,iClusterName,rid,isNew);
       checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,iClusterName);
-      if (stream != null && stream.length > 0) {
+      final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.INSTANCE.checkIfPartial((ODocument)record);
+      if (stream != null && stream.length > 0 && !partialMarshalling) {
         if (iCallTriggers) {
           final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
           final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
@@ -32,7 +33,8 @@
  else           if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)           return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
         }
       }
-      if (!record.isDirty())       return (RET)record;
+      if (wasNew && !isNew)       record.setDirty();
+ else       if (!record.isDirty())       return (RET)record;
       final ORecordVersion realVersion=!mvcc || iVersion.isUntracked() ? OVersionFactory.instance().createUntrackedVersion() : record.getRecordVersion();
       try {
         boolean updateContent=ORecordInternal.isContentChanged(record);
@@ -53,7 +55,7 @@
           ORecordInternal.onAfterIdentityChanged(record);
         }
         if (operationResult.getModifiedRecordContent() != null)         stream=operationResult.getModifiedRecordContent();
-        ORecordInternal.fill(record,rid,version,stream,stream == null || stream.length == 0);
+        ORecordInternal.fill(record,rid,version,stream,partialMarshalling);
         callbackHookSuccess(record,iCallTriggers,wasNew,stream,operationResult);
       }
  catch (      Throwable t) {

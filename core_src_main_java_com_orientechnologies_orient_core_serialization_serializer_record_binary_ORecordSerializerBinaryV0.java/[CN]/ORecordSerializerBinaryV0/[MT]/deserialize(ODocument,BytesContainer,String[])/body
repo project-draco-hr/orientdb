@@ -2,8 +2,9 @@
   final String className=readString(bytes);
   if (className.length() != 0)   document.setClassNameIfExists(className);
   int last=0;
-  String field;
+  String fieldName;
   int unmarshalledFields=0;
+  final boolean partialLoading=iFields != null && iFields.length > 0;
   while (true) {
     OGlobalProperty prop=null;
     final int len=OVarIntSerializer.readAsInteger(bytes);
@@ -11,17 +12,40 @@
       break;
     }
  else     if (len > 0) {
+      if (partialLoading) {
+        boolean possibleMatch=false;
+        for (int i=0; i < iFields.length; ++i)         if (iFields[i].length() == len) {
+          possibleMatch=true;
+          break;
+        }
+        if (!possibleMatch) {
+          bytes.skip(len + OIntegerSerializer.INT_SIZE + 1);
+          continue;
+        }
+      }
       final String res=new String(bytes.bytes,bytes.offset,len,utf8);
       bytes.skip(len);
-      field=res;
+      fieldName=res;
+      if (partialLoading) {
+        boolean foundField=false;
+        for (int i=0; i < iFields.length; ++i)         if (iFields[i].equals(fieldName)) {
+          foundField=true;
+          unmarshalledFields++;
+          break;
+        }
+        if (!foundField) {
+          bytes.skip(OIntegerSerializer.INT_SIZE + 1);
+          continue;
+        }
+      }
     }
  else {
       ODatabaseDocument db=document.getDatabase();
-      if (db == null || db.isClosed())       throw new ODatabaseException("Impossible deserialize the document no database present");
+      if (db == null || db.isClosed())       throw new ODatabaseException("Cannot unmarshall the document because no database is active");
       prop=db.getMetadata().getImmutableSchemaSnapshot().getGlobalPropertyById((len * -1) - 1);
-      field=prop.getName();
+      fieldName=prop.getName();
     }
-    if (ODocumentInternal.rawContainsField(document,field)) {
+    if (ODocumentInternal.rawContainsField(document,fieldName)) {
       if (prop != null && prop.getType() != OType.ANY)       bytes.skip(OIntegerSerializer.INT_SIZE);
  else       bytes.skip(OIntegerSerializer.INT_SIZE + 1);
       continue;
@@ -36,21 +60,11 @@
       final Object value=readSingleValue(bytes,type,document);
       if (bytes.offset > last)       last=bytes.offset;
       bytes.offset=headerCursor;
-      ODocumentInternal.rawField(document,field,value,type);
+      ODocumentInternal.rawField(document,fieldName,value,type);
     }
- else     ODocumentInternal.rawField(document,field,null,null);
-    boolean exit=false;
-    if (iFields != null) {
-      for (int i=0; i < iFields.length; ++i) {
-        if (field.equals(iFields[i])) {
-          unmarshalledFields++;
-          if (unmarshalledFields >= iFields.length)           exit=true;
-          break;
-        }
-      }
-      if (exit)       break;
-    }
+ else     ODocumentInternal.rawField(document,fieldName,null,null);
+    if (partialLoading && unmarshalledFields >= iFields.length)     break;
   }
-  if (iFields == null || iFields.length == 0)   ORecordInternal.clearSource(document);
+  if (!partialLoading)   ORecordInternal.clearSource(document);
   if (last > bytes.offset)   bytes.offset=last;
 }

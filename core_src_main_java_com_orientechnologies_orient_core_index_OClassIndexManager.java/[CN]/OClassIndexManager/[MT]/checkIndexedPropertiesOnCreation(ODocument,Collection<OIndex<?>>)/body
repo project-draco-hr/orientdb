@@ -1,22 +1,36 @@
 {
   ODocument replaced=null;
-  for (  final OIndex<?> index : iIndexes) {
+  final TreeMap<OIndex<?>,List<Object>> indexKeysMap=new TreeMap<OIndex<?>,List<Object>>();
+  for (  final OIndex<?> index : indexes) {
+    final List<Object> keys=new ArrayList<Object>();
     final OIndexDefinition indexDefinition=index.getDefinition();
-    final Object key=index.getDefinition().getDocumentValueToIndex(iRecord);
+    final Object key=index.getDefinition().getDocumentValueToIndex(record);
     if (key instanceof Collection) {
       for (      final Object keyItem : (Collection<?>)key) {
         if (!indexDefinition.isNullValuesIgnored() || keyItem != null) {
-          final ODocument r=index.checkEntry(iRecord,keyItem);
-          if (r != null)           if (replaced == null)           replaced=r;
- else           throw new OIndexException("Cannot merge record from multiple indexes. Use this strategy when you have only one index");
+          keys.add(keyItem);
         }
       }
     }
  else {
       if (!indexDefinition.isNullValuesIgnored() || key != null) {
-        final ODocument r=index.checkEntry(iRecord,key);
-        if (r != null)         if (replaced == null)         replaced=r;
- else         throw new OIndexException("Cannot merge record from multiple indexes. Use this strategy when you have only one index");
+        keys.add(key);
+      }
+    }
+    indexKeysMap.put(index,keys);
+  }
+  for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
+    final OIndexInternal<?> index=entry.getKey().getInternal();
+    index.lockKeysForUpdate(entry.getValue());
+  }
+  lockedKeys.set(indexKeysMap);
+  for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
+    final OIndex<?> index=entry.getKey();
+    for (    Object keyItem : entry.getValue()) {
+      final ODocument r=index.checkEntry(record,keyItem);
+      if (r != null)       if (replaced == null)       replaced=r;
+ else {
+        throw new OIndexException("Cannot merge record from multiple indexes. Use this strategy when you have only one index");
       }
     }
   }

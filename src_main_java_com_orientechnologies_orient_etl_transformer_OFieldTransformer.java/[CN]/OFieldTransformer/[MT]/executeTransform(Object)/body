@@ -4,14 +4,23 @@
     if (rec instanceof ODocument) {
       final ODocument doc=(ODocument)rec;
       if (setOperation) {
-        if (sqlFilter == null)         sqlFilter=new OSQLFilter(expression,context,null);
-        final Object newValue=sqlFilter.evaluate(doc,null,context);
+        final Object newValue;
+        if (expression != null) {
+          if (sqlFilter == null)           sqlFilter=new OSQLFilter(expression,context,null);
+          newValue=sqlFilter.evaluate(doc,null,context);
+        }
+ else         newValue=value;
         doc.field(fieldName,newValue);
         log(OETLProcessor.LOG_LEVELS.DEBUG,"set %s=%s in document=%s",fieldName,newValue,doc);
       }
  else {
         final Object prev=doc.removeField(fieldName);
         log(OETLProcessor.LOG_LEVELS.DEBUG,"removed %s (value=%s) from document=%s",fieldName,prev,doc);
+      }
+      if (save) {
+        final ODatabaseDocumentTx db=super.pipeline.getDocumentDatabase();
+        if (db == null)         throw new OETLProcessHaltedException("Database instance not found in pipeline");
+        db.save(doc);
       }
     }
   }

@@ -1,0 +1,32 @@
+{
+  setCurrentDatabaseInThreadLocal();
+  try {
+    if (status == STATUS.OPEN)     throw new IllegalStateException("Database " + getName() + " is already open");
+    if (user != null && !user.getIdentity().equals(iToken.getUserId()))     initialized=false;
+    if (storage instanceof OStorageProxy) {
+      throw new ODatabaseException("Cannot use a token open on remote database");
+    }
+    if (storage.isClosed()) {
+      storage.open("","",properties);
+    }
+    status=STATUS.OPEN;
+    initAtFirstOpen(null,null);
+    final OSecurity security=metadata.getSecurity();
+    if (user == null || user.getVersion() != security.getVersion()) {
+      final OUser usr=metadata.getSecurity().authenticate(iToken);
+      if (usr != null)       user=new OImmutableUser(security.getVersion(),usr);
+ else       user=null;
+      checkSecurity(ORule.ResourceGeneric.DATABASE,ORole.PERMISSION_READ);
+    }
+    callOnOpenListeners();
+  }
+ catch (  OException e) {
+    close();
+    throw e;
+  }
+catch (  Exception e) {
+    close();
+    throw new ODatabaseException("Cannot open database",e);
+  }
+  return (DB)this;
+}

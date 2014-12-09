@@ -1,40 +1,62 @@
 {
   super.beforeExecute(iRequest,iResponse);
+  init();
   final String[] urlParts=iRequest.url.substring(1).split("/");
   if (urlParts.length < 2)   throw new OHttpRequestException("Syntax error in URL. Expected is: <command>/<database>[/...]");
   iRequest.databaseName=urlParts[1];
-  final List<String> authenticationParts=iRequest.authorization != null ? OStringSerializerHelper.split(iRequest.authorization,':') : null;
-  OHttpSession currentSession;
-  if (iRequest.sessionId != null && iRequest.sessionId.length() > 1) {
-    currentSession=OHttpSessionManager.getInstance().getSession(iRequest.sessionId);
-    if (currentSession != null && authenticationParts != null) {
-      if (!currentSession.getUserName().equals(authenticationParts.get(0))) {
-        currentSession=null;
-      }
+  if (iRequest.bearerTokenRaw != null) {
+    try {
+      iRequest.bearerToken=handler.parseWebToken(iRequest.bearerTokenRaw.getBytes());
     }
-  }
- else   currentSession=null;
-  if (currentSession == null) {
-    if (iRequest.authorization == null || SESSIONID_LOGOUT.equals(iRequest.sessionId)) {
-      iResponse.setSessionId(SESSIONID_UNAUTHORIZED);
+ catch (    Exception e) {
+      OLogManager.instance().warn(this,"Bearer token parsing failed",e);
+    }
+    if (iRequest.bearerToken == null || iRequest.bearerToken.getIsVerified() == false) {
       sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
       return false;
     }
- else     return authenticate(iRequest,iResponse,authenticationParts,iRequest.databaseName);
+    handler.validateToken(iRequest.bearerToken,urlParts[0],urlParts[1]);
+    if (iRequest.bearerToken.getIsValid() == false) {
+      OLogManager.instance().warn(this,"Token '%s' is not valid for database '%s'",iRequest.bearerTokenRaw,iRequest.databaseName);
+      sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
+      return false;
+    }
+    return iRequest.bearerToken.getIsValid();
   }
  else {
-    if (!currentSession.getDatabaseName().equals(iRequest.databaseName)) {
-      OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s', but has been authenticated against the database '%s'",iRequest.sessionId,iRequest.databaseName,currentSession.getDatabaseName());
-      OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
-      sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
-      return false;
+    final List<String> authenticationParts=iRequest.authorization != null ? OStringSerializerHelper.split(iRequest.authorization,':') : null;
+    OHttpSession currentSession;
+    if (iRequest.sessionId != null && iRequest.sessionId.length() > 1) {
+      currentSession=OHttpSessionManager.getInstance().getSession(iRequest.sessionId);
+      if (currentSession != null && authenticationParts != null) {
+        if (!currentSession.getUserName().equals(authenticationParts.get(0))) {
+          currentSession=null;
+        }
+      }
     }
- else     if (authenticationParts != null && !currentSession.getUserName().equals(authenticationParts.get(0))) {
-      OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s' with user '%s', but has been authenticated with user '%s'",iRequest.sessionId,iRequest.databaseName,authenticationParts.get(0),currentSession.getUserName());
-      OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
-      sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
-      return false;
+ else     currentSession=null;
+    if (currentSession == null) {
+      if (iRequest.authorization == null || SESSIONID_LOGOUT.equals(iRequest.sessionId)) {
+        iResponse.setSessionId(SESSIONID_UNAUTHORIZED);
+        sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
+        return false;
+      }
+ else       return authenticate(iRequest,iResponse,authenticationParts,iRequest.databaseName);
     }
-    return true;
+ else {
+      if (!currentSession.getDatabaseName().equals(iRequest.databaseName)) {
+        OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s', but has been authenticated against the database '%s'",iRequest.sessionId,iRequest.databaseName,currentSession.getDatabaseName());
+        OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
+        sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
+        return false;
+      }
+ else       if (authenticationParts != null && !currentSession.getUserName().equals(authenticationParts.get(0))) {
+        OLogManager.instance().warn(this,"Session %s is trying to access to the database '%s' with user '%s', but has been authenticated with user '%s'",iRequest.sessionId,iRequest.databaseName,authenticationParts.get(0),currentSession.getUserName());
+        OHttpSessionManager.getInstance().removeSession(iRequest.sessionId);
+        sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
+        return false;
+      }
+      return true;
+    }
   }
 }

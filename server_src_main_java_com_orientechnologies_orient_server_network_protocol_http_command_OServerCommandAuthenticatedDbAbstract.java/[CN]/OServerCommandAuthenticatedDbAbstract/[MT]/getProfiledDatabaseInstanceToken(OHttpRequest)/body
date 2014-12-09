@@ -1,0 +1,18 @@
+{
+  ODatabaseDocumentInternal localDatabase=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  if (localDatabase == null) {
+    localDatabase=(ODatabaseDocumentTx)server.openDatabase("document",iRequest.databaseName,iRequest.bearerToken);
+  }
+ else {
+    ORID currentUserId=iRequest.bearerToken.getUserId();
+    if (currentUserId != null && localDatabase != null && localDatabase.getUser() != null) {
+      if (!currentUserId.equals(localDatabase.getUser().getDocument().getIdentity().toString())) {
+        ODocument userDoc=localDatabase.load(currentUserId);
+        localDatabase.setUser(new OUser(userDoc));
+      }
+    }
+  }
+  iRequest.data.lastDatabase=localDatabase.getName();
+  iRequest.data.lastUser=localDatabase.getUser() != null ? localDatabase.getUser().getName() : null;
+  return (ODatabaseDocumentTx)localDatabase.getDatabaseOwner();
+}

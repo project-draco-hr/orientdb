@@ -1,0 +1,20 @@
+{
+  final OHttpSession session=OHttpSessionManager.getInstance().getSession(iRequest.sessionId);
+  if (session == null)   throw new OSecurityAccessException(iRequest.databaseName,"No session active");
+  ODatabaseDocumentInternal localDatabase=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  if (localDatabase == null) {
+    localDatabase=(ODatabaseDocumentTx)server.openDatabase("document",iRequest.databaseName,session.getUserName(),session.getUserPassword());
+  }
+ else {
+    String currentUserId=iRequest.data.currentUserId;
+    if (currentUserId != null && currentUserId.length() > 0 && localDatabase != null && localDatabase.getUser() != null) {
+      if (!currentUserId.equals(localDatabase.getUser().getIdentity().toString())) {
+        ODocument userDoc=localDatabase.load(new ORecordId(currentUserId));
+        localDatabase.setUser(new OUser(userDoc));
+      }
+    }
+  }
+  iRequest.data.lastDatabase=localDatabase.getName();
+  iRequest.data.lastUser=localDatabase.getUser() != null ? localDatabase.getUser().getName() : null;
+  return (ODatabaseDocumentTx)localDatabase.getDatabaseOwner();
+}

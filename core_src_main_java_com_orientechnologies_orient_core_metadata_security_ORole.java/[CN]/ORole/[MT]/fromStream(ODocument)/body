@@ -11,19 +11,27 @@
   }
   final OIdentifiable role=document.field("inheritedRole");
   parentRole=role != null ? document.getDatabase().getMetadata().getSecurity().getRole(role) : null;
+  boolean rolesNeedToBeUpdated=false;
   Object loadedRules=document.field("rules");
   if (loadedRules instanceof Map) {
     loadOldVersionOfRules((Map<String,Number>)loadedRules);
   }
  else {
     final Set<ODocument> storedRules=(Set<ODocument>)loadedRules;
-    if (storedRules != null)     for (    ODocument ruleDoc : storedRules) {
-      final ORule.ResourceGeneric resourceGeneric=ORule.ResourceGeneric.valueOf(ruleDoc.<String>field("resourceGeneric"));
-      final Map<String,Byte> specificResources=ruleDoc.field("specificResources");
-      final Byte access=ruleDoc.field("access");
-      final ORule rule=new ORule(resourceGeneric,specificResources,access);
-      rules.put(resourceGeneric,rule);
+    if (storedRules != null) {
+      for (      ODocument ruleDoc : storedRules) {
+        final ORule.ResourceGeneric resourceGeneric=ORule.ResourceGeneric.valueOf(ruleDoc.<String>field("resourceGeneric"));
+        final Map<String,Byte> specificResources=ruleDoc.field("specificResources");
+        final Byte access=ruleDoc.field("access");
+        final ORule rule=new ORule(resourceGeneric,specificResources,access);
+        rules.put(resourceGeneric,rule);
+      }
     }
+    rolesNeedToBeUpdated=true;
   }
   if (getName().equals("admin") && !hasRule(ORule.ResourceGeneric.BYPASS_RESTRICTED,null))   addRule(ORule.ResourceGeneric.BYPASS_RESTRICTED,null,ORole.PERMISSION_ALL).save();
+  if (rolesNeedToBeUpdated) {
+    updateRolesDocumentContent();
+    save();
+  }
 }

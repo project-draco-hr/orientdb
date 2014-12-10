@@ -10,24 +10,29 @@
     int clusterId=iRecord.getIdentity().getClusterId();
     if (clusterId == ORID.CLUSTER_ID_INVALID) {
       if (iClusterName == null) {
-        if (schemaClass != null) {
-          if (schemaClass.isAbstract())           throw new OSchemaException("Document belongs to abstract class " + schemaClass.getName() + " and can not be saved");
-          iClusterName=getClusterNameById(schemaClass.getClusterForNewInstance(doc));
-        }
+        if (storage.isAssigningClusterIds()) {
+          if (schemaClass != null) {
+            if (schemaClass.isAbstract())             throw new OSchemaException("Document belongs to abstract class " + schemaClass.getName() + " and can not be saved");
+            iClusterName=getClusterNameById(schemaClass.getClusterForNewInstance(doc));
+          }
  else {
-          iClusterName=getClusterNameById(storage.getDefaultClusterId());
+            iClusterName=getClusterNameById(storage.getDefaultClusterId());
+          }
         }
       }
-      clusterId=getClusterIdByName(iClusterName);
-      if (clusterId == -1)       throw new IllegalArgumentException("Cluster name " + iClusterName + " is not configured");
+      if (iClusterName != null) {
+        clusterId=getClusterIdByName(iClusterName);
+        if (clusterId == -1)         throw new IllegalArgumentException("Cluster name '" + iClusterName + "' is not configured");
+      }
     }
     final int[] clusterIds;
-    if (schemaClass != null) {
+    if (schemaClass != null && clusterId > -1) {
       clusterIds=schemaClass.getClusterIds();
       int i=0;
       for (; i < clusterIds.length; ++i)       if (clusterIds[i] == clusterId)       break;
-      if (i == clusterIds.length)       throw new IllegalArgumentException("Cluster name " + iClusterName + " (id="+ clusterId+ ") is not configured to store the class "+ doc.getClassName()+ ", valid are "+ Arrays.toString(clusterIds));
+      if (i == clusterIds.length)       throw new IllegalArgumentException("Cluster name '" + iClusterName + "' (id="+ clusterId+ ") is not configured to store the class '"+ doc.getClassName()+ "', valid are "+ Arrays.toString(clusterIds));
     }
+    ((ORecordId)iRecord.getIdentity()).clusterId=clusterId;
   }
  else {
     if (doc.getClassName() != null)     checkSecurity(ORule.ResourceGeneric.CLASS,ORole.PERMISSION_UPDATE,doc.getClassName());

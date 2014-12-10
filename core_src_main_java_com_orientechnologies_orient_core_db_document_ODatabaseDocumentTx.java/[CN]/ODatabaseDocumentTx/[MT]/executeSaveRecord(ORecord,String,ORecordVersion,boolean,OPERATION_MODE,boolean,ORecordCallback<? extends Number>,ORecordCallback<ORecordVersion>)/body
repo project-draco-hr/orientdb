@@ -9,7 +9,11 @@
   try {
     if (record instanceof ODocument)     acquireIndexModificationLock((ODocument)record,lockedIndexes);
     final boolean wasNew=forceCreate || rid.isNew();
-    if (wasNew && rid.clusterId == -1)     rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
+    if (wasNew && rid.clusterId == -1 && (clusterName != null || storage.isAssigningClusterIds())) {
+      if (clusterName != null)       rid.clusterId=getClusterIdByName(clusterName);
+ else       if (record instanceof ODocument && ODocumentInternal.getImmutableSchemaClass(((ODocument)record)) != null)       rid.clusterId=ODocumentInternal.getImmutableSchemaClass(((ODocument)record)).getClusterForNewInstance((ODocument)record);
+ else       getDefaultClusterId();
+    }
     byte[] stream=null;
     final OStorageOperationResult<ORecordVersion> operationResult;
     getMetadata().makeThreadLocalSchemaSnapshot();
@@ -19,9 +23,9 @@
       final boolean isNew=forceCreate || rid.isNew();
       if (isNew)       ORecordInternal.onBeforeIdentityChanged(record);
  else       if (stream == null || stream.length == 0)       return (RET)record;
-      if (isNew && rid.clusterId < 0)       rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
+      if (isNew && rid.clusterId < 0 && storage.isAssigningClusterIds())       rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
       if (rid.clusterId > -1 && clusterName == null)       clusterName=getClusterNameById(rid.clusterId);
-      checkRecordClass(record,clusterName,rid,isNew);
+      if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
       checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
       final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.INSTANCE.checkIfPartial((ODocument)record);
       if (stream != null && stream.length > 0 && !partialMarshalling) {

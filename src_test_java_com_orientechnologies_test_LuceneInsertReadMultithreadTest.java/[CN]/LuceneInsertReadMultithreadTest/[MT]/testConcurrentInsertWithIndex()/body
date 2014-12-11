@@ -1,0 +1,11 @@
+{
+  databaseDocumentTx.getMetadata().reload();
+  OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  Thread[] threads=new Thread[THREADS + RTHREADS];
+  for (int i=0; i < THREADS; ++i)   threads[i]=new Thread(new LuceneInsertThread(CYCLE),"ConcurrentWriteTest" + i);
+  for (int i=THREADS; i < THREADS + RTHREADS; ++i)   threads[i]=new Thread(new LuceneReadThread(CYCLE),"ConcurrentReadTest" + i);
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].start();
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].join();
+  OIndex idx=schema.getClass("City").getClassIndex("City.name");
+  Assert.assertEquals(idx.getSize(),THREADS * CYCLE);
+}

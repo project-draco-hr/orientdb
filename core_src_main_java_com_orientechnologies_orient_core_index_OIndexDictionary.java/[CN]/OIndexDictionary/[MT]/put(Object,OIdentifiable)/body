@@ -1,19 +1,27 @@
 {
-  modificationLock.requestModificationLock();
   key=getCollatingValue(key);
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (txIsActive)   keyLockManager.acquireSharedLock(key);
   try {
-    checkForKeyType(key);
-    acquireSharedLock();
+    modificationLock.requestModificationLock();
     try {
-      markStorageDirty();
-      indexEngine.put(key,value);
-      return this;
+      checkForKeyType(key);
+      acquireSharedLock();
+      try {
+        markStorageDirty();
+        indexEngine.put(key,value);
+        return this;
+      }
+  finally {
+        releaseSharedLock();
+      }
     }
   finally {
-      releaseSharedLock();
+      modificationLock.releaseModificationLock();
     }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (txIsActive)     keyLockManager.releaseSharedLock(key);
   }
 }

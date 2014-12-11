@@ -1,0 +1,34 @@
+{
+  walActive=OGlobalConfiguration.USE_WAL.getValueAsBoolean();
+  if (walActive)   OGlobalConfiguration.USE_WAL.setValue(false);
+  if (averageEdgeNumberPerNode > 0) {
+    OGlobalConfiguration.RID_BAG_EMBEDDED_DEFAULT_SIZE.setValue(averageEdgeNumberPerNode);
+    OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD.setValue(bonsaiThreshold);
+  }
+  db=new ODatabaseDocumentTx(dbUrl);
+  if (db.exists()) {
+    db.open(userName,password);
+  }
+ else {
+    db.create();
+  }
+  createBaseSchema();
+  out=estimatedEntries > 0 ? new HashMap<Long,List<Long>>(estimatedEntries) : new HashMap<Long,List<Long>>();
+  in=estimatedEntries > 0 ? new HashMap<Long,List<Long>>(estimatedEntries) : new HashMap<Long,List<Long>>();
+  OClass vClass=db.getMetadata().getSchema().getClass(this.vertexClass);
+  int[] existingClusters=vClass.getClusterIds();
+  for (int c=existingClusters.length; c <= parallel; c++) {
+    vClass.addCluster(vClass.getName() + "_" + c);
+  }
+  clusterIds=vClass.getClusterIds();
+  lastClusterPositions=new long[clusterIds.length];
+  for (int i=0; i < clusterIds.length; i++) {
+    int clusterId=clusterIds[i];
+    try {
+      lastClusterPositions[i]=db.getStorage().getClusterById(clusterId).getLastPosition();
+    }
+ catch (    Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+}

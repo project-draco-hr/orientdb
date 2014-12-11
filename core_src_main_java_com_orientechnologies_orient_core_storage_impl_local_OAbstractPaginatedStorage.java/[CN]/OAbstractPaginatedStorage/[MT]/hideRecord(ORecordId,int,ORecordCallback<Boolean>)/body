@@ -1,44 +1,36 @@
 {
   checkOpeness();
-  final long timer=Orient.instance().getProfiler().startChrono();
+  checkLowDiskSpace();
   final OCluster cluster=getClusterById(rid.clusterId);
+  if (transaction.get() != null) {
+    final long timer=Orient.instance().getProfiler().startChrono();
+    try {
+      return doHideMethod(rid,cluster);
+    }
+  finally {
+      Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
+    }
+  }
+  final long timer=Orient.instance().getProfiler().startChrono();
   cluster.getExternalModificationLock().requestModificationLock();
   try {
     modificationLock.requestModificationLock();
     try {
-      lock.acquireSharedLock();
+      final Lock recordLock=lockManager.acquireExclusiveLock(rid);
       try {
-        final Lock recordLock=lockManager.acquireExclusiveLock(rid);
+        lock.acquireSharedLock();
         try {
-          final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
-          if (ppos == null)           return new OStorageOperationResult<Boolean>(false);
-          makeStorageDirty();
-          atomicOperationsManager.startAtomicOperation();
-          try {
-            final ORecordSerializationContext context=ORecordSerializationContext.getContext();
-            if (context != null)             context.executeOperations(this);
-            cluster.hideRecord(ppos.clusterPosition);
-            atomicOperationsManager.endAtomicOperation(false);
-          }
- catch (          Throwable e) {
-            atomicOperationsManager.endAtomicOperation(true);
-            OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
-            return new OStorageOperationResult<Boolean>(false);
-          }
-          return new OStorageOperationResult<Boolean>(true);
+          return doHideMethod(rid,cluster);
         }
   finally {
-          lockManager.releaseLock(recordLock);
+          lock.releaseSharedLock();
         }
       }
   finally {
-        lock.releaseSharedLock();
+        lockManager.releaseLock(recordLock);
       }
     }
- catch (    IOException e) {
-      OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
-    }
- finally {
+  finally {
       modificationLock.releaseModificationLock();
     }
   }
@@ -46,5 +38,4 @@
     cluster.getExternalModificationLock().releaseModificationLock();
     Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
   }
-  return new OStorageOperationResult<Boolean>(false);
 }

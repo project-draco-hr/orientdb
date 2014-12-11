@@ -4,10 +4,12 @@
     if (!active)     return this;
     active=false;
     workers.shutdown();
-    OLogManager.instance().debug(this,"Orient Engine is shutting down...");
-    for (    OOrientListener l : browseListeners()) {
-      if (l != null)       l.onShutdown();
+    try {
+      workers.awaitTermination(2,TimeUnit.MINUTES);
     }
+ catch (    InterruptedException e) {
+    }
+    OLogManager.instance().debug(this,"Orient Engine is shutting down...");
     closeAllStorages();
     for (    OEngine engine : engines.values())     engine.shutdown();
     engines.clear();
@@ -18,24 +20,22 @@
     }
     if (threadGroup != null)     threadGroup.interrupt();
     resetListeners();
-    timer.purge();
+    timer.cancel();
+    timer=null;
     profiler.shutdown();
-    if (memoryWatchDog != null) {
-      memoryWatchDog.sendShutdown();
-      try {
-        memoryWatchDog.join();
-      }
- catch (      InterruptedException e) {
-      }
- finally {
-        memoryWatchDog=null;
-      }
-    }
-    OLogManager.instance().info(this,"OrientDB Engine shutdown complete");
-    OLogManager.instance().flush();
   }
   finally {
     engineLock.writeLock().unlock();
   }
+  for (  OOrientListener l : browseListeners()) {
+    if (l != null)     try {
+      l.onShutdown();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"Error during orient shutdown.");
+    }
+  }
+  OLogManager.instance().info(this,"OrientDB Engine shutdown complete");
+  OLogManager.instance().flush();
   return this;
 }

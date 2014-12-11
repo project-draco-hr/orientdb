@@ -2,7 +2,12 @@
   engineLock.writeLock().lock();
   try {
     if (active)     return this;
+    if (timer == null)     timer=new Timer();
     shutdownHook=new OrientShutdownHook();
+    if (signalHandler == null) {
+      signalHandler=new OSignalHandler();
+      signalHandler.installDefaultSignals();
+    }
     final int cores=Runtime.getRuntime().availableProcessors();
     workers=new ThreadPoolExecutor(cores,cores * 3,10,TimeUnit.SECONDS,new LinkedBlockingQueue<Runnable>(cores * 500){
       @Override public boolean offer(      Runnable e){
@@ -22,11 +27,16 @@
     registerEngine("com.orientechnologies.orient.client.remote.OEngineRemote");
     if (OGlobalConfiguration.PROFILER_ENABLED.getValueAsBoolean())     profiler.startRecording();
     if (OGlobalConfiguration.ENVIRONMENT_DUMP_CFG_AT_STARTUP.getValueAsBoolean())     OGlobalConfiguration.dumpConfiguration(System.out);
-    memoryWatchDog=new OMemoryWatchDog();
     active=true;
-    return this;
   }
   finally {
     engineLock.writeLock().unlock();
   }
+  for (  OOrientListener l : browseListeners())   try {
+    if (l != null && l instanceof OOrientStartupListener)     ((OOrientStartupListener)l).onStartup();
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on startup",e);
+  }
+  return this;
 }

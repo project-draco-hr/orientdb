@@ -15,7 +15,7 @@
   responseThread=new Thread(new Runnable(){
     @Override public void run(){
       Thread.currentThread().setName("OrientDB Node Response " + queueName);
-      while (!Thread.interrupted()) {
+      while (running) {
         String senderNode=null;
         ODistributedResponse message=null;
         try {
@@ -37,6 +37,10 @@ catch (        DistributedObjectDestroyedException e) {
 catch (        HazelcastInstanceNotActiveException e) {
           Thread.interrupted();
           break;
+        }
+catch (        HazelcastException e) {
+          if (e.getCause() instanceof InterruptedException)           Thread.interrupted();
+ else           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
         }
 catch (        Throwable e) {
           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");

@@ -4,9 +4,14 @@
   final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
   if (configuredDatabases.contains(databaseName)) {
     if (iStartup && hotAlignment != null && !hotAlignment) {
-      ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"dropping local database '%s' in '%s' and get a fresh copy from a remote node...",databaseName,dbPath);
       Orient.instance().unregisterStorageByName(databaseName);
-      OFileUtils.deleteRecursively(new File(dbPath));
+      final String backupPath=serverInstance.getDatabaseDirectory() + "/" + BACKUP_DIR+ "/"+ databaseName;
+      final File f=new File(BACKUP_DIR);
+      if (f.exists())       OFileUtils.deleteRecursively(new File(backupPath));
+ else       f.mkdirs();
+      ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"moving existent database '%s' in '%s' t '%s' and get a fresh copy from a remote node...",databaseName,dbPath,backupPath);
+      final File oldDirectory=new File(dbPath);
+      oldDirectory.renameTo(new File(backupPath));
     }
  else     return false;
   }
@@ -79,8 +84,24 @@
  catch (        IOException e) {
         }
       }
-      installDatabaseOnLocalNode(distrDatabase,databaseName,dbPath,r.getKey(),fileName);
-      distrDatabase.configureDatabase(false,true);
+      final ODatabaseDocumentTx db=installDatabaseOnLocalNode(distrDatabase,databaseName,dbPath,r.getKey(),fileName);
+      if (db != null) {
+        db.close();
+        final OStorage stg=Orient.instance().getStorage(databaseName);
+        if (stg != null)         stg.close();
+        distrDatabase.configureDatabase(false,true,new Callable<Void>(){
+          @Override public Void call() throws Exception {
+            final boolean distribCfgDirty=installDbClustersForLocalNode(db,cfg);
+            if (distribCfgDirty) {
+              OLogManager.instance().warn(this,"Distributed configuration modified");
+              updateCachedDatabaseConfiguration(db.getName(),cfg.serialize(),true,true);
+            }
+            return null;
+          }
+        }
+);
+        db.close();
+      }
       return true;
     }
  else     throw new IllegalArgumentException("Type " + value + " not supported");

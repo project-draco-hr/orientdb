@@ -1,42 +1,31 @@
 {
   final Set<String> clusters=new HashSet<String>();
   if (parsedTarget != null) {
-    final ODatabaseRecord db=getDatabase();
+    final ODatabaseDocument db=getDatabase();
     if (parsedTarget.getTargetQuery() != null) {
       final Set<String> clIds=parsedTarget.getTargetQuery().getInvolvedClusters();
-      for (      String c : clIds)       if (checkClusterAccess(db,c))       clusters.add(c);
+      for (      String c : clIds) {
+        if (checkClusterAccess(db,c)) {
+          clusters.add(c);
+        }
+      }
     }
  else     if (parsedTarget.getTargetRecords() != null) {
       for (      OIdentifiable identifiable : parsedTarget.getTargetRecords()) {
         final String c=db.getClusterNameById(identifiable.getIdentity().getClusterId()).toLowerCase();
-        if (checkClusterAccess(db,c))         clusters.add(c);
+        if (checkClusterAccess(db,c)) {
+          clusters.add(c);
+        }
       }
     }
     if (parsedTarget.getTargetClasses() != null) {
-      for (      String clazz : parsedTarget.getTargetClasses().values()) {
-        final OClass cls=db.getMetadata().getSchema().getClass(clazz);
-        if (cls != null)         for (        int clId : cls.getClusterIds()) {
-          if (clId > -1 && checkClusterAccess(db,db.getClusterNameById(clId)))           clusters.add(db.getClusterNameById(clId).toLowerCase());
-        }
-      }
+      return getInvolvedClustersOfClasses(parsedTarget.getTargetClasses().values());
     }
     if (parsedTarget.getTargetClusters() != null) {
-      for (      String cluster : parsedTarget.getTargetClusters().keySet()) {
-        final String c=cluster.toLowerCase();
-        if (checkClusterAccess(db,c))         clusters.add(c);
-      }
+      return getInvolvedClustersOfClusters(parsedTarget.getTargetClusters().values());
     }
     if (parsedTarget.getTargetIndex() != null) {
-      final OIndex<?> idx=db.getMetadata().getIndexManager().getIndex(parsedTarget.getTargetIndex());
-      if (idx != null) {
-        final String clazz=idx.getDefinition().getClassName();
-        if (clazz != null) {
-          final OClass cls=db.getMetadata().getSchema().getClass(clazz);
-          if (cls != null)           for (          int clId : cls.getClusterIds()) {
-            clusters.add(db.getClusterNameById(clId).toLowerCase());
-          }
-        }
-      }
+      return getInvolvedClustersOfIndex(parsedTarget.getTargetIndex());
     }
   }
   return clusters;

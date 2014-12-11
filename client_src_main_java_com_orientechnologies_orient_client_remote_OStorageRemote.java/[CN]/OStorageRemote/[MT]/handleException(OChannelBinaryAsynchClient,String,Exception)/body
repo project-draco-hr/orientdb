@@ -1,26 +1,40 @@
 {
-  if (exception instanceof OTimeoutException)   throw (OTimeoutException)exception;
- else   if (exception instanceof OException)   throw (OException)exception;
- else   if (!(exception instanceof IOException))   throw new OStorageException(message,exception);
-  if (status != STATUS.OPEN)   return;
-  OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception);
-  try {
-    engine.getConnectionManager().remove(iNetwork);
+  Exception originalException=exception;
+  if (exception instanceof OIOException) {
+    exception=(Exception)exception.getCause();
   }
- catch (  Exception e) {
+ else   if (exception instanceof OException) {
+    if (iNetwork != null)     engine.getConnectionManager().release(iNetwork);
+    throw (OException)exception;
+  }
+ else   if (!(exception instanceof IOException)) {
+    if (iNetwork != null)     engine.getConnectionManager().release(iNetwork);
+    throw new OStorageException(message,exception);
+  }
+  if (status != STATUS.OPEN)   return;
+  if (iNetwork != null) {
+    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception == null ? originalException : exception);
+    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
+    try {
+      engine.getConnectionManager().remove(iNetwork);
+    }
+ catch (    Exception e) {
+    }
+  }
+ else {
+    OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",exception == null ? originalException : exception);
+    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
   }
   final long lostConnectionTime=System.currentTimeMillis();
   final int currentMaxRetry;
   final int currentRetryDelay;
-synchronized (clusterConfiguration) {
-    if (!clusterConfiguration.isEmpty()) {
-      currentMaxRetry=1;
-      currentRetryDelay=0;
-    }
+  if (serverURLs.size() > 1) {
+    currentMaxRetry=1;
+    currentRetryDelay=0;
+  }
  else {
-      currentMaxRetry=connectionRetry;
-      currentRetryDelay=connectionRetryDelay;
-    }
+    currentMaxRetry=connectionRetry;
+    currentRetryDelay=connectionRetryDelay;
   }
   for (int retry=0; retry < currentMaxRetry; ++retry) {
     if (retry > 0 && currentRetryDelay > 0)     try {
@@ -32,9 +46,9 @@ synchronized (clusterConfiguration) {
     }
     try {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + (retry + 1) + "/"+ currentMaxRetry+ "...");
-      setSessionId(null,-1);
-      openRemoteDatabase();
-      OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries: no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1);
+      setSessionId(null,-1,null);
+      final String currentURL=openRemoteDatabase();
+      OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries to server '%s': no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1,currentURL);
       return;
     }
  catch (    Throwable t) {

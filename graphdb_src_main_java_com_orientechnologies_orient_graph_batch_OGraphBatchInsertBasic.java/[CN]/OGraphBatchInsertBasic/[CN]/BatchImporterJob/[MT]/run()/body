@@ -1,0 +1,47 @@
+{
+  try {
+    ODatabaseDocumentTx db=new ODatabaseDocumentTx(dbUrl);
+    db.open(userName,password);
+    db.declareIntent(new OIntentMassiveInsert());
+    int clusterId=clusterIds[mod];
+    final String outField="E".equals(edgeClass) ? "out_" : ("out_" + edgeClass);
+    final String inField="E".equals(edgeClass) ? "in_" : ("in_" + edgeClass);
+    String clusterName=db.getStorage().getClusterById(clusterId).getName();
+    for (long i=mod; i <= last; i+=parallel) {
+      final List<Long> outIds=out.get(i);
+      final List<Long> inIds=in.get(i);
+      final ODocument doc=new ODocument(vClass);
+      if (outIds == null && inIds == null) {
+        db.save(doc,clusterName).delete();
+      }
+ else {
+        doc.field(idPropertyName,i);
+        if (outIds != null) {
+          final ORidBag outBag=new ORidBag();
+          for (          Long l : outIds) {
+            final ORecordId rid=new ORecordId(getClusterId(l),getClusterPosition(l));
+            outBag.add(rid);
+          }
+          doc.field(outField,outBag);
+        }
+        if (inIds != null) {
+          final ORidBag inBag=new ORidBag();
+          for (          Long l : inIds) {
+            final ORecordId rid=new ORecordId(getClusterId(l),getClusterPosition(l));
+            inBag.add(rid);
+          }
+          doc.field(inField,inBag);
+        }
+        db.save(doc,clusterName);
+      }
+    }
+  }
+  finally {
+    runningThreads.decrementAndGet();
+synchronized (runningThreads) {
+      runningThreads.notifyAll();
+    }
+    db.declareIntent(null);
+    db.close();
+  }
+}

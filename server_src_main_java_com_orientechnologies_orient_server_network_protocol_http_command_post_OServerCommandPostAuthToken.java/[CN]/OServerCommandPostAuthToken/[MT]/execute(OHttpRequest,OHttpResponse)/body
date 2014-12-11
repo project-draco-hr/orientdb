@@ -1,0 +1,50 @@
+{
+  init();
+  String[] urlParts=checkSyntax(iRequest.url,2,"Syntax error: token/<database>");
+  iRequest.databaseName=urlParts[1];
+  iRequest.data.commandInfo="Generate authentication token";
+  Map<String,String> content=iRequest.getUrlEncodedContent();
+  String signedToken="";
+  String grantType=content.get("grant_type").toLowerCase();
+  String username=content.get("username");
+  String password=content.get("password");
+  String authenticatedRid;
+  ODocument result;
+  if (grantType.equals("password")) {
+    authenticatedRid=authenticate(username,password,iRequest.databaseName);
+    if (authenticatedRid == null) {
+      sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
+    }
+ else {
+      ODatabaseDocumentTx db=null;
+      OSecurityUser user=null;
+      try {
+        db=(ODatabaseDocumentTx)server.openDatabase("document",iRequest.databaseName,username,password);
+        user=db.getUser();
+        if (user != null) {
+          byte[] tokenBytes=handler.getSignedWebToken(db,user);
+          signedToken=new String(tokenBytes);
+        }
+ else {
+        }
+      }
+ catch (      OSecurityAccessException e) {
+      }
+catch (      OLockException e) {
+        OLogManager.instance().error(this,"Cannot access to the database '" + iRequest.databaseName + "'",ODatabaseException.class,e);
+      }
+ finally {
+        if (db != null) {
+          db.close();
+        }
+      }
+      result=new ODocument().field("access_token",signedToken).field("expires_in",3600);
+      iResponse.writeRecord(result,RESPONSE_FORMAT,null);
+    }
+  }
+ else {
+    result=new ODocument().field("error","unsupported_grant_type");
+    sendError(iRequest,iResponse,result);
+  }
+  return false;
+}

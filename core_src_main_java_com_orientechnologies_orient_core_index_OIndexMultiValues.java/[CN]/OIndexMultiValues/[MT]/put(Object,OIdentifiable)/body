@@ -1,37 +1,47 @@
 {
   checkForRebuild();
   key=getCollatingValue(key);
-  modificationLock.requestModificationLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (txIsActive)   keyLockManager.acquireSharedLock(key);
   try {
-    checkForKeyType(key);
-    acquireExclusiveLock();
-    startStorageAtomicOperation();
+    modificationLock.requestModificationLock();
     try {
-      Set<OIdentifiable> values=indexEngine.get(key);
-      if (values == null) {
-        if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-          values=new OIndexRIDContainer(getName());
-        }
+      checkForKeyType(key);
+      acquireExclusiveLock();
+      startStorageAtomicOperation();
+      try {
+        Set<OIdentifiable> values=indexEngine.get(key);
+        if (values == null) {
+          if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
+            boolean durable=false;
+            if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))             durable=true;
+            values=new OIndexRIDContainer(getName(),durable);
+          }
  else {
-          values=new OMVRBTreeRIDSet(OGlobalConfiguration.MVRBTREE_RID_BINARY_THRESHOLD.getValueAsInteger());
-          ((OMVRBTreeRIDSet)values).setAutoConvertToRecord(false);
+            values=new OMVRBTreeRIDSet(OGlobalConfiguration.MVRBTREE_RID_BINARY_THRESHOLD.getValueAsInteger());
+            ((OMVRBTreeRIDSet)values).setAutoConvertToRecord(false);
+          }
         }
+        if (!iSingleValue.getIdentity().isValid())         ((ORecord)iSingleValue).save();
+        values.add(iSingleValue.getIdentity());
+        indexEngine.put(key,values);
+        commitStorageAtomicOperation();
+        return this;
       }
-      if (!iSingleValue.getIdentity().isValid())       ((ORecord)iSingleValue).save();
-      values.add(iSingleValue.getIdentity());
-      indexEngine.put(key,values);
-      commitStorageAtomicOperation();
-      return this;
-    }
- catch (    RuntimeException e) {
-      rollbackStorageAtomicOperation();
-      throw new OIndexException("Error during insertion of key in index",e);
-    }
+ catch (      RuntimeException e) {
+        rollbackStorageAtomicOperation();
+        throw new OIndexException("Error during insertion of key in index",e);
+      }
  finally {
-      releaseExclusiveLock();
+        releaseExclusiveLock();
+      }
+    }
+  finally {
+      modificationLock.releaseModificationLock();
     }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (txIsActive)     keyLockManager.releaseSharedLock(key);
   }
 }

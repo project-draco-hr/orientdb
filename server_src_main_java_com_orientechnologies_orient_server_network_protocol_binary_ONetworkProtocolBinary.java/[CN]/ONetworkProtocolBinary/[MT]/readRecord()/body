@@ -7,13 +7,13 @@
   if (connection.data.protocolVersion >= 9)   ignoreCache=channel.readByte() == 1;
   boolean loadTombstones=false;
   if (connection.data.protocolVersion >= 13)   loadTombstones=channel.readByte() > 0;
-  if (rid.clusterId == 0 && rid.clusterPosition.longValue() == 0) {
+  if (rid.clusterId == 0 && rid.clusterPosition == 0) {
     OFetchHelper.checkFetchPlanValid(fetchPlanString);
     beginResponse();
     try {
       sendOk(clientTxId);
       channel.writeByte((byte)1);
-      channel.writeBytes(connection.database.getStorage().getConfiguration().toStream());
+      channel.writeBytes(connection.database.getStorage().getConfiguration().toStream(connection.data.protocolVersion));
       channel.writeVersion(OVersionFactory.instance().createVersion());
       channel.writeByte(ORecordBytes.RECORD_TYPE);
       channel.writeByte((byte)0);
@@ -29,12 +29,14 @@
       sendOk(clientTxId);
       if (record != null) {
         channel.writeByte((byte)1);
-        channel.writeBytes(getRecordBytes(record));
+        byte[] bytes=getRecordBytes(record);
+        int length=trimCsvSerializedContent(bytes);
+        channel.writeBytes(bytes,length);
         channel.writeVersion(record.getRecordVersion());
         channel.writeByte(ORecordInternal.getRecordType(record));
         if (fetchPlanString.length() > 0) {
           if (record instanceof ODocument) {
-            final Map<String,Integer> fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
+            final OFetchPlan fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
             final Set<ORecord> recordsToSend=new HashSet<ORecord>();
             final ODocument doc=(ODocument)record;
             final OFetchListener listener=new ORemoteFetchListener(){

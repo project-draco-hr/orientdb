@@ -1,4 +1,19 @@
 {
-  setFieldType(iFieldName,iFieldType);
-  return (RET)field(iFieldName);
+  RET value=(RET)field(iFieldName);
+  OType original;
+  if (iFieldType != null && iFieldType != (original=fieldType(iFieldName))) {
+    if (original == null) {
+      original=OType.getTypeByValue(value);
+      if (iFieldType == original)       return value;
+    }
+    Object newValue=null;
+    if (iFieldType == OType.BINARY && value instanceof String)     newValue=OStringSerializerHelper.getBinaryContent(value);
+ else     if (iFieldType == OType.DATE && value instanceof Long)     newValue=new Date((Long)value);
+ else     if ((iFieldType == OType.EMBEDDEDSET || iFieldType == OType.LINKSET) && value instanceof List)     newValue=Collections.unmodifiableSet((Set<?>)ODocumentHelper.convertField(this,iFieldName,Set.class,value));
+ else     if ((iFieldType == OType.EMBEDDEDLIST || iFieldType == OType.LINKLIST) && value instanceof Set)     newValue=Collections.unmodifiableList((List<?>)ODocumentHelper.convertField(this,iFieldName,List.class,value));
+ else     if ((iFieldType == OType.EMBEDDEDMAP || iFieldType == OType.LINKMAP) && value instanceof Map)     newValue=Collections.unmodifiableMap((Map<?,?>)ODocumentHelper.convertField(this,iFieldName,Map.class,value));
+ else     newValue=OType.convert(value,iFieldType.getDefaultJavaType());
+    if (newValue != null)     value=(RET)newValue;
+  }
+  return value;
 }

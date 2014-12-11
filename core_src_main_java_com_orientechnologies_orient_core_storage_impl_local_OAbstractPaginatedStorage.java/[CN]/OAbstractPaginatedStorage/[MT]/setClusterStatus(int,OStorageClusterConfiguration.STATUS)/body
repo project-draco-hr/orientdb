@@ -1,0 +1,31 @@
+{
+  lock.acquireExclusiveLock();
+  try {
+    if (clusterId < 0 || clusterId >= clusters.size())     throw new IllegalArgumentException("Cluster id '" + clusterId + "' is outside the of range of configured clusters (0-"+ (clusters.size() - 1)+ ") in database '"+ name+ "'");
+    final OCluster cluster=clusters.get(clusterId);
+    if (cluster == null)     return false;
+    if (iStatus == OStorageClusterConfiguration.STATUS.OFFLINE && cluster instanceof OOfflineCluster || iStatus == OStorageClusterConfiguration.STATUS.ONLINE && !(cluster instanceof OOfflineCluster))     return false;
+    final OCluster newCluster;
+    if (iStatus == OStorageClusterConfiguration.STATUS.OFFLINE) {
+      cluster.close(true);
+      newCluster=new OOfflineCluster(this,clusterId,cluster.getName());
+    }
+ else {
+      newCluster=OPaginatedClusterFactory.INSTANCE.createCluster(configuration.version);
+      newCluster.configure(this,clusterId,cluster.getName());
+      newCluster.open();
+    }
+    clusterMap.put(cluster.getName().toLowerCase(),newCluster);
+    clusters.set(clusterId,newCluster);
+    makeStorageDirty();
+    configuration.setClusterStatus(clusterId,iStatus);
+    makeFullCheckpoint();
+    return true;
+  }
+ catch (  Exception e) {
+    throw new OStorageException("Error while removing cluster '" + clusterId + "'",e);
+  }
+ finally {
+    lock.releaseExclusiveLock();
+  }
+}

@@ -1,0 +1,24 @@
+{
+  if (properties == null || properties.size() == 0) {
+    return;
+  }
+  settingProperties=true;
+  int cluster=(int)(id % parallel);
+  if (nextVerticesToCreate[cluster] <= id) {
+    if (oVertexClass == null) {
+      oVertexClass=db.getMetadata().getSchema().getClass(vertexClass);
+    }
+    if (nextVerticesToCreate[cluster] < id) {
+      new BatchImporterJob(cluster,oVertexClass,id - 1).run(db);
+    }
+    new BatchImporterJob(cluster,oVertexClass,id).createVertex(db,id,properties);
+  }
+ else {
+    ODocument doc=(ODocument)db.load(new ORecordId(getClusterId(id),getClusterPosition(id)));
+    if (doc == null) {
+      throw new RuntimeException("trying to insert properties on non existing document");
+    }
+    doc.fromMap(properties);
+    db.save(doc);
+  }
+}

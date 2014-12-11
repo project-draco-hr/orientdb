@@ -1,0 +1,88 @@
+{
+  checkOpeness();
+  setCurrentDatabaseInThreadLocal();
+  if (!record.isDirty())   return (RET)record;
+  final ORecordId rid=(ORecordId)record.getIdentity();
+  if (rid == null)   throw new ODatabaseException("Cannot create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
+  final Set<OIndex<?>> lockedIndexes=new HashSet<OIndex<?>>();
+  record.setInternalStatus(ORecordElement.STATUS.MARSHALLING);
+  try {
+    if (record instanceof ODocument)     acquireIndexModificationLock((ODocument)record,lockedIndexes);
+    final boolean wasNew=forceCreate || rid.isNew();
+    if (wasNew && rid.clusterId == -1 && (clusterName != null || storage.isAssigningClusterIds())) {
+      if (clusterName != null)       rid.clusterId=getClusterIdByName(clusterName);
+ else       if (record instanceof ODocument && ODocumentInternal.getImmutableSchemaClass(((ODocument)record)) != null)       rid.clusterId=ODocumentInternal.getImmutableSchemaClass(((ODocument)record)).getClusterForNewInstance((ODocument)record);
+ else       getDefaultClusterId();
+    }
+    byte[] stream=null;
+    final OStorageOperationResult<ORecordVersion> operationResult;
+    getMetadata().makeThreadLocalSchemaSnapshot();
+    ORecordSerializationContext.pushContext();
+    try {
+      stream=record.toStream();
+      final boolean isNew=forceCreate || rid.isNew();
+      if (isNew)       ORecordInternal.onBeforeIdentityChanged(record);
+ else       if (stream == null || stream.length == 0)       return (RET)record;
+      if (isNew && rid.clusterId < 0 && storage.isAssigningClusterIds())       rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
+      if (rid.clusterId > -1 && clusterName == null)       clusterName=getClusterNameById(rid.clusterId);
+      if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
+      checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
+      final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.INSTANCE.checkIfPartial((ODocument)record);
+      if (stream != null && stream.length > 0 && !partialMarshalling) {
+        if (callTriggers) {
+          final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
+          final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
+          if (hookResult == ORecordHook.RESULT.RECORD_CHANGED)           stream=updateStream(record);
+ else           if (hookResult == ORecordHook.RESULT.SKIP_IO)           return (RET)record;
+ else           if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)           return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
+        }
+      }
+      if (wasNew && !isNew)       record.setDirty();
+ else       if (!record.isDirty())       return (RET)record;
+      try {
+        boolean updateContent=ORecordInternal.isContentChanged(record);
+        byte[] content=(stream == null) ? new byte[0] : stream;
+        byte recordType=ORecordInternal.getRecordType(record);
+        final int modeIndex=mode.ordinal();
+        Orient.instance().getRecordFactoryManager().getRecordTypeClass(recordType);
+        if (forceCreate || ORecordId.isNew(rid.clusterPosition)) {
+          final OStorageOperationResult<OPhysicalPosition> ppos=storage.createRecord(rid,content,ver,recordType,modeIndex,(ORecordCallback<Long>)recordCreatedCallback);
+          operationResult=new OStorageOperationResult<ORecordVersion>(ppos.getResult().recordVersion,ppos.isMoved());
+        }
+ else {
+          operationResult=storage.updateRecord(rid,updateContent,content,ver,recordType,modeIndex,recordUpdatedCallback);
+        }
+        final ORecordVersion version=operationResult.getResult();
+        if (isNew) {
+          ((ORecordId)record.getIdentity()).copyFrom(rid);
+          ORecordInternal.onAfterIdentityChanged(record);
+        }
+        if (operationResult.getModifiedRecordContent() != null)         stream=operationResult.getModifiedRecordContent();
+        ORecordInternal.fill(record,rid,version,stream,partialMarshalling);
+        callbackHookSuccess(record,callTriggers,wasNew,stream,operationResult);
+      }
+ catch (      Throwable t) {
+        callbackHookFailure(record,callTriggers,wasNew,stream);
+        throw t;
+      }
+    }
+  finally {
+      callbackHookFinalize(record,callTriggers,wasNew,stream);
+      ORecordSerializationContext.pullContext();
+      getMetadata().clearThreadLocalSchemaSnapshot();
+    }
+    if (stream != null && stream.length > 0 && !operationResult.isMoved())     getLocalCache().updateRecord(record);
+  }
+ catch (  OException e) {
+    throw e;
+  }
+catch (  Throwable t) {
+    if (!ORecordId.isValid(record.getIdentity().getClusterPosition()))     throw new ODatabaseException("Error on saving record in cluster #" + record.getIdentity().getClusterId(),t);
+ else     throw new ODatabaseException("Error on saving record " + record.getIdentity(),t);
+  }
+ finally {
+    releaseIndexModificationLock(lockedIndexes);
+    record.setInternalStatus(ORecordElement.STATUS.LOADED);
+  }
+  return (RET)record;
+}

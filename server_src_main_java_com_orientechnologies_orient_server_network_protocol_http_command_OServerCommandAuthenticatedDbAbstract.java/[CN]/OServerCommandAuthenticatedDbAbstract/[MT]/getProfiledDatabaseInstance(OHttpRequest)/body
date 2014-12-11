@@ -1,20 +1,9 @@
 {
   final OHttpSession session=OHttpSessionManager.getInstance().getSession(iRequest.sessionId);
-  if (session == null)   throw new OSecurityAccessException(iRequest.databaseName,"No session active");
-  ODatabaseRecordInternal localDatabase=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
-  if (localDatabase == null) {
-    localDatabase=(ODatabaseDocumentTx)server.openDatabase("document",iRequest.databaseName,session.getUserName(),session.getUserPassword());
+  if (iRequest.bearerToken != null) {
+    return getProfiledDatabaseInstanceToken(iRequest);
   }
  else {
-    String currentUserId=iRequest.data.currentUserId;
-    if (currentUserId != null && currentUserId.length() > 0 && localDatabase != null && localDatabase.getUser() != null) {
-      if (!currentUserId.equals(localDatabase.getUser().getDocument().getIdentity().toString())) {
-        ODocument userDoc=localDatabase.load(new ORecordId(currentUserId));
-        localDatabase.setUser(new OUser(userDoc));
-      }
-    }
+    return getProfiledDatabaseInstanceBasic(iRequest);
   }
-  iRequest.data.lastDatabase=localDatabase.getName();
-  iRequest.data.lastUser=localDatabase.getUser() != null ? localDatabase.getUser().getName() : null;
-  return (ODatabaseDocumentTx)localDatabase.getDatabaseOwner();
 }

@@ -1,0 +1,39 @@
+{
+  ODatabaseRecordThreadLocal.INSTANCE.set(baseDocumentTx);
+  OIndexCursor cursor=baseDocumentTx.getMetadata().getIndexManager().getIndex("mi").cursor();
+  long lastTs=0;
+  long minLostTs=Long.MAX_VALUE;
+  long restoredRecords=0;
+  Map.Entry<Object,OIdentifiable> entry=cursor.nextEntry();
+  while (entry != null) {
+    ODatabaseRecordThreadLocal.INSTANCE.set(baseDocumentTx);
+    Integer key=(Integer)entry.getKey();
+    OIdentifiable identifiable=entry.getValue();
+    ODocument doc=identifiable.getRecord();
+    long ts=doc.<Long>field("ts");
+    if (ts > lastTs)     lastTs=ts;
+    entry=cursor.nextEntry();
+    ODatabaseRecordThreadLocal.INSTANCE.set(testDocumentTx);
+    OIndex testIndex=testDocumentTx.getMetadata().getIndexManager().getIndex("mi");
+    Set<OIdentifiable> result=(Set<OIdentifiable>)testIndex.get(key);
+    if (result == null || result.size() < 10) {
+      if (minLostTs > ts)       minLostTs=ts;
+    }
+ else {
+      boolean cnt=true;
+      for (int i=0; i < 10; i++) {
+        if (!result.contains(new ORecordId("#0:" + i))) {
+          cnt=false;
+          break;
+        }
+      }
+      if (!cnt) {
+        if (minLostTs > ts)         minLostTs=ts;
+      }
+ else       restoredRecords++;
+    }
+  }
+  ODatabaseRecordThreadLocal.INSTANCE.set(baseDocumentTx);
+  System.out.println("Restored entries : " + restoredRecords + " out of : "+ baseDocumentTx.getMetadata().getIndexManager().getIndex("mi").getSize());
+  System.out.println("Lost records max interval : " + (minLostTs == Long.MAX_VALUE ? 0 : lastTs - minLostTs));
+}

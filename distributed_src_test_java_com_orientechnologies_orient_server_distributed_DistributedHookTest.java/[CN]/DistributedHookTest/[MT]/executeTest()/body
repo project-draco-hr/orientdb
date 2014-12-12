@@ -1,0 +1,24 @@
+{
+  for (int s=1; s <= SERVERS; ++s) {
+    OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + s + "/databases/"+ getDatabaseName());
+    OrientGraphNoTx g=factory.getNoTx();
+    g.getRawGraph().registerHook(new TestHookSourceNode(),ORecordHook.HOOK_POSITION.REGULAR);
+    try {
+      OIdentifiable inserted=g.command(new OCommandSQL("insert into OUser (name, password, status) values ('novo" + s + "','teste','ACTIVE') RETURN @rid")).execute();
+      Assert.assertNotNull(inserted);
+      Assert.assertEquals(beforeCreate.get(),s);
+      Assert.assertEquals(afterCreate.get(),s);
+      ODocument loadedDoc=inserted.getIdentity().copy().getRecord();
+      loadedDoc.field("additionalProperty","test");
+      loadedDoc.save();
+      Assert.assertEquals(beforeUpdate.get(),s);
+      Assert.assertEquals(afterUpdate.get(),s);
+      loadedDoc.delete();
+      Assert.assertEquals(beforeDelete.get(),s);
+      Assert.assertEquals(afterDelete.get(),s);
+    }
+  finally {
+      g.shutdown();
+    }
+  }
+}

@@ -11,7 +11,8 @@
   OScriptManager scriptManager=null;
   Bindings binding=null;
   scriptManager=Orient.instance().getScriptManager();
-  final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),function.getLanguage());
+  final OPartitionedObjectPool.PoolEntry<ScriptEngine> entry=scriptManager.acquireDatabaseEngine(db.getName(),function.getLanguage());
+  final ScriptEngine scriptEngine=entry.object;
   try {
     binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
     scriptManager.bind(binding,(ODatabaseDocumentTx)db,null,iArgs);
@@ -50,7 +51,7 @@ catch (  Exception ex) {
   }
  finally {
     if (scriptManager != null && binding != null)     scriptManager.unbind(binding,null,iArgs);
-    scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
+    scriptManager.releaseDatabaseEngine(function.getLanguage(),db.getName(),entry);
     OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
     isRunning=false;
     this.document.field(PROP_STATUS,SCHEDULER_STATUS.WAITING);

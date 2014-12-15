@@ -1,0 +1,56 @@
+{
+  checkForClose();
+  final int th=threadHashCode.get();
+  while (true) {
+    final PoolPartition[] pts=partitions;
+    final int index=(pts.length - 1) & th;
+    PoolPartition<T> partition=pts[index];
+    if (partition == null) {
+      if (!poolBusy.get() && poolBusy.compareAndSet(false,true)) {
+        if (pts == partitions) {
+          partition=pts[index];
+          if (partition == null) {
+            partition=new PoolPartition<T>();
+            initQueue(partition);
+            pts[index]=partition;
+          }
+        }
+        poolBusy.set(false);
+      }
+      continue;
+    }
+ else {
+      T object=partition.queue.poll();
+      if (object == null) {
+        if (pts.length < maxPartitions) {
+          if (!poolBusy.get() && poolBusy.compareAndSet(false,true)) {
+            if (pts == partitions) {
+              final PoolPartition[] newPartitions=new PoolPartition[partitions.length << 1];
+              System.arraycopy(partitions,0,newPartitions,0,partitions.length);
+              partitions=newPartitions;
+            }
+            poolBusy.set(false);
+          }
+          continue;
+        }
+ else {
+          if (partition.currentSize.get() >= maxSize)           throw new IllegalStateException("You have reached maximum pool size for given partition");
+          object=factory.create();
+          partition.acquiredObjects.incrementAndGet();
+          partition.currentSize.incrementAndGet();
+          return new PoolEntry<T>(partition,object);
+        }
+      }
+ else {
+        if (!factory.isValid(object)) {
+          factory.close(object);
+          partition.currentSize.decrementAndGet();
+          continue;
+        }
+        factory.init(object);
+        partition.acquiredObjects.incrementAndGet();
+        return new PoolEntry<T>(partition,object);
+      }
+    }
+  }
+}

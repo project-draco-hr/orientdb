@@ -4,7 +4,8 @@
   final OFunction f=db.getMetadata().getFunctionLibrary().getFunction(parserText);
   db.checkSecurity(ORule.ResourceGeneric.FUNCTION,ORole.PERMISSION_READ,f.getName());
   final OScriptManager scriptManager=Orient.instance().getScriptManager();
-  final ScriptEngine scriptEngine=scriptManager.acquireDatabaseEngine(db.getName(),f.getLanguage());
+  final OPartitionedObjectPool.PoolEntry<ScriptEngine> entry=scriptManager.acquireDatabaseEngine(db.getName(),f.getLanguage());
+  final ScriptEngine scriptEngine=entry.object;
   try {
     final Bindings binding=scriptManager.bind(scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE),(ODatabaseDocumentTx)db,iContext,iArgs);
     try {
@@ -39,6 +40,6 @@ catch (    OCommandScriptException e) {
     }
   }
   finally {
-    scriptManager.releaseDatabaseEngine(db.getName(),scriptEngine);
+    scriptManager.releaseDatabaseEngine(f.getLanguage(),db.getName(),entry);
   }
 }

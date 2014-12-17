@@ -8,6 +8,7 @@
   do {
     do {
       try {
+        clearToken();
         network=getAvailableNetwork(currentURL);
         try {
           network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
@@ -25,13 +26,18 @@
         try {
           beginResponse(network);
           sessionId=network.readInt();
-          setSessionId(network.getServerURL(),sessionId);
+          byte[] token=network.readBytes();
+          if (token.length == 0) {
+            token=null;
+            network.getServiceThread().setTokenBased(true);
+          }
+          setSessionId(network.getServerURL(),sessionId,token);
           OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
           readDatabaseInformation(network);
-          updateClusterConfiguration(network.readBytes());
+          updateClusterConfiguration(network.getServerURL(),network.readBytes());
           if (network.getSrvProtocolVersion() >= 14)           network.readString();
           status=STATUS.OPEN;
-          return;
+          return currentURL;
         }
   finally {
           endResponse(network);

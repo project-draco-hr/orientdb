@@ -1,0 +1,35 @@
+{
+  scriptManager=iScriptManager;
+  pooledEngines=new OPartitionedObjectPoolFactory<String,ScriptEngine>(new OPartitionedObjectPoolFactory.ObjectFactoryFactory<String,ScriptEngine>(){
+    @Override public OPartitionedObjectPool.ObjectFactory<ScriptEngine> create(    final String language){
+      return new OPartitionedObjectPool.ObjectFactory<ScriptEngine>(){
+        @Override public ScriptEngine create(){
+          final ScriptEngine scriptEngine=scriptManager.getEngine(language);
+          final String library=scriptManager.getLibrary(ODatabaseRecordThreadLocal.INSTANCE.get(),language);
+          if (library != null)           try {
+            scriptEngine.eval(library);
+          }
+ catch (          ScriptException e) {
+            scriptManager.throwErrorMessage(e,library);
+          }
+          return scriptEngine;
+        }
+        @Override public void init(        ScriptEngine object){
+        }
+        @Override public void close(        ScriptEngine object){
+        }
+        @Override public boolean isValid(        ScriptEngine object){
+          if (language.equals("sql")) {
+            if (!language.equals(object.getFactory().getLanguageName()))             return false;
+          }
+ else {
+            if ((object.getFactory().getLanguageName()).equals("sql"))             return false;
+          }
+          return true;
+        }
+      }
+;
+    }
+  }
+,OGlobalConfiguration.SCRIPT_POOL.getValueAsInteger());
+}

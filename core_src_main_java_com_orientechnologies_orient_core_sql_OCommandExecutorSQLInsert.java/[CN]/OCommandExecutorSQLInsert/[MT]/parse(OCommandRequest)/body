@@ -4,6 +4,11 @@
   className=null;
   newRecords=null;
   content=null;
+  if (parserTextUpperCase.endsWith(KEYWORD_UNSAFE)) {
+    unsafe=true;
+    parserText=parserText.substring(0,parserText.length() - KEYWORD_UNSAFE.length() - 1);
+    parserTextUpperCase=parserTextUpperCase.substring(0,parserTextUpperCase.length() - KEYWORD_UNSAFE.length() - 1);
+  }
   parserRequiredKeyword("INSERT");
   parserRequiredKeyword("INTO");
   String subjectName=parserRequiredWord(true,"Invalid subject name. Expected cluster, class or index");
@@ -11,8 +16,9 @@
  else   if (subjectName.startsWith(OCommandExecutorSQLAbstract.INDEX_PREFIX))   indexName=subjectName.substring(OCommandExecutorSQLAbstract.INDEX_PREFIX.length());
  else {
     if (subjectName.startsWith(OCommandExecutorSQLAbstract.CLASS_PREFIX))     subjectName=subjectName.substring(OCommandExecutorSQLAbstract.CLASS_PREFIX.length());
-    final OClass cls=database.getMetadata().getImmutableSchemaSnapshot().getClass(subjectName);
+    final OClass cls=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(subjectName);
     if (cls == null)     throwParsingException("Class " + subjectName + " not found in database");
+    if (!unsafe && cls.isSubClassOf("E"))     throw new OCommandExecutionException("'INSERT' command cannot create Edges. Use 'CREATE EDGE' command instead, or apply the 'UNSAFE' keyword to force it");
     className=cls.getName();
   }
   parserSkipWhiteSpaces();

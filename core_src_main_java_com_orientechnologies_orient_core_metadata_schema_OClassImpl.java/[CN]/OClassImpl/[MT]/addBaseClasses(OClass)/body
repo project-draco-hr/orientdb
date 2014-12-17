@@ -2,9 +2,17 @@
   if (baseClasses == null)   baseClasses=new ArrayList<OClass>();
   if (baseClasses.contains(iBaseClass))   return this;
   baseClasses.add(iBaseClass);
+  final Set<String> browsedClasses=new HashSet<String>();
   OClassImpl currentClass=this;
   while (currentClass != null) {
+    browsedClasses.add(currentClass.getName());
     currentClass.addPolymorphicClusterIds((OClassImpl)iBaseClass);
+    final OClass s=currentClass.getSuperClass();
+    if (s != null && browsedClasses.contains(s.getName())) {
+      OLogManager.instance().error(this,"Error in schema: class '%s' has a recursive dependency. Resetting superclass to null",currentClass.getName());
+      currentClass.superClass=null;
+      break;
+    }
     currentClass=(OClassImpl)currentClass.getSuperClass();
   }
   return this;

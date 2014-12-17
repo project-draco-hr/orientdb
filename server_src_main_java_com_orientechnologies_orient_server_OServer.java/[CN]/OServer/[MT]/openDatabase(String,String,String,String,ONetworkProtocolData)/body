@@ -1,0 +1,39 @@
+{
+  final String path=getStoragePath(iDbUrl);
+  final ODatabaseInternal<?> database=Orient.instance().getDatabaseFactory().createDatabase(iDbType,path);
+  final OStorage storage=database.getStorage();
+  if (database.isClosed()) {
+    if (database.getStorage() instanceof ODirectMemoryStorage && !storage.exists()) {
+      try {
+        database.create();
+      }
+ catch (      OStorageException e) {
+      }
+    }
+ else {
+      try {
+        database.open(user,password);
+        if (data != null) {
+          data.serverUser=false;
+          data.serverUsername=null;
+        }
+      }
+ catch (      OSecurityException e) {
+        try {
+          serverLogin(user,password,"database.passthrough");
+        }
+ catch (        OSecurityException ex) {
+          throw e;
+        }
+        database.resetInitialization();
+        database.setProperty(ODatabase.OPTIONS.SECURITY.toString(),Boolean.FALSE);
+        database.open(user,password);
+        if (data != null) {
+          data.serverUser=true;
+          data.serverUsername=user;
+        }
+      }
+    }
+  }
+  return database;
+}

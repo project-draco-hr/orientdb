@@ -1,35 +1,43 @@
 {
   checkForRebuild();
   key=getCollatingValue(key);
-  modificationLock.requestModificationLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (txIsActive)   keyLockManager.acquireSharedLock(key);
   try {
-    final Set<String> words=splitIntoWords(key.toString());
-    boolean removed=false;
-    for (    final String word : words) {
-      acquireExclusiveLock();
-      startStorageAtomicOperation();
-      try {
-        final Set<OIdentifiable> recs=indexEngine.get(word);
-        if (recs != null && !recs.isEmpty()) {
-          if (recs.remove(value)) {
-            if (recs.isEmpty())             indexEngine.remove(word);
- else             indexEngine.put(word,recs);
-            removed=true;
+    modificationLock.requestModificationLock();
+    try {
+      final Set<String> words=splitIntoWords(key.toString());
+      boolean removed=false;
+      for (      final String word : words) {
+        acquireExclusiveLock();
+        startStorageAtomicOperation();
+        try {
+          final Set<OIdentifiable> recs=indexEngine.get(word);
+          if (recs != null && !recs.isEmpty()) {
+            if (recs.remove(value)) {
+              if (recs.isEmpty())               indexEngine.remove(word);
+ else               indexEngine.put(word,recs);
+              removed=true;
+            }
           }
+          commitStorageAtomicOperation();
         }
-        commitStorageAtomicOperation();
-      }
- catch (      RuntimeException e) {
-        rollbackStorageAtomicOperation();
-        throw new OIndexException("Error during removal of entry by key and value",e);
-      }
+ catch (        RuntimeException e) {
+          rollbackStorageAtomicOperation();
+          throw new OIndexException("Error during removal of entry by key and value",e);
+        }
  finally {
-        releaseExclusiveLock();
+          releaseExclusiveLock();
+        }
       }
+      return removed;
     }
-    return removed;
+  finally {
+      modificationLock.releaseModificationLock();
+    }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (txIsActive)     keyLockManager.releaseSharedLock(key);
   }
 }

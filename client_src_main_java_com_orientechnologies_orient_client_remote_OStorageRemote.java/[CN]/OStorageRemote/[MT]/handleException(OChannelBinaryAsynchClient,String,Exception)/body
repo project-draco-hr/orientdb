@@ -1,4 +1,5 @@
 {
+  Exception originalException=exception;
   if (exception instanceof OIOException) {
     exception=(Exception)exception.getCause();
   }
@@ -12,14 +13,18 @@
   }
   if (status != STATUS.OPEN)   return;
   if (iNetwork != null) {
-    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception);
+    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception == null ? originalException : exception);
+    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
     try {
       engine.getConnectionManager().remove(iNetwork);
     }
  catch (    Exception e) {
     }
   }
- else   OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",exception);
+ else {
+    OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",exception == null ? originalException : exception);
+    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
+  }
   final long lostConnectionTime=System.currentTimeMillis();
   final int currentMaxRetry;
   final int currentRetryDelay;
@@ -41,9 +46,9 @@
     }
     try {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + (retry + 1) + "/"+ currentMaxRetry+ "...");
-      setSessionId(null,-1);
-      openRemoteDatabase();
-      OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries: no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1);
+      setSessionId(null,-1,null);
+      final String currentURL=openRemoteDatabase();
+      OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries to server '%s': no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1,currentURL);
       return;
     }
  catch (    Throwable t) {

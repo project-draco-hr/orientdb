@@ -2,6 +2,7 @@
   engineLock.writeLock().lock();
   try {
     if (active)     return this;
+    if (timer == null)     timer=new Timer();
     shutdownHook=new OrientShutdownHook();
     if (signalHandler == null) {
       signalHandler=new OSignalHandler();
@@ -27,9 +28,15 @@
     if (OGlobalConfiguration.PROFILER_ENABLED.getValueAsBoolean())     profiler.startRecording();
     if (OGlobalConfiguration.ENVIRONMENT_DUMP_CFG_AT_STARTUP.getValueAsBoolean())     OGlobalConfiguration.dumpConfiguration(System.out);
     active=true;
-    return this;
   }
   finally {
     engineLock.writeLock().unlock();
   }
+  for (  OOrientListener l : browseListeners())   try {
+    if (l != null && l instanceof OOrientStartupListener)     ((OOrientStartupListener)l).onStartup();
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on startup",e);
+  }
+  return this;
 }

@@ -1,8 +1,29 @@
 {
-  if (className == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  if (className == null) {
+    throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
+  }
   final ODatabaseDocument database=getDatabase();
-  final OClass oClass=database.getMetadata().getSchema().getClass(className);
-  if (oClass == null)   return null;
+  final OClass cls=database.getMetadata().getSchema().getClass(className);
+  if (cls == null) {
+    return null;
+  }
+  final long records=cls.count(true);
+  if (records > 0 && !unsafe) {
+    if (cls.isSubClassOf("V")) {
+      throw new OCommandExecutionException("'DROP CLASS' command cannot drop class '" + className + "' because contains Vertices. Use 'DELETE VERTEX' command first to avoid broken edges in database, or apply the 'UNSAFE' keyword to force it");
+    }
+ else     if (cls.isSubClassOf("E")) {
+      throw new OCommandExecutionException("'DROP CLASS' command cannot drop class '" + className + "' because contains Edges. Use 'DELETE EDGE' command first to avoid broken vertices in database, or apply the 'UNSAFE' keyword to force it");
+    }
+  }
   database.getMetadata().getSchema().dropClass(className);
+  if (records > 0 && unsafe) {
+    if (cls.isSubClassOf("V")) {
+      if (unsafe)       OLogManager.instance().warn(this,"Dropped class '%s' containing %d vertices using UNSAFE mode. Database could contain broken edges",className,records);
+    }
+ else     if (cls.isSubClassOf("E")) {
+      OLogManager.instance().warn(this,"Dropped class '%s' containing %d edges using UNSAFE mode. Database could contain broken vertices",className,records);
+    }
+  }
   return true;
 }

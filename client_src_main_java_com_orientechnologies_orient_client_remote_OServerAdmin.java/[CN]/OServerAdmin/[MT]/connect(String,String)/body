@@ -1,5 +1,5 @@
 {
-  storage.setSessionId(null,-1);
+  storage.setSessionId(null,-1,null);
   try {
     final OChannelBinaryAsynchClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CONNECT);
     storage.sendClientInfo(network);
@@ -13,7 +13,12 @@
     try {
       storage.beginResponse(network);
       sessionId=network.readInt();
-      storage.setSessionId(network.getServerURL(),sessionId);
+      sessionToken=network.readBytes();
+      if (sessionToken.length == 0) {
+        sessionToken=null;
+        network.getServiceThread().setTokenBased(true);
+      }
+      storage.setSessionId(network.getServerURL(),sessionId,sessionToken);
     }
   finally {
       storage.endResponse(network);

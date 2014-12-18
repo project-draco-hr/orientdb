@@ -1,0 +1,41 @@
+{
+  final String className=readString(bytes);
+  if (className.length() != 0)   document.setClassNameIfExists(className);
+  int last=0;
+  String fieldName;
+  int valuePos;
+  OType type;
+  while (true) {
+    final int len=OVarIntSerializer.readAsInteger(bytes);
+    if (len == 0) {
+      break;
+    }
+ else     if (len > 0) {
+      fieldName=new String(bytes.bytes,bytes.offset,len,utf8);
+      bytes.skip(len);
+      valuePos=readInteger(bytes);
+      type=readOType(bytes);
+    }
+ else {
+      OGlobalProperty prop=getGlobalProperty(document,len);
+      fieldName=prop.getName();
+      valuePos=readInteger(bytes);
+      if (prop.getType() != OType.ANY)       type=prop.getType();
+ else       type=readOType(bytes);
+    }
+    if (ODocumentInternal.rawContainsField(document,fieldName)) {
+      continue;
+    }
+    if (valuePos != 0) {
+      int headerCursor=bytes.offset;
+      bytes.offset=valuePos;
+      final Object value=readSingleValue(bytes,type,document);
+      if (bytes.offset > last)       last=bytes.offset;
+      bytes.offset=headerCursor;
+      ODocumentInternal.rawField(document,fieldName,value,type);
+    }
+ else     ODocumentInternal.rawField(document,fieldName,null,null);
+  }
+  ORecordInternal.clearSource(document);
+  if (last > bytes.offset)   bytes.offset=last;
+}

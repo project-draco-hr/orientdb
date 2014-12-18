@@ -8,39 +8,44 @@
   String originalTemp=null;
   if (temp != null && !parserIsEnded())   originalTemp=parserText.substring(parserGetPreviousPosition(),parserGetCurrentPosition()).trim();
   final OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false);
-  while (temp != null) {
-    if (temp.equals("FROM")) {
-      fromExpr=parserRequiredWord(false,"Syntax error"," =><,\r\n");
-      if (rid != null)       throwSyntaxErrorException("FROM '" + fromExpr + "' is not allowed when specify a RID ("+ rid+ ")");
+  try {
+    while (temp != null) {
+      if (temp.equals("FROM")) {
+        fromExpr=parserRequiredWord(false,"Syntax error"," =><,\r\n");
+        if (rid != null)         throwSyntaxErrorException("FROM '" + fromExpr + "' is not allowed when specify a RID ("+ rid+ ")");
+      }
+ else       if (temp.equals("TO")) {
+        toExpr=parserRequiredWord(false,"Syntax error"," =><,\r\n");
+        if (rid != null)         throwSyntaxErrorException("TO '" + toExpr + "' is not allowed when specify a RID ("+ rid+ ")");
+      }
+ else       if (temp.startsWith("#")) {
+        rid=new ORecordId(temp);
+        if (fromExpr != null || toExpr != null)         throwSyntaxErrorException("Specifying the RID " + rid + " is not allowed with FROM/TO");
+      }
+ else       if (temp.equals(KEYWORD_WHERE)) {
+        if (clazz == null)         clazz=graph.getEdgeType(OrientEdgeType.CLASS_NAME);
+        where=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetCurrentPosition()) : "";
+        compiledFilter=OSQLEngine.getInstance().parseCondition(where,getContext(),KEYWORD_WHERE);
+        break;
+      }
+ else       if (temp.equals(KEYWORD_RETRY)) {
+        parseRetry();
+      }
+ else       if (temp.length() > 0) {
+        label=originalTemp;
+        clazz=graph.getEdgeType(temp);
+        if (clazz == null)         throw new OCommandSQLParsingException("Class '" + temp + " was not found");
+      }
+      temp=parseOptionalWord(true);
+      if (parserIsEnded())       break;
     }
- else     if (temp.equals("TO")) {
-      toExpr=parserRequiredWord(false,"Syntax error"," =><,\r\n");
-      if (rid != null)       throwSyntaxErrorException("TO '" + toExpr + "' is not allowed when specify a RID ("+ rid+ ")");
-    }
- else     if (temp.startsWith("#")) {
-      rid=new ORecordId(temp);
-      if (fromExpr != null || toExpr != null)       throwSyntaxErrorException("Specifying the RID " + rid + " is not allowed with FROM/TO");
-    }
- else     if (temp.equals(KEYWORD_WHERE)) {
-      if (clazz == null)       clazz=graph.getEdgeType(OrientEdgeType.CLASS_NAME);
-      where=parserGetCurrentPosition() > -1 ? " " + parserText.substring(parserGetCurrentPosition()) : "";
-      compiledFilter=OSQLEngine.getInstance().parseCondition(where,getContext(),KEYWORD_WHERE);
-      break;
-    }
- else     if (temp.equals(KEYWORD_RETRY)) {
-      parseRetry();
-    }
- else     if (temp.length() > 0) {
-      label=originalTemp;
-      clazz=graph.getEdgeType(temp);
-      if (clazz == null)       throw new OCommandSQLParsingException("Class '" + temp + " was not found");
-    }
-    temp=parseOptionalWord(true);
-    if (parserIsEnded())     break;
+    if (where == null)     where="";
+ else     where=" WHERE " + where;
+    if (fromExpr == null && toExpr == null && rid == null)     if (clazz == null)     query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from E" + where,this));
+ else     query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from " + clazz.getName() + where,this));
+    return this;
   }
-  if (where == null)   where="";
- else   where=" WHERE " + where;
-  if (fromExpr == null && toExpr == null && rid == null)   if (clazz == null)   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from E" + where,this));
- else   query=graph.getRawGraph().command(new OSQLAsynchQuery<ODocument>("select from " + clazz.getName() + where,this));
-  return this;
+  finally {
+    graph.shutdown(false);
+  }
 }

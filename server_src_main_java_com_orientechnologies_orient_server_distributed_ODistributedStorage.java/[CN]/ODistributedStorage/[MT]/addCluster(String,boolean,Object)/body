@@ -1,12 +1,30 @@
 {
-  final int clId;
-  clId=wrapped.addCluster(iClusterName,false,iParameters);
-  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.DEFAULT) {
-    final StringBuilder cmd=new StringBuilder("create cluster ");
-    cmd.append(iClusterName);
-    OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
-    commandSQL.addExcludedNode(getNodeId());
-    command(commandSQL);
+  int clId;
+  for (int retry=0; retry < 10; ++retry) {
+    clId=wrapped.addCluster(iClusterName,false,iParameters);
+    if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.DEFAULT) {
+      final StringBuilder cmd=new StringBuilder("create cluster ");
+      cmd.append(iClusterName);
+      OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
+      commandSQL.addExcludedNode(getNodeId());
+      final Object result=command(commandSQL);
+      if (((Integer)result).intValue() != clId) {
+        wrapped.dropCluster(clId,false);
+        cmd.setLength(0);
+        cmd.append("drop cluster ");
+        cmd.append(iClusterName);
+        commandSQL=new OCommandSQL(cmd.toString());
+        commandSQL.addExcludedNode(getNodeId());
+        command(commandSQL);
+        try {
+          Thread.sleep(300);
+        }
+ catch (        InterruptedException e) {
+        }
+        continue;
+      }
+    }
+    return clId;
   }
-  return clId;
+  throw new ODistributedException("Error on creating cluster: local and remote id assigned are different");
 }

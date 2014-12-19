@@ -7,7 +7,8 @@
   iRequest.data.commandInfo="Gephi";
   iRequest.data.commandDetail=text;
   final ODatabaseDocumentTx db=getProfiledDatabaseInstance(iRequest);
-  final OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false);
+  final OModifiableBoolean shutdownFlag=new OModifiableBoolean();
+  final OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false,shutdownFlag);
   try {
     final Iterable<OrientVertex> vertices;
     if (language.equals("sql"))     vertices=graph.command(new OSQLSynchQuery<OrientVertex>(text,limit).setFetchPlan(fetchPlan)).execute();
@@ -23,7 +24,7 @@
     sendRecordsContent(iRequest,iResponse,vertices,fetchPlan);
   }
   finally {
-    if (graph != null)     graph.shutdown();
+    if (graph != null && shutdownFlag.getValue())     graph.shutdown();
     if (db != null)     db.close();
   }
   return false;

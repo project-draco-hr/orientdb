@@ -13,6 +13,7 @@
       graphNoTx.createEdgeType("Knows");
       graphNoTx.createEdgeType("Buy");
       graphNoTx.createEdgeType("Loves");
+      Thread.sleep(500);
     }
   finally {
       graphNoTx.shutdown();
@@ -51,7 +52,13 @@
         graph.shutdown();
       }
     }
-    for (int i=0; i < vertices.length; ++i)     System.out.println("Created vertex " + i + ": "+ vertices[i].getRecord());
+    graph=localFactory.getNoTx();
+    try {
+      for (int i=0; i < vertices.length; ++i)       System.out.println("Created vertex " + i + ": "+ vertices[i].getRecord());
+    }
+  finally {
+      graph.shutdown();
+    }
     for (int i=0; i < vertices.length; ++i) {
       OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + i + "/databases/"+ getDatabaseName());
       graph=factory.getNoTx();
@@ -76,14 +83,17 @@
       OrientGraphNoTx g=f.getNoTx();
       System.out.println("Query from server " + server + "...");
       try {
-        for (int cluster=0; cluster < vertices.length; ++cluster) {
-          final String query="select from cluster:client_" + cluster;
+        for (int i=0; i < vertices.length; ++i) {
+          final String nodeName=serverInstance.get(i).getServerInstance().getDistributedManager().getLocalNodeName();
+          String clusterName="client";
+          if (i > 0)           clusterName+="_" + nodeName;
+          String query="select from cluster:" + clusterName;
           final OrientVertex explain=g.command(new OCommandSQL("explain " + query)).execute();
           System.out.println("explain " + query + " -> "+ ((ODocument)explain.getRecord()).field("servers"));
           Iterable<OrientVertex> result=g.command(new OCommandSQL(query)).execute();
-          Assert.assertTrue("Error on query against 'cluster_" + cluster + "' on server '"+ server+ "': "+ query,result.iterator().hasNext());
+          Assert.assertTrue("Error on query against '" + clusterName + "' on server '"+ server+ "': "+ query,result.iterator().hasNext());
           OrientVertex v=result.iterator().next();
-          Assert.assertEquals("Returned vertices name property is != shard_" + cluster + " on server "+ server,"shard_" + cluster,v.getProperty("name"));
+          Assert.assertEquals("Returned vertices name property is != shard_" + i + " on server "+ server,"shard_" + i,v.getProperty("name"));
           final Iterable<Vertex> knows=v.getVertices(Direction.OUT,"Knows");
           final Iterable<Vertex> boughtV=v.getVertices(Direction.OUT,"Buy");
           Assert.assertTrue(boughtV.iterator().hasNext());
@@ -127,7 +137,7 @@
           final Iterable<Edge> boughtE=v.getEdges(Direction.OUT,"Buy");
           Assert.assertNotNull(boughtE.iterator().next().getProperty("price"));
         }
-        Assert.assertEquals("Returned wrong vertices count on server " + server,3,count);
+        Assert.assertEquals("Returned wrong vertices count on server " + server,SERVERS,count);
       }
   finally {
         g.shutdown();

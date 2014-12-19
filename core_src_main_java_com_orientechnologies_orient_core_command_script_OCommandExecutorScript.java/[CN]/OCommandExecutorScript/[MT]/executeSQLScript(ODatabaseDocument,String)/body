@@ -27,12 +27,19 @@
             lastResult=db.command(new OCommandSQL(cmd).setContext(getContext())).execute();
             getContext().setVariable(variable,lastResult);
           }
- else           if ("begin".equalsIgnoreCase(lastCommand)) {
+ else           if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"begin")) {
             if (txBegun)             throw new OCommandSQLParsingException("Transaction already begun");
             txBegun=true;
             txBegunAtLine=line;
             txBegunAtPart=linePart;
             db.begin();
+            if (lastCommand.length() > "begin ".length()) {
+              String next=lastCommand.substring("begin ".length()).trim();
+              if (OStringSerializerHelper.startsWithIgnoreCase(next,"isolation ")) {
+                next=next.substring("isolation ".length()).trim();
+                db.getTransaction().setIsolationLevel(OTransaction.ISOLATION_LEVEL.valueOf(next.toUpperCase()));
+              }
+            }
           }
  else           if ("rollback".equalsIgnoreCase(lastCommand)) {
             if (!txBegun)             throw new OCommandSQLParsingException("Transaction not begun");

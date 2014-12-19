@@ -1,49 +1,44 @@
 {
   final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false);
-  try {
-    final ORecord record=(ORecord)(iCurrentRecord != null ? iCurrentRecord.getRecord() : null);
-    Object source=iParams[0];
-    if (OMultiValue.isMultiValue(source)) {
-      if (OMultiValue.getSize(source) > 1)       throw new IllegalArgumentException("Only one sourceVertex is allowed");
-      source=OMultiValue.getFirstValue(source);
-    }
-    OrientVertex sourceVertex=graph.getVertex(OSQLHelper.getValue(source,record,iContext));
-    Object dest=iParams[1];
-    if (OMultiValue.isMultiValue(dest)) {
-      if (OMultiValue.getSize(dest) > 1)       throw new IllegalArgumentException("Only one destinationVertex is allowed");
-      dest=OMultiValue.getFirstValue(dest);
-    }
-    OrientVertex destinationVertex=graph.getVertex(OSQLHelper.getValue(dest,record,iContext));
-    if (sourceVertex.equals(destinationVertex)) {
-      final List<ORID> result=new ArrayList<ORID>(1);
-      result.add(destinationVertex.getIdentity());
-      return result;
-    }
-    Direction direction=Direction.BOTH;
-    if (iParams.length > 2)     direction=Direction.valueOf(iParams[2].toString().toUpperCase());
-    final ArrayQueue<OrientVertex> queue=new ArrayQueue<OrientVertex>();
-    final Set<ORID> visited=new HashSet<ORID>();
-    final Map<ORID,ORID> previouses=new HashMap<ORID,ORID>();
-    queue.add(sourceVertex);
-    visited.add(sourceVertex.getIdentity());
-    OrientVertex current;
-    while (!queue.isEmpty()) {
-      current=queue.poll();
-      final Iterable<Vertex> neighbors=current.getVertices(direction);
-      for (      Vertex neighbor : neighbors) {
-        final OrientVertex v=(OrientVertex)neighbor;
-        final ORID neighborIdentity=v.getIdentity();
-        if (!visited.contains(neighborIdentity)) {
-          previouses.put(neighborIdentity,current.getIdentity());
-          if (destinationVertex.equals(neighbor))           return computePath(previouses,neighborIdentity);
-          queue.offer(v);
-          visited.add(neighborIdentity);
-        }
+  final ORecord record=(ORecord)(iCurrentRecord != null ? iCurrentRecord.getRecord() : null);
+  Object source=iParams[0];
+  if (OMultiValue.isMultiValue(source)) {
+    if (OMultiValue.getSize(source) > 1)     throw new IllegalArgumentException("Only one sourceVertex is allowed");
+    source=OMultiValue.getFirstValue(source);
+  }
+  OrientVertex sourceVertex=graph.getVertex(OSQLHelper.getValue(source,record,iContext));
+  Object dest=iParams[1];
+  if (OMultiValue.isMultiValue(dest)) {
+    if (OMultiValue.getSize(dest) > 1)     throw new IllegalArgumentException("Only one destinationVertex is allowed");
+    dest=OMultiValue.getFirstValue(dest);
+  }
+  OrientVertex destinationVertex=graph.getVertex(OSQLHelper.getValue(dest,record,iContext));
+  if (sourceVertex.equals(destinationVertex)) {
+    final List<ORID> result=new ArrayList<ORID>(1);
+    result.add(destinationVertex.getIdentity());
+    return result;
+  }
+  Direction direction=Direction.BOTH;
+  if (iParams.length > 2)   direction=Direction.valueOf(iParams[2].toString().toUpperCase());
+  final ArrayQueue<OrientVertex> queue=new ArrayQueue<OrientVertex>();
+  final Set<ORID> visited=new HashSet<ORID>();
+  final Map<ORID,ORID> previouses=new HashMap<ORID,ORID>();
+  queue.add(sourceVertex);
+  visited.add(sourceVertex.getIdentity());
+  OrientVertex current;
+  while (!queue.isEmpty()) {
+    current=queue.poll();
+    final Iterable<Vertex> neighbors=current.getVertices(direction);
+    for (    Vertex neighbor : neighbors) {
+      final OrientVertex v=(OrientVertex)neighbor;
+      final ORID neighborIdentity=v.getIdentity();
+      if (!visited.contains(neighborIdentity)) {
+        previouses.put(neighborIdentity,current.getIdentity());
+        if (destinationVertex.equals(neighbor))         return computePath(previouses,neighborIdentity);
+        queue.offer(v);
+        visited.add(neighborIdentity);
       }
     }
-    return new ArrayList<ORID>();
   }
-  finally {
-    graph.shutdown(false);
-  }
+  return new ArrayList<ORID>();
 }

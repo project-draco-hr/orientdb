@@ -1,6 +1,18 @@
 {
-synchronized (syncObject) {
+  syncObject.lock();
+  try {
     checkForClose();
+    if (record instanceof OOperationUnitRecord && !activeOperations.contains(((OOperationUnitRecord)record).getOperationUnitId())) {
+      while (segmentCreationFlag) {
+        try {
+          segmentCreationComplete.await();
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new OInterruptedException(e);
+        }
+      }
+    }
     final byte[] serializedForm=OWALRecordsFactory.INSTANCE.toStream(record);
     LogSegment last=logSegments.get(logSegments.size() - 1);
     long lastSize=last.filledUpTo();
@@ -31,12 +43,20 @@ synchronized (syncObject) {
       }
     }
     if (last.filledUpTo() >= maxSegmentSize) {
-      last.stopFlush(true);
-      last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxPagesCacheSize);
-      last.init();
-      last.startFlush();
-      logSegments.add(last);
+      segmentCreationFlag=true;
+      if (record instanceof OAtomicUnitEndRecord && activeOperations.size() == 1 || (!(record instanceof OOperationUnitRecord) && activeOperations.isEmpty())) {
+        last.stopFlush(true);
+        last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxPagesCacheSize);
+        last.init();
+        last.startFlush();
+        logSegments.add(last);
+        segmentCreationFlag=false;
+        segmentCreationComplete.signalAll();
+      }
     }
     return lsn;
+  }
+  finally {
+    syncObject.unlock();
   }
 }

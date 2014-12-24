@@ -2,15 +2,10 @@
   syncObject.lock();
   try {
     checkForClose();
-    boolean insideOfActiveOperations=false;
-    if (record instanceof OOperationUnitRecord) {
-      final OOperationUnitId unitId=((OOperationUnitRecord)record).getOperationUnitId();
-      insideOfActiveOperations=activeOperations.contains(unitId);
-    }
-    if (!insideOfActiveOperations) {
-      while (truncationFlag) {
+    if (record instanceof OOperationUnitRecord && !activeOperations.contains(((OOperationUnitRecord)record).getOperationUnitId())) {
+      while (segmentCreationFlag) {
         try {
-          truncationComplete.await();
+          segmentCreationComplete.await();
         }
  catch (        InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -48,23 +43,16 @@
       }
     }
     if (last.filledUpTo() >= maxSegmentSize) {
-      truncationFlag=true;
-      while (record instanceof OOperationUnitRecord && activeOperations.size() > 1 || !(record instanceof OOperationUnitRecord) && !activeOperations.isEmpty()) {
-        try {
-          operationComplete.await();
-        }
- catch (        InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new OInterruptedException(e);
-        }
+      segmentCreationFlag=true;
+      if (record instanceof OAtomicUnitEndRecord && activeOperations.size() == 1 || (!(record instanceof OOperationUnitRecord) && activeOperations.isEmpty())) {
+        last.stopFlush(true);
+        last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxPagesCacheSize);
+        last.init();
+        last.startFlush();
+        logSegments.add(last);
+        segmentCreationFlag=false;
+        segmentCreationComplete.signalAll();
       }
-      last.stopFlush(true);
-      last=new LogSegment(new File(walLocation,getSegmentName(last.getOrder() + 1)),maxPagesCacheSize);
-      last.init();
-      last.startFlush();
-      logSegments.add(last);
-      truncationFlag=false;
-      truncationComplete.signalAll();
     }
     return lsn;
   }

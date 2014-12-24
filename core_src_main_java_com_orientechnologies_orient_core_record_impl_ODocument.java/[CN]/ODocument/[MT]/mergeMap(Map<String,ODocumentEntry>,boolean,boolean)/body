@@ -1,0 +1,36 @@
+{
+  checkForLoading();
+  checkForFields();
+  _source=null;
+  for (  String f : iOther.keySet()) {
+    ODocumentEntry docEntry=iOther.get(f);
+    if (!docEntry.exist) {
+      continue;
+    }
+    final Object value=field(f);
+    final Object otherValue=docEntry.value;
+    if (containsField(f) && iMergeSingleItemsOfMultiValueFields) {
+      if (value instanceof Map<?,?>) {
+        final Map<String,Object> map=(Map<String,Object>)value;
+        final Map<String,Object> otherMap=(Map<String,Object>)otherValue;
+        for (        Entry<String,Object> entry : otherMap.entrySet()) {
+          map.put(entry.getKey(),entry.getValue());
+        }
+        continue;
+      }
+ else       if (OMultiValue.isMultiValue(value)) {
+        for (        Object item : OMultiValue.getMultiValueIterable(otherValue)) {
+          if (!OMultiValue.contains(value,item))           OMultiValue.add(value,item);
+        }
+        continue;
+      }
+    }
+    boolean bagsMerged=false;
+    if (value instanceof ORidBag && otherValue instanceof ORidBag)     bagsMerged=((ORidBag)value).tryMerge((ORidBag)otherValue,iMergeSingleItemsOfMultiValueFields);
+    if (!bagsMerged && (value != null && !value.equals(otherValue)) || (value == null && otherValue != null))     field(f,otherValue);
+  }
+  if (!iUpdateOnlyMode) {
+    for (    String f : fieldNames())     if (!iOther.containsKey(f) || !iOther.get(f).exist)     removeField(f);
+  }
+  return this;
+}

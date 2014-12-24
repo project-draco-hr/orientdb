@@ -1,27 +1,52 @@
 {
   checkForLoading();
   checkForFields();
-  if (_fieldValues == null)   return OEmptyMapEntryIterator.INSTANCE;
-  final Iterator<Entry<String,Object>> iterator=_fieldValues.entrySet().iterator();
+  if (_fields == null)   return OEmptyMapEntryIterator.INSTANCE;
+  final Iterator<Entry<String,ODocumentEntry>> iterator=_fields.entrySet().iterator();
   return new Iterator<Entry<String,Object>>(){
-    private Entry<String,Object> current;
+    private Entry<String,ODocumentEntry> current;
+    private boolean read=true;
     public boolean hasNext(){
-      return iterator.hasNext();
-    }
-    public Entry<String,Object> next(){
-      current=iterator.next();
-      return current;
-    }
-    public void remove(){
-      iterator.remove();
-      if (_trackingChanges) {
-        if (_fieldOriginalValues == null)         _fieldOriginalValues=new HashMap<String,Object>();
-        if (!_fieldOriginalValues.containsKey(current.getKey())) {
-          _fieldOriginalValues.put(current.getKey(),current.getValue());
+      while (iterator.hasNext()) {
+        current=iterator.next();
+        if (current.getValue().exist) {
+          read=false;
+          return true;
         }
       }
-      removeCollectionChangeListener(current.getKey(),current.getValue());
-      removeCollectionTimeLine(current.getKey());
+      return false;
+    }
+    public Entry<String,Object> next(){
+      if (read)       if (!hasNext()) {
+        iterator.next();
+      }
+      Entry<String,Object> toRet=new Entry<String,Object>(){
+        private Entry<String,ODocumentEntry> intern=current;
+        @Override public Object setValue(        Object value){
+          throw new UnsupportedOperationException();
+        }
+        @Override public Object getValue(){
+          return intern.getValue().value;
+        }
+        @Override public String getKey(){
+          return intern.getKey();
+        }
+      }
+;
+      read=true;
+      return toRet;
+    }
+    public void remove(){
+      if (_trackingChanges) {
+        if (current.getValue().changed)         current.getValue().original=current.getValue().value;
+        current.getValue().value=null;
+        current.getValue().exist=false;
+        current.getValue().changed=true;
+      }
+ else       iterator.remove();
+      _size--;
+      removeCollectionChangeListener(current.getValue(),current.getValue().value);
+      removeCollectionTimeLine(current.getValue());
     }
   }
 ;

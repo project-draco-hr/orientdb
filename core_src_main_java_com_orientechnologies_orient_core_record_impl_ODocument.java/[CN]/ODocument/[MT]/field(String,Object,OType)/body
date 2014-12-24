@@ -35,9 +35,24 @@
   iFieldName=checkFieldName(iFieldName);
   checkForLoading();
   checkForFields();
-  final boolean knownProperty=_fieldValues.containsKey(iFieldName);
-  final Object oldValue=_fieldValues.get(iFieldName);
-  final OType oldType=fieldType(iFieldName);
+  ODocumentEntry entry=_fields.get(iFieldName);
+  final boolean knownProperty;
+  final Object oldValue;
+  final OType oldType;
+  if (entry == null) {
+    entry=new ODocumentEntry();
+    _size++;
+    _fields.put(iFieldName,entry);
+    entry.created=true;
+    knownProperty=false;
+    oldValue=null;
+    oldType=null;
+  }
+ else {
+    knownProperty=entry.exist;
+    oldValue=entry.value;
+    oldType=entry.type;
+  }
   if (knownProperty)   if (iPropertyValue == null) {
     if (oldValue == null)     return this;
   }
@@ -54,7 +69,7 @@
       OLogManager.instance().warn(this,"Error on checking the value of property %s against the record %s",e,iFieldName,getIdentity());
     }
   }
-  OType fieldType=deriveFieldType(iFieldName,iFieldType);
+  OType fieldType=deriveFieldType(iFieldName,entry,iFieldType);
   if (oldValue instanceof ORidBag) {
     final ORidBag ridBag=(ORidBag)oldValue;
     ridBag.setOwner(null);
@@ -78,15 +93,22 @@
     }
   }
   if (oldType != fieldType && oldType != null) {
-    if (iPropertyValue == null || fieldType != null || oldType != OType.getTypeByValue(iPropertyValue))     setFieldType(iFieldName,fieldType);
+    if (iPropertyValue == null || fieldType != null || oldType != OType.getTypeByValue(iPropertyValue))     entry.type=fieldType;
   }
-  removeCollectionChangeListener(iFieldName,_fieldValues.get(iFieldName));
-  removeCollectionTimeLine(iFieldName);
-  _fieldValues.put(iFieldName,iPropertyValue);
-  addCollectionChangeListener(iFieldName,iPropertyValue);
+  removeCollectionChangeListener(entry,oldValue);
+  removeCollectionTimeLine(entry);
+  entry.value=iPropertyValue;
+  if (!entry.exist) {
+    entry.exist=true;
+    _size++;
+  }
+  addCollectionChangeListener(iFieldName,entry,iPropertyValue);
   if (_status != STATUS.UNMARSHALLING) {
     setDirty();
-    saveOldFieldValue(iFieldName,oldValue);
+    if (!entry.changed) {
+      entry.original=oldValue;
+      entry.changed=true;
+    }
   }
   return this;
 }

@@ -1,0 +1,39 @@
+{
+  List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  for (int i=0; i < 8; i++) {
+    futures.add(writerExecutor.submit(new Writer()));
+  }
+  Thread.sleep(15 * 60 * 1000);
+  stop=true;
+  for (  Future<Void> future : futures)   future.get();
+  final Set<OOperationUnitId> operations=new HashSet<OOperationUnitId>();
+  writeAheadLog.close();
+  writeAheadLog=new ODiskWriteAheadLog(200,500,64 * 1024L * 1024L,64 * 64 * 1024L* 1024L,localPaginatedStorage);
+  OLogSequenceNumber lsn=writeAheadLog.begin();
+  long segment=lsn.getSegment();
+  System.out.println("Segment : " + lsn.getSegment());
+  while (lsn != null) {
+    OWALRecord record=writeAheadLog.read(lsn);
+    if (record instanceof OAtomicUnitStartRecord) {
+      OOperationUnitId operationUnitId=((OAtomicUnitStartRecord)record).getOperationUnitId();
+      Assert.assertFalse(operations.contains(operationUnitId));
+      operations.add(operationUnitId);
+    }
+ else     if (record instanceof OAtomicUnitEndRecord) {
+      OOperationUnitId operationUnitId=((OAtomicUnitEndRecord)record).getOperationUnitId();
+      Assert.assertTrue(operations.contains(operationUnitId));
+      operations.remove(operationUnitId);
+    }
+ else     if (record instanceof OOperationUnitRecord) {
+      OOperationUnitId operationUnitId=((OOperationUnitRecord)record).getOperationUnitId();
+      Assert.assertTrue(operations.contains(operationUnitId));
+    }
+    lsn=writeAheadLog.next(lsn);
+    if (lsn != null && lsn.getSegment() != segment) {
+      System.out.println("Segment : " + lsn.getSegment());
+      Assert.assertTrue(operations.isEmpty());
+      segment=lsn.getSegment();
+    }
+  }
+  Assert.assertTrue(operations.isEmpty());
+}

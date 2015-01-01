@@ -5,18 +5,20 @@
   OCachePointer dataPointer;
   final OFileClassic fileClassic=files.get(fileId);
   if (fileClassic == null)   throw new IllegalArgumentException("File with id " + fileId + " not found in WOW Cache");
+  OLogSequenceNumber lastLsn;
+  if (writeAheadLog != null)   lastLsn=writeAheadLog.getFlushedLSN();
+ else   lastLsn=new OLogSequenceNumber(-1,-1);
   if (fileClassic.getFilledUpTo() >= endPosition) {
     fileClassic.read(startPosition,content,content.length - 2 * PAGE_PADDING,PAGE_PADDING);
     final ODirectMemoryPointer pointer=new ODirectMemoryPointer(content);
-    final OLogSequenceNumber storedLSN=ODurablePage.getLogSequenceNumberFromPage(pointer);
-    dataPointer=new OCachePointer(pointer,storedLSN);
+    dataPointer=new OCachePointer(pointer,lastLsn);
   }
  else {
     final int space=(int)(endPosition - fileClassic.getFilledUpTo());
     fileClassic.allocateSpace(space);
     addAllocatedSpace(space);
     final ODirectMemoryPointer pointer=new ODirectMemoryPointer(content);
-    dataPointer=new OCachePointer(pointer,new OLogSequenceNumber(-1,-1));
+    dataPointer=new OCachePointer(pointer,lastLsn);
   }
   return dataPointer;
 }

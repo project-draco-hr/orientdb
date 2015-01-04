@@ -3,7 +3,7 @@
   if (className.length() != 0)   ODocumentInternal.fillClassNameIfNeeded(document,className);
   final byte[][] fields=new byte[iFields.length][];
   for (int i=0; i < iFields.length; ++i)   fields[i]=iFields[i].getBytes();
-  String fieldName;
+  String fieldName=null;
   int valuePos;
   OType type;
   int unmarshalledFields=0;
@@ -13,38 +13,29 @@
       break;
     }
  else     if (len > 0) {
-      boolean possibleMatch=false;
+      boolean match=false;
       for (int i=0; i < iFields.length; ++i) {
         if (iFields[i].length() == len) {
-          possibleMatch=true;
-          break;
-        }
-      }
-      if (!possibleMatch) {
-        bytes.skip(len + OIntegerSerializer.INT_SIZE + 1);
-        continue;
-      }
-      int matchFieldId=-1;
-      for (int f=0; f < fields.length; f++) {
-        boolean matchField=true;
-        for (int i=0; i < len; i++) {
-          if (bytes.bytes[bytes.offset + i] != fields[f][i]) {
-            matchField=false;
+          boolean matchField=true;
+          for (int j=0; j < len; ++j) {
+            if (bytes.bytes[bytes.offset + j] != fields[i][j]) {
+              matchField=false;
+              break;
+            }
+          }
+          if (matchField) {
+            fieldName=iFields[i];
+            unmarshalledFields++;
+            bytes.skip(len);
+            match=true;
             break;
           }
         }
-        if (matchField) {
-          matchFieldId=f;
-          unmarshalledFields++;
-          break;
-        }
       }
-      if (matchFieldId < 0) {
+      if (!match) {
         bytes.skip(len + OIntegerSerializer.INT_SIZE + 1);
         continue;
       }
-      fieldName=new String(bytes.bytes,bytes.offset,len,utf8);
-      bytes.skip(len);
       valuePos=readInteger(bytes);
       type=readOType(bytes);
     }

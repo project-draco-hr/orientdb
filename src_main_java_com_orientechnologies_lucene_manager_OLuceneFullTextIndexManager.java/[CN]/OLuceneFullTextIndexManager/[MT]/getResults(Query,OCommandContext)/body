@@ -1,29 +1,7 @@
 {
   try {
     IndexSearcher searcher=getSearcher();
-    Integer limit=null;
-    if (context != null) {
-      limit=(Integer)context.getVariable("$limit");
-    }
-    final long startFetching=System.currentTimeMillis();
-    final TopDocs docs=searcher.search(query,(limit != null && limit > 0) ? limit : Integer.MAX_VALUE);
-    ScoreDoc[] hits=docs.scoreDocs;
-    sendTotalHits(context,docs);
-    Set<OIdentifiable> results=new LinkedHashSet<OIdentifiable>(hits.length);
-    for (    final ScoreDoc score : hits) {
-      Document ret=searcher.doc(score.doc);
-      String rId=ret.get(RID);
-      results.add(new OContextualRecordId(rId).setContext(new HashMap<String,Object>(){
-{
-          put("score",score.score);
-        }
-      }
-));
-    }
-    if (context != null) {
-      sendLookupTime(context,docs,limit,startFetching);
-    }
-    return results;
+    return new LuceneResultSet(this,new QueryContext(context,searcher,query));
   }
  catch (  IOException e) {
     throw new OIndexException("Error reading from Lucene index",e);

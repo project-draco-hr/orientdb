@@ -1,7 +1,6 @@
 {
   double lat=((Double)OType.convert(((OCompositeKey)key).getKeys().get(0),Double.class)).doubleValue();
   double lng=((Double)OType.convert(((OCompositeKey)key).getKeys().get(1),Double.class)).doubleValue();
-  Set<OIdentifiable> result=new HashSet<OIdentifiable>();
   SpatialOperation operation=SpatialOperation.Intersects;
   Point p=ctx.makePoint(lng,lat);
   SpatialArgs args=new SpatialArgs(operation,ctx.makeCircle(lng,lat,DistanceUtils.dist2Degrees(distance,DistanceUtils.EARTH_MEAN_RADIUS_KM)));
@@ -9,24 +8,5 @@
   IndexSearcher searcher=getSearcher();
   ValueSource valueSource=strategy.makeDistanceValueSource(p);
   Sort distSort=new Sort(valueSource.getSortField(false)).rewrite(searcher);
-  Integer limit=null;
-  if (context != null) {
-    limit=(Integer)context.getVariable("$limit");
-  }
-  int limitDoc=(limit != null && limit > 0) ? limit : Integer.MAX_VALUE;
-  TopDocs topDocs=searcher.search(new MatchAllDocsQuery(),filter,limitDoc,distSort);
-  ScoreDoc[] scoreDocs=topDocs.scoreDocs;
-  for (  ScoreDoc s : scoreDocs) {
-    Document doc=searcher.doc(s.doc);
-    Point docPoint=(Point)ctx.readShape(doc.get(strategy.getFieldName()));
-    double docDistDEG=ctx.getDistCalc().distance(args.getShape().getCenter(),docPoint);
-    final double docDistInKM=DistanceUtils.degrees2Dist(docDistDEG,DistanceUtils.EARTH_EQUATORIAL_RADIUS_KM);
-    result.add(new OContextualRecordId(doc.get(RID)).setContext(new HashMap<String,Object>(){
-{
-        put("distance",docDistInKM);
-      }
-    }
-));
-  }
-  return result;
+  return new LuceneResultSet(this,new SpatialQueryContext(context,searcher,new MatchAllDocsQuery(),filter,distSort).setSpatialArgs(args));
 }

@@ -1,5 +1,5 @@
 {
-  wereDataRestoredAfterOpen=true;
+  final OModifiableBoolean atLeastOnePageUpdate=new OModifiableBoolean(false);
   long recordsProcessed=0;
   int reportInterval=OGlobalConfiguration.WAL_REPORT_AFTER_OPERATIONS_DURING_RESTORE.getValueAsInteger();
   final int batchSize=OGlobalConfiguration.WAL_RESTORE_BATCH_SIZE.getValueAsInteger();
@@ -11,14 +11,14 @@
       batch.add(walRecord);
       if (batch.size() >= batchSize) {
         OLogManager.instance().info(this,"WAL size exceed configured heap memory for recovery (%s=%d). Fetching WAL records in batch",OGlobalConfiguration.WAL_RESTORE_BATCH_SIZE.getKey(),OGlobalConfiguration.WAL_RESTORE_BATCH_SIZE.getValueAsInteger());
-        recordsProcessed=restoreWALBatch(batch,operationUnits,recordsProcessed,reportInterval);
+        recordsProcessed=restoreWALBatch(batch,operationUnits,recordsProcessed,reportInterval,atLeastOnePageUpdate);
         batch=new ArrayList<OWALRecord>();
       }
       lsn=writeAheadLog.next(lsn);
     }
     if (!batch.isEmpty()) {
       OLogManager.instance().info(this,"Apply last batch of operations are read from WAL.");
-      restoreWALBatch(batch,operationUnits,recordsProcessed,reportInterval);
+      restoreWALBatch(batch,operationUnits,recordsProcessed,reportInterval,atLeastOnePageUpdate);
     }
   }
  catch (  OWALPageBrokenException e) {
@@ -26,4 +26,5 @@
   }
   rollbackAllUnfinishedWALOperations(operationUnits);
   operationUnits.clear();
+  return atLeastOnePageUpdate.getValue();
 }

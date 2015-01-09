@@ -1,11 +1,11 @@
 {
   if (writeAheadLog == null) {
     OLogManager.instance().error(this,"Restore is not possible because write ahead logging is switched off.");
-    return;
+    return true;
   }
   if (writeAheadLog.begin() == null) {
     OLogManager.instance().error(this,"Restore is not possible because write ahead log is empty.");
-    return;
+    return false;
   }
   OLogManager.instance().info(this,"Looking for last checkpoint...");
   OLogSequenceNumber lastCheckPoint;
@@ -17,8 +17,7 @@
   }
   if (lastCheckPoint == null) {
     OLogManager.instance().info(this,"Checkpoints are absent, the restore will start from the beginning.");
-    restoreFromBegging();
-    return;
+    return restoreFromBegging();
   }
   OWALRecord checkPointRecord;
   try {
@@ -29,8 +28,7 @@
   }
   if (checkPointRecord == null) {
     OLogManager.instance().info(this,"Checkpoints are absent, the restore will start from the beginning.");
-    restoreFromBegging();
-    return;
+    return restoreFromBegging();
   }
   if (checkPointRecord instanceof OFuzzyCheckpointStartRecord) {
     OLogManager.instance().info(this,"Found FUZZY checkpoint.");
@@ -42,15 +40,14 @@
       if (previousCheckpoint != null)       checkPointRecord=writeAheadLog.read(previousCheckpoint);
       if (checkPointRecord != null) {
         OLogManager.instance().warn(this,"Restore will start from the previous checkpoint.");
-        restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
+        return restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
       }
  else {
         OLogManager.instance().warn(this,"Restore will start from the beginning.");
-        restoreFromBegging();
+        return restoreFromBegging();
       }
     }
- else     restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
-    return;
+ else     return restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
   }
   if (checkPointRecord instanceof OFullCheckpointStartRecord) {
     OLogManager.instance().info(this,"FULL checkpoint found.");
@@ -65,11 +62,10 @@
       }
  else {
         OLogManager.instance().warn(this,"Restore will start from the beginning.");
-        restoreFromBegging();
+        return restoreFromBegging();
       }
     }
- else     restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
-    return;
+ else     return restoreFromCheckPoint((OAbstractCheckPointStartRecord)checkPointRecord);
   }
   throw new OStorageException("Unknown checkpoint record type " + checkPointRecord.getClass().getName());
 }

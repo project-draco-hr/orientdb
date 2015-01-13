@@ -2,17 +2,21 @@
   if (record == null)   return;
   Object fieldValue;
   iContext.onBeforeFetch(record);
+  Set<String> toRemove=new HashSet<String>();
   for (  String fieldName : record.fieldNames()) {
     String fieldPath=!iFieldPathFromRoot.isEmpty() ? iFieldPathFromRoot + "." + fieldName : fieldName;
     int depthLevel;
     depthLevel=getDepthLevel(iFetchPlan,fieldPath);
-    if (depthLevel == -2)     continue;
+    if (depthLevel == -2) {
+      toRemove.add(fieldName);
+      continue;
+    }
     if (iFieldDepthLevel > -1)     depthLevel=iFieldDepthLevel;
     fieldValue=record.rawField(fieldName);
     boolean fetch=!iFormat.contains("shallow") && (!(fieldValue instanceof OIdentifiable) || depthLevel == -1 || iCurrentLevel <= depthLevel || iFetchPlan.has(fieldPath));
     final boolean isEmbedded=isEmbedded(fieldValue);
     if (!fetch && isEmbedded && iContext.fetchEmbeddedDocuments())     fetch=true;
-    if (iFormat.contains("shallow") || fieldValue == null || (!fetch && fieldValue instanceof OIdentifiable) || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof ORecordLazyMultiValue) || !((ORecordLazyMultiValue)fieldValue).rawIterator().hasNext() || !(((ORecordLazyMultiValue)fieldValue).rawIterator().next() instanceof OIdentifiable)) && (!(OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue)) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue))) instanceof OIdentifiable))) {
+    if (iFormat.contains("shallow") || fieldValue == null || (!fetch && fieldValue instanceof OIdentifiable) || !(fieldValue instanceof OIdentifiable) && (!(fieldValue instanceof ORecordLazyMultiValue) || !((ORecordLazyMultiValue)fieldValue).rawIterator().hasNext() || !(((ORecordLazyMultiValue)fieldValue).rawIterator().next() instanceof OIdentifiable)) && (!(fieldValue.getClass().isArray()) || Array.getLength(fieldValue) == 0 || !(Array.get(fieldValue,0) instanceof OIdentifiable))&& (!(OMultiValue.getFirstValue(fieldValue) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue)) instanceof OIdentifiable || OMultiValue.getFirstValue(OMultiValue.getFirstValue(OMultiValue.getFirstValue(fieldValue))) instanceof OIdentifiable))) {
       iContext.onBeforeStandardField(fieldValue,fieldName,iUserObject);
       iListener.processStandardField(record,fieldValue,fieldName,iContext,iUserObject,iFormat);
       iContext.onAfterStandardField(fieldValue,fieldName,iUserObject);
@@ -28,6 +32,9 @@
         OLogManager.instance().error(null,"Fetching error on record %s",e,record.getIdentity());
       }
     }
+  }
+  for (  String fieldName : toRemove) {
+    iListener.skipStandardField(record,fieldName,iContext,iUserObject,iFormat);
   }
   iContext.onAfterFetch(record);
 }

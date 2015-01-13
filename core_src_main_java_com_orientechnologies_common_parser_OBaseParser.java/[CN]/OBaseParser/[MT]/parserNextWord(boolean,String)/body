@@ -1,6 +1,7 @@
 {
   parserPreviousPos=parserCurrentPos;
   parserLastWord.setLength(0);
+  parserEscapeSequnceCount=0;
   parserSkipWhiteSpaces();
   if (parserCurrentPos == -1)   return;
   char stringBeginChar=' ';
@@ -24,11 +25,12 @@
     int escapePos=-1;
     for (; parserCurrentPos < text2Use.length(); parserCurrentPos++) {
       final char c=text2Use.charAt(parserCurrentPos);
-      if (c == '\\' && ((parserCurrentPos + 1) < text2Use.length())) {
+      if (escapePos == -1 && c == '\\' && ((parserCurrentPos + 1) < text2Use.length())) {
         if (openGraph == 0) {
           final char nextChar=text2Use.charAt(parserCurrentPos + 1);
           if (nextChar == 'u') {
             parserCurrentPos=OStringParser.readUnicode(text2Use,parserCurrentPos + 2,parserLastWord);
+            parserEscapeSequnceCount+=5;
           }
  else {
             if (nextChar == 'n')             parserLastWord.append('\n');
@@ -36,7 +38,10 @@
  else             if (nextChar == 't')             parserLastWord.append('\t');
  else             if (nextChar == 'b')             parserLastWord.append('\b');
  else             if (nextChar == 'f')             parserLastWord.append('\f');
- else             parserLastWord.append(nextChar);
+ else {
+              parserLastWord.append(nextChar);
+              parserEscapeSequnceCount++;
+            }
             parserCurrentPos++;
           }
           continue;
@@ -67,6 +72,7 @@
  else         if (c == '{')         openGraph++;
  else         if (c == '}' && openGraph > 0)         openGraph--;
       }
+      if (escapePos != -1)       parserEscapeSequnceCount++;
       if (escapePos != parserCurrentPos)       escapePos=-1;
       parserLastWord.append(c);
     }

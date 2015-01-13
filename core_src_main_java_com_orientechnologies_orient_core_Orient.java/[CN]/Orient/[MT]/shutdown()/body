@@ -19,7 +19,6 @@
       shutdownHook=null;
     }
     if (threadGroup != null)     threadGroup.interrupt();
-    resetListeners();
     timer.cancel();
     timer=null;
     profiler.shutdown();
@@ -32,9 +31,20 @@
       l.onShutdown();
     }
  catch (    Exception e) {
-      OLogManager.instance().error(this,"Error during orient shutdown.");
+      OLogManager.instance().error(this,"Error during orient shutdown.",e);
     }
   }
+  purgeWeakShutdownListeners();
+  for (  final WeakHashSetValueHolder<OOrientShutdownListener> wl : weakShutdownListeners)   try {
+    if (wl != null) {
+      final OOrientShutdownListener l=wl.get();
+      if (l != null)       l.onShutdown();
+    }
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error during orient shutdown.",e);
+  }
+  resetListeners();
   OLogManager.instance().info(this,"OrientDB Engine shutdown complete");
   OLogManager.instance().flush();
   return this;

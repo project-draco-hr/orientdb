@@ -1,17 +1,23 @@
 {
-  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false);
-  final String[] labels;
-  if (iParameters != null && iParameters.length > 0 && iParameters[0] != null)   labels=OMultiValue.array(iParameters,String.class,new OCallable<Object,Object>(){
-    @Override public Object call(    final Object iArgument){
-      return OStringSerializerHelper.getStringContent(iArgument);
+  final OModifiableBoolean shutdownFlag=new OModifiableBoolean();
+  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false,shutdownFlag);
+  try {
+    final String[] labels;
+    if (iParameters != null && iParameters.length > 0 && iParameters[0] != null)     labels=OMultiValue.array(iParameters,String.class,new OCallable<Object,Object>(){
+      @Override public Object call(      final Object iArgument){
+        return OStringSerializerHelper.getStringContent(iArgument);
+      }
     }
-  }
 );
- else   labels=null;
-  return OSQLEngine.foreachRecord(new OCallable<Object,OIdentifiable>(){
-    @Override public Object call(    final OIdentifiable iArgument){
-      return move(graph,iArgument,labels);
+ else     labels=null;
+    return OSQLEngine.foreachRecord(new OCallable<Object,OIdentifiable>(){
+      @Override public Object call(      final OIdentifiable iArgument){
+        return move(graph,iArgument,labels);
+      }
     }
-  }
 ,iThis,iContext);
+  }
+  finally {
+    if (shutdownFlag.getValue())     graph.shutdown(false);
+  }
 }

@@ -45,21 +45,21 @@
         final ORecord record=currentRecord != null && currentRecord instanceof OIdentifiable ? ((OIdentifiable)currentRecord).getRecord() : null;
         final Object index=getIndexPart(iContext,indexPart);
         final String indexAsString=index != null ? index.toString() : null;
-        final List<String> indexParts=OStringSerializerHelper.smartSplit(indexAsString,',');
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(indexAsString,',',OStringSerializerHelper.DEFAULT_IGNORE_CHARS);
         final List<String> indexRanges=OStringSerializerHelper.smartSplit(indexAsString,'-',' ');
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(indexAsString,'=',' ');
         if (indexParts.size() == 1 && indexCondition.size() == 1 && indexRanges.size() == 1)         value=((ODocument)record).field(indexAsString);
  else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            values[i]=((ODocument)record).field(indexParts.get(i));
+            values[i]=((ODocument)record).field(OStringSerializerHelper.getStringContent(indexParts.get(i)));
           }
           value=values;
         }
  else         if (indexRanges.size() > 1) {
           String from=indexRanges.get(0);
           String to=indexRanges.get(1);
-          final ODocument doc=((ODocument)((OIdentifiable)value).getRecord());
+          final ODocument doc=(ODocument)record;
           final String[] fieldNames=doc.fieldNames();
           final int rangeFrom=from != null && !from.isEmpty() ? Integer.parseInt(from) : 0;
           final int rangeTo=to != null && !to.isEmpty() ? Math.min(Integer.parseInt(to),fieldNames.length - 1) : fieldNames.length - 1;
@@ -77,18 +77,37 @@
         }
       }
  else       if (value instanceof Map<?,?>) {
-        final List<String> indexParts=OStringSerializerHelper.smartSplit(indexPart,',',OStringSerializerHelper.DEFAULT_IGNORE_CHARS);
-        if (indexParts.size() == 1) {
-          final Object index=getIndexPart(iContext,indexPart);
-          value=((Map<?,?>)value).get(index);
-        }
- else {
+        final Object index=getIndexPart(iContext,indexPart);
+        final String indexAsString=index != null ? index.toString() : null;
+        final List<String> indexParts=OStringSerializerHelper.smartSplit(indexAsString,',',OStringSerializerHelper.DEFAULT_IGNORE_CHARS);
+        final List<String> indexRanges=OStringSerializerHelper.smartSplit(indexAsString,'-',' ');
+        final List<String> indexCondition=OStringSerializerHelper.smartSplit(indexAsString,'=',' ');
+        final Map<String,?> map=(Map<String,?>)value;
+        if (indexParts.size() == 1 && indexCondition.size() == 1 && indexRanges.size() == 1)         value=map.get(indexAsString);
+ else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            final Object index=getIndexPart(iContext,indexParts.get(i));
-            values[i]=((Map<?,?>)value).get(index);
+            values[i]=map.get(OStringSerializerHelper.getStringContent(indexParts.get(i)));
           }
           value=values;
+        }
+ else         if (indexRanges.size() > 1) {
+          String from=indexRanges.get(0);
+          String to=indexRanges.get(1);
+          final List<String> fieldNames=new ArrayList<String>(map.keySet());
+          final int rangeFrom=from != null && !from.isEmpty() ? Integer.parseInt(from) : 0;
+          final int rangeTo=to != null && !to.isEmpty() ? Math.min(Integer.parseInt(to),fieldNames.size() - 1) : fieldNames.size() - 1;
+          final Object[] values=new Object[rangeTo - rangeFrom + 1];
+          for (int i=rangeFrom; i <= rangeTo; ++i)           values[i - rangeFrom]=map.get(fieldNames.get(i));
+          value=values;
+        }
+ else         if (!indexCondition.isEmpty()) {
+          final String conditionFieldName=indexCondition.get(0);
+          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          final Object fieldValue=map.get(conditionFieldName);
+          if (conditionFieldValue != null && fieldValue != null)           conditionFieldValue=OType.convert(conditionFieldValue,fieldValue.getClass());
+          if (fieldValue == null && !conditionFieldValue.equals("null") || fieldValue != null && !fieldValue.equals(conditionFieldValue))           value=null;
         }
       }
  else       if (OMultiValue.isMultiValue(value)) {

@@ -6,7 +6,8 @@
       parallelExec(iTarget);
     }
  else {
-      while (iTarget.hasNext()) {
+      int queryScanThresholdWarning=OGlobalConfiguration.QUERY_SCAN_THRESHOLD_TIP.getValueAsInteger();
+      for (int browsed=0; iTarget.hasNext(); browsed++) {
         final OIdentifiable next=iTarget.next();
         if (next == null)         break;
         final ORID identity=next.getIdentity();
@@ -14,8 +15,10 @@
           if (uniqueResult.contains(identity))           continue;
           if (identity.isValid())           uniqueResult.add(identity);
         }
-        if (!executeSearchRecord(next)) {
-          break;
+        if (!executeSearchRecord(next))         break;
+        if (queryScanThresholdWarning > 0 && browsed > queryScanThresholdWarning && compiledFilter != null) {
+          reportTip(String.format("Query '%s' fetched more than %d records: to speed up the execution, create an index or change the query to use an existent index",parserText,queryScanThresholdWarning));
+          queryScanThresholdWarning=0;
         }
       }
     }

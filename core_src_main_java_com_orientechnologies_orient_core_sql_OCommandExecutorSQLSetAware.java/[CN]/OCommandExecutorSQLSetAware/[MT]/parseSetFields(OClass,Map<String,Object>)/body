@@ -1,0 +1,58 @@
+{
+  String fieldName;
+  String fieldValue;
+  while (!parserIsEnded() && (fields.size() == 0 || parserGetLastSeparator() == ',' || parserGetCurrentChar() == ',')) {
+    fieldName=parserRequiredWord(false,"Field name expected");
+    if (fieldName.equalsIgnoreCase(KEYWORD_WHERE)) {
+      parserGoBack();
+      break;
+    }
+    parserNextChars(false,true,"=");
+    fieldValue=parserRequiredWord(false,"Value expected"," =><,\r\n");
+    Object v=getFieldValueCountingParameters(fieldValue);
+    if (iClass != null) {
+      final OProperty p=iClass.getProperty(fieldName);
+      if (p != null) {
+switch (p.getType()) {
+case EMBEDDEDSET:
+          if (!(v instanceof Map) && OMultiValue.isMultiValue(v)) {
+            final Set set=new HashSet();
+            final OClass embeddedType=p.getLinkedClass();
+            for (            Object o : OMultiValue.getMultiValueIterable(v)) {
+              if (o instanceof Map) {
+                final ODocument doc=new ODocument();
+                if (embeddedType != null)                 doc.setClassName(embeddedType.getName());
+                doc.fromMap((Map<String,Object>)o);
+                set.add(doc);
+              }
+ else               if (o instanceof OIdentifiable)               set.add(((OIdentifiable)o).getRecord());
+ else               set.add(o);
+            }
+            v=set;
+          }
+        break;
+case EMBEDDEDLIST:
+      if (!(v instanceof Map) && OMultiValue.isMultiValue(v)) {
+        final List set=new ArrayList();
+        final OClass embeddedType=p.getLinkedClass();
+        for (        Object o : OMultiValue.getMultiValueIterable(v)) {
+          if (o instanceof Map) {
+            final ODocument doc=new ODocument();
+            if (embeddedType != null)             doc.setClassName(embeddedType.getName());
+            doc.fromMap((Map<String,Object>)o);
+            set.add(doc);
+          }
+ else           if (o instanceof OIdentifiable)           set.add(((OIdentifiable)o).getRecord());
+ else           set.add(o);
+        }
+        v=set;
+      }
+    break;
+}
+}
+}
+fields.put(fieldName,v);
+parserSkipWhiteSpaces();
+}
+if (fields.size() == 0) throwParsingException("Entries to set <field> = <value> are missed. Example: name = 'Bill', salary = 300.2");
+}

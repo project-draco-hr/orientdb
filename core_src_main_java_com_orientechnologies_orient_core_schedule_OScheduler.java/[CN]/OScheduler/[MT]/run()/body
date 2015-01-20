@@ -4,7 +4,7 @@
   final SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
   final Date date=new Date(System.currentTimeMillis());
   OLogManager.instance().warn(this,"execute : " + this.toString() + " at "+ sdf.format(date));
-  ODatabaseRecordThreadLocal.INSTANCE.set(db);
+  if (db != null)   ODatabaseRecordThreadLocal.INSTANCE.set(db);
   this.document.field(PROP_STATUS,SCHEDULER_STATUS.RUNNING);
   this.document.field(PROP_STARTTIME,System.currentTimeMillis());
   this.document.save();
@@ -15,7 +15,7 @@
   final ScriptEngine scriptEngine=entry.object;
   try {
     binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
-    scriptManager.bind(binding,(ODatabaseDocumentTx)db,null,iArgs);
+    scriptManager.bind(binding,(ODatabaseDocumentTx)db,null,getArguments());
     if (this.function.getLanguage() == null)     throw new OConfigurationException("Database function '" + this.function.getName() + "' has no language");
     final String funcStr=scriptManager.getFunctionDefinition(this.function);
     if (funcStr != null) {
@@ -29,6 +29,7 @@
     if (scriptEngine instanceof Invocable) {
       final Invocable invocableEngine=(Invocable)scriptEngine;
       Object[] args=null;
+      Map<Object,Object> iArgs=getArguments();
       if (iArgs != null) {
         args=new Object[iArgs.size()];
         int i=0;
@@ -50,7 +51,7 @@ catch (  Exception ex) {
     throw new OCommandScriptException("Unknown Exception",this.function.getName(),0,ex);
   }
  finally {
-    if (scriptManager != null && binding != null)     scriptManager.unbind(binding,null,iArgs);
+    if (scriptManager != null && binding != null)     scriptManager.unbind(binding,null,getArguments());
     scriptManager.releaseDatabaseEngine(function.getLanguage(),db.getName(),entry);
     OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
     isRunning=false;

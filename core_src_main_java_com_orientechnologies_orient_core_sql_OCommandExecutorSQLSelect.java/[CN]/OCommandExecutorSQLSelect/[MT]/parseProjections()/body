@@ -1,16 +1,10 @@
 {
-  if (!parserOptionalKeyword(KEYWORD_SELECT)) {
-    return -1;
-  }
+  if (!parserOptionalKeyword(KEYWORD_SELECT))   return -1;
   int upperBound=OStringSerializerHelper.getLowerIndexOf(parserTextUpperCase,parserGetCurrentPosition(),KEYWORD_FROM_2FIND,KEYWORD_LET_2FIND);
-  if (upperBound == -1) {
-    upperBound=parserText.length();
-  }
+  if (upperBound == -1)   upperBound=parserText.length();
   int lastRealPositionProjection=-1;
   int currPos=parserGetCurrentPosition();
-  if (currPos == -1) {
-    return -1;
-  }
+  if (currPos == -1)   return -1;
   final String projectionString=parserText.substring(currPos,upperBound);
   if (projectionString.trim().length() > 0) {
     projections=new LinkedHashMap<String,Object>();
@@ -19,57 +13,35 @@
     int endPos;
     for (    String projectionItem : items) {
       String projection=OStringSerializerHelper.smartTrim(projectionItem.trim(),true,true);
-      if (projectionDefinition == null) {
-        throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() and EXPAND() operators");
-      }
+      if (projectionDefinition == null)       throw new OCommandSQLParsingException("Projection not allowed with FLATTEN() and EXPAND() operators");
       final List<String> words=OStringSerializerHelper.smartSplit(projection,' ');
       String fieldName;
       if (words.size() > 1 && words.get(1).trim().equalsIgnoreCase(KEYWORD_AS)) {
-        if (words.size() < 3) {
-          throw new OCommandSQLParsingException("Found 'AS' without alias");
-        }
+        if (words.size() < 3)         throw new OCommandSQLParsingException("Found 'AS' without alias");
         fieldName=words.get(2).trim();
-        if (projectionDefinition.containsKey(fieldName)) {
-          throw new OCommandSQLParsingException("Field '" + fieldName + "' is duplicated in current SELECT, choose a different name");
-        }
+        if (projectionDefinition.containsKey(fieldName))         throw new OCommandSQLParsingException("Field '" + fieldName + "' is duplicated in current SELECT, choose a different name");
         projection=words.get(0).trim();
-        if (words.size() > 3) {
-          lastRealPositionProjection=projectionString.indexOf(words.get(3));
-        }
- else {
-          lastRealPositionProjection+=projectionItem.length() + 1;
-        }
+        if (words.size() > 3)         lastRealPositionProjection=projectionString.indexOf(words.get(3));
+ else         lastRealPositionProjection+=projectionItem.length() + 1;
       }
  else {
         projection=words.get(0);
         fieldName=projection;
         lastRealPositionProjection=projectionString.indexOf(fieldName) + fieldName.length() + 1;
-        if (fieldName.charAt(0) == '@') {
-          fieldName=fieldName.substring(1);
-        }
+        if (fieldName.charAt(0) == '@')         fieldName=fieldName.substring(1);
         endPos=extractProjectionNameSubstringEndPosition(fieldName);
-        if (endPos > -1) {
-          fieldName=fieldName.substring(0,endPos);
-        }
-        for (int fieldIndex=2; projectionDefinition.containsKey(fieldName); ++fieldIndex) {
-          fieldName+=fieldIndex;
-        }
+        if (endPos > -1)         fieldName=fieldName.substring(0,endPos);
+        for (int fieldIndex=2; projectionDefinition.containsKey(fieldName); ++fieldIndex)         fieldName+=fieldIndex;
       }
-      String p=projection.toUpperCase(Locale.ENGLISH);
+      final String p=upperCase(projection);
       if (p.startsWith("FLATTEN(") || p.startsWith("EXPAND(")) {
-        if (p.startsWith("FLATTEN(")) {
-          OLogManager.instance().debug(this,"FLATTEN() operator has been replaced by EXPAND()");
-        }
+        if (p.startsWith("FLATTEN("))         OLogManager.instance().debug(this,"FLATTEN() operator has been replaced by EXPAND()");
         List<String> pars=OStringSerializerHelper.getParameters(projection);
-        if (pars.size() != 1) {
-          throw new OCommandSQLParsingException("EXPAND/FLATTEN operators expects the field name as parameter. Example EXPAND( out )");
-        }
+        if (pars.size() != 1)         throw new OCommandSQLParsingException("EXPAND/FLATTEN operators expects the field name as parameter. Example EXPAND( out )");
         expandTarget=OSQLHelper.parseValue(this,pars.get(0).trim(),context);
         projectionDefinition=null;
         projections=null;
-        if (groupedResult == null && expandTarget instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)expandTarget).aggregateResults()) {
-          getProjectionGroup(null);
-        }
+        if (groupedResult == null && expandTarget instanceof OSQLFunctionRuntime && ((OSQLFunctionRuntime)expandTarget).aggregateResults())         getProjectionGroup(null);
         continue;
       }
       fieldName=OStringSerializerHelper.getStringContent(fieldName);
@@ -89,14 +61,8 @@
       projections=null;
     }
   }
-  if (upperBound < parserText.length() - 1) {
-    parserSetCurrentPosition(upperBound);
-  }
- else   if (lastRealPositionProjection > -1) {
-    parserMoveCurrentPosition(lastRealPositionProjection);
-  }
- else {
-    parserSetEndOfText();
-  }
+  if (upperBound < parserText.length() - 1)   parserSetCurrentPosition(upperBound);
+ else   if (lastRealPositionProjection > -1)   parserMoveCurrentPosition(lastRealPositionProjection);
+ else   parserSetEndOfText();
   return parserGetCurrentPosition();
 }

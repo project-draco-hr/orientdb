@@ -13,7 +13,6 @@
         ODatabaseHelper.deleteDatabase(tx,getStorageType());
         ODatabaseHelper.createDatabase(tx,dbUrl,getStorageType());
         try {
-          System.out.println("(" + getDbId(tx) + ") "+ "Created");
           if (tx.isClosed()) {
             tx.open("admin","admin");
           }
@@ -23,35 +22,23 @@
             DummyObject dummy=new DummyObject("name" + j);
             Assert.assertEquals(ODatabaseRecordThreadLocal.INSTANCE.get().getURL(),dbUrl);
             dummy=tx.save(dummy);
-            Assert.assertEquals(((ORID)dummy.getId()).getClusterPosition(),OClusterPositionFactory.INSTANCE.valueOf(j),"RID was " + dummy.getId());
-            if ((j + 1) % 20000 == 0) {
-              System.out.println("(" + getDbId(tx) + ") "+ "Operations (WRITE) executed: "+ (j + 1));
-            }
+            Assert.assertEquals(((ORID)dummy.getId()).getClusterPosition(),j,"RID was " + dummy.getId());
           }
           long end=System.currentTimeMillis();
           String time="(" + getDbId(tx) + ") "+ "Executed operations (WRITE) in: "+ (end - start)+ " ms";
-          System.out.println(time);
           times.add(time);
           start=System.currentTimeMillis();
           for (int j=0; j < operations_read; j++) {
             List<DummyObject> l=tx.query(new OSQLSynchQuery<DummyObject>(" select * from DummyObject "));
             Assert.assertEquals(l.size(),operations_write);
-            if ((j + 1) % 20000 == 0) {
-              System.out.println("(" + getDbId(tx) + ") "+ "Operations (READ) executed: "+ j+ 1);
-            }
           }
           end=System.currentTimeMillis();
           time="(" + getDbId(tx) + ") "+ "Executed operations (READ) in: "+ (end - start)+ " ms";
-          System.out.println(time);
           times.add(time);
           tx.close();
         }
   finally {
-          System.out.println("(" + getDbId(tx) + ") "+ "Dropping");
-          System.out.flush();
           ODatabaseHelper.deleteDatabase(tx,getStorageType());
-          System.out.println("(" + getDbId(tx) + ") "+ "Dropped");
-          System.out.flush();
         }
         return null;
       }
@@ -60,5 +47,4 @@
     threads.add(executorService.submit(t));
   }
   for (  Future future : threads)   future.get();
-  System.out.println("Test testObjectMultipleDBsThreaded ended");
 }

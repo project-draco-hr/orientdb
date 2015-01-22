@@ -1,11 +1,19 @@
 {
   for (  List<OLogSequenceNumber> operationUnit : operationUnits.values()) {
     if (operationUnit.isEmpty())     continue;
-    final OAtomicUnitStartRecord atomicUnitStartRecord=(OAtomicUnitStartRecord)writeAheadLog.read(operationUnit.get(0));
-    if (!atomicUnitStartRecord.isRollbackSupported())     continue;
-    final OAtomicUnitEndRecord atomicUnitEndRecord=new OAtomicUnitEndRecord(atomicUnitStartRecord.getOperationUnitId(),true);
-    final OLogSequenceNumber logSequenceNumber=writeAheadLog.log(atomicUnitEndRecord);
-    operationUnit.add(logSequenceNumber);
-    undoOperation(operationUnit);
+    final OOperationUnitRecord atomicOperationRecord=(OOperationUnitRecord)writeAheadLog.read(operationUnit.get(0));
+    if (atomicOperationRecord == null) {
+      writeAheadLog.read(operationUnit.get(0));
+    }
+    final OAtomicUnitStartRecord startRecord;
+    if (atomicOperationRecord instanceof OAtomicUnitStartRecord)     startRecord=(OAtomicUnitStartRecord)atomicOperationRecord;
+ else {
+      OLogManager.instance().info(this,"Rollback operation with id %s  and lsn %s",atomicOperationRecord.getOperationUnitId(),((OOperationUnitBodyRecord)atomicOperationRecord).getStartLsn());
+      startRecord=(OAtomicUnitStartRecord)writeAheadLog.read(((OOperationUnitBodyRecord)atomicOperationRecord).getStartLsn());
+    }
+    if (!startRecord.isRollbackSupported())     continue;
+    writeAheadLog.logAtomicOperationEndRecord(startRecord.getOperationUnitId(),true,startRecord.getLsn());
+    List<OLogSequenceNumber> records=readOperationUnit(startRecord.getLsn(),startRecord.getOperationUnitId());
+    undoOperation(records);
   }
 }

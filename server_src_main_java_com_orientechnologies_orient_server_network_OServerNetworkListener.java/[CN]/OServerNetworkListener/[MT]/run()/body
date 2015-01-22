@@ -3,17 +3,30 @@
     while (active) {
       try {
         final Socket socket=serverSocket.accept();
-        final int conns=OClientConnectionManager.instance().getTotal();
+        if (server.getDistributedManager() != null) {
+          final ODistributedServerManager.NODE_STATUS nodeStatus=server.getDistributedManager().getNodeStatus();
+          if (nodeStatus != ODistributedServerManager.NODE_STATUS.ONLINE) {
+            OLogManager.instance().warn(this,"Distributed server is not yet ONLINE (status=%s), reject incoming connection from %s",nodeStatus,socket.getRemoteSocketAddress());
+            socket.close();
+            Thread.sleep(100);
+            continue;
+          }
+        }
+        int conns=OClientConnectionManager.instance().getTotal();
         if (conns >= OGlobalConfiguration.NETWORK_MAX_CONCURRENT_SESSIONS.getValueAsInteger()) {
-          OLogManager.instance().warn(this,"Reached maximum number of concurrent connections (%d), reject incoming connection from %s",conns,socket.getRemoteSocketAddress());
-          socket.close();
-          Thread.sleep(100);
-          continue;
+          OClientConnectionManager.instance().cleanExpiredConnections();
+          conns=OClientConnectionManager.instance().getTotal();
+          if (conns >= OGlobalConfiguration.NETWORK_MAX_CONCURRENT_SESSIONS.getValueAsInteger()) {
+            OLogManager.instance().warn(this,"Reached maximum number of concurrent connections (%d), reject incoming connection from %s",conns,socket.getRemoteSocketAddress());
+            socket.close();
+            Thread.sleep(100);
+            continue;
+          }
         }
         socket.setPerformancePreferences(0,2,1);
         socket.setSendBufferSize(socketBufferSize);
         socket.setReceiveBufferSize(socketBufferSize);
-        protocol=protocolType.newInstance();
+        ONetworkProtocol protocol=protocolType.newInstance();
         protocol.config(this,server,socket,configuration);
       }
  catch (      Throwable e) {
@@ -26,7 +39,6 @@
   finally {
     try {
       if (serverSocket != null && !serverSocket.isClosed())       serverSocket.close();
-      protocol=null;
     }
  catch (    IOException ioe) {
     }

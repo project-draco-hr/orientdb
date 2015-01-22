@@ -2,41 +2,49 @@
   checkForRebuild();
   if (key == null)   return this;
   key=getCollatingValue(key);
-  modificationLock.requestModificationLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (txIsActive)   keyLockManager.acquireSharedLock(key);
   try {
-    final Set<String> words=splitIntoWords(key.toString());
-    for (    final String word : words) {
-      acquireExclusiveLock();
-      startStorageAtomicOperation();
-      try {
-        Set<OIdentifiable> refs;
-        refs=indexEngine.get(word);
-        if (refs == null) {
-          if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-            boolean durable=false;
-            if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))             durable=true;
-            refs=new OIndexRIDContainer(getName(),durable);
-          }
+    modificationLock.requestModificationLock();
+    try {
+      final Set<String> words=splitIntoWords(key.toString());
+      for (      final String word : words) {
+        acquireExclusiveLock();
+        startStorageAtomicOperation();
+        try {
+          Set<OIdentifiable> refs;
+          refs=indexEngine.get(word);
+          if (refs == null) {
+            if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
+              boolean durable=false;
+              if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))               durable=true;
+              refs=new OIndexRIDContainer(getName(),durable);
+            }
  else {
-            refs=new OMVRBTreeRIDSet();
-            ((OMVRBTreeRIDSet)refs).setAutoConvertToRecord(false);
+              refs=new OMVRBTreeRIDSet();
+              ((OMVRBTreeRIDSet)refs).setAutoConvertToRecord(false);
+            }
           }
+          refs.add(iSingleValue);
+          indexEngine.put(word,refs);
+          commitStorageAtomicOperation();
         }
-        refs.add(iSingleValue);
-        indexEngine.put(word,refs);
-        commitStorageAtomicOperation();
-      }
- catch (      RuntimeException e) {
-        rollbackStorageAtomicOperation();
-        throw new OIndexException("Error during put of key - value entry",e);
-      }
+ catch (        RuntimeException e) {
+          rollbackStorageAtomicOperation();
+          throw new OIndexException("Error during put of key - value entry",e);
+        }
  finally {
-        releaseExclusiveLock();
+          releaseExclusiveLock();
+        }
       }
+      return this;
     }
-    return this;
+  finally {
+      modificationLock.releaseModificationLock();
+    }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (txIsActive)     keyLockManager.releaseSharedLock(key);
   }
 }

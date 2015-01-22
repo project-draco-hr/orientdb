@@ -1,24 +1,25 @@
 {
   checkTransaction();
+  try {
 switch (iStatus) {
 case ORecordOperation.CREATED:
-    database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
-  database.callbackHooks(TYPE.BEFORE_CREATE,iRecord);
-break;
+      database.checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_CREATE,iClusterName);
+    database.callbackHooks(TYPE.BEFORE_CREATE,iRecord);
+  break;
 case ORecordOperation.LOADED:
 break;
 case ORecordOperation.UPDATED:
-database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
+database.checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_UPDATE,iClusterName);
 database.callbackHooks(TYPE.BEFORE_UPDATE,iRecord);
 break;
 case ORecordOperation.DELETED:
-database.checkSecurity(ODatabaseSecurityResources.CLUSTER,ORole.PERMISSION_DELETE,iClusterName);
+database.checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_DELETE,iClusterName);
 database.callbackHooks(TYPE.BEFORE_DELETE,iRecord);
 break;
 }
 try {
 if (iRecord.getIdentity().isTemporary()) temp2persistent.put(iRecord.getIdentity().copy(),iRecord);
-if ((status == OTransaction.TXSTATUS.COMMITTING) && database.getStorage().getUnderlying() instanceof OStorageEmbedded) {
+if ((status == OTransaction.TXSTATUS.COMMITTING) && database.getStorage().getUnderlying() instanceof OAbstractPaginatedStorage) {
 switch (iStatus) {
 case ORecordOperation.CREATED:
 case ORecordOperation.UPDATED:
@@ -44,18 +45,19 @@ txRecord.type=iStatus;
  else {
 final ORecordId rid=(ORecordId)iRecord.getIdentity();
 if (!rid.isValid()) {
-iRecord.onBeforeIdentityChanged(iRecord);
+ORecordInternal.onBeforeIdentityChanged(iRecord);
+if (database.getStorage().isAssigningClusterIds() || iClusterName != null) {
 if (rid.clusterId == ORID.CLUSTER_ID_INVALID) rid.clusterId=iClusterName != null ? database.getClusterIdByName(iClusterName) : database.getDefaultClusterId();
 if (database.getStorageVersions().classesAreDetectedByClusterId() && iRecord instanceof ODocument) {
 final ODocument recordSchemaAware=(ODocument)iRecord;
-final OClass recordClass=recordSchemaAware.getSchemaClass();
-final OClass clusterIdClass=database.getMetadata().getSchema().getClassByClusterId(rid.clusterId);
+final OClass recordClass=ODocumentInternal.getImmutableSchemaClass(recordSchemaAware);
+final OClass clusterIdClass=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClassByClusterId(rid.clusterId);
 if (recordClass == null && clusterIdClass != null || clusterIdClass == null && recordClass != null || (recordClass != null && !recordClass.equals(clusterIdClass))) throw new OSchemaException("Record saved into cluster " + iClusterName + " should be saved with class "+ clusterIdClass+ " but saved with class "+ recordClass);
 }
-rid.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(newObjectCounter--);
-iRecord.onAfterIdentityChanged(iRecord);
 }
- else database.getLocalCache().freeRecord(rid);
+rid.clusterPosition=newObjectCounter--;
+ORecordInternal.onAfterIdentityChanged(iRecord);
+}
 ORecordOperation txEntry=getRecordEntry(rid);
 if (txEntry == null) {
 if (!(rid.isTemporary() && iStatus != ORecordOperation.CREATED)) {
@@ -108,6 +110,10 @@ case ORecordOperation.DELETED:
 database.callbackHooks(TYPE.AFTER_DELETE,iRecord);
 break;
 }
+if (iRecord instanceof ODocument && ((ODocument)iRecord).isTrackingChanges()) {
+((ODocument)iRecord).setTrackingChanges(false);
+((ODocument)iRecord).setTrackingChanges(true);
+}
 }
  catch (Throwable t) {
 switch (iStatus) {
@@ -123,5 +129,16 @@ break;
 }
 if (t instanceof RuntimeException) throw (RuntimeException)t;
  else throw new ODatabaseException("Error on saving record " + iRecord.getIdentity(),t);
+}
+}
+  finally {
+switch (iStatus) {
+case ORecordOperation.CREATED:
+database.callbackHooks(TYPE.FINALIZE_CREATION,iRecord);
+break;
+case ORecordOperation.UPDATED:
+database.callbackHooks(TYPE.FINALIZE_UPDATE,iRecord);
+break;
+}
 }
 }

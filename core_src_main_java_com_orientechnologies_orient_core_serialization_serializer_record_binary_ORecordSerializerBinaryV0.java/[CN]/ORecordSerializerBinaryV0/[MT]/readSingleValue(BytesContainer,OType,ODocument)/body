@@ -23,7 +23,7 @@ case BYTE:
 value=readByte(bytes);
 break;
 case BOOLEAN:
-value=readByte(bytes) == 1 ? true : false;
+value=readByte(bytes) == 1;
 break;
 case DATETIME:
 value=new Date(OVarIntSerializer.readAsLong(bytes));
@@ -48,6 +48,7 @@ value=newValue;
 throw new RuntimeException(e);
 }
 }
+ else ODocumentInternal.addOwner((ODocument)value,document);
 break;
 case EMBEDDEDSET:
 value=readEmbeddedCollection(bytes,new OTrackedSet<Object>(document),document);
@@ -80,6 +81,7 @@ break;
 case LINKBAG:
 ORidBag bag=new ORidBag();
 bag.fromStream(bytes);
+bag.setOwner(document);
 value=bag;
 break;
 case TRANSIENT:
@@ -90,7 +92,8 @@ String className=readString(bytes);
 Class<?> clazz=Class.forName(className);
 OSerializableStream stream=(OSerializableStream)clazz.newInstance();
 stream.fromStream(readBinary(bytes));
-value=stream;
+if (stream instanceof OSerializableWrapper) value=((OSerializableWrapper)stream).getSerializable();
+ else value=stream;
 }
  catch (Exception e) {
 throw new RuntimeException(e);

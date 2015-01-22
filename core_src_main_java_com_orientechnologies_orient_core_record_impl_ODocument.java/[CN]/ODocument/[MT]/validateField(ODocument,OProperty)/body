@@ -1,7 +1,8 @@
 {
   final Object fieldValue;
-  if (iRecord.containsField(p.getName())) {
-    fieldValue=iRecord.rawField(p.getName());
+  ODocumentEntry entry=iRecord._fields.get(p.getName());
+  if (entry != null && entry.exist()) {
+    fieldValue=entry.value;
     if (p.isNotNull() && fieldValue == null)     throw new OValidationException("The field '" + p.getFullName() + "' cannot be null, record: "+ iRecord);
     if (fieldValue != null && p.getRegexp() != null) {
       if (!fieldValue.toString().matches(p.getRegexp()))       throw new OValidationException("The field '" + p.getFullName() + "' does not match the regular expression '"+ p.getRegexp()+ "'. Field value is: "+ fieldValue+ ", record: "+ iRecord);
@@ -15,7 +16,7 @@
   if (fieldValue != null && type != null) {
 switch (type) {
 case LINK:
-      validateLink(p,fieldValue);
+      validateLink(p,fieldValue,false);
     break;
 case LINKLIST:
   if (!(fieldValue instanceof List))   throw new OValidationException("The field '" + p.getFullName() + "' has been declared as LINKLIST but an incompatible type is used. Value: "+ fieldValue);
@@ -53,10 +54,10 @@ break;
 case EMBEDDEDMAP:
 if (!(fieldValue instanceof Map)) throw new OValidationException("The field '" + p.getFullName() + "' has been declared as EMBEDDEDMAP but an incompatible type is used. Value: "+ fieldValue);
 if (p.getLinkedClass() != null) {
-for (Entry<?,?> entry : ((Map<?,?>)fieldValue).entrySet()) validateEmbedded(p,entry.getValue());
+for (Entry<?,?> colleEntry : ((Map<?,?>)fieldValue).entrySet()) validateEmbedded(p,colleEntry.getValue());
 }
  else if (p.getLinkedType() != null) {
-for (Entry<?,?> entry : ((Map<?,?>)fieldValue).entrySet()) validateType(p,entry.getValue());
+for (Entry<?,?> collEntry : ((Map<?,?>)fieldValue).entrySet()) validateType(p,collEntry.getValue());
 }
 break;
 }
@@ -110,10 +111,10 @@ if (fieldValue != null && ((Date)fieldValue).before(iRecord.getDatabaseInternal(
  else if ((p.getType().equals(OType.EMBEDDEDLIST) || p.getType().equals(OType.EMBEDDEDSET) || p.getType().equals(OType.LINKLIST)|| p.getType().equals(OType.LINKSET)) && (fieldValue != null && ((Collection<?>)fieldValue).size() > Integer.parseInt(max))) throw new OValidationException("The field '" + p.getFullName() + "' contains more items than "+ max+ " requested");
 }
 if (p.isReadonly() && iRecord instanceof ODocument && !iRecord.getRecordVersion().isTombstone()) {
-for (String f : ((ODocument)iRecord).getDirtyFields()) if (f.equals(p.getName())) {
-Object orgVal=((ODocument)iRecord).getOriginalValue(f);
+if ((entry.changed || entry.timeLine != null) && !entry.created) {
+Object orgVal=entry.original;
 boolean simple=fieldValue != null ? OType.isSimpleType(fieldValue) : OType.isSimpleType(orgVal);
-if ((simple) || (fieldValue != null && orgVal == null) || (fieldValue == null && orgVal != null)|| (fieldValue != null && !fieldValue.equals(orgVal))) throw new OValidationException("The field '" + p.getFullName() + "' is immutable and cannot be altered. Field value is: "+ ((ODocument)iRecord).field(f));
+if ((simple) || (fieldValue != null && orgVal == null) || (fieldValue == null && orgVal != null)|| (fieldValue != null && !fieldValue.equals(orgVal))) throw new OValidationException("The field '" + p.getFullName() + "' is immutable and cannot be altered. Field value is: "+ entry.value);
 }
 }
 }

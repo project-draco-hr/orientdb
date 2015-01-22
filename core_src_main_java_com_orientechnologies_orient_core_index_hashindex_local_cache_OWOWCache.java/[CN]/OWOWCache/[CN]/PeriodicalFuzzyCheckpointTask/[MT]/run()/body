@@ -1,0 +1,34 @@
+{
+  OLogSequenceNumber minLsn=writeAheadLog.getFlushedLSN();
+  for (  Map.Entry<GroupKey,WriteGroup> entry : writeGroups.entrySet()) {
+    Lock groupLock=lockManager.acquireExclusiveLock(entry.getKey());
+    try {
+      WriteGroup group=entry.getValue();
+      for (int i=0; i < 16; i++) {
+        final OCachePointer pagePointer=group.pages[i];
+        if (pagePointer != null) {
+          if (minLsn.compareTo(pagePointer.getLastFlushedLsn()) > 0) {
+            minLsn=pagePointer.getLastFlushedLsn();
+          }
+        }
+      }
+    }
+  finally {
+      lockManager.releaseLock(groupLock);
+    }
+  }
+  OLogManager.instance().debug(this,"Start fuzzy checkpoint flushed LSN is %s",minLsn);
+  try {
+    writeAheadLog.logFuzzyCheckPointStart(minLsn);
+    for (    OFileClassic fileClassic : files.values()) {
+      fileClassic.synch();
+    }
+    writeAheadLog.logFuzzyCheckPointEnd();
+    writeAheadLog.flush();
+    if (minLsn.compareTo(new OLogSequenceNumber(-1,-1)) > 0)     writeAheadLog.cutTill(minLsn);
+  }
+ catch (  IOException ioe) {
+    OLogManager.instance().error(this,"Error during fuzzy checkpoint",ioe);
+  }
+  OLogManager.instance().debug(this,"End fuzzy checkpoint");
+}

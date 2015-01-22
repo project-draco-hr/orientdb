@@ -1,16 +1,12 @@
 {
-  this.foundResults.clear();
-  final ODatabaseRecord database=getDatabase();
-  database.checkSecurity(ODatabaseSecurityResources.CLASS,ORole.PERMISSION_READ,iSchemaClass.getName().toLowerCase());
+  if (uniqueResult != null)   uniqueResult.clear();
+  final ODatabaseDocument database=getDatabase();
+  database.checkSecurity(ORule.ResourceGeneric.CLASS,ORole.PERMISSION_READ,iSchemaClass.getName().toLowerCase());
   if (compiledFilter == null) {
-    if (orderedFields.size() == 0) {
-      return false;
-    }
- else {
-      return optimizeSort(iSchemaClass);
-    }
+    return tryOptimizeSort(iSchemaClass);
   }
   final List<List<OIndexSearchResult>> conditionHierarchy=filterAnalyzer.analyzeMainCondition(compiledFilter.getRootCondition(),iSchemaClass,context);
+  if (conditionHierarchy == null)   return false;
   List<OIndexCursor> cursors=new ArrayList<OIndexCursor>();
   boolean indexIsUsedInOrderBy=false;
   List<IndexUsageLog> indexUseAttempts=new ArrayList<IndexUsageLog>();
@@ -88,7 +84,7 @@ catch (          Exception e) {
         }
       }
       if (!indexUsed) {
-        return false;
+        return tryOptimizeSort(iSchemaClass);
       }
     }
     if (cursors.size() == 0 || lastSearchResult == null) {
@@ -97,9 +93,12 @@ catch (          Exception e) {
     if (cursors.size() == 1 && canOptimize(conditionHierarchy)) {
       filterOptimizer.optimize(compiledFilter,lastSearchResult);
     }
+    uniqueResult=new HashSet<ORID>();
     for (    OIndexCursor cursor : cursors) {
       fetchValuesFromIndexCursor(cursor);
     }
+    uniqueResult.clear();
+    uniqueResult=null;
     metricRecorder.recordOrderByOptimizationMetric(indexIsUsedInOrderBy,this.fullySortedByIndex);
     indexUseAttempts.clear();
     return true;

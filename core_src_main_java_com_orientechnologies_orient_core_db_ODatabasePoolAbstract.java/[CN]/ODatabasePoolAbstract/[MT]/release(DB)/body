@@ -1,12 +1,14 @@
 {
-  final String dbPooledName=iDatabase instanceof ODatabaseComplex ? ((ODatabaseComplex<?>)iDatabase).getUser().getName() + "@" + iDatabase.getURL() : iDatabase.getURL();
+  iDatabase.declareIntent(null);
+  final String dbPooledName=iDatabase.getUser().getName() + "@" + iDatabase.getURL();
+  final OReentrantResourcePool<String,DB> pool;
   lock();
   try {
-    final OReentrantResourcePool<String,DB> pool=pools.get(dbPooledName);
-    if (pool == null)     throw new OLockException("Cannot release a database URL not acquired before. URL: " + iDatabase.getName());
-    if (pool.returnResource(iDatabase))     this.notifyEvictor(dbPooledName,iDatabase);
+    pool=pools.get(dbPooledName);
   }
   finally {
     unlock();
   }
+  if (pool == null)   throw new OLockException("Cannot release a database URL not acquired before. URL: " + iDatabase.getName());
+  if (pool.returnResource(iDatabase))   this.notifyEvictor(dbPooledName,iDatabase);
 }

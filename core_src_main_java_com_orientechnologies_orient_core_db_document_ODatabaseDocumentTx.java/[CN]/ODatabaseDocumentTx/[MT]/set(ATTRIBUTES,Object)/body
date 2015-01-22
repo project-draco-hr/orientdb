@@ -1,0 +1,80 @@
+{
+  if (iAttribute == null)   throw new IllegalArgumentException("attribute is null");
+  final String stringValue=OStringSerializerHelper.getStringContent(iValue != null ? iValue.toString() : null);
+switch (iAttribute) {
+case STATUS:
+    if (stringValue == null)     throw new IllegalArgumentException("DB status can't be null");
+  setStatus(STATUS.valueOf(stringValue.toUpperCase(Locale.ENGLISH)));
+break;
+case DEFAULTCLUSTERID:
+if (iValue != null) {
+if (iValue instanceof Number) storage.setDefaultClusterId(((Number)iValue).intValue());
+ else storage.setDefaultClusterId(storage.getClusterIdByName(iValue.toString()));
+}
+break;
+case TYPE:
+throw new IllegalArgumentException("Database type property is not supported");
+case DATEFORMAT:
+new SimpleDateFormat(stringValue).format(new Date());
+storage.getConfiguration().dateFormat=stringValue;
+storage.getConfiguration().update();
+break;
+case DATETIMEFORMAT:
+new SimpleDateFormat(stringValue).format(new Date());
+storage.getConfiguration().dateTimeFormat=stringValue;
+storage.getConfiguration().update();
+break;
+case TIMEZONE:
+if (stringValue == null) throw new IllegalArgumentException("Timezone can't be null");
+storage.getConfiguration().setTimeZone(TimeZone.getTimeZone(stringValue.toUpperCase()));
+storage.getConfiguration().update();
+break;
+case LOCALECOUNTRY:
+storage.getConfiguration().setLocaleCountry(stringValue);
+storage.getConfiguration().update();
+break;
+case LOCALELANGUAGE:
+storage.getConfiguration().setLocaleLanguage(stringValue);
+storage.getConfiguration().update();
+break;
+case CHARSET:
+storage.getConfiguration().setCharset(stringValue);
+storage.getConfiguration().update();
+break;
+case CUSTOM:
+int indx=stringValue != null ? stringValue.indexOf('=') : -1;
+if (indx < 0) {
+if ("clear".equalsIgnoreCase(stringValue)) {
+clearCustomInternal();
+}
+ else throw new IllegalArgumentException("Syntax error: expected <name> = <value> or clear, instead found: " + iValue);
+}
+ else {
+String customName=stringValue.substring(0,indx).trim();
+String customValue=stringValue.substring(indx + 1).trim();
+if (customValue.isEmpty()) removeCustomInternal(customName);
+ else setCustomInternal(customName,customValue);
+}
+break;
+case CLUSTERSELECTION:
+storage.getConfiguration().setClusterSelection(stringValue);
+storage.getConfiguration().update();
+break;
+case MINIMUMCLUSTERS:
+if (iValue != null) {
+if (iValue instanceof Number) storage.getConfiguration().setMinimumClusters(((Number)iValue).intValue());
+ else storage.getConfiguration().setMinimumClusters(Integer.parseInt(stringValue));
+}
+ else storage.getConfiguration().setMinimumClusters(1);
+storage.getConfiguration().update();
+break;
+case CONFLICTSTRATEGY:
+storage.setConflictStrategy(Orient.instance().getRecordConflictStrategy().getStrategy(stringValue));
+storage.getConfiguration().setConflictStrategy(stringValue);
+storage.getConfiguration().update();
+break;
+default :
+throw new IllegalArgumentException("Option '" + iAttribute + "' not supported on alter database");
+}
+return (DB)this;
+}

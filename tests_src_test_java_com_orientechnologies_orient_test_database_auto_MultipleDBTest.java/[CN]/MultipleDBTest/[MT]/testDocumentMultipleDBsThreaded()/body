@@ -11,12 +11,8 @@
       @Override public Void call() throws InterruptedException, IOException {
         ODatabaseDocumentTx tx=new ODatabaseDocumentTx(dbUrl);
         ODatabaseHelper.deleteDatabase(tx,getStorageType());
-        System.out.println("Thread " + this + " is creating database "+ dbUrl);
-        System.out.flush();
         ODatabaseHelper.createDatabase(tx,dbUrl,getStorageType());
         try {
-          System.out.println("(" + getDbId(tx) + ") "+ "Created");
-          System.out.flush();
           if (tx.isClosed()) {
             tx.open("admin","admin");
           }
@@ -26,36 +22,22 @@
             dummy.field("name","name" + j);
             Assert.assertEquals(ODatabaseRecordThreadLocal.INSTANCE.get().getURL(),dbUrl);
             dummy=tx.save(dummy);
-            Assert.assertEquals(dummy.getIdentity().getClusterPosition(),OClusterPositionFactory.INSTANCE.valueOf(j),"RID was " + dummy.getIdentity());
-            if ((j + 1) % 20000 == 0) {
-              System.out.println("(" + getDbId(tx) + ") "+ "Operations (WRITE) executed: "+ (j + 1));
-              System.out.flush();
-            }
+            Assert.assertEquals(dummy.getIdentity().getClusterPosition(),j,"RID was " + dummy.getIdentity());
           }
           long end=System.currentTimeMillis();
           String time="(" + getDbId(tx) + ") "+ "Executed operations (WRITE) in: "+ (end - start)+ " ms";
-          System.out.println(time);
-          System.out.flush();
           times.add(time);
           start=System.currentTimeMillis();
           for (int j=0; j < operations_read; j++) {
             List<DummyObject> l=tx.query(new OSQLSynchQuery<DummyObject>(" select * from DummyObject "));
             Assert.assertEquals(l.size(),operations_write);
-            if ((j + 1) % 20000 == 0) {
-              System.out.println("(" + getDbId(tx) + ") "+ "Operations (READ) executed: "+ j+ 1);
-              System.out.flush();
-            }
           }
           end=System.currentTimeMillis();
           time="(" + getDbId(tx) + ") "+ "Executed operations (READ) in: "+ (end - start)+ " ms";
-          System.out.println(time);
-          System.out.flush();
           times.add(time);
         }
   finally {
           tx.close();
-          System.out.println("Thread " + this + "  is dropping database "+ dbUrl);
-          System.out.flush();
           ODatabaseHelper.deleteDatabase(tx,getStorageType());
         }
         return null;
@@ -65,6 +47,4 @@
     results.add(executorService.submit(t));
   }
   for (  Future future : results)   future.get();
-  System.out.println("Test testDocumentMultipleDBsThreaded ended");
-  System.out.flush();
 }

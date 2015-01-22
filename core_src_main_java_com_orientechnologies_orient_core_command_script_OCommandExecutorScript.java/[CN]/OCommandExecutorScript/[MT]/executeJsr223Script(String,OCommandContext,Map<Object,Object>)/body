@@ -1,32 +1,34 @@
 {
-  ODatabaseRecordInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
-  if (db != null && !(db instanceof ODatabaseRecordTx))   db=db.getUnderlying();
+  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
   final OScriptManager scriptManager=Orient.instance().getScriptManager();
   CompiledScript compiledScript=request.getCompiledScript();
-  if (compiledScript == null) {
-    ScriptEngine scriptEngine=scriptManager.getEngine(language);
-    if (!(scriptEngine instanceof Compilable))     throw new OCommandExecutionException("Language '" + language + "' does not support compilation");
-    String lib=scriptManager.getLibrary(db,language);
-    if (lib == null)     lib="";
-    parserText=lib + parserText;
-    Compilable c=(Compilable)scriptEngine;
+  final OPartitionedObjectPool.PoolEntry<ScriptEngine> entry=scriptManager.acquireDatabaseEngine(db.getName(),language);
+  final ScriptEngine scriptEngine=entry.object;
+  try {
+    if (compiledScript == null) {
+      if (!(scriptEngine instanceof Compilable))       throw new OCommandExecutionException("Language '" + language + "' does not support compilation");
+      final Compilable c=(Compilable)scriptEngine;
+      try {
+        compiledScript=c.compile(parserText);
+      }
+ catch (      ScriptException e) {
+        scriptManager.throwErrorMessage(e,parserText);
+      }
+      request.setCompiledScript(compiledScript);
+    }
+    final Bindings binding=scriptManager.bind(compiledScript.getEngine().getBindings(ScriptContext.ENGINE_SCOPE),(ODatabaseDocumentTx)db,iContext,iArgs);
     try {
-      compiledScript=c.compile(parserText);
+      final Object ob=compiledScript.eval(binding);
+      return OCommandExecutorUtility.transformResult(ob);
     }
  catch (    ScriptException e) {
-      scriptManager.getErrorMessage(e,parserText);
+      throw new OCommandScriptException("Error on execution of the script",request.getText(),e.getColumnNumber(),e);
     }
-    request.setCompiledScript(compiledScript);
-  }
-  final Bindings binding=scriptManager.bind(compiledScript.getEngine().getBindings(ScriptContext.ENGINE_SCOPE),(ODatabaseRecordTx)db,iContext,iArgs);
-  try {
-    final Object ob=compiledScript.eval(binding);
-    return OCommandExecutorUtility.transformResult(ob);
-  }
- catch (  ScriptException e) {
-    throw new OCommandScriptException("Error on execution of the script",request.getText(),e.getColumnNumber(),e);
-  }
  finally {
-    scriptManager.unbind(binding);
+      scriptManager.unbind(binding,iContext,iArgs);
+    }
+  }
+  finally {
+    scriptManager.releaseDatabaseEngine(language,db.getName(),entry);
   }
 }

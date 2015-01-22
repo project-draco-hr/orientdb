@@ -1,28 +1,25 @@
 {
   OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
   OChannelBinaryAsynchClient client=null;
-  try {
-    client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_FIRST_KEY);
-    OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
-    storage.endRequest(client);
-    byte[] stream;
+  while (true) {
     try {
-      storage.beginResponse(client);
-      stream=client.readBytes();
-    }
+      client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_FIRST_KEY);
+      OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
+      storage.endRequest(client);
+      byte[] stream;
+      try {
+        storage.beginResponse(client);
+        stream=client.readBytes();
+      }
   finally {
-      storage.endResponse(client);
+        storage.endResponse(client);
+      }
+      final byte serializerId=OByteSerializer.INSTANCE.deserializeLiteral(stream,0);
+      final OBinarySerializer<K> serializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
+      return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
     }
-    final byte serializerId=OByteSerializer.INSTANCE.deserializeLiteral(stream,0);
-    final OBinarySerializer<K> serializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
-    return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
-  }
- catch (  IOException e) {
-    storage.getEngine().getConnectionManager().remove(client);
-    throw new ODatabaseException("Can't get first key from sb-tree bonsai.",e);
-  }
-catch (  RuntimeException e2) {
-    storage.getEngine().getConnectionManager().release(client);
-    throw e2;
+ catch (    Exception e) {
+      storage.handleException(client,"Can't get first key from sb-tree bonsai.",e);
+    }
   }
 }

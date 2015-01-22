@@ -1,33 +1,21 @@
 {
+  if (this.function == null)   return;
   isRunning=true;
-  SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
-  Date date=new Date(System.currentTimeMillis());
+  final SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
+  final Date date=new Date(System.currentTimeMillis());
   OLogManager.instance().warn(this,"execute : " + this.toString() + " at "+ sdf.format(date));
-  ODatabaseRecordThreadLocal.INSTANCE.set(db);
+  if (db != null)   ODatabaseRecordThreadLocal.INSTANCE.set(db);
   this.document.field(PROP_STATUS,SCHEDULER_STATUS.RUNNING);
   this.document.field(PROP_STARTTIME,System.currentTimeMillis());
   this.document.save();
   OScriptManager scriptManager=null;
   Bindings binding=null;
+  scriptManager=Orient.instance().getScriptManager();
+  final OPartitionedObjectPool.PoolEntry<ScriptEngine> entry=scriptManager.acquireDatabaseEngine(db.getName(),function.getLanguage());
+  final ScriptEngine scriptEngine=entry.object;
   try {
-    if (this.function == null)     return;
-    if (db != null && !(db instanceof ODatabaseRecordTx))     db=db.getUnderlying();
-    scriptManager=Orient.instance().getScriptManager();
-    final ScriptEngine scriptEngine=scriptManager.getEngine(this.function.getLanguage());
     binding=scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
-    for (    OScriptInjection i : scriptManager.getInjections())     i.bind(binding);
-    binding.put("doc",this.document);
-    if (db != null)     binding.put("db",new OScriptDocumentDatabaseWrapper((ODatabaseRecordTx)db));
-    binding.put("orient",new OScriptOrientWrapper(db));
-    if (iArgs != null) {
-      for (      Entry<Object,Object> a : iArgs.entrySet()) {
-        binding.put(a.getKey().toString(),a.getValue());
-      }
-      binding.put("params",iArgs.values().toArray());
-    }
- else {
-      binding.put("params",new Object[0]);
-    }
+    scriptManager.bind(binding,(ODatabaseDocumentTx)db,null,getArguments());
     if (this.function.getLanguage() == null)     throw new OConfigurationException("Database function '" + this.function.getName() + "' has no language");
     final String funcStr=scriptManager.getFunctionDefinition(this.function);
     if (funcStr != null) {
@@ -35,12 +23,13 @@
         scriptEngine.eval(funcStr);
       }
  catch (      ScriptException e) {
-        scriptManager.getErrorMessage(e,funcStr);
+        scriptManager.throwErrorMessage(e,funcStr);
       }
     }
     if (scriptEngine instanceof Invocable) {
       final Invocable invocableEngine=(Invocable)scriptEngine;
       Object[] args=null;
+      Map<Object,Object> iArgs=getArguments();
       if (iArgs != null) {
         args=new Object[iArgs.size()];
         int i=0;
@@ -62,7 +51,8 @@ catch (  Exception ex) {
     throw new OCommandScriptException("Unknown Exception",this.function.getName(),0,ex);
   }
  finally {
-    if (scriptManager != null && binding != null)     scriptManager.unbind(binding);
+    if (scriptManager != null && binding != null)     scriptManager.unbind(binding,null,getArguments());
+    scriptManager.releaseDatabaseEngine(function.getLanguage(),db.getName(),entry);
     OLogManager.instance().warn(this,"Job : " + this.toString() + " Finished!");
     isRunning=false;
     this.document.field(PROP_STATUS,SCHEDULER_STATUS.WAITING);

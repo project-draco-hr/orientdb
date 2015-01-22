@@ -1,0 +1,21 @@
+{
+  localCache.shutdown();
+  if (isClosed())   return;
+  setCurrentDatabaseInThreadLocal();
+  try {
+    commit(true);
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Exception during commit of active transaction.",e);
+  }
+  if (status != STATUS.OPEN)   return;
+  callOnCloseListeners();
+  if (currentIntent != null) {
+    currentIntent.end(this);
+    currentIntent=null;
+  }
+  status=STATUS.CLOSED;
+  localCache.clear();
+  if (!keepStorageOpen && storage != null)   storage.close();
+  ODatabaseRecordThreadLocal.INSTANCE.remove();
+}

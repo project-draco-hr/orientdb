@@ -9,25 +9,25 @@
       if (excludeClusters.contains(clusterName))       continue;
     }
     clusterId=storage1.getClusterIdByName(clusterName);
-    OClusterPosition[] db1Range=storage1.getClusterDataRange(clusterId);
-    OClusterPosition[] db2Range=storage2.getClusterDataRange(clusterId);
-    final OClusterPosition db1Max=db1Range[1];
-    final OClusterPosition db2Max=db2Range[1];
+    final long[] db1Range=storage1.getClusterDataRange(clusterId);
+    final long[] db2Range=storage2.getClusterDataRange(clusterId);
+    final long db1Max=db1Range[1];
+    final long db2Max=db2Range[1];
     ODatabaseRecordThreadLocal.INSTANCE.set(databaseDocumentTxOne);
     final ODocument doc1=new ODocument();
     ODatabaseRecordThreadLocal.INSTANCE.set(databaseDocumentTxTwo);
     final ODocument doc2=new ODocument();
     final ORecordId rid=new ORecordId(clusterId);
-    final OClusterPosition clusterMax=db1Max.compareTo(db2Max) > 0 ? db1Max : db2Max;
+    final long clusterMax=Math.max(db1Max,db2Max);
     final OStorage storage;
-    if (clusterMax.equals(db1Max))     storage=storage1;
+    if (clusterMax == db1Max)     storage=storage1;
  else     storage=storage2;
-    OPhysicalPosition[] physicalPositions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(OClusterPositionFactory.INSTANCE.valueOf(0)));
+    OPhysicalPosition[] physicalPositions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(0));
     long recordsCounter=0;
     while (physicalPositions.length > 0) {
       for (      OPhysicalPosition physicalPosition : physicalPositions) {
         recordsCounter++;
-        final OClusterPosition position=physicalPosition.clusterPosition;
+        final long position=physicalPosition.clusterPosition;
         rid.clusterPosition=position;
         if (isDocumentDatabases() && rid.equals(new ORecordId(storage1.getConfiguration().indexMgrRecordId)) && rid.equals(new ORecordId(storage2.getConfiguration().indexMgrRecordId)))         continue;
         if (isDocumentDatabases() && rid.equals(new ORecordId(storage1.getConfiguration().schemaRecordId)) && rid.equals(new ORecordId(storage2.getConfiguration().schemaRecordId)))         continue;

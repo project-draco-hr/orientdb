@@ -1,0 +1,18 @@
+{
+  if (database.getURL().startsWith("remote:"))   return;
+  if (database.exists())   ODatabaseHelper.deleteDatabase(database,getStorageType());
+  ODatabaseHelper.createDatabase(database,url,getStorageType());
+  database.close();
+  final AtomicInteger recordedChanges=new AtomicInteger();
+  database.open("admin","admin");
+  database.begin(TXTYPE.OPTIMISTIC);
+  ODocument rec=database.newInstance().field("name","Jay").save();
+  database.commit();
+  final DocumentChangeListener cl=new DocumentChangeListener(database);
+  database.begin(TXTYPE.OPTIMISTIC);
+  rec.field("surname","Miner").save();
+  database.commit();
+  Assert.assertEquals(cl.getChanges().size(),1);
+  ODatabaseHelper.deleteDatabase(database,getStorageType());
+  ODatabaseHelper.createDatabase(database,url,getStorageType());
+}

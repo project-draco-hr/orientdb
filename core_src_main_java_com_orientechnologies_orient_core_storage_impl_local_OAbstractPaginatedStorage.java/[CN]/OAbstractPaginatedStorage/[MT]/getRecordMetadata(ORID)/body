@@ -2,23 +2,23 @@
   if (rid.isNew())   throw new OStorageException("Passed record with id " + rid + " is new and can not be stored.");
   checkOpeness();
   final OCluster cluster=getClusterById(rid.getClusterId());
-  lock.acquireSharedLock();
+  Lock recordLock=lockManager.acquireSharedLock(rid);
   try {
-    Lock recordLock=lockManager.acquireSharedLock(rid);
+    lock.acquireSharedLock();
     try {
       final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.getClusterPosition()));
       if (ppos == null)       return null;
       return new ORecordMetadata(rid,ppos.recordVersion);
     }
   finally {
-      lockManager.releaseLock(recordLock);
+      lock.releaseSharedLock();
     }
   }
  catch (  IOException ioe) {
     OLogManager.instance().error(this,"Retrieval of record  '" + rid + "' cause: "+ ioe.getMessage(),ioe);
   }
  finally {
-    lock.releaseSharedLock();
+    lockManager.releaseLock(recordLock);
   }
   return null;
 }

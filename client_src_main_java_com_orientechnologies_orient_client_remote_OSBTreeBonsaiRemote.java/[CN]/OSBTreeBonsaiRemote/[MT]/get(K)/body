@@ -3,29 +3,26 @@
   final byte[] keyStream=new byte[keySerializer.getObjectSize(key)];
   keySerializer.serialize(key,keyStream,0);
   OChannelBinaryAsynchClient client=null;
-  try {
-    client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET);
-    OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
-    client.writeBytes(keyStream);
-    storage.endRequest(client);
-    byte[] stream;
+  while (true) {
     try {
-      storage.beginResponse(client);
-      stream=client.readBytes();
-    }
+      client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET);
+      OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
+      client.writeBytes(keyStream);
+      storage.endRequest(client);
+      byte[] stream;
+      try {
+        storage.beginResponse(client);
+        stream=client.readBytes();
+      }
   finally {
-      storage.endResponse(client);
+        storage.endResponse(client);
+      }
+      final byte serializerId=OByteSerializer.INSTANCE.deserializeLiteral(stream,0);
+      final OBinarySerializer<V> serializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
+      return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
     }
-    final byte serializerId=OByteSerializer.INSTANCE.deserializeLiteral(stream,0);
-    final OBinarySerializer<V> serializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
-    return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
-  }
- catch (  IOException e) {
-    storage.getEngine().getConnectionManager().remove(client);
-    throw new ODatabaseException("Can't get by key from sb-tree bonsai.",e);
-  }
-catch (  RuntimeException e2) {
-    storage.getEngine().getConnectionManager().release(client);
-    throw e2;
+ catch (    Exception e) {
+      storage.handleException(client,"Can't get by key from sb-tree bonsai.",e);
+    }
   }
 }

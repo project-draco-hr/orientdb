@@ -1,0 +1,30 @@
+{
+  String dbUrl="memory:batchinsert_testHoles";
+  OGraphBatchInsert batch=new OGraphBatchInsert(dbUrl,"admin","admin");
+  batch.setParallel(1);
+  batch.begin();
+  batch.createEdge(0L,1L,null);
+  batch.createEdge(1L,3L,null);
+  batch.createEdge(3L,4L,null);
+  Map<String,Object> vertexProps=new HashMap<String,Object>();
+  vertexProps.put("foo","aa");
+  batch.setVertexProperties(3L,vertexProps);
+  vertexProps.put("foo","bar");
+  batch.setVertexProperties(4L,vertexProps);
+  batch.end();
+  ODatabaseDocumentTx databaseDocumentTx=new ODatabaseDocumentTx(dbUrl);
+  databaseDocumentTx.open("admin","admin");
+  OStorage storage=databaseDocumentTx.getStorage();
+  databaseDocumentTx.close();
+  storage.close(true,false);
+  OrientGraph g=new OrientGraph(dbUrl,"admin","admin");
+  Iterable<Vertex> result=g.command(new OSQLSynchQuery<Vertex>("select expand(out().in().out().out().in().out().out().in().out()) from V where uid = ?")).execute(0L);
+  boolean found=false;
+  for (  Vertex v : result) {
+    assertFalse(found);
+    assertEquals("bar",v.getProperty("foo"));
+    found=true;
+  }
+  assertTrue(found);
+  g.shutdown();
+}

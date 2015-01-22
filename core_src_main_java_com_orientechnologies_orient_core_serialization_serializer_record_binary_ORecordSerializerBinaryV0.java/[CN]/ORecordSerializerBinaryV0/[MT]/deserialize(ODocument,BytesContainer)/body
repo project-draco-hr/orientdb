@@ -1,41 +1,41 @@
 {
   final String className=readString(bytes);
-  if (className.length() != 0)   document.setClassNameIfExists(className);
+  if (className.length() != 0)   ODocumentInternal.fillClassNameIfNeeded(document,className);
   int last=0;
-  String field;
+  String fieldName;
+  int valuePos;
+  OType type;
   while (true) {
     OGlobalProperty prop=null;
     final int len=OVarIntSerializer.readAsInteger(bytes);
-    if (len == 0)     break;
+    if (len == 0) {
+      break;
+    }
  else     if (len > 0) {
-      final String res=new String(bytes.bytes,bytes.offset,len,utf8);
+      fieldName=stringFromBytes(bytes.bytes,bytes.offset,len).intern();
       bytes.skip(len);
-      field=res;
+      valuePos=readInteger(bytes);
+      type=readOType(bytes);
     }
  else {
-      ODatabaseRecord db=document.getDatabase();
-      if (db == null || db.isClosed())       throw new ODatabaseException("Impossible deserialize the document no database present");
-      prop=db.getMetadata().getSchema().getGlobalPropertyById((len * -1) - 1);
-      field=prop.getName();
+      prop=getGlobalProperty(document,len);
+      fieldName=prop.getName();
+      valuePos=readInteger(bytes);
+      if (prop.getType() != OType.ANY)       type=prop.getType();
+ else       type=readOType(bytes);
     }
-    if (document.containsField(field)) {
-      if (prop != null && prop.getType() != OType.ANY)       bytes.skip(OIntegerSerializer.INT_SIZE);
- else       bytes.skip(OIntegerSerializer.INT_SIZE + 1);
+    if (ODocumentInternal.rawContainsField(document,fieldName)) {
       continue;
     }
-    final int valuePos=readInteger(bytes);
-    final OType type;
-    if (prop != null && prop.getType() != OType.ANY)     type=prop.getType();
- else     type=readOType(bytes);
     if (valuePos != 0) {
       int headerCursor=bytes.offset;
       bytes.offset=valuePos;
       final Object value=readSingleValue(bytes,type,document);
       if (bytes.offset > last)       last=bytes.offset;
       bytes.offset=headerCursor;
-      document.field(field,value,type);
+      ODocumentInternal.rawField(document,fieldName,value,type);
     }
- else     document.field(field,(Object)null);
+ else     ODocumentInternal.rawField(document,fieldName,null,null);
   }
   ORecordInternal.clearSource(document);
   if (last > bytes.offset)   bytes.offset=last;

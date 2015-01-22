@@ -1,0 +1,32 @@
+{
+  final OIdentifiable f=database.command(new OCommandSQL("create function testMTCall \"return 3;\" LANGUAGE Javascript")).execute();
+  Assert.assertNotNull(f);
+  final int TOT=1000;
+  final int threadNum=OGlobalConfiguration.SCRIPT_POOL.getValueAsInteger() * 3;
+  final long startTime=System.currentTimeMillis();
+  final AtomicLong counter=new AtomicLong();
+  final Thread[] threads=new Thread[threadNum];
+  for (int i=0; i < threadNum; ++i) {
+    threads[i]=new Thread(){
+      public void run(){
+        for (int cycle=0; cycle < TOT; ++cycle) {
+          OResultSet<OIdentifiable> res1=database.command(new OCommandSQL("select testMTCall()")).execute();
+          Assert.assertNotNull(res1);
+          Assert.assertNotNull(res1.get(0));
+          Assert.assertEquals(((ODocument)res1.get(0)).field("testMTCall"),3);
+          counter.incrementAndGet();
+        }
+      }
+    }
+;
+    threads[i].start();
+  }
+  for (int i=0; i < threadNum; ++i)   try {
+    threads[i].join();
+  }
+ catch (  InterruptedException e) {
+    e.printStackTrace();
+  }
+  Assert.assertEquals(counter.get(),(long)threadNum * TOT);
+  final long totalTime=System.currentTimeMillis() - startTime;
+}

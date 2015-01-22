@@ -3,7 +3,7 @@
   long seed=System.currentTimeMillis();
   MersenneTwisterFast mersenneTwisterFast=new MersenneTwisterFast(1381162033616L);
   System.out.println("testBackwardIteration seed : " + seed);
-  NavigableMap<OClusterPosition,byte[]> positionRecordMap=new TreeMap<OClusterPosition,byte[]>();
+  NavigableMap<Long,byte[]> positionRecordMap=new TreeMap<Long,byte[]>();
   ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
   recordVersion.increment();
   recordVersion.increment();
@@ -14,29 +14,29 @@
     final OPhysicalPosition physicalPosition=paginatedCluster.createRecord(record,recordVersion,(byte)2);
     positionRecordMap.put(physicalPosition.clusterPosition,record);
   }
-  Iterator<OClusterPosition> positionIterator=positionRecordMap.keySet().iterator();
+  Iterator<Long> positionIterator=positionRecordMap.keySet().iterator();
   while (positionIterator.hasNext()) {
-    OClusterPosition clusterPosition=positionIterator.next();
+    long clusterPosition=positionIterator.next();
     if (mersenneTwisterFast.nextBoolean()) {
       Assert.assertTrue(paginatedCluster.deleteRecord(clusterPosition));
       positionIterator.remove();
     }
   }
   OPhysicalPosition physicalPosition=new OPhysicalPosition();
-  physicalPosition.clusterPosition=OClusterPositionFactory.INSTANCE.valueOf(Long.MAX_VALUE);
+  physicalPosition.clusterPosition=Long.MAX_VALUE;
   OPhysicalPosition[] positions=paginatedCluster.floorPositions(physicalPosition);
   Assert.assertTrue(positions.length > 0);
   positionIterator=positionRecordMap.descendingKeySet().iterator();
   int counter=0;
   while (positionIterator.hasNext()) {
     Assert.assertTrue(positions.length > 0);
-    OClusterPosition testedPosition=positionIterator.next();
+    long testedPosition=positionIterator.next();
     Assert.assertEquals(positions[positions.length - 1].clusterPosition,testedPosition);
     OPhysicalPosition positionToFind=positions[positions.length - 1];
     positions=paginatedCluster.lowerPositions(positionToFind);
     counter++;
   }
   Assert.assertEquals(paginatedCluster.getEntries(),counter);
-  Assert.assertEquals(paginatedCluster.getFirstPosition(),positionRecordMap.firstKey());
-  Assert.assertEquals(paginatedCluster.getLastPosition(),positionRecordMap.lastKey());
+  Assert.assertEquals(paginatedCluster.getFirstPosition(),(long)positionRecordMap.firstKey());
+  Assert.assertEquals(paginatedCluster.getLastPosition(),(long)positionRecordMap.lastKey());
 }

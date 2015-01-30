@@ -4,12 +4,29 @@
     final String text=textRequest.getText();
     if (text == null)     throw new IllegalArgumentException("Command text is null");
     final String textUpperCase=upperCase(text);
-    delegate=(OCommandExecutorSQLAbstract)OSQLEngine.getInstance().getCommand(textUpperCase);
-    if (delegate == null)     throw new OCommandExecutorNotFoundException("Cannot find a command executor for the command request: " + iCommand);
-    delegate.setContext(context);
-    delegate.setLimit(iCommand.getLimit());
-    delegate.parse(iCommand);
-    delegate.setProgressListener(progressListener);
+    if (textUpperCase.startsWith("SELECT") && false) {
+      InputStream is=new ByteArrayInputStream(text.getBytes());
+      OrientSql osql=new OrientSql(is);
+      try {
+        OStatement stm=osql.parse();
+        delegate=stm.buildExecutor(iCommand);
+        delegate.setContext(context);
+        delegate.setLimit(iCommand.getLimit());
+        delegate.setProgressListener(progressListener);
+        is.close();
+      }
+ catch (      Exception e) {
+        throwParsingException(e.getMessage());
+      }
+    }
+ else {
+      delegate=(OCommandExecutorSQLAbstract)OSQLEngine.getInstance().getCommand(textUpperCase);
+      if (delegate == null)       throw new OCommandExecutorNotFoundException("Cannot find a command executor for the command request: " + iCommand);
+      delegate.setContext(context);
+      delegate.setLimit(iCommand.getLimit());
+      delegate.parse(iCommand);
+      delegate.setProgressListener(progressListener);
+    }
   }
  else   throw new OCommandExecutionException("Cannot find a command executor for the command request: " + iCommand);
   return this;

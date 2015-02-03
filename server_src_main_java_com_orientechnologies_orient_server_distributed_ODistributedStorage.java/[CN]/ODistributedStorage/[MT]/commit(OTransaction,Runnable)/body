@@ -20,18 +20,17 @@
     for (    ORecordOperation op : iTx.getCurrentRecordEntries()) {
       final OAbstractRecordReplicatedTask task;
       final ORecord record=op.getRecord();
-      final ORecordId rid=(ORecordId)op.record.getIdentity();
+      final ORecordId rid=(ORecordId)record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-        final byte[] stream=record.toStream();
-      if (rid.isNew()) {
-        task=new OCreateRecordTask(rid,stream,record.getRecordVersion(),ORecordInternal.getRecordType(record));
-        break;
-      }
+        if (rid.isNew()) {
+          task=new OCreateRecordTask(record);
+          break;
+        }
 case ORecordOperation.UPDATED:
-    final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-  if (previousContent.getResult() == null)   throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+      final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+    if (previousContent.getResult() == null)     throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+  task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
 break;
 case ORecordOperation.DELETED:
 task=new ODeleteRecordTask(rid,record.getRecordVersion());

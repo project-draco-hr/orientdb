@@ -15,24 +15,28 @@
 );
       return;
     }
+    OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.BEGUN);
     final OTxTask txTask=new OTxTask();
     final Set<String> involvedClusters=new HashSet<String>();
-    for (    ORecordOperation op : iTx.getCurrentRecordEntries()) {
-      final OAbstractRecordReplicatedTask task;
-      final ORecord record=op.getRecord();
-      final ORecordId rid=(ORecordId)op.record.getIdentity();
+    final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
+    while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
+      for (      ORecordOperation txEntry : iTx.getCurrentRecordEntries())       tmpEntries.add(txEntry);
+      iTx.clearRecordEntries();
+      for (      ORecordOperation op : tmpEntries) {
+        final OAbstractRecordReplicatedTask task;
+        final ORecord record=op.getRecord();
+        final ORecordId rid=(ORecordId)record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-        final byte[] stream=record.toStream();
-      if (rid.isNew()) {
-        task=new OCreateRecordTask(rid,stream,record.getRecordVersion(),ORecordInternal.getRecordType(record));
-        break;
-      }
+          if (rid.isNew()) {
+            task=new OCreateRecordTask(record);
+            break;
+          }
 case ORecordOperation.UPDATED:
-    final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-  if (previousContent.getResult() == null)   throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
-break;
+        final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+      if (previousContent.getResult() == null)       throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+    task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+  break;
 case ORecordOperation.DELETED:
 task=new ODeleteRecordTask(rid,record.getRecordVersion());
 break;
@@ -42,6 +46,8 @@ continue;
 involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
 }
+}
+OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
 final Set<String> nodes=dbCfg.getServers(involvedClusters);
 Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
 if (executionModeSynch == null) executionModeSynch=Boolean.TRUE;

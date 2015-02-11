@@ -5,8 +5,16 @@
     database.begin();
     final List<Object> results=new ArrayList<Object>();
     for (    OAbstractRecordReplicatedTask task : tasks) {
-      final Object taskResult=task.execute(iServer,iManager,database);
-      results.add(taskResult);
+      if (task instanceof OCreateRecordTask) {
+        final Object taskResult=task.execute(iServer,iManager,database);
+        results.add(taskResult);
+      }
+    }
+    for (    OAbstractRecordReplicatedTask task : tasks) {
+      if (!(task instanceof OCreateRecordTask)) {
+        final Object taskResult=task.execute(iServer,iManager,database);
+        results.add(taskResult);
+      }
     }
     database.commit();
     for (int i=0; i < results.size(); ++i) {
@@ -15,6 +23,12 @@
       if (task instanceof OCreateRecordTask) {
         final OCreateRecordTask t=(OCreateRecordTask)task;
         results.set(i,new OPlaceholder(t.getRecord()));
+      }
+ else       if (task instanceof OUpdateRecordTask) {
+        if (((OSimpleVersion)o).getCounter() < 0) {
+          results.set(i,task.getRid().getRecord().reload().getRecordVersion());
+        }
+ else         results.set(i,o);
       }
     }
     return results;

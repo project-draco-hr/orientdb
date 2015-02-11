@@ -29,6 +29,9 @@
   finally {
       graph.shutdown();
     }
+    Assert.assertEquals(product.getRecord().getVersion(),1);
+    Assert.assertEquals(fishing.getRecord().getVersion(),1);
+    versions=new int[serverInstance.size()];
     vertices=new OrientVertex[serverInstance.size()];
     for (int i=0; i < vertices.length; ++i) {
       final String nodeName=serverInstance.get(i).getServerInstance().getDistributedManager().getLocalNodeName();
@@ -52,6 +55,10 @@
         graph.shutdown();
       }
     }
+    for (int i=0; i < vertices.length; ++i) {
+      versions[i]=vertices[i].getRecord().getVersion();
+      Assert.assertTrue(versions[i] > 1);
+    }
     graph=localFactory.getNoTx();
     try {
       for (int i=0; i < vertices.length; ++i)       System.out.println("Created vertex " + i + ": "+ vertices[i].getRecord());
@@ -67,6 +74,11 @@
         Assert.assertTrue(result.iterator().hasNext());
         OrientEdge e=result.iterator().next();
         Assert.assertEquals(e.getProperty("real"),true);
+        Assert.assertEquals(1,e.getRecord().getVersion());
+        e.getOutVertex().getRecord().reload();
+        Assert.assertEquals(versions[i] + 1,e.getOutVertex().getRecord().getVersion());
+        e.getInVertex().getRecord().reload();
+        Assert.assertEquals(fishing.getRecord().getVersion() + i + 1,e.getInVertex().getRecord().getVersion());
         final OrientVertex explain=graph.command(new OCommandSQL("explain select from " + e.getIdentity())).execute();
         System.out.println("explain select from " + e.getIdentity() + " -> "+ ((ODocument)explain.getRecord()).field("servers"));
         result=graph.command(new OCommandSQL("select from " + e.getIdentity())).execute();

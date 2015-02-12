@@ -1,25 +1,32 @@
 {
   if (iEvent.getMember() == null)   return;
-  final String key=iEvent.getKey();
-  if (key.startsWith(CONFIG_NODE_PREFIX)) {
-    if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember())) {
-      final ODocument cfg=(ODocument)iEvent.getValue();
-      final String nodeName=(String)cfg.field("name");
-      if (nodeName.equals(getLocalNodeName())) {
-        ODistributedServerLog.error(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
-        throw new ODistributedException("Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
+  final Lock lock=getLock("orientdb.clusterEvents");
+  lock.lock();
+  try {
+    final String key=iEvent.getKey();
+    if (key.startsWith(CONFIG_NODE_PREFIX)) {
+      if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember())) {
+        final ODocument cfg=(ODocument)iEvent.getValue();
+        final String nodeName=(String)cfg.field("name");
+        if (nodeName.equals(getLocalNodeName())) {
+          ODistributedServerLog.error(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
+          throw new ODistributedException("Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
+        }
+        activeNodes.put(nodeName,(Member)iEvent.getMember());
+        ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
+        installNewDatabases(false);
       }
-      activeNodes.put(nodeName,(Member)iEvent.getMember());
-      ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
-      installNewDatabases(false);
+    }
+ else     if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
+      final String databaseName=key.substring(CONFIG_DATABASE_PREFIX.length());
+      checkDatabaseEvent(iEvent,databaseName);
+      if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember()))       installNewDatabases(false);
+    }
+ else     if (key.startsWith(CONFIG_DBSTATUS_PREFIX)) {
+      ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"received new status %s=%s",key.substring(CONFIG_DBSTATUS_PREFIX.length()),iEvent.getValue());
     }
   }
- else   if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
-    updateCachedDatabaseConfiguration(key.substring(CONFIG_DATABASE_PREFIX.length()),(ODocument)iEvent.getValue(),true,false);
-    OClientConnectionManager.instance().pushDistribCfg2Clients(getClusterConfiguration());
-    if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember()))     installNewDatabases(false);
-  }
- else   if (key.startsWith(CONFIG_DBSTATUS_PREFIX)) {
-    ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"received new status %s=%s",key.substring(CONFIG_DBSTATUS_PREFIX.length()),iEvent.getValue());
+  finally {
+    lock.unlock();
   }
 }

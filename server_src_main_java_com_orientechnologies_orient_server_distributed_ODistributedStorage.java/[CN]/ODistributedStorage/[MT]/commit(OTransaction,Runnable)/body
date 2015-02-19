@@ -30,13 +30,15 @@ switch (op.type) {
 case ORecordOperation.CREATED:
           if (rid.isNew()) {
             task=new OCreateRecordTask(record);
+            if (record instanceof ODocument)             ((ODocument)record).validate();
             break;
           }
 case ORecordOperation.UPDATED:
-        final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
-      if (previousContent.getResult() == null)       throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-    task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
-  break;
+        if (record instanceof ODocument)         ((ODocument)record).validate();
+      final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.DEFAULT);
+    if (previousContent.getResult() == null)     throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+  task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion());
+break;
 case ORecordOperation.DELETED:
 task=new ODeleteRecordTask(rid,record.getRecordVersion());
 break;
@@ -95,7 +97,10 @@ if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,tx
  else asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask));
 }
 }
- catch (Exception e) {
+ catch (OValidationException e) {
+throw e;
+}
+catch (Exception e) {
 handleDistributedException("Cannot route TX operation against distributed node",e);
 }
 }

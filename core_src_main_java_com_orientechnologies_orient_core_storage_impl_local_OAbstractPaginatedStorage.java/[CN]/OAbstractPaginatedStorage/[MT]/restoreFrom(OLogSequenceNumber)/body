@@ -9,7 +9,14 @@
   OLogSequenceNumber startLsn=lsn;
   try {
     restoreLoop:     while (lsn != null) {
-      OWALRecord walRecord=writeAheadLog.read(lsn);
+      OWALRecord walRecord;
+      try {
+        walRecord=writeAheadLog.read(lsn);
+      }
+ catch (      Exception e) {
+        OLogManager.instance().error(this,"Data restore was paused because of exception during reading of wal record.",e);
+        break restoreLoop;
+      }
       batch.add(new SoftReference<OWALRecord>(walRecord,batchQueue));
       if (batchQueue.poll() != null) {
         lsn=startLsn;

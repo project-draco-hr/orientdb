@@ -1,0 +1,40 @@
+{
+  final String url=conf.getString("storage.url");
+  if (!url.startsWith("remote:"))   return;
+  try {
+    final OServerAdmin admin=new OServerAdmin(url);
+    admin.connect(conf.getString("storage.user"),conf.getString("storage.password"));
+    if (!admin.existsDatabase()) {
+      System.err.println("creating database " + url);
+      admin.createDatabase("graph","plocal");
+    }
+    try {
+      OrientGraph t=new OrientGraph(url,conf.getString("storage.user"),conf.getString("storage.password"));
+      t.command(new OCommandSQL("alter database custom useLightweightEdges=false")).execute();
+      t.commit();
+      t.shutdown();
+    }
+ catch (    Throwable ignored) {
+    }
+    try {
+      OrientGraph t=new OrientGraph(url,conf.getString("storage.user"),conf.getString("storage.password"));
+      t.command(new OCommandSQL("ALTER CLASS V CLUSTERSELECTION balanced")).execute();
+      t.commit();
+      t.shutdown();
+    }
+ catch (    Throwable ignored) {
+    }
+    try {
+      OrientGraph t=new OrientGraph(url,conf.getString("storage.user"),conf.getString("storage.password"));
+      t.command(new OCommandSQL("ALTER CLASS E CLUSTERSELECTION balanced")).execute();
+      t.commit();
+      t.shutdown();
+    }
+ catch (    Throwable ignored) {
+    }
+    admin.close();
+  }
+ catch (  IOException ex1) {
+    throw new RuntimeException(ex1);
+  }
+}

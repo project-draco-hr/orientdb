@@ -3,18 +3,27 @@
   ODatabaseRecordThreadLocal.INSTANCE.set(database);
   try {
     database.begin();
+    final OTransactionOptimistic tx=(OTransactionOptimistic)database.getTransaction();
     final List<Object> results=new ArrayList<Object>();
     for (    OAbstractRecordReplicatedTask task : tasks) {
       if (task instanceof OCreateRecordTask) {
-        final Object taskResult=task.execute(iServer,iManager,database);
-        results.add(taskResult);
+        final OCreateRecordTask createRT=(OCreateRecordTask)task;
+        final String clusterName=createRT.getRid().isValid() ? database.getClusterNameById(createRT.getRid().getClusterId()) : null;
+        tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
       }
     }
     for (    OAbstractRecordReplicatedTask task : tasks) {
-      if (!(task instanceof OCreateRecordTask)) {
-        final Object taskResult=task.execute(iServer,iManager,database);
-        results.add(taskResult);
+      if (task instanceof OCreateRecordTask) {
+        final ORecord record=((OCreateRecordTask)task).getRecord();
+        for (        String f : ((ODocument)record).fieldNames()) {
+          final Object fValue=((ODocument)record).field(f);
+          if (fValue instanceof ORidBag)           ((ORidBag)fValue).convertLinks2Records();
+        }
       }
+    }
+    for (    OAbstractRecordReplicatedTask task : tasks) {
+      final Object taskResult=task.execute(iServer,iManager,database);
+      results.add(taskResult);
     }
     database.commit();
     for (int i=0; i < results.size(); ++i) {

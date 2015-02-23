@@ -1,0 +1,26 @@
+{
+  OrientGraph g=new OrientGraph(URL,"admin","admin");
+  try {
+    g.createVertexType("BrokenVertex1V");
+    g.createEdgeType("BrokenVertex1E");
+    OrientVertex vertexOne=g.addVertex("class:BrokenVertex1V");
+    OrientVertex vertexTwo=g.addVertex("class:BrokenVertex1V");
+    vertexOne.addEdge("BrokenVertex1E",vertexTwo);
+    g.commit();
+    g.command(new OCommandSQL("delete from " + vertexTwo.getRecord().getIdentity() + " unsafe")).execute();
+    g.shutdown();
+    g=new OrientGraph(URL,"admin","admin");
+    Iterable<Vertex> iterable=g.command(new OCommandSQL("select from BrokenVertex1V")).execute();
+    Iterator<Vertex> iterator=iterable.iterator();
+    int counter=0;
+    while (iterator.hasNext()) {
+      OrientVertex v=(OrientVertex)iterator.next();
+      for (      Vertex v1 : v.getVertices(Direction.OUT,"BrokenVertex1E")) {
+        assertNotNull(((OrientVertex)v1).getRecord());
+      }
+    }
+  }
+  finally {
+    g.shutdown();
+  }
+}

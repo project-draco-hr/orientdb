@@ -1,24 +1,23 @@
 {
-  final OClass cls=ODocumentInternal.getImmutableSchemaClass(iDocument);
-  if (cls != null && cls.isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME)) {
+  final OImmutableClass cls=ODocumentInternal.getImmutableSchemaClass(iDocument);
+  if (cls != null && cls.isRestricted()) {
     String fieldNames=cls.getCustom(OSecurityShared.ONCREATE_FIELD);
     if (fieldNames == null)     fieldNames=OSecurityShared.ALLOW_ALL_FIELD;
     final String[] fields=fieldNames.split(",");
     String identityType=cls.getCustom(OSecurityShared.ONCREATE_IDENTITY_TYPE);
     if (identityType == null)     identityType="user";
-    final ODatabaseDocument db=ODatabaseRecordThreadLocal.INSTANCE.get();
     OIdentifiable identity=null;
     if (identityType.equals("user")) {
-      final OSecurityUser user=db.getUser();
+      final OSecurityUser user=database.getUser();
       if (user != null)       identity=user.getIdentity();
     }
  else     if (identityType.equals("role")) {
-      final Set<? extends OSecurityRole> roles=db.getUser().getRoles();
+      final Set<? extends OSecurityRole> roles=database.getUser().getRoles();
       if (!roles.isEmpty())       identity=roles.iterator().next().getIdentity();
     }
  else     throw new OConfigurationException("Wrong custom field '" + OSecurityShared.ONCREATE_IDENTITY_TYPE + "' in class '"+ cls.getName()+ "' with value '"+ identityType+ "'. Supported ones are: 'user', 'role'");
     if (identity != null) {
-      for (      String f : fields)       db.getMetadata().getSecurity().allowIdentity(iDocument,f,identity);
+      for (      String f : fields)       database.getMetadata().getSecurity().allowIdentity(iDocument,f,identity);
       return RESULT.RECORD_CHANGED;
     }
   }

@@ -1,35 +1,45 @@
 {
-  super.parse(iRequest);
-  final int pos=parseFields();
-  if (pos == -1)   throw new OCommandSQLParsingException("Traverse must have the field list. Use " + getSyntax());
-  parserSetCurrentPosition(pos);
-  int endPosition=parserText.length();
-  parsedTarget=OSQLEngine.getInstance().parseTarget(parserText.substring(pos,endPosition),getContext(),KEYWORD_WHILE);
-  if (parsedTarget.parserIsEnded())   parserSetCurrentPosition(endPosition);
- else   parserMoveCurrentPosition(parsedTarget.parserGetCurrentPosition());
-  if (!parserIsEnded()) {
-    parserNextWord(true);
-    if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE))     warnDeprecatedWhere();
-    if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE) || parserGetLastWord().equalsIgnoreCase(KEYWORD_WHILE)) {
-      compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition(),endPosition),getContext(),KEYWORD_WHILE);
-      traverse.predicate(compiledFilter);
-      optimize();
-      parserSetCurrentPosition(compiledFilter.parserIsEnded() ? endPosition : compiledFilter.parserGetCurrentPosition() + parserGetCurrentPosition());
+  final OCommandRequestText textRequest=(OCommandRequestText)iRequest;
+  String queryText=textRequest.getText();
+  String originalQuery=queryText;
+  try {
+    queryText=preParse(queryText,iRequest);
+    textRequest.setText(queryText);
+    super.parse(iRequest);
+    final int pos=parseFields();
+    if (pos == -1)     throw new OCommandSQLParsingException("Traverse must have the field list. Use " + getSyntax());
+    parserSetCurrentPosition(pos);
+    int endPosition=parserText.length();
+    parsedTarget=OSQLEngine.getInstance().parseTarget(parserText.substring(pos,endPosition),getContext(),KEYWORD_WHILE);
+    if (parsedTarget.parserIsEnded())     parserSetCurrentPosition(endPosition);
+ else     parserMoveCurrentPosition(parsedTarget.parserGetCurrentPosition());
+    if (!parserIsEnded()) {
+      parserNextWord(true);
+      if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE))       warnDeprecatedWhere();
+      if (parserGetLastWord().equalsIgnoreCase(KEYWORD_WHERE) || parserGetLastWord().equalsIgnoreCase(KEYWORD_WHILE)) {
+        compiledFilter=OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition(),endPosition),getContext(),KEYWORD_WHILE);
+        traverse.predicate(compiledFilter);
+        optimize();
+        parserSetCurrentPosition(compiledFilter.parserIsEnded() ? endPosition : compiledFilter.parserGetCurrentPosition() + parserGetCurrentPosition());
+      }
+ else       parserGoBack();
     }
- else     parserGoBack();
-  }
-  parserSkipWhiteSpaces();
-  if (!parserIsEnded()) {
-    if (parserOptionalKeyword(KEYWORD_LIMIT,KEYWORD_SKIP,KEYWORD_OFFSET,KEYWORD_TIMEOUT,KEYWORD_STRATEGY)) {
-      final String w=parserGetLastWord();
-      if (w.equals(KEYWORD_LIMIT))       parseLimit(w);
- else       if (w.equals(KEYWORD_SKIP) || w.equals(KEYWORD_OFFSET))       parseSkip(w);
- else       if (w.equals(KEYWORD_TIMEOUT))       parseTimeout(w);
- else       if (w.equals(KEYWORD_STRATEGY))       parseStrategy(w);
+    parserSkipWhiteSpaces();
+    if (!parserIsEnded()) {
+      if (parserOptionalKeyword(KEYWORD_LIMIT,KEYWORD_SKIP,KEYWORD_OFFSET,KEYWORD_TIMEOUT,KEYWORD_STRATEGY)) {
+        final String w=parserGetLastWord();
+        if (w.equals(KEYWORD_LIMIT))         parseLimit(w);
+ else         if (w.equals(KEYWORD_SKIP) || w.equals(KEYWORD_OFFSET))         parseSkip(w);
+ else         if (w.equals(KEYWORD_TIMEOUT))         parseTimeout(w);
+ else         if (w.equals(KEYWORD_STRATEGY))         parseStrategy(w);
+      }
     }
+    if (limit == 0 || limit < -1)     throw new IllegalArgumentException("Limit must be > 0 or = -1 (no limit)");
+ else     traverse.limit(limit);
+    iRequest.getContext().setChild(traverse.getContext());
   }
-  if (limit == 0 || limit < -1)   throw new IllegalArgumentException("Limit must be > 0 or = -1 (no limit)");
- else   traverse.limit(limit);
-  iRequest.getContext().setChild(traverse.getContext());
+  finally {
+    textRequest.setText(originalQuery);
+  }
   return this;
 }

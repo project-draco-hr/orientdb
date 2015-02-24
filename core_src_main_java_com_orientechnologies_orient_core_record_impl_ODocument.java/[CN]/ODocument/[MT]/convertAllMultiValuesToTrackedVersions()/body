@@ -1,20 +1,21 @@
 {
-  if (_fieldValues == null)   return;
-  final Map<String,Object> fieldsToUpdate=new HashMap<String,Object>();
-  for (  Map.Entry<String,Object> fieldEntry : _fieldValues.entrySet()) {
-    final Object fieldValue=fieldEntry.getValue();
+  if (_fields == null)   return;
+  for (  Map.Entry<String,ODocumentEntry> fieldEntry : _fields.entrySet()) {
+    final Object fieldValue=fieldEntry.getValue().value;
     if (!(fieldValue instanceof Collection<?>) && !(fieldValue instanceof Map<?,?>))     continue;
     if (fieldValue instanceof OTrackedMultiValue) {
-      addCollectionChangeListener(fieldEntry.getKey(),(OTrackedMultiValue<Object,Object>)fieldValue);
+      addCollectionChangeListener(fieldEntry.getKey(),fieldEntry.getValue(),(OTrackedMultiValue<Object,Object>)fieldValue);
       continue;
     }
-    OType fieldType=fieldType(fieldEntry.getKey());
-    OClass _clazz=getImmutableSchemaClass();
-    if (fieldType == null && _clazz != null) {
-      final OProperty prop=_clazz.getProperty(fieldEntry.getKey());
-      fieldType=prop != null ? prop.getType() : null;
+    OType fieldType=fieldEntry.getValue().type;
+    if (fieldType == null) {
+      OClass _clazz=getImmutableSchemaClass();
+      if (_clazz != null) {
+        final OProperty prop=_clazz.getProperty(fieldEntry.getKey());
+        fieldType=prop != null ? prop.getType() : null;
+      }
     }
-    if (fieldType == null)     fieldType=OType.getTypeByValue(fieldEntry.getValue());
+    if (fieldType == null)     fieldType=OType.getTypeByValue(fieldValue);
     if (fieldType == null || !(OType.EMBEDDEDLIST.equals(fieldType) || OType.EMBEDDEDMAP.equals(fieldType) || OType.EMBEDDEDSET.equals(fieldType)|| OType.LINKSET.equals(fieldType)|| OType.LINKLIST.equals(fieldType)|| OType.LINKMAP.equals(fieldType)))     continue;
     Object newValue=null;
     if (fieldValue instanceof List && fieldType.equals(OType.EMBEDDEDLIST))     newValue=new OTrackedList<Object>(this,(List<?>)fieldValue,null);
@@ -24,9 +25,8 @@
  else     if (fieldValue instanceof List && fieldType.equals(OType.LINKLIST))     newValue=new ORecordLazyList(this,(List<OIdentifiable>)fieldValue);
  else     if (fieldValue instanceof Map && fieldType.equals(OType.LINKMAP))     newValue=new ORecordLazyMap(this,(Map<Object,OIdentifiable>)fieldValue);
     if (newValue != null) {
-      addCollectionChangeListener(fieldEntry.getKey(),(OTrackedMultiValue<Object,Object>)newValue);
-      fieldsToUpdate.put(fieldEntry.getKey(),newValue);
+      addCollectionChangeListener(fieldEntry.getKey(),fieldEntry.getValue(),(OTrackedMultiValue<Object,Object>)newValue);
+      fieldEntry.getValue().value=newValue;
     }
   }
-  _fieldValues.putAll(fieldsToUpdate);
 }

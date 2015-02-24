@@ -1,0 +1,26 @@
+{
+  getDatabase().checkSecurity(ORule.ResourceGeneric.SCHEMA,ORole.PERMISSION_UPDATE);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseDocumentInternal database=getDatabase();
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      final String cmd=String.format("alter property %s defaultvalue %s",getFullName(),defaultValue);
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final String cmd=String.format("alter property %s defaultvalue %s",getFullName(),defaultValue);
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setDefaultValueInternal(defaultValue);
+    }
+ else {
+      setDefaultValueInternal(defaultValue);
+    }
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
+  return this;
+}

@@ -1,41 +1,51 @@
 {
-  final ODatabaseDocument database=getDatabase();
-  init((OCommandRequestText)iRequest);
-  parserRequiredKeyword("CREATE");
-  parserRequiredKeyword("EDGE");
-  String className=null;
-  String temp=parseOptionalWord(true);
-  while (temp != null) {
-    if (temp.equals("CLUSTER")) {
-      clusterName=parserRequiredWord(false);
+  final OCommandRequestText textRequest=(OCommandRequestText)iRequest;
+  String queryText=textRequest.getText();
+  String originalQuery=queryText;
+  try {
+    queryText=preParse(queryText,iRequest);
+    textRequest.setText(queryText);
+    final ODatabaseDocument database=getDatabase();
+    init((OCommandRequestText)iRequest);
+    parserRequiredKeyword("CREATE");
+    parserRequiredKeyword("EDGE");
+    String className=null;
+    String temp=parseOptionalWord(true);
+    while (temp != null) {
+      if (temp.equals("CLUSTER")) {
+        clusterName=parserRequiredWord(false);
+      }
+ else       if (temp.equals(KEYWORD_FROM)) {
+        from=parserRequiredWord(false,"Syntax error"," =><,\r\n");
+      }
+ else       if (temp.equals("TO")) {
+        to=parserRequiredWord(false,"Syntax error"," =><,\r\n");
+      }
+ else       if (temp.equals(KEYWORD_SET)) {
+        fields=new LinkedHashMap<String,Object>();
+        parseSetFields(clazz,fields);
+      }
+ else       if (temp.equals(KEYWORD_CONTENT)) {
+        parseContent();
+      }
+ else       if (temp.equals(KEYWORD_RETRY)) {
+        parseRetry();
+      }
+ else       if (className == null && temp.length() > 0) {
+        className=temp;
+        clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
+      }
+      temp=parseOptionalWord(true);
+      if (parserIsEnded())       break;
     }
- else     if (temp.equals(KEYWORD_FROM)) {
-      from=parserRequiredWord(false,"Syntax error"," =><,\r\n");
-    }
- else     if (temp.equals("TO")) {
-      to=parserRequiredWord(false,"Syntax error"," =><,\r\n");
-    }
- else     if (temp.equals(KEYWORD_SET)) {
-      fields=new LinkedHashMap<String,Object>();
-      parseSetFields(clazz,fields);
-    }
- else     if (temp.equals(KEYWORD_CONTENT)) {
-      parseContent();
-    }
- else     if (temp.equals(KEYWORD_RETRY)) {
-      parseRetry();
-    }
- else     if (className == null && temp.length() > 0) {
-      className=temp;
+    if (className == null) {
+      className="E";
       clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
     }
-    temp=parseOptionalWord(true);
-    if (parserIsEnded())     break;
+    if (clazz == null)     throw new OCommandSQLParsingException("Class '" + className + "' was not found");
   }
-  if (className == null) {
-    className="E";
-    clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
+  finally {
+    textRequest.setText(originalQuery);
   }
-  if (clazz == null)   throw new OCommandSQLParsingException("Class '" + className + "' was not found");
   return this;
 }

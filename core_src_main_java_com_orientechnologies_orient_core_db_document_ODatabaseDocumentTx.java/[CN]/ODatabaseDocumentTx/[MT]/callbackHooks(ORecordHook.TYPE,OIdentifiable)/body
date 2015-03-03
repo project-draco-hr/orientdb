@@ -4,21 +4,24 @@
     final ORecord rec=id.getRecord();
     if (rec == null)     return ORecordHook.RESULT.RECORD_NOT_CHANGED;
     final OScenarioThreadLocal.RUN_MODE runMode=OScenarioThreadLocal.INSTANCE.get();
-    if (runMode != RUN_MODE.RUNNING_DISTRIBUTED && getStorage().isDistributed())     return ORecordHook.RESULT.RECORD_NOT_CHANGED;
-    ORecordHook[] hooksToRun=null;
-    if (runMode == RUN_MODE.RUNNING_DISTRIBUTED)     hooksToRun=distributedHooks;
- else     hooksToRun=defaultHooks;
     boolean recordChanged=false;
-    for (    ORecordHook hook : hooksToRun) {
-      final ORecordHook.RESULT res=hook.onTrigger(type,rec);
-      if (res == ORecordHook.RESULT.RECORD_CHANGED)       recordChanged=true;
- else       if (res == ORecordHook.RESULT.SKIP_IO)       return res;
- else       if (res == ORecordHook.RESULT.SKIP)       return res;
- else       if (res == ORecordHook.RESULT.RECORD_REPLACED)       return res;
-    }
-    return recordChanged ? ORecordHook.RESULT.RECORD_CHANGED : ORecordHook.RESULT.RECORD_NOT_CHANGED;
-  }
+    for (    ORecordHook hook : hooks.keySet()) {
+switch (runMode) {
+case DEFAULT:
+        if (getStorage().isDistributed() && hook.getDistributedExecutionMode() == ORecordHook.DISTRIBUTED_EXECUTION_MODE.TARGET_NODE)         continue;
+      break;
+case RUNNING_DISTRIBUTED:
+    if (hook.getDistributedExecutionMode() == ORecordHook.DISTRIBUTED_EXECUTION_MODE.SOURCE_NODE)     continue;
+}
+final ORecordHook.RESULT res=hook.onTrigger(type,rec);
+if (res == ORecordHook.RESULT.RECORD_CHANGED) recordChanged=true;
+ else if (res == ORecordHook.RESULT.SKIP_IO) return res;
+ else if (res == ORecordHook.RESULT.SKIP) return res;
+ else if (res == ORecordHook.RESULT.RECORD_REPLACED) return res;
+}
+return recordChanged ? ORecordHook.RESULT.RECORD_CHANGED : ORecordHook.RESULT.RECORD_NOT_CHANGED;
+}
   finally {
-    popInHook(id);
-  }
+popInHook(id);
+}
 }

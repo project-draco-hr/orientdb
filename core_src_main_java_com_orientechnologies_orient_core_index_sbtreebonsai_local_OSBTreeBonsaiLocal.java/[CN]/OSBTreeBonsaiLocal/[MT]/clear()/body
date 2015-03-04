@@ -1,17 +1,16 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
+    OAtomicOperation atomicOperation=startAtomicOperation();
     final Queue<OBonsaiBucketPointer> subTreesToDelete=new LinkedList<OBonsaiBucketPointer>();
     OCacheEntry cacheEntry=diskCache.load(fileId,rootBucketPointer.getPageIndex(),false);
     cacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getTrackMode());
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       addChildrenToQueue(subTreesToDelete,rootBucket);
       rootBucket.shrink(0);
-      rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getTrackMode());
+      rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       rootBucket.setTreeSize(0);
-      logPageChanges(rootBucket,fileId,rootBucketPointer.getPageIndex(),false);
       cacheEntry.markDirty();
     }
   finally {

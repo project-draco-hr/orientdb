@@ -5,7 +5,8 @@
     OBonsaiBucketPointer bucketPointer=rootBucketPointer;
     OCacheEntry cacheEntry=diskCache.load(fileId,rootBucketPointer.getPageIndex(),false);
     int itemIndex=0;
-    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
     try {
       while (true) {
         if (bucket.isLeaf()) {
@@ -49,7 +50,7 @@
         }
         diskCache.release(cacheEntry);
         cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
-        bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       }
     }
   finally {

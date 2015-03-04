@@ -2,16 +2,16 @@
   OBonsaiBucketPointer head=OBonsaiBucketPointer.NULL;
   OBonsaiBucketPointer tail=subTreesToDelete.peek();
   int bucketCount=0;
+  OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
   while (!subTreesToDelete.isEmpty()) {
     final OBonsaiBucketPointer bucketPointer=subTreesToDelete.poll();
     OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
     cacheEntry.acquireExclusiveLock();
     try {
-      final OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getTrackMode());
+      final OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       addChildrenToQueue(subTreesToDelete,bucket);
       bucket.setFreeListPointer(head);
       head=bucketPointer;
-      logPageChanges(bucket,fileId,bucketPointer.getPageIndex(),false);
       cacheEntry.markDirty();
     }
   finally {
@@ -24,11 +24,10 @@
     final OCacheEntry sysCacheEntry=diskCache.load(fileId,SYS_BUCKET.getPageIndex(),false);
     sysCacheEntry.acquireExclusiveLock();
     try {
-      final OSysBucket sysBucket=new OSysBucket(sysCacheEntry,getTrackMode());
+      final OSysBucket sysBucket=new OSysBucket(sysCacheEntry,getChangesTree(atomicOperation,sysCacheEntry));
       attachFreeListHead(tail,sysBucket.getFreeListHead());
       sysBucket.setFreeListHead(head);
       sysBucket.setFreeListLength(sysBucket.freeListLength() + bucketCount);
-      logPageChanges(sysBucket,fileId,SYS_BUCKET.getPageIndex(),false);
     }
   finally {
       sysCacheEntry.releaseExclusiveLock();

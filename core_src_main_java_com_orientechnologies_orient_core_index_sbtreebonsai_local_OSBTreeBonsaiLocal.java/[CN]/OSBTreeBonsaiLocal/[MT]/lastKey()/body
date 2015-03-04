@@ -3,8 +3,9 @@
   try {
     LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
     OBonsaiBucketPointer bucketPointer=rootBucketPointer;
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
-    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+    OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
     int itemIndex=bucket.size() - 1;
     try {
       while (true) {
@@ -47,7 +48,7 @@
         }
         diskCache.release(cacheEntry);
         cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
-        bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (itemIndex == OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1)         itemIndex=bucket.size() - 1;
       }
     }

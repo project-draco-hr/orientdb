@@ -1,0 +1,41 @@
+{
+  database.begin();
+  for (int i=0; i < 100000; i++) {
+    final ODocument doc1=new ODocument("IndexInSubclassesTestChild1");
+    doc1.field("name","name" + i);
+    final ODocument doc2=new ODocument("IndexInSubclassesTestChild2");
+    doc2.field("name","name" + i);
+    doc1.save();
+    doc2.save();
+    if (i % 100 == 0) {
+      database.commit();
+    }
+  }
+  database.commit();
+  long begin=System.currentTimeMillis();
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name99995' and name < 'name99999' order by name ASC"));
+  System.out.println("elapsed: " + (System.currentTimeMillis() - begin));
+  Assert.assertTrue(result.size() == 6);
+  String lastName=result.get(0).field("name");
+  System.out.println(lastName);
+  for (int i=1; i < result.size(); i++) {
+    ODocument current=result.get(i);
+    String currentName=current.field("name");
+    Assert.assertTrue(lastName.compareTo(currentName) <= 0);
+    lastName=currentName;
+    System.out.println(currentName);
+  }
+  begin=System.currentTimeMillis();
+  result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name99995' and name < 'name99999' order by name DESC"));
+  System.out.println("elapsed: " + (System.currentTimeMillis() - begin));
+  Assert.assertTrue(result.size() == 6);
+  lastName=result.get(0).field("name");
+  System.out.println(lastName);
+  for (int i=1; i < result.size(); i++) {
+    ODocument current=result.get(i);
+    String currentName=current.field("name");
+    Assert.assertTrue(lastName.compareTo(currentName) >= 0);
+    lastName=currentName;
+    System.out.println(currentName);
+  }
+}

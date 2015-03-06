@@ -1,9 +1,10 @@
 {
   LinkedList<PagePathItemUnit> path=new LinkedList<PagePathItemUnit>();
   long bucketIndex=ROOT_INDEX;
+  OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
   OCacheEntry cacheEntry=diskCache.load(fileId,bucketIndex,false);
   int itemIndex=0;
-  OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+  OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
   try {
     while (true) {
       if (!bucket.isLeaf()) {
@@ -46,7 +47,7 @@
       }
       diskCache.release(cacheEntry);
       cacheEntry=diskCache.load(fileId,bucketIndex,false);
-      bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+      bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
     }
   }
   finally {

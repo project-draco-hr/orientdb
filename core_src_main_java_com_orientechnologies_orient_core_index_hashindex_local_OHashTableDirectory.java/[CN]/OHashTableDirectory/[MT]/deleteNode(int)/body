@@ -1,11 +1,11 @@
 {
   acquireExclusiveLock();
-  startAtomicOperation();
   try {
+    final OAtomicOperation atomicOperation=startAtomicOperation();
     diskCache.loadPinnedPage(firstEntry);
     firstEntry.acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,ODurablePage.TrackMode.NONE,firstEntry);
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
       if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
         firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
         firstPage.setTombstone(nodeIndex);
@@ -17,18 +17,16 @@
         diskCache.loadPinnedPage(cacheEntry);
         cacheEntry.acquireExclusiveLock();
         try {
-          ODirectoryPage page=new ODirectoryPage(cacheEntry,ODurablePage.TrackMode.NONE,cacheEntry);
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),cacheEntry);
           page.setPointer(localNodeIndex,0,firstPage.getTombstone());
           firstPage.setTombstone(nodeIndex);
           cacheEntry.markDirty();
-          logPageChanges(page,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
   finally {
           cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
       }
-      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
       firstEntry.releaseExclusiveLock();

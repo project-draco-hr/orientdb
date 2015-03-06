@@ -9,13 +9,12 @@
       OCacheEntry keyBucketCacheEntry=diskCache.load(fileId,bucketSearchResult.getLastPathItem(),false);
       keyBucketCacheEntry.acquireExclusiveLock();
       try {
-        startAtomicOperation();
-        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getTrackMode());
+        OAtomicOperation atomicOperation=startAtomicOperation();
+        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
         final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
         final V value=readValue(removed);
         long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
         if (removedValueLink >= 0)         removeLinkedValue(removedValueLink);
-        logPageChanges(keyBucket,fileId,keyBucketCacheEntry.getPageIndex(),false);
         keyBucketCacheEntry.markDirty();
         setSize(size() - 1);
         endAtomicOperation(false);
@@ -32,18 +31,17 @@
     }
  else {
       if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
-      startAtomicOperation();
+      OAtomicOperation atomicOperation=startAtomicOperation();
       try {
         V removedValue=null;
         OCacheEntry nullCacheEntry=diskCache.load(nullBucketFileId,0,false);
         nullCacheEntry.acquireExclusiveLock();
         try {
-          ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getTrackMode(),valueSerializer,false);
+          ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getChangesTree(atomicOperation,nullCacheEntry),valueSerializer,false);
           OSBTreeValue<V> treeValue=nullBucket.getValue();
           if (treeValue == null)           return null;
           removedValue=readValue(treeValue);
           nullBucket.removeValue();
-          logPageChanges(nullBucket,nullBucketFileId,0,false);
         }
   finally {
           nullCacheEntry.releaseExclusiveLock();

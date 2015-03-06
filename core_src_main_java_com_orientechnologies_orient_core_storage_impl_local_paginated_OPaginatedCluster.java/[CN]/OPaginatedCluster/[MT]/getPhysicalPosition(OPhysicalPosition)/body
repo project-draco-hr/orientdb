@@ -4,13 +4,14 @@
     long clusterPosition=position.clusterPosition;
     OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
     if (positionEntry == null)     return null;
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     long pageIndex=positionEntry.getPageIndex();
     int recordPosition=positionEntry.getRecordPosition();
     long pagesCount=diskCache.getFilledUpTo(fileId);
     if (pageIndex >= pagesCount)     return null;
     OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
     try {
-      final OClusterPage localPage=new OClusterPage(cacheEntry,false,ODurablePage.TrackMode.NONE);
+      final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
       if (localPage.isDeleted(recordPosition))       return null;
       if (localPage.getRecordByteValue(recordPosition,-OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 0)       return null;
       final OPhysicalPosition physicalPosition=new OPhysicalPosition();

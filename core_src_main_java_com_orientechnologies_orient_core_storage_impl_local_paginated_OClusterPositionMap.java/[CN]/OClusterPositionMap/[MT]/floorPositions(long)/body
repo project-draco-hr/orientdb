@@ -4,6 +4,7 @@
     if (clusterPosition < 0)     return new long[0];
     long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
     int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     final long filledUpTo=diskCache.getFilledUpTo(fileId);
     long[] result;
     if (pageIndex >= filledUpTo) {
@@ -12,7 +13,7 @@
     }
     do {
       OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
+      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       if (index == Integer.MIN_VALUE)       index=bucket.getSize() - 1;
       int resultSize=index + 1;
       int entriesCount=0;

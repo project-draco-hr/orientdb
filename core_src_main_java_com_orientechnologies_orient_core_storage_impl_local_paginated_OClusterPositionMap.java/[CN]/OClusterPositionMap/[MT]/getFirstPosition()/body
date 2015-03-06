@@ -1,11 +1,12 @@
 {
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     final long filledUpTo=diskCache.getFilledUpTo(fileId);
     for (long pageIndex=0; pageIndex < filledUpTo; pageIndex++) {
       OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
       try {
-        OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
+        OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
         int bucketSize=bucket.getSize();
         for (int index=0; index < bucketSize; index++) {
           if (bucket.exists(index))           return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;

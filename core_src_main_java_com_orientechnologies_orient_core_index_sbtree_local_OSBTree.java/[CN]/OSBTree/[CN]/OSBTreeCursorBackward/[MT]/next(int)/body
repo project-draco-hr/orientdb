@@ -5,12 +5,13 @@
   if (prefetchSize < 0 || prefetchSize > OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger())   prefetchSize=OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger();
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     while (dataCache.size() < prefetchSize) {
       if (pageIndex >= diskCache.getFilledUpTo(fileId))       pageIndex=diskCache.getFilledUpTo(fileId) - 1;
       if (pageIndex == -1)       break;
       final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
       try {
-        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (itemIndex >= bucket.size())         itemIndex=bucket.size() - 1;
         if (itemIndex < 0) {
           pageIndex=bucket.getLeftSibling();

@@ -1,11 +1,11 @@
 {
+  final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
   for (long pageIndex=0; pageIndex < MAX_LEVEL_SIZE; pageIndex++) {
     final OCacheEntry cacheEntry=loadPageEntry(pageIndex,0);
     cacheEntry.acquireExclusiveLock();
     try {
-      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,cacheEntry,keySerializer,valueSerializer,keyTypes,getTrackMode());
+      final OHashIndexBucket<K,V> emptyBucket=new OHashIndexBucket<K,V>(MAX_LEVEL_DEPTH,cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       cacheEntry.markDirty();
-      logPageChanges(emptyBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),true);
     }
   finally {
       cacheEntry.releaseExclusiveLock();
@@ -19,11 +19,10 @@
   diskCache.loadPinnedPage(hashStateEntry);
   hashStateEntry.acquireExclusiveLock();
   try {
-    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+    OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
     metadataPage.setBucketsCount(0,MAX_LEVEL_SIZE);
     metadataPage.setRecordsCount(0);
     hashStateEntry.markDirty();
-    logPageChanges(metadataPage,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
   }
   finally {
     hashStateEntry.releaseExclusiveLock();

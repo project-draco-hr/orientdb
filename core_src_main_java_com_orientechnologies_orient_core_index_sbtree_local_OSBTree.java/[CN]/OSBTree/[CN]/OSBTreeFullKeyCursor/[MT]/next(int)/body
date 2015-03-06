@@ -6,6 +6,7 @@
   if (prefetchSize == 0)   prefetchSize=1;
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     while (keysCache.size() < prefetchSize) {
       if (pageIndex == -1)       break;
       if (pageIndex >= diskCache.getFilledUpTo(fileId)) {
@@ -14,7 +15,7 @@
       }
       final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
       try {
-        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (itemIndex >= bucket.size()) {
           pageIndex=bucket.getRightSibling();
           itemIndex=0;

@@ -1,16 +1,16 @@
 {
   final long freeListPage=bucketToSplit.getValuesFreeListFirstIndex();
   final long treeSize=bucketToSplit.getTreeSize();
+  final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
   final List<OSBTreeBucket.SBTreeEntry<K,V>> leftEntries=new ArrayList<OSBTreeBucket.SBTreeEntry<K,V>>(indexToSplit);
   for (int i=0; i < indexToSplit; i++)   leftEntries.add(bucketToSplit.getEntry(i));
   OCacheEntry leftBucketEntry=diskCache.allocateNewPage(fileId);
   OCacheEntry rightBucketEntry=diskCache.allocateNewPage(fileId);
   leftBucketEntry.acquireExclusiveLock();
   try {
-    OSBTreeBucket<K,V> newLeftBucket=new OSBTreeBucket<K,V>(leftBucketEntry,splitLeaf,keySerializer,keyTypes,valueSerializer,getTrackMode());
+    OSBTreeBucket<K,V> newLeftBucket=new OSBTreeBucket<K,V>(leftBucketEntry,splitLeaf,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,leftBucketEntry));
     newLeftBucket.addAll(leftEntries);
     if (splitLeaf)     newLeftBucket.setRightSibling(rightBucketEntry.getPageIndex());
-    logPageChanges(newLeftBucket,fileId,leftBucketEntry.getPageIndex(),true);
   }
   finally {
     leftBucketEntry.releaseExclusiveLock();
@@ -18,21 +18,19 @@
   }
   rightBucketEntry.acquireExclusiveLock();
   try {
-    OSBTreeBucket<K,V> newRightBucket=new OSBTreeBucket<K,V>(rightBucketEntry,splitLeaf,keySerializer,keyTypes,valueSerializer,getTrackMode());
+    OSBTreeBucket<K,V> newRightBucket=new OSBTreeBucket<K,V>(rightBucketEntry,splitLeaf,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,rightBucketEntry));
     newRightBucket.addAll(rightEntries);
     if (splitLeaf)     newRightBucket.setLeftSibling(leftBucketEntry.getPageIndex());
-    logPageChanges(newRightBucket,fileId,rightBucketEntry.getPageIndex(),true);
     rightBucketEntry.markDirty();
   }
   finally {
     rightBucketEntry.releaseExclusiveLock();
     diskCache.release(rightBucketEntry);
   }
-  bucketToSplit=new OSBTreeBucket<K,V>(bucketEntry,false,keySerializer,keyTypes,valueSerializer,getTrackMode());
+  bucketToSplit=new OSBTreeBucket<K,V>(bucketEntry,false,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,bucketEntry));
   bucketToSplit.setTreeSize(treeSize);
   bucketToSplit.setValuesFreeListFirstIndex(freeListPage);
   bucketToSplit.addEntry(0,new OSBTreeBucket.SBTreeEntry<K,V>(leftBucketEntry.getPageIndex(),rightBucketEntry.getPageIndex(),separationKey,null),true);
-  logPageChanges(bucketToSplit,fileId,pageIndex,false);
   ArrayList<Long> resultPath=new ArrayList<Long>(path.subList(0,path.size() - 1));
   if (comparator.compare(keyToInsert,separationKey) < 0) {
     resultPath.add(leftBucketEntry.getPageIndex());

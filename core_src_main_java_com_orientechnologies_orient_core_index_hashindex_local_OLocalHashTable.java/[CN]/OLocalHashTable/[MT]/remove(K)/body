@@ -1,7 +1,7 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
+    final OAtomicOperation atomicOperation=startAtomicOperation();
     checkNullSupport(key);
     int sizeDiff=0;
     if (key != null) {
@@ -15,7 +15,7 @@
       final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
       cacheEntry.acquireExclusiveLock();
       try {
-        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getTrackMode());
+        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
         final int positionIndex=bucket.getIndex(hashCode,key);
         if (positionIndex < 0) {
           endAtomicOperation(false);
@@ -25,7 +25,6 @@
         sizeDiff--;
         mergeBucketsAfterDeletion(nodePath,bucket);
         cacheEntry.markDirty();
-        logPageChanges(bucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
       }
   finally {
         cacheEntry.releaseExclusiveLock();
@@ -47,13 +46,12 @@
       if (cacheEntry == null)       cacheEntry=diskCache.allocateNewPage(nullBucketFileId);
       cacheEntry.acquireExclusiveLock();
       try {
-        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getTrackMode(),valueSerializer,false);
+        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChangesTree(atomicOperation,cacheEntry),valueSerializer,false);
         removed=nullBucket.getValue();
         if (removed != null) {
           nullBucket.removeValue();
           sizeDiff--;
           cacheEntry.markDirty();
-          logPageChanges(nullBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
       }
   finally {

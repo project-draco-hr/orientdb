@@ -9,22 +9,23 @@
       long pageIndex=positionEntry.getPageIndex();
       int recordPosition=positionEntry.getRecordPosition();
       if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
-      final OClusterPage.TrackMode trackMode=getTrackMode();
       long nextPagePointer=-1;
       int removedContentSize=0;
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
       do {
         final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
         cacheEntry.acquireExclusiveLock();
         int initialFreePageIndex;
         try {
-          final OClusterPage localPage=new OClusterPage(cacheEntry,false,trackMode);
+          final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
           initialFreePageIndex=calculateFreePageIndex(localPage);
           if (localPage.isDeleted(recordPosition)) {
             if (removedContentSize == 0)             return false;
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0) {
-            startAtomicOperation();
+            atomicOperation=startAtomicOperation();
+            localPage.setChangesTree(getChangesTree(atomicOperation,cacheEntry));
             operationStarted=true;
             lockTillAtomicOperationCompletes();
           }
@@ -33,18 +34,17 @@
           localPage.deleteRecord(recordPosition);
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
-          logPageChanges(localPage,fileId,pageIndex,false);
         }
   finally {
           cacheEntry.releaseExclusiveLock();
           diskCache.release(cacheEntry);
         }
-        updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);
+        updateFreePagesIndex(initialFreePageIndex,pageIndex);
         pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
         recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
       }
  while (nextPagePointer >= 0);
-      updateClusterState(trackMode,-1,-removedContentSize);
+      updateClusterState(-1,-removedContentSize);
       clusterPositionMap.remove(clusterPosition);
       endAtomicOperation(false);
       return true;

@@ -1,11 +1,11 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
+    final OAtomicOperation atomicOperation=startAtomicOperation();
     diskCache.loadPinnedPage(hashStateEntry);
     hashStateEntry.acquireExclusiveLock();
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
       for (int i=0; i < HASH_CODE_SIZE; i++) {
         if (!page.isRemoved(i)) {
           diskCache.truncateFile(page.getFileId(i));
@@ -14,7 +14,6 @@
         }
       }
       hashStateEntry.markDirty();
-      logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
     }
   finally {
       hashStateEntry.releaseExclusiveLock();

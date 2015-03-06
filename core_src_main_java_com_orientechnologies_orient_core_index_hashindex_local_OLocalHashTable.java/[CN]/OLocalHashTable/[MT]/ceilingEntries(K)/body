@@ -1,6 +1,7 @@
 {
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     key=keySerializer.preprocess(key,(Object[])keyTypes);
     final long hashCode=keyHashFunction.hashCode(key);
     BucketPath bucketPath=getBucket(hashCode);
@@ -9,7 +10,7 @@
     long pageIndex=getPageIndex(bucketPointer);
     OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       while (bucket.size() == 0) {
         bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
         if (bucketPath == null)         return new OHashIndexBucket.Entry[0];
@@ -18,7 +19,7 @@
         fileLevel=getFileLevel(nextPointer);
         pageIndex=getPageIndex(nextPointer);
         cacheEntry=loadPageEntry(pageIndex,fileLevel);
-        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
+        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       }
       final int index=bucket.getIndex(hashCode,key);
       final int startIndex;

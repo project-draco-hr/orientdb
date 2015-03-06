@@ -1,6 +1,16 @@
 {
   database.begin();
-  for (int i=0; i < 100000; i++) {
+  OProfilerMBean profiler=Orient.instance().getProfiler();
+  long indexUsage=profiler.getCounter("db.demo.query.indexUsed");
+  long indexUsageReverted=profiler.getCounter("db.demo.query.indexUseAttemptedAndReverted");
+  if (indexUsage < 0) {
+    indexUsage=0;
+  }
+  if (indexUsageReverted < 0) {
+    indexUsageReverted=0;
+  }
+  profiler.startRecording();
+  for (int i=0; i < 10000; i++) {
     final ODocument doc0=new ODocument("IndexInSubclassesTestBase");
     doc0.field("name","name" + i);
     doc0.save();
@@ -15,30 +25,26 @@
     }
   }
   database.commit();
-  long begin=System.currentTimeMillis();
-  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name99995' and name < 'name99999' order by name ASC"));
-  System.out.println("elapsed: " + (System.currentTimeMillis() - begin));
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name9995' and name < 'name9999' order by name ASC"));
   Assert.assertTrue(result.size() == 9);
   String lastName=result.get(0).field("name");
-  System.out.println(lastName);
   for (int i=1; i < result.size(); i++) {
     ODocument current=result.get(i);
     String currentName=current.field("name");
     Assert.assertTrue(lastName.compareTo(currentName) <= 0);
     lastName=currentName;
-    System.out.println(currentName);
   }
-  begin=System.currentTimeMillis();
-  result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name99995' and name < 'name99999' order by name DESC"));
-  System.out.println("elapsed: " + (System.currentTimeMillis() - begin));
+  Assert.assertEquals(profiler.getCounter("db.demo.query.indexUsed"),indexUsage + 2);
+  long reverted=profiler.getCounter("db.demo.query.indexUseAttemptedAndReverted");
+  Assert.assertEquals(reverted < 0 ? 0 : reverted,indexUsageReverted);
+  result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBase where name > 'name9995' and name < 'name9999' order by name DESC"));
   Assert.assertTrue(result.size() == 9);
   lastName=result.get(0).field("name");
-  System.out.println(lastName);
   for (int i=1; i < result.size(); i++) {
     ODocument current=result.get(i);
     String currentName=current.field("name");
     Assert.assertTrue(lastName.compareTo(currentName) >= 0);
     lastName=currentName;
-    System.out.println(currentName);
   }
+  profiler.stopRecording();
 }

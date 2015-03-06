@@ -1,0 +1,37 @@
+{
+  database.begin();
+  OProfilerMBean profiler=Orient.instance().getProfiler();
+  profiler.startRecording();
+  for (int i=0; i < 10000; i++) {
+    final ODocument doc1=new ODocument("IndexInSubclassesTestChild1Fail");
+    doc1.field("name","name" + i);
+    doc1.save();
+    final ODocument doc2=new ODocument("IndexInSubclassesTestChild2Fail");
+    doc2.field("name","name" + i);
+    doc2.save();
+    if (i % 100 == 0) {
+      database.commit();
+    }
+  }
+  database.commit();
+  long indexUsage=profiler.getCounter("db.demo.query.indexUsed");
+  long indexUsageReverted=profiler.getCounter("db.demo.query.indexUseAttemptedAndReverted");
+  if (indexUsage < 0) {
+    indexUsage=0;
+  }
+  if (indexUsageReverted < 0) {
+    indexUsageReverted=0;
+  }
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from IndexInSubclassesTestBaseFail where name > 'name9995' and name < 'name9999' order by name ASC"));
+  Assert.assertTrue(result.size() == 6);
+  long lastIndexUsage=profiler.getCounter("db.demo.query.indexUsed");
+  long lastIndexUsageReverted=profiler.getCounter("db.demo.query.indexUseAttemptedAndReverted");
+  if (lastIndexUsage < 0) {
+    lastIndexUsage=0;
+  }
+  if (lastIndexUsageReverted < 0) {
+    lastIndexUsageReverted=0;
+  }
+  Assert.assertEquals(lastIndexUsage - indexUsage,lastIndexUsageReverted - indexUsageReverted);
+  profiler.stopRecording();
+}

@@ -4,7 +4,12 @@
   if (loadedRecord == null)   throw new ORecordNotFoundException("Record " + rid + " was not found on update");
   if (loadedRecord instanceof ODocument) {
     final ODocument newDocument=new ODocument().fromStream(content);
-    ((ODocument)loadedRecord).merge(newDocument,false,false).getRecordVersion().copyFrom(version);
+    ODocument loadedDocument=(ODocument)loadedRecord;
+    ORecordVersion loadedRecordVersion=loadedDocument.merge(newDocument,false,false).getRecordVersion();
+    if (loadedRecordVersion.getCounter() != version.getCounter()) {
+      loadedDocument.setDirty();
+    }
+    loadedRecordVersion.copyFrom(version);
   }
  else   ORecordInternal.fill(loadedRecord,rid,version,content,true);
   loadedRecord=database.save(loadedRecord);

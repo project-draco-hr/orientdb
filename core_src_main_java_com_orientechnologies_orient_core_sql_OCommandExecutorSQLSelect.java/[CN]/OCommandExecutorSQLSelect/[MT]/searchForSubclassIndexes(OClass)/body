@@ -1,3 +1,58 @@
 {
-  return false;
+  Collection<OClass> subclasses=iSchemaClass.getSubclasses();
+  if (subclasses.size() == 0) {
+    return false;
+  }
+  OOrderBy order=new OOrderBy();
+  order.setItems(new ArrayList<OOrderByItem>());
+  if (this.orderedFields != null) {
+    for (    OPair<String,String> pair : this.orderedFields) {
+      OOrderByItem item=new OOrderByItem();
+      item.setRecordAttr(pair.getKey());
+      if (pair.getValue() == null) {
+        item.setType(OOrderByItem.ASC);
+      }
+ else {
+        item.setType(pair.getValue().toUpperCase().equals("DESC") ? OOrderByItem.DESC : OOrderByItem.ASC);
+      }
+      order.getItems().add(item);
+    }
+  }
+  OSortedMultiIterator<OIdentifiable> cursor=new OSortedMultiIterator<OIdentifiable>(order);
+  boolean fullySorted=true;
+  if (!iSchemaClass.isAbstract()) {
+    Iterator<OIdentifiable> parentClassIterator=(Iterator<OIdentifiable>)searchInClasses(iSchemaClass,false,true);
+    if (parentClassIterator.hasNext()) {
+      cursor.add(parentClassIterator);
+      fullySorted=false;
+    }
+  }
+  if (uniqueResult != null) {
+    uniqueResult.clear();
+  }
+  int attempted=0;
+  for (  OClass subclass : subclasses) {
+    List<OIndexCursor> subcursors=getIndexCursors(subclass);
+    fullySorted=fullySorted && fullySortedByIndex;
+    if (subcursors == null || subcursors.size() == 0) {
+      if (attempted > 0) {
+        revertSubclassesProfiler(context,attempted);
+      }
+      return false;
+    }
+    for (    OIndexCursor c : subcursors) {
+      if (!fullySortedByIndex) {
+      }
+      attempted++;
+      cursor.add(c);
+    }
+  }
+  fullySortedByIndex=fullySorted;
+  uniqueResult=new HashSet<ORID>();
+  fetchFromTarget(cursor);
+  if (uniqueResult != null) {
+    uniqueResult.clear();
+  }
+  uniqueResult=null;
+  return true;
 }

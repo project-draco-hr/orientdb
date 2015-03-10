@@ -1,0 +1,39 @@
+{
+  ExecutorService pool=Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+  List<Callable<List<Long>>> callables=new ArrayList<Callable<List<Long>>>();
+  for (int i=0; i < DB_COUNT; ++i) {
+    final int id=i;
+    callables.add(new Callable<List<Long>>(){
+      @Override public List<Long> call() throws Exception {
+        final ODatabaseDocumentTx db=dbs[id];
+        ODatabaseRecordThreadLocal.INSTANCE.set(db);
+        List<Long> res=new ArrayList<Long>(SEQ_RUN_COUNT);
+        OSequence seq=db.getMetadata().getSequenceLibrary().getSequence(sequenceName);
+        long lastValue=-1;
+        for (int j=0; j < SEQ_RUN_COUNT; ++j) {
+          try {
+            long value=seq.next();
+            res.add(value);
+            lastValue=value;
+          }
+ catch (          OConcurrentModificationException ex) {
+            failures.incrementAndGet();
+          }
+        }
+        return res;
+      }
+    }
+);
+  }
+  List<Future<List<Long>>> results=pool.invokeAll(callables);
+  pool.shutdown();
+  pool.awaitTermination(Long.MAX_VALUE,TimeUnit.NANOSECONDS);
+  final int totalValues=SEQ_RUN_COUNT * DB_COUNT;
+  Set<Long> set=new HashSet<Long>(totalValues);
+  for (int i=0; i < DB_COUNT; ++i) {
+    List<Long> singleResults=results.get(i).get();
+    set.addAll(singleResults);
+  }
+  long expectedSize=set.size() - failures.get();
+  Assert.assertEquals("Distributed sequence of type " + sequenceType + " generates duplicate values",totalValues,expectedSize);
+}

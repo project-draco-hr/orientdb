@@ -1,0 +1,33 @@
+{
+  int retry=RETRY_COUNT;
+  while (retry > 0) {
+    try {
+      return callInTx(callable);
+    }
+ catch (    OConcurrentModificationException ex) {
+      --retry;
+      reloadSequence();
+    }
+catch (    OStorageException e) {
+      if (e.getCause() instanceof OConcurrentModificationException) {
+        --retry;
+        reloadSequence();
+      }
+ else {
+        throw new OSequenceException(e);
+      }
+    }
+catch (    Exception e) {
+      throw new OSequenceException(e);
+    }
+  }
+  try {
+    return callInTx(callable);
+  }
+ catch (  Exception e) {
+    if (e.getCause() instanceof OConcurrentModificationException) {
+      throw ((OConcurrentModificationException)e.getCause());
+    }
+    throw new OSequenceException(e);
+  }
+}

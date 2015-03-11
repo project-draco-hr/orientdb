@@ -1,4 +1,5 @@
 {
+  OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
   byte[] serializeValue=new byte[valueSerializer.getObjectSize(value)];
   valueSerializer.serializeNativeObject(value,serializeValue,0);
   final int amountOfPages=OSBTreeValuePage.calculateAmountOfPage(serializeValue.length);
@@ -6,8 +7,7 @@
   long freeListPageIndex=allocateValuePageFromFreeList();
   OCacheEntry cacheEntry;
   if (freeListPageIndex < 0)   cacheEntry=diskCache.allocateNewPage(fileId);
- else   cacheEntry=diskCache.load(fileId,freeListPageIndex,false);
-  OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+ else   cacheEntry=loadPage(atomicOperation,fileId,freeListPageIndex,false,diskCache);
   final long valueLink=cacheEntry.getPageIndex();
   cacheEntry.acquireExclusiveLock();
   try {
@@ -24,7 +24,7 @@
   for (int i=1; i < amountOfPages; i++) {
     freeListPageIndex=allocateValuePageFromFreeList();
     if (freeListPageIndex < 0)     cacheEntry=diskCache.allocateNewPage(fileId);
- else     cacheEntry=diskCache.load(fileId,freeListPageIndex,false);
+ else     cacheEntry=loadPage(atomicOperation,fileId,freeListPageIndex,false,diskCache);
     cacheEntry.acquireExclusiveLock();
     try {
       OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),freeListPageIndex >= 0);
@@ -36,7 +36,7 @@
       cacheEntry.releaseExclusiveLock();
       diskCache.release(cacheEntry);
     }
-    OCacheEntry prevPageCacheEntry=diskCache.load(fileId,prevPage,false);
+    OCacheEntry prevPageCacheEntry=loadPage(atomicOperation,fileId,prevPage,false,diskCache);
     prevPageCacheEntry.acquireExclusiveLock();
     try {
       OSBTreeValuePage valuePage=new OSBTreeValuePage(prevPageCacheEntry,getChangesTree(atomicOperation,prevPageCacheEntry),freeListPageIndex >= 0);

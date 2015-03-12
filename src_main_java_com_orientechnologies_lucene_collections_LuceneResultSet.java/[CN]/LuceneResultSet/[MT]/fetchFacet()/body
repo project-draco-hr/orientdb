@@ -1,0 +1,31 @@
+{
+  if (queryContext.facet) {
+    FacetsCollector facetsCollector=new FacetsCollector(true);
+    try {
+      FacetsCollector.search(queryContext.searcher,query,PAGE_SIZE,facetsCollector);
+      Facets facets=new FastTaxonomyFacetCounts(queryContext.reader,new FacetsConfig(),facetsCollector);
+      List<FacetResult> res=facets.getAllDims(10);
+      int i=0;
+      List<ODocument> documents=new ArrayList<ODocument>();
+      for (      FacetResult facetResult : res) {
+        ODocument doc=new ODocument();
+        doc.field("childCount",facetResult.childCount);
+        doc.field("value",facetResult.value);
+        doc.field("dim",facetResult.dim);
+        List<ODocument> labelsAndValue=new ArrayList<ODocument>();
+        for (        LabelAndValue labelValue : facetResult.labelValues) {
+          ODocument doc1=new ODocument();
+          doc1.field("label",labelValue.label);
+          doc1.field("value",labelValue.value);
+          labelsAndValue.add(doc1);
+        }
+        doc.field("labelsValue",labelsAndValue);
+        documents.add(doc);
+      }
+      queryContext.context.setVariable("$facet",documents);
+    }
+ catch (    IOException e) {
+      e.printStackTrace();
+    }
+  }
+}

@@ -11,15 +11,14 @@
     this.directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
     OAtomicOperation atomicOperation=startAtomicOperation();
     try {
-      fileStateId=diskCache.addFile(name + metadataConfigurationFileExtension);
-      logFileCreation(name + metadataConfigurationFileExtension,fileStateId);
+      fileStateId=addFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
       directory.create();
       hashStateEntry=addPage(atomicOperation,fileStateId,diskCache);
       pinPage(atomicOperation,hashStateEntry,diskCache);
       hashStateEntry.acquireExclusiveLock();
       try {
         OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),true);
-        createFileMetadata(0,page);
+        createFileMetadata(0,page,atomicOperation);
       }
   finally {
         hashStateEntry.releaseExclusiveLock();
@@ -28,10 +27,7 @@
       setKeySerializer(keySerializer);
       setValueSerializer(valueSerializer);
       initHashTreeState();
-      if (nullKeyIsSupported) {
-        nullBucketFileId=diskCache.addFile(name + nullBucketFileExtension);
-        logFileCreation(name + nullBucketFileExtension,nullBucketFileId);
-      }
+      if (nullKeyIsSupported)       nullBucketFileId=addFile(atomicOperation,name + nullBucketFileExtension,diskCache);
       endAtomicOperation(false);
     }
  catch (    IOException e) {

@@ -1,0 +1,44 @@
+{
+  String name=Integer.toString(serverId);
+  for (int i=0; i < count; i+=2) {
+    final OrientGraph graph=factory.getTx();
+    try {
+      if ((i + 1) % 100 == 0)       System.out.println("\nWriter " + databaseUrl + " managed "+ (i + 1)+ "/"+ count+ " vertices so far");
+      try {
+        OrientVertex person1=createVertex(graph,serverId,threadId,i);
+        OrientVertex person2=createVertex(graph,serverId,threadId,i + 1);
+        OrientEdge knows=createEdge(graph,person1,person2);
+        Assert.assertEquals(knows.getOutVertex(),person1.getIdentity());
+        Assert.assertEquals(knows.getInVertex(),person2.getIdentity());
+        graph.commit();
+        updateVertex(graph,person1);
+        checkVertex(graph,person1);
+        Assert.assertTrue(person1.getIdentity().isPersistent());
+        updateVertex(graph,person2);
+        checkVertex(graph,person2);
+        Assert.assertTrue(person2.getIdentity().isPersistent());
+      }
+ catch (      Exception e) {
+        graph.rollback();
+        throw e;
+      }
+      Thread.sleep(delayWriter);
+    }
+ catch (    InterruptedException e) {
+      System.out.println("Writer received interrupt (db=" + databaseUrl);
+      Thread.currentThread().interrupt();
+      break;
+    }
+catch (    Exception e) {
+      System.out.println("Writer received exception (db=" + databaseUrl);
+      e.printStackTrace();
+      break;
+    }
+ finally {
+      runningWriters.countDown();
+      graph.shutdown();
+    }
+  }
+  System.out.println("\nWriter " + name + " END");
+  return null;
+}

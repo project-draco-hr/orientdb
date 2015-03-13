@@ -1,0 +1,40 @@
+{
+  final ODatabaseDocumentInternal database=ODatabaseRecordThreadLocal.INSTANCE.get();
+  final ODatabaseDocumentTx db=((ODatabaseDocumentTx)database).copy();
+  final NonBlockingQueryFuture future=new NonBlockingQueryFuture();
+  if (database instanceof ODatabaseDocumentTx) {
+    Thread t=new Thread(new Runnable(){
+      @Override public void run(){
+        try {
+          db.setCurrentDatabaseInThreadLocal();
+          OSQLNonBlockingQuery.super.execute(iArgs);
+        }
+  finally {
+          if (db != null) {
+            try {
+              db.close();
+            }
+ catch (            Exception e) {
+              e.printStackTrace();
+            }
+          }
+          try {
+synchronized (future) {
+              future.finished=true;
+              future.notifyAll();
+            }
+          }
+ catch (          Exception e) {
+            e.printStackTrace();
+          }
+        }
+      }
+    }
+);
+    t.start();
+    return (RET)future;
+  }
+ else {
+    throw new RuntimeException("cannot run non blocking query with non tx db");
+  }
+}

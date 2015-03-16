@@ -3,57 +3,19 @@
   OCachePointer cachePointer=new OCachePointer(pagePointer,new OLogSequenceNumber(0,0));
   cachePointer.incrementReferrer();
   OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
+  ODirectMemoryPointer directPagePointer=new ODirectMemoryPointer(new byte[OClusterPage.PAGE_SIZE + ODurablePage.PAGE_PADDING]);
+  OCachePointer directCachePointer=new OCachePointer(directPagePointer,new OLogSequenceNumber(0,0));
+  directCachePointer.incrementReferrer();
+  OCacheEntry directCacheEntry=new OCacheEntry(0,0,directCachePointer,false);
   try {
     OClusterPage localPage=new OClusterPage(cacheEntry,true,new OWALChangesTree());
-    Map<Integer,Byte> positionCounter=new HashMap<Integer,Byte>();
-    Set<Integer> deletedPositions=new HashSet<Integer>();
-    int lastPosition;
-    byte counter=0;
-    int freeSpace=localPage.getFreeSpace();
-    ORecordVersion recordVersion=OVersionFactory.instance().createVersion();
-    recordVersion.increment();
-    do {
-      lastPosition=localPage.appendRecord(recordVersion,new byte[]{counter,counter,counter},false);
-      if (lastPosition >= 0) {
-        Assert.assertEquals(lastPosition,positionCounter.size());
-        positionCounter.put(lastPosition,counter);
-        counter++;
-        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - (19 + OVersionFactory.instance().getVersionSize()));
-        freeSpace=localPage.getFreeSpace();
-      }
-    }
- while (lastPosition >= 0);
-    int filledRecordsCount=positionCounter.size();
-    Assert.assertEquals(localPage.getRecordsCount(),filledRecordsCount);
-    for (int i=0; i < filledRecordsCount; i+=2) {
-      localPage.deleteRecord(i);
-      deletedPositions.add(i);
-      positionCounter.remove(i);
-    }
-    freeSpace=localPage.getFreeSpace();
-    do {
-      lastPosition=localPage.appendRecord(recordVersion,new byte[]{counter,counter,counter},false);
-      if (lastPosition >= 0) {
-        positionCounter.put(lastPosition,counter);
-        counter++;
-        Assert.assertEquals(localPage.getFreeSpace(),freeSpace - 15);
-        freeSpace=localPage.getFreeSpace();
-      }
-    }
- while (lastPosition >= 0);
-    ORecordVersion deletedVersion=OVersionFactory.instance().createVersion();
-    deletedVersion.copyFrom(recordVersion);
-    deletedVersion.increment();
-    Assert.assertEquals(localPage.getRecordsCount(),filledRecordsCount);
-    for (    Map.Entry<Integer,Byte> entry : positionCounter.entrySet()) {
-      Assert.assertEquals(localPage.getRecordBinaryValue(entry.getKey(),0,3),new byte[]{entry.getValue(),entry.getValue(),entry.getValue()});
-      Assert.assertEquals(localPage.getRecordSize(entry.getKey()),3);
-      if (deletedPositions.contains(entry.getKey()))       Assert.assertEquals(localPage.getRecordVersion(entry.getKey()),deletedVersion);
- else       Assert.assertEquals(localPage.getRecordVersion(entry.getKey()),recordVersion);
-    }
-    assertChangesTracking(localPage,pagePointer);
+    OClusterPage directLocalPage=new OClusterPage(directCacheEntry,true,null);
+    addFullPageDeleteAndAddAgain(localPage);
+    addFullPageDeleteAndAddAgain(directLocalPage);
+    assertChangesTracking(localPage,directPagePointer);
   }
   finally {
     cachePointer.decrementReferrer();
+    directCachePointer.decrementReferrer();
   }
 }

@@ -1,19 +1,26 @@
 {
-  acquireExclusiveLock();
-  try {
-    for (int retry=0; retry < 10; retry++)     try {
-      super.save();
-      getDatabase().getStorage().synch();
-      return (RET)this;
-    }
- catch (    OConcurrentModificationException e) {
-      reload(null,true);
-    }
-    super.save();
-    getDatabase().getStorage().synch();
-    return (RET)this;
-  }
+  OScenarioThreadLocal.executeAsDistributed(new Callable<Object>(){
+    @Override public Object call() throws Exception {
+      acquireExclusiveLock();
+      try {
+        for (int retry=0; retry < 10; retry++)         try {
+          toStream();
+          document.save();
+          getDatabase().getStorage().synch();
+          break;
+        }
+ catch (        OConcurrentModificationException e) {
+          reload(null,true);
+        }
+        document.save();
+        getDatabase().getStorage().synch();
+        return null;
+      }
   finally {
-    releaseExclusiveLock();
+        releaseExclusiveLock();
+      }
+    }
   }
+);
+  return (RET)this;
 }

@@ -3,9 +3,11 @@
     wrapped.commit(iTx,callback);
     return;
   }
+  final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+  final String localNodeName=dManager.getLocalNodeName();
+  checkNodeIsMaster(localNodeName,dbCfg);
   try {
-    final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-    if (!dbCfg.isReplicationActive(null,dManager.getLocalNodeName())) {
+    if (!dbCfg.isReplicationActive(null,localNodeName)) {
       ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
         @Override public Object call() throws Exception {
           wrapped.commit(iTx,callback);
@@ -78,12 +80,12 @@ if (record != null) ORecordInternal.unsetDirty(record);
 }
 }
  else if (result instanceof Throwable) {
-if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error: %s",result,result.toString());
+if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error: %s",result,result.toString());
 if (result instanceof OTransactionException || result instanceof ONeedRetryException) throw (RuntimeException)result;
 throw new OTransactionException("Error on committing distributed transaction",(Throwable)result);
 }
  else {
-if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
+if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
 throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
 }
 return;
@@ -96,7 +98,7 @@ return null;
 }
 }
 );
-nodes.remove(dManager.getLocalNodeName());
+nodes.remove(localNodeName);
 if (!nodes.isEmpty()) {
 if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
  else asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask));

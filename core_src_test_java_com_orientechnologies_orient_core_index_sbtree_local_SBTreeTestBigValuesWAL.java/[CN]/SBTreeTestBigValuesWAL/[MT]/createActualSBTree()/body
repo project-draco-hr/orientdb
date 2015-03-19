@@ -1,6 +1,7 @@
 {
   actualStorageConfiguration.clusters=new ArrayList<OStorageClusterConfiguration>();
   actualStorageConfiguration.fileTemplate=new OStorageSegmentConfiguration();
+  actualStorageConfiguration.binaryFormatVersion=Integer.MAX_VALUE;
   actualStorageDir=buildDirectory + "/sbtreeWithBigValuesWALTestActual";
   when(actualStorage.getStoragePath()).thenReturn(actualStorageDir);
   when(actualStorage.getName()).thenReturn("sbtreeBigValuesWithWALTesActual");
@@ -8,12 +9,18 @@
   if (!buildDir.exists())   buildDir.mkdirs();
   File actualStorageDirFile=new File(actualStorageDir);
   if (!actualStorageDirFile.exists())   actualStorageDirFile.mkdirs();
+  OStorageVariableParser variableParser=new OStorageVariableParser(actualStorageDir);
+  when(actualStorage.getVariableParser()).thenReturn(variableParser);
+  when(actualStorage.getComponentsFactory()).thenReturn(new OCurrentStorageComponentsFactory(actualStorageConfiguration));
   writeAheadLog=new ODiskWriteAheadLog(6000,-1,10 * 1024L * OWALPage.PAGE_SIZE,actualStorage);
+  when(actualStorage.getWALInstance()).thenReturn(writeAheadLog);
+  actualAtomicOperationsManager=new OAtomicOperationsManager(actualStorage);
   actualDiskCache=new OReadWriteDiskCache(400L * 1024 * 1024* 1024,1648L * 1024 * 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,1000000,100,actualStorage,null,false,false);
   when(actualStorage.getStorageTransaction()).thenReturn(null);
   when(actualStorage.getDiskCache()).thenReturn(actualDiskCache);
   when(actualStorage.getWALInstance()).thenReturn(writeAheadLog);
   when(actualStorage.getConfiguration()).thenReturn(actualStorageConfiguration);
+  when(actualStorage.getAtomicOperationsManager()).thenReturn(actualAtomicOperationsManager);
   when(actualStorage.getMode()).thenReturn("rw");
   when(actualStorageConfiguration.getDirectory()).thenReturn(actualStorageDir);
   sbTree=new OSBTree<Integer,byte[]>(".sbt",true,".nbt");

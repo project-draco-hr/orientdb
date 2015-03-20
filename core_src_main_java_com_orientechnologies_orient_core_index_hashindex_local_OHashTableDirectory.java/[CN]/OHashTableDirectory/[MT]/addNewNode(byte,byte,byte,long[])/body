@@ -1,2 +1,65 @@
 {
+  int nodeIndex;
+  acquireExclusiveLock();
+  try {
+    OAtomicOperation atomicOperation=startAtomicOperation();
+    OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true,diskCache);
+    firstEntry.acquireExclusiveLock();
+    try {
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
+      final int tombstone=firstPage.getTombstone();
+      if (tombstone >= 0)       nodeIndex=tombstone;
+ else {
+        nodeIndex=firstPage.getTreeSize();
+        firstPage.setTreeSize(nodeIndex + 1);
+      }
+      if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
+        final int localNodeIndex=nodeIndex;
+        firstPage.setMaxLeftChildDepth(localNodeIndex,maxLeftChildDepth);
+        firstPage.setMaxRightChildDepth(localNodeIndex,maxRightChildDepth);
+        firstPage.setNodeLocalDepth(localNodeIndex,nodeLocalDepth);
+        if (tombstone >= 0)         firstPage.setTombstone((int)firstPage.getPointer(nodeIndex,0));
+        for (int i=0; i < newNode.length; i++)         firstPage.setPointer(localNodeIndex,i,newNode[i]);
+      }
+ else {
+        final int pageIndex=nodeIndex / ODirectoryPage.NODES_PER_PAGE;
+        final int localLevel=nodeIndex % ODirectoryPage.NODES_PER_PAGE;
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true,diskCache);
+        while (cacheEntry == null || cacheEntry.getPageIndex() < pageIndex) {
+          if (cacheEntry != null)           releasePage(atomicOperation,cacheEntry,diskCache);
+          cacheEntry=addPage(atomicOperation,fileId,diskCache);
+        }
+        cacheEntry.acquireExclusiveLock();
+        try {
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),cacheEntry);
+          page.setMaxLeftChildDepth(localLevel,maxLeftChildDepth);
+          page.setMaxRightChildDepth(localLevel,maxRightChildDepth);
+          page.setNodeLocalDepth(localLevel,nodeLocalDepth);
+          if (tombstone >= 0)           firstPage.setTombstone((int)page.getPointer(localLevel,0));
+          for (int i=0; i < newNode.length; i++)           page.setPointer(localLevel,i,newNode[i]);
+        }
+  finally {
+          cacheEntry.releaseExclusiveLock();
+          releasePage(atomicOperation,cacheEntry,diskCache);
+        }
+      }
+    }
+  finally {
+      firstEntry.releaseExclusiveLock();
+      releasePage(atomicOperation,firstEntry,diskCache);
+    }
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  Throwable e) {
+    endAtomicOperation(true);
+    throw new OStorageException(null,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+  return nodeIndex;
 }

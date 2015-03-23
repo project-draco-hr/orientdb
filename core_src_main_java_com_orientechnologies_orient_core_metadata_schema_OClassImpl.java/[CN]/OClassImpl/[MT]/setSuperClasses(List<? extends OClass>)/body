@@ -1,0 +1,31 @@
+{
+  getDatabase().checkSecurity(ORule.ResourceGeneric.SCHEMA,ORole.PERMISSION_UPDATE);
+  acquireSchemaWriteLock();
+  try {
+    final ODatabaseDocumentInternal database=getDatabase();
+    final OStorage storage=database.getStorage();
+    String superClasses=null;
+    if (classes != null && classes.size() > 0) {
+      StringBuilder sb=new StringBuilder();
+      for (      OClass superClass : classes) {
+        sb.append(superClass.getName()).append(',');
+      }
+      sb.deleteCharAt(sb.length() - 1);
+    }
+    final String cmd=String.format("alter class %s superclasses %s",name,superClasses);
+    if (storage instanceof OStorageProxy) {
+      database.command(new OCommandSQL(cmd)).execute();
+    }
+ else     if (isDistributedCommand()) {
+      final OCommandSQL commandSQL=new OCommandSQL(cmd);
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      setSuperClassesInternal(classes);
+    }
+ else     setSuperClassesInternal(classes);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
+  return this;
+}

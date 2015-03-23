@@ -1,0 +1,32 @@
+{
+  if (iClassName == null)   return null;
+  acquireSchemaReadLock();
+  try {
+    OClass cls=classes.get(iClassName.toLowerCase());
+    if (cls != null)     return cls;
+  }
+  finally {
+    releaseSchemaReadLock();
+  }
+  OClass cls;
+  int[] clusterIds=null;
+  int retry=0;
+  while (true)   try {
+    acquireSchemaWriteLock();
+    try {
+      cls=classes.get(iClassName.toLowerCase());
+      if (cls != null)       return cls;
+      cls=doCreateClass(iClassName,Arrays.asList(superClasses),clusterIds,retry);
+      addClusterClassMap(cls);
+    }
+  finally {
+      releaseSchemaWriteLock();
+    }
+    break;
+  }
+ catch (  ClusterIdsAreEmptyException e) {
+    clusterIds=createClusters(iClassName);
+    retry++;
+  }
+  return cls;
+}

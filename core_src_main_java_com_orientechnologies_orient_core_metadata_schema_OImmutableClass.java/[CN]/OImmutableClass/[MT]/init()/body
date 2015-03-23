@@ -1,25 +1,20 @@
 {
-  initSuperClass();
-  final Collection<OProperty> allProperties=new ArrayList<OProperty>();
-  OImmutableClass currentClass=this;
-  do {
-    allProperties.addAll(currentClass.properties.values());
-    currentClass.initSuperClass();
-    currentClass=currentClass.superClass;
-  }
- while (currentClass != null);
-  this.allProperties=Collections.unmodifiableCollection(allProperties);
-  final Map<String,OProperty> allPropsMap=new HashMap<String,OProperty>(20);
-  OImmutableClass currentMapClass=this;
-  do {
-    for (    OProperty p : currentMapClass.properties.values()) {
+  if (!inited) {
+    initSuperClasses();
+    final Collection<OProperty> allProperties=new ArrayList<OProperty>();
+    final Map<String,OProperty> allPropsMap=new HashMap<String,OProperty>(20);
+    for (int i=superClasses.size() - 1; i >= 0; i--) {
+      allProperties.addAll(superClasses.get(i).allProperties);
+      allPropsMap.putAll(superClasses.get(i).allPropertiesMap);
+    }
+    allProperties.addAll(properties.values());
+    for (    OProperty p : properties.values()) {
       final String propName=p.getName();
       if (!allPropsMap.containsKey(propName))       allPropsMap.put(propName,p);
     }
-    currentMapClass.initSuperClass();
-    currentMapClass=currentMapClass.superClass;
+    this.allProperties=Collections.unmodifiableCollection(allProperties);
+    this.allPropertiesMap=Collections.unmodifiableMap(allPropsMap);
+    this.restricted=isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME);
+    inited=true;
   }
- while (currentMapClass != null);
-  allPropertiesMap=Collections.unmodifiableMap(allPropsMap);
-  this.restricted=isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME);
 }

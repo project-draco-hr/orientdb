@@ -2,14 +2,13 @@
   final ODiskCache expectedDiskCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getDiskCache();
   for (  OWALRecord walRecord : records) {
     atomicUnit.add(walRecord);
-    if (!atomicChangeIsProcessed) {
-      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
+    if (!atomicChangeIsProcessed && walRecord instanceof OAtomicUnitStartRecord) {
       atomicChangeIsProcessed=true;
     }
  else     if (walRecord instanceof OAtomicUnitEndRecord) {
       atomicChangeIsProcessed=false;
       for (      OWALRecord restoreRecord : atomicUnit) {
-        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord)         continue;
+        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord || restoreRecord instanceof ONonTxOperationPerformedWALRecord|| restoreRecord instanceof OFullCheckpointStartRecord|| restoreRecord instanceof OCheckpointEndRecord)         continue;
         if (restoreRecord instanceof OUpdatePageRecord) {
           final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
           final long fileId=updatePageRecord.getFileId();
@@ -33,13 +32,15 @@
         }
  else         if (restoreRecord instanceof OFileCreatedCreatedWALRecord) {
           final OFileCreatedCreatedWALRecord fileCreatedCreatedRecord=(OFileCreatedCreatedWALRecord)restoreRecord;
-          expectedDiskCache.openFile(fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable"),fileCreatedCreatedRecord.getFileId());
+          String fileName=fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable");
+          if (expectedDiskCache.exists(fileName))           expectedDiskCache.openFile(fileName,fileCreatedCreatedRecord.getFileId());
+ else           expectedDiskCache.addFile(fileName);
         }
       }
       atomicUnit.clear();
     }
  else {
-      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedCreatedWALRecord);
+      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedCreatedWALRecord || walRecord instanceof ONonTxOperationPerformedWALRecord|| walRecord instanceof OFullCheckpointStartRecord|| walRecord instanceof OCheckpointEndRecord);
     }
   }
   return atomicChangeIsProcessed;

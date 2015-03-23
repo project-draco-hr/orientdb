@@ -5,14 +5,14 @@
     OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     if (key != null) {
       key=keySerializer.preprocess(key,(Object[])keyTypes);
-      BucketSearchResult bucketSearchResult=findBucket(key);
+      BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
       if (bucketSearchResult.itemIndex < 0)       return null;
       long pageIndex=bucketSearchResult.getLastPathItem();
       OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
       try {
         OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
         OSBTreeBucket.SBTreeEntry<K,V> treeEntry=keyBucket.getEntry(bucketSearchResult.itemIndex);
-        return readValue(treeEntry.value);
+        return readValue(treeEntry.value,atomicOperation);
       }
   finally {
         releasePage(atomicOperation,keyBucketCacheEntry,diskCache);
@@ -25,7 +25,7 @@
         final ONullBucket<V> nullBucket=new ONullBucket<V>(nullBucketCacheEntry,getChangesTree(atomicOperation,nullBucketCacheEntry),valueSerializer,false);
         final OSBTreeValue<V> treeValue=nullBucket.getValue();
         if (treeValue == null)         return null;
-        return readValue(treeValue);
+        return readValue(treeValue,atomicOperation);
       }
   finally {
         releasePage(atomicOperation,nullBucketCacheEntry,diskCache);

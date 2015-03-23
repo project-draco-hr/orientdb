@@ -1,0 +1,51 @@
+{
+  byte[] serializeValue=new byte[valueSerializer.getObjectSize(value)];
+  valueSerializer.serializeNativeObject(value,serializeValue,0);
+  final int amountOfPages=OSBTreeValuePage.calculateAmountOfPage(serializeValue.length);
+  int position=0;
+  long freeListPageIndex=allocateValuePageFromFreeList(atomicOperation);
+  OCacheEntry cacheEntry;
+  if (freeListPageIndex < 0)   cacheEntry=addPage(atomicOperation,fileId,diskCache);
+ else   cacheEntry=loadPage(atomicOperation,fileId,freeListPageIndex,false,diskCache);
+  final long valueLink=cacheEntry.getPageIndex();
+  cacheEntry.acquireExclusiveLock();
+  try {
+    OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),freeListPageIndex >= 0);
+    position=valuePage.fillBinaryContent(serializeValue,position);
+    valuePage.setNextFreeListPage(-1);
+    valuePage.setNextPage(-1);
+  }
+  finally {
+    cacheEntry.releaseExclusiveLock();
+    releasePage(atomicOperation,cacheEntry,diskCache);
+  }
+  long prevPage=valueLink;
+  for (int i=1; i < amountOfPages; i++) {
+    freeListPageIndex=allocateValuePageFromFreeList(atomicOperation);
+    if (freeListPageIndex < 0)     cacheEntry=addPage(atomicOperation,fileId,diskCache);
+ else     cacheEntry=loadPage(atomicOperation,fileId,freeListPageIndex,false,diskCache);
+    cacheEntry.acquireExclusiveLock();
+    try {
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),freeListPageIndex >= 0);
+      position=valuePage.fillBinaryContent(serializeValue,position);
+      valuePage.setNextFreeListPage(-1);
+      valuePage.setNextPage(-1);
+    }
+  finally {
+      cacheEntry.releaseExclusiveLock();
+      releasePage(atomicOperation,cacheEntry,diskCache);
+    }
+    OCacheEntry prevPageCacheEntry=loadPage(atomicOperation,fileId,prevPage,false,diskCache);
+    prevPageCacheEntry.acquireExclusiveLock();
+    try {
+      OSBTreeValuePage valuePage=new OSBTreeValuePage(prevPageCacheEntry,getChangesTree(atomicOperation,prevPageCacheEntry),freeListPageIndex >= 0);
+      valuePage.setNextPage(cacheEntry.getPageIndex());
+    }
+  finally {
+      prevPageCacheEntry.releaseExclusiveLock();
+      releasePage(atomicOperation,prevPageCacheEntry,diskCache);
+    }
+    prevPage=cacheEntry.getPageIndex();
+  }
+  return valueLink;
+}

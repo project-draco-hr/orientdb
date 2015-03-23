@@ -4,18 +4,19 @@
   try {
     if (key != null) {
       key=keySerializer.preprocess(key,(Object[])keyTypes);
-      BucketSearchResult bucketSearchResult=findBucket(key);
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+      BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
       if (bucketSearchResult.itemIndex < 0)       return null;
-      OAtomicOperation atomicOperation=startAtomicOperation();
+      atomicOperation=startAtomicOperation();
       OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketSearchResult.getLastPathItem(),false,diskCache);
       keyBucketCacheEntry.acquireExclusiveLock();
       try {
         OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
         final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
-        final V value=readValue(removed);
+        final V value=readValue(removed,atomicOperation);
         long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
-        if (removedValueLink >= 0)         removeLinkedValue(removedValueLink);
-        setSize(size() - 1);
+        if (removedValueLink >= 0)         removeLinkedValue(removedValueLink,atomicOperation);
+        setSize(size() - 1,atomicOperation);
         endAtomicOperation(false);
         return value;
       }
@@ -40,14 +41,14 @@
           ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getChangesTree(atomicOperation,nullCacheEntry),valueSerializer,false);
           OSBTreeValue<V> treeValue=nullBucket.getValue();
           if (treeValue == null)           return null;
-          removedValue=readValue(treeValue);
+          removedValue=readValue(treeValue,atomicOperation);
           nullBucket.removeValue();
         }
   finally {
           nullCacheEntry.releaseExclusiveLock();
           releasePage(atomicOperation,nullCacheEntry,diskCache);
         }
-        if (removedValue != null)         setSize(size() - 1);
+        if (removedValue != null)         setSize(size() - 1,atomicOperation);
         endAtomicOperation(false);
         return removedValue;
       }

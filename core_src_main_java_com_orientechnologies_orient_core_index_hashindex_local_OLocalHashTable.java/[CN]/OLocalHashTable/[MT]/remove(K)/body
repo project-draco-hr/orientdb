@@ -12,7 +12,7 @@
       final long pageIndex=getPageIndex(bucketPointer);
       final int fileLevel=getFileLevel(bucketPointer);
       final V removed;
-      final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+      final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
       cacheEntry.acquireExclusiveLock();
       try {
         final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
@@ -23,7 +23,7 @@
         }
         removed=bucket.deleteEntry(positionIndex).value;
         sizeDiff--;
-        mergeBucketsAfterDeletion(nodePath,bucket);
+        mergeBucketsAfterDeletion(nodePath,bucket,atomicOperation);
       }
   finally {
         cacheEntry.releaseExclusiveLock();
@@ -34,7 +34,7 @@
         final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(directory.getNode(nodePath.nodeIndex),hashMapSize);
         if (allMapsContainSameBucket)         mergeNodeToParent(nodePath);
       }
-      changeSize(sizeDiff);
+      changeSize(sizeDiff,atomicOperation);
       endAtomicOperation(false);
       return removed;
     }
@@ -56,7 +56,7 @@
         cacheEntry.releaseExclusiveLock();
         releasePage(atomicOperation,cacheEntry,diskCache);
       }
-      changeSize(sizeDiff);
+      changeSize(sizeDiff,atomicOperation);
       endAtomicOperation(false);
       return removed;
     }

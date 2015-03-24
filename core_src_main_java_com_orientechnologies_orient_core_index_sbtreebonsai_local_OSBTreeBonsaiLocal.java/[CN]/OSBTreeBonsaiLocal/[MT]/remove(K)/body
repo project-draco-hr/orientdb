@@ -1,10 +1,10 @@
 {
   acquireExclusiveLock();
   try {
-    BucketSearchResult bucketSearchResult=findBucket(key);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
     if (bucketSearchResult.itemIndex < 0)     return null;
     OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
     final V removed;
     keyBucketCacheEntry.acquireExclusiveLock();
@@ -18,7 +18,7 @@
       keyBucketCacheEntry.releaseExclusiveLock();
       releasePage(atomicOperation,keyBucketCacheEntry,diskCache);
     }
-    setSize(size() - 1);
+    setSize(size() - 1,atomicOperation);
     endAtomicOperation(false);
     return removed;
   }

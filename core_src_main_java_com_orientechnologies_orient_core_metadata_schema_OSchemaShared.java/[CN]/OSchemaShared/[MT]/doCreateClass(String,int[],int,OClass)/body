@@ -11,10 +11,17 @@
     if (!isDistributedCommand())     checkClustersAreAbsent(clusterIds);
     cmd=new StringBuilder("create class ");
     cmd.append(className);
-    if (superClasses != null && !superClasses.isEmpty()) {
+    List<OClass> superClassesList=new ArrayList<OClass>();
+    if (superClasses != null && superClasses.length > 0) {
       cmd.append(" extends ");
+      boolean first=true;
       for (      OClass superClass : superClasses) {
-        cmd.append(superClass.getName()).append(", ");
+        if (superClass != null) {
+          if (!first)           cmd.append(", ");
+          cmd.append(superClass.getName());
+          first=false;
+          superClassesList.add(superClass);
+        }
       }
       cmd.setLength(cmd.length() - 2);
     }
@@ -30,7 +37,7 @@
       }
     }
     if (isDistributedCommand()) {
-      createClassInternal(className,superClasses,clusterIds);
+      createClassInternal(className,clusterIds,superClassesList);
       final OAutoshardedStorage autoshardedStorage=(OAutoshardedStorage)storage;
       OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       commandSQL.addExcludedNode(autoshardedStorage.getNodeId());
@@ -40,7 +47,7 @@
       db.command(new OCommandSQL(cmd.toString())).execute();
       reload();
     }
- else     createClassInternal(className,superClasses,clusterIds);
+ else     createClassInternal(className,clusterIds,superClassesList);
     result=classes.get(className.toLowerCase());
     for (Iterator<ODatabaseLifecycleListener> it=Orient.instance().getDbLifecycleListeners(); it.hasNext(); )     it.next().onCreateClass(getDatabase(),result);
   }

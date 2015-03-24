@@ -4,12 +4,13 @@
   try {
     acquireExclusiveLock();
     try {
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
       if (positionEntry == null)       return;
       int recordPosition=positionEntry.getRecordPosition();
       long pageIndex=positionEntry.getPageIndex();
       long pagePointer=createPagePointer(pageIndex,recordPosition);
-      byte[] fullEntryContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
+      byte[] fullEntryContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
       if (fullEntryContent == null)       return;
       if (useCRC32) {
         CRC32 crc32=new CRC32();
@@ -27,7 +28,7 @@
         if (!useCRC32)         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
  else         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + 2 * OIntegerSerializer.INT_SIZE];
       }
-      OAtomicOperation atomicOperation=startAtomicOperation();
+      atomicOperation=startAtomicOperation();
       try {
         int entryPosition=0;
         recordEntry[entryPosition]=recordType;
@@ -87,7 +88,7 @@
             cacheEntry.releaseExclusiveLock();
             releasePage(atomicOperation,cacheEntry,diskCache);
           }
-          updateFreePagesIndex(freePageIndex,pageIndex);
+          updateFreePagesIndex(freePageIndex,pageIndex,atomicOperation);
         }
         int from=currentPos;
         int to=from + (OClusterPage.MAX_RECORD_SIZE - OByteSerializer.BYTE_SIZE - OLongSerializer.LONG_SIZE);
@@ -98,7 +99,7 @@
           if (from > 0)           entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=0;
  else           entryContent[entryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE]=1;
           OLongSerializer.INSTANCE.serializeNative(-1L,entryContent,entryContent.length - OLongSerializer.LONG_SIZE);
-          final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent);
+          final AddEntryResult addEntryResult=addEntry(recordVersion,entryContent,atomicOperation);
           recordsSizeDiff+=addEntryResult.recordsSizeDiff;
           long addedPagePointer=createPagePointer(addEntryResult.pageIndex,addEntryResult.pagePosition);
           if (prevPageRecordPointer >= 0) {
@@ -120,7 +121,7 @@
           to=to + (OClusterPage.MAX_RECORD_SIZE - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE);
           if (to > recordEntry.length)           to=recordEntry.length;
         }
-        updateClusterState(0,recordsSizeDiff);
+        updateClusterState(0,recordsSizeDiff,atomicOperation);
         endAtomicOperation(false);
       }
  catch (      Throwable e) {

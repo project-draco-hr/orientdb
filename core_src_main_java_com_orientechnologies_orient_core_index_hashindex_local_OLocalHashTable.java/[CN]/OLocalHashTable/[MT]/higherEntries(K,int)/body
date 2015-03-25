@@ -3,6 +3,9 @@
   try {
     final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     key=keySerializer.preprocess(key,(Object[])keyTypes);
+    if (keyHashFunction instanceof OMurmurHash3HashFunction) {
+      ((OMurmurHash3HashFunction)keyHashFunction).setValueSerializer(keySerializer);
+    }
     final long hashCode=keyHashFunction.hashCode(key);
     BucketPath bucketPath=getBucket(hashCode);
     long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
@@ -13,7 +16,7 @@
       OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       while (bucket.size() == 0 || comparator.compare(bucket.getKey(bucket.size() - 1),key) <= 0) {
         bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
-        if (bucketPath == null)         return new OHashIndexBucket.Entry[0];
+        if (bucketPath == null)         return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
         releasePage(atomicOperation,cacheEntry,diskCache);
         final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
         fileLevel=getFileLevel(nextPointer);

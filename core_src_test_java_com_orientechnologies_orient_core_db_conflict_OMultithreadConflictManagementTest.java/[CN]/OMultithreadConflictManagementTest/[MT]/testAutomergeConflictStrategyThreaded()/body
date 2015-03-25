@@ -1,0 +1,56 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + OMultithreadConflictManagementTest.class.getSimpleName());
+  db.create();
+  db.setConflictStrategy("automerge");
+  try {
+    db.begin();
+    ORidBag bag=new ORidBag();
+    bag.add(new ORecordId(30,20));
+    ODocument doc=new ODocument();
+    doc.field("bag",bag);
+    doc=db.save(doc);
+    db.commit();
+    final ORID id;
+    id=doc.getIdentity();
+    ExecutorService service=Executors.newFixedThreadPool(2);
+    final AtomicInteger interger=new AtomicInteger(0);
+    Runnable runnable=new Runnable(){
+      @Override public void run(){
+        ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + OMultithreadConflictManagementTest.class.getSimpleName());
+        db.setConflictStrategy("automerge");
+        db.open("admin","admin");
+        db.begin();
+        ODocument doc=db.load(id);
+        ORidBag bag1=((ORidBag)doc.field("bag"));
+        ORecordId newId=new ORecordId(30,30 + interger.incrementAndGet());
+        bag1.add(newId);
+        db.save(doc);
+        db.commit();
+        db.close();
+        ORidBag bag=doc.field("bag");
+        bag.setAutoConvertToRecord(false);
+      }
+    }
+;
+    service.execute(runnable);
+    service.execute(runnable);
+    service.shutdown();
+    try {
+      service.awaitTermination(1,TimeUnit.HOURS);
+    }
+ catch (    InterruptedException e) {
+    }
+    db.getLocalCache().clear();
+    doc=db.load(id);
+    ORidBag bag2=doc.field("bag");
+    bag2.setAutoConvertToRecord(false);
+    List<ORecordId> ids=new ArrayList<ORecordId>(Arrays.asList(new ORecordId(30,20),new ORecordId(30,31),new ORecordId(30,32)));
+    for (    OIdentifiable ide : bag2) {
+      assertTrue(ids.remove(ide));
+    }
+    assertTrue(ids.isEmpty());
+  }
+  finally {
+    db.drop();
+  }
+}

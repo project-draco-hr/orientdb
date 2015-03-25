@@ -1,2 +1,38 @@
 {
+  acquireExclusiveLock();
+  try {
+    storage=storageLocal;
+    final ODiskCache diskCache=storage.getDiskCache();
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    if (isFileExists(atomicOperation,name + metadataConfigurationFileExtension,diskCache)) {
+      fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
+      OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,0,true,diskCache);
+      try {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        for (int i=0; i < HASH_CODE_SIZE; i++) {
+          if (!metadataPage.isRemoved(i)) {
+            final long fileId=metadataPage.getFileId(i);
+            openFile(atomicOperation,fileId,diskCache);
+            deleteFile(atomicOperation,fileId,diskCache);
+          }
+        }
+      }
+  finally {
+        diskCache.release(hashStateEntry);
+      }
+      diskCache.deleteFile(fileStateId);
+      directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+      directory.deleteWithoutOpen();
+      if (isFileExists(atomicOperation,name + nullBucketFileExtension,diskCache)) {
+        final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension,diskCache);
+        deleteFile(atomicOperation,nullBucketId,diskCache);
+      }
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Can not delete hash table with name " + name,ioe);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

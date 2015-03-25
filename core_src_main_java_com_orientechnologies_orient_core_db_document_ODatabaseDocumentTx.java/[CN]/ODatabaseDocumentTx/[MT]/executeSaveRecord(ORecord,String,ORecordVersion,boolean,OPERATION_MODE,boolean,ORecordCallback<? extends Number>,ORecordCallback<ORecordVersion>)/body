@@ -32,7 +32,10 @@
         if (callTriggers) {
           final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
           final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
-          if (hookResult == ORecordHook.RESULT.RECORD_CHANGED)           stream=updateStream(record);
+          if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
+            if (record instanceof ODocument)             ((ODocument)record).validate();
+            stream=updateStream(record);
+          }
  else           if (hookResult == ORecordHook.RESULT.SKIP_IO)           return (RET)record;
  else           if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)           return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
         }
@@ -41,7 +44,7 @@
  else       if (!record.isDirty())       return (RET)record;
       try {
         boolean updateContent=ORecordInternal.isContentChanged(record);
-        byte[] content=(stream == null) ? new byte[0] : stream;
+        byte[] content=(stream == null) ? OCommonConst.EMPTY_BYTE_ARRAY : stream;
         byte recordType=ORecordInternal.getRecordType(record);
         final int modeIndex=mode.ordinal();
         Orient.instance().getRecordFactoryManager().getRecordTypeClass(recordType);

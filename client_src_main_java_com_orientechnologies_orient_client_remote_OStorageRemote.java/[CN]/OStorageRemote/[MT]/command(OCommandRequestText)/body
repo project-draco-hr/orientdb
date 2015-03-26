@@ -1,6 +1,7 @@
 {
   if (!(iCommand instanceof OSerializableStream))   throw new OCommandExecutionException("Cannot serialize the command to be executed to the server side.");
   Object result=null;
+  final boolean live=iCommand instanceof OLiveQuery;
   final ODatabaseDocument database=ODatabaseRecordThreadLocal.INSTANCE.get();
   try {
     OChannelBinaryAsynchClient network=null;
@@ -10,7 +11,12 @@
         final boolean asynch=iCommand instanceof OCommandRequestAsynch && ((OCommandRequestAsynch)iCommand).isAsynchronous();
         try {
           network=beginRequest(OChannelBinaryProtocol.REQUEST_COMMAND);
-          network.writeByte((byte)(asynch ? 'a' : 's'));
+          if (live) {
+            network.writeByte((byte)'l');
+          }
+ else {
+            network.writeByte((byte)(asynch ? 'a' : 's'));
+          }
           network.writeBytes(OStreamSerializerAnyStreamable.INSTANCE.toStream(iCommand));
         }
   finally {
@@ -70,6 +76,23 @@ final ORecord record=(ORecord)OChannelBinaryProtocol.readIdentifiable(network);
 if (record != null && status == 2) database.getLocalCache().updateRecord(record);
 }
 }
+if (live) {
+ODocument doc=((List<ODocument>)result).get(0);
+Integer token=doc.field("token");
+Boolean unsubscribe=doc.field("unsubscribe");
+if (token != null) {
+if (Boolean.TRUE.equals(unsubscribe)) {
+this.asynchEventListener.unregisterLiveListener(token);
+}
+ else {
+OLiveResultListener listener=(OLiveResultListener)iCommand.getResultListener();
+this.asynchEventListener.registerLiveListener(token,listener);
+}
+}
+ else {
+throw new OStorageException("Cannot execute live query, returned null token");
+}
+}
 }
 break;
 }
@@ -90,7 +113,7 @@ OStorageRemoteThreadLocal.INSTANCE.get().commandExecuting=false;
  while (true);
 }
   finally {
-if (iCommand.getResultListener() != null) iCommand.getResultListener().end();
+if (iCommand.getResultListener() != null && !live) iCommand.getResultListener().end();
 }
 return result;
 }

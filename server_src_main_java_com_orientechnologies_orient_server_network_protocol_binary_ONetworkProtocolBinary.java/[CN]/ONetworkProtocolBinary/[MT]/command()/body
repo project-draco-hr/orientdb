@@ -1,6 +1,8 @@
 {
   setDataCommandInfo("Execute remote command");
-  final boolean asynch=channel.readByte() == 'a';
+  byte type=channel.readByte();
+  final boolean live=type == 'l';
+  final boolean asynch=type == 'a';
   String dbSerializerName=connection.database.getSerializer().toString();
   String name=getRecordSerializerName();
   if (!dbSerializerName.equals(name)) {
@@ -13,8 +15,14 @@
   beginResponse();
   try {
     connection.data.command=command;
-    final OAbstractCommandResultListener listener;
-    if (asynch) {
+    OAbstractCommandResultListener listener=null;
+    OLiveCommandResultListener liveListener=null;
+    if (live) {
+      liveListener=new OLiveCommandResultListener(this,clientTxId,command.getResultListener());
+      listener=new OSyncCommandResultListener();
+      command.setResultListener(liveListener);
+    }
+ else     if (asynch) {
       listener=new OAsyncCommandResultListener(this,clientTxId,command.getResultListener());
       command.setResultListener(listener);
     }
@@ -70,7 +78,7 @@
         ORecordSerializerStringAbstract.fieldTypeToString(value,OType.getTypeByClass(result.getClass()),result);
         channel.writeString(value.toString());
       }
-      if (connection.data.protocolVersion >= 17) {
+      if (connection.data.protocolVersion >= 17 && listener instanceof OSyncCommandResultListener) {
         for (        ORecord rec : ((OSyncCommandResultListener)listener).getFetchedRecordsToSend()) {
           channel.writeByte((byte)2);
           writeIdentifiable(rec);

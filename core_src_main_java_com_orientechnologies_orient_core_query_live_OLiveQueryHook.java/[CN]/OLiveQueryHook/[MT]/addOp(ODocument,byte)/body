@@ -1,0 +1,17 @@
+{
+  ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+  if (db.getTransaction() == null || !db.getTransaction().isActive()) {
+    ORecordOperation op=new ORecordOperation(iDocument,iType);
+    queueThread.enqueue(op);
+    return;
+  }
+  ORecordOperation result=new ORecordOperation(iDocument,iType);
+synchronized (pendingOps) {
+    List<ORecordOperation> list=this.pendingOps.get(db.getStorage());
+    if (list == null) {
+      list=new ArrayList<ORecordOperation>();
+      this.pendingOps.put(db,list);
+    }
+    list.add(result);
+  }
+}

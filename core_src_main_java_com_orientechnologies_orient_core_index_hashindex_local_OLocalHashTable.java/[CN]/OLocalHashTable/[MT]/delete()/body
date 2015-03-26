@@ -1,21 +1,22 @@
 {
   acquireExclusiveLock();
   try {
-    diskCache.loadPinnedPage(hashStateEntry);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
     try {
       for (int i=0; i < HASH_CODE_SIZE; i++) {
-        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,ODurablePage.TrackMode.NONE,false);
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
         if (!metadataPage.isRemoved(i)) {
-          diskCache.deleteFile(metadataPage.getFileId(i));
+          deleteFile(atomicOperation,metadataPage.getFileId(i),diskCache);
         }
       }
     }
   finally {
-      diskCache.release(hashStateEntry);
+      releasePage(atomicOperation,hashStateEntry,diskCache);
     }
     directory.delete();
-    diskCache.deleteFile(fileStateId);
-    if (nullKeyIsSupported)     diskCache.deleteFile(nullBucketFileId);
+    deleteFile(atomicOperation,fileStateId,diskCache);
+    if (nullKeyIsSupported)     deleteFile(atomicOperation,nullBucketFileId,diskCache);
   }
  catch (  IOException e) {
     throw new OIndexException("Exception during index deletion",e);

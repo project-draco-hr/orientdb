@@ -20,6 +20,9 @@
     OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.BEGUN);
     final OTxTask txTask=new OTxTask();
     final Set<String> involvedClusters=new HashSet<String>();
+    final Set<String> nodes=dbCfg.getServers(involvedClusters);
+    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
+    if (executionModeSynch == null)     executionModeSynch=Boolean.TRUE;
     final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
     while (iTx.getCurrentRecordEntries().iterator().hasNext()) {
       for (      ORecordOperation txEntry : iTx.getCurrentRecordEntries())       tmpEntries.add(txEntry);
@@ -31,7 +34,8 @@
 switch (op.type) {
 case ORecordOperation.CREATED:
           if (rid.isNew()) {
-            task=new OCreateRecordTask(record);
+            final ORecord rec=executionModeSynch ? record : record.copy();
+            task=new OCreateRecordTask(rec);
             if (record instanceof ODocument)             ((ODocument)record).validate();
             break;
           }
@@ -52,9 +56,6 @@ txTask.add(task);
 }
 }
 OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
-final Set<String> nodes=dbCfg.getServers(involvedClusters);
-Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
-if (executionModeSynch == null) executionModeSynch=Boolean.TRUE;
 if (executionModeSynch) {
 final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
 if (result instanceof List<?>) {

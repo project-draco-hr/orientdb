@@ -9,31 +9,26 @@
     this.name=name;
     init(storage);
     this.directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
-    startAtomicOperation();
+    OAtomicOperation atomicOperation=startAtomicOperation();
     try {
-      fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
-      logFileCreation(name + metadataConfigurationFileExtension,fileStateId);
+      fileStateId=addFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
       directory.create();
-      hashStateEntry=diskCache.allocateNewPage(fileStateId);
-      diskCache.pinPage(hashStateEntry);
+      final OCacheEntry hashStateEntry=addPage(atomicOperation,fileStateId,diskCache);
+      pinPage(atomicOperation,hashStateEntry,diskCache);
       hashStateEntry.acquireExclusiveLock();
       try {
-        OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),true);
-        createFileMetadata(0,page);
-        hashStateEntry.markDirty();
-        logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),true);
+        OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),true);
+        createFileMetadata(0,page,atomicOperation);
+        hashStateEntryIndex=hashStateEntry.getPageIndex();
       }
   finally {
         hashStateEntry.releaseExclusiveLock();
-        diskCache.release(hashStateEntry);
+        releasePage(atomicOperation,hashStateEntry,diskCache);
       }
       setKeySerializer(keySerializer);
       setValueSerializer(valueSerializer);
-      initHashTreeState();
-      if (nullKeyIsSupported) {
-        nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
-        logFileCreation(name + nullBucketFileExtension,nullBucketFileId);
-      }
+      initHashTreeState(atomicOperation);
+      if (nullKeyIsSupported)       nullBucketFileId=addFile(atomicOperation,name + nullBucketFileExtension,diskCache);
       endAtomicOperation(false);
     }
  catch (    IOException e) {

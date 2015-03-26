@@ -2,20 +2,21 @@
   acquireExclusiveLock();
   OStorageTransaction transaction=storage.getStorageTransaction();
   try {
-    startAtomicOperation();
-    diskCache.truncateFile(fileId);
-    if (nullPointerSupport)     diskCache.truncateFile(nullBucketFileId);
-    OCacheEntry cacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+    OAtomicOperation atomicOperation=startAtomicOperation();
+    truncateFile(atomicOperation,fileId,diskCache);
+    if (nullPointerSupport)     truncateFile(atomicOperation,nullBucketFileId,diskCache);
+    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false,diskCache);
+    if (cacheEntry == null) {
+      cacheEntry=addPage(atomicOperation,fileId,diskCache);
+    }
     cacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getTrackMode());
+      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       rootBucket.setTreeSize(0);
-      logPageChanges(rootBucket,fileId,ROOT_INDEX,true);
-      cacheEntry.markDirty();
     }
   finally {
       cacheEntry.releaseExclusiveLock();
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
     endAtomicOperation(false);
   }

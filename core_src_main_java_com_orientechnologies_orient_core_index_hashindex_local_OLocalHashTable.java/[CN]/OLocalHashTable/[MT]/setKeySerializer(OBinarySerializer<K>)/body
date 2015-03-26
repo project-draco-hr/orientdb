@@ -1,19 +1,17 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
+    OAtomicOperation atomicOperation=startAtomicOperation();
     this.keySerializer=keySerializer;
-    diskCache.loadPinnedPage(hashStateEntry);
+    OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
     hashStateEntry.acquireExclusiveLock();
     try {
-      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
       metadataPage.setKeySerializerId(keySerializer.getId());
-      hashStateEntry.markDirty();
-      logPageChanges(metadataPage,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
     }
   finally {
       hashStateEntry.releaseExclusiveLock();
-      diskCache.release(hashStateEntry);
+      releasePage(atomicOperation,hashStateEntry,diskCache);
     }
     endAtomicOperation(false);
   }

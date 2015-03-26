@@ -4,7 +4,8 @@
     if (clusterPosition < 0)     return OCommonConst.EMPTY_LONG_ARRAY;
     long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
     int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
-    final long filledUpTo=diskCache.getFilledUpTo(fileId);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    final long filledUpTo=getFilledUpTo(atomicOperation,diskCache,fileId);
     long[] result;
     if (pageIndex >= filledUpTo) {
       pageIndex=filledUpTo - 1;
@@ -14,8 +15,8 @@
       return OCommonConst.EMPTY_LONG_ARRAY;
     }
     do {
-      OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
+      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       if (index == Integer.MIN_VALUE)       index=bucket.getSize() - 1;
       int resultSize=index + 1;
       int entriesCount=0;
@@ -33,7 +34,7 @@
         index=Integer.MIN_VALUE;
       }
  else       result=Arrays.copyOf(result,entriesCount);
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
  while (result == null && pageIndex >= 0);
     if (result == null)     result=OCommonConst.EMPTY_LONG_ARRAY;

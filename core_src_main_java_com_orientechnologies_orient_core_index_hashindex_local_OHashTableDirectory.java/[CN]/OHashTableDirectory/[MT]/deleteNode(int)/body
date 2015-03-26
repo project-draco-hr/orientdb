@@ -1,38 +1,34 @@
 {
   acquireExclusiveLock();
-  startAtomicOperation();
   try {
-    diskCache.loadPinnedPage(firstEntry);
+    final OAtomicOperation atomicOperation=startAtomicOperation();
+    OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true,diskCache);
     firstEntry.acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,ODurablePage.TrackMode.NONE,firstEntry);
+      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
       if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
         firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
         firstPage.setTombstone(nodeIndex);
       }
  else {
-        final int pageIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) / ODirectoryPage.NODES_PER_PAGE;
-        final int localNodeIndex=(nodeIndex - ODirectoryFirstPage.NODES_PER_PAGE) % ODirectoryPage.NODES_PER_PAGE;
-        final OCacheEntry cacheEntry=entries.get(pageIndex);
-        diskCache.loadPinnedPage(cacheEntry);
+        final int pageIndex=nodeIndex / ODirectoryPage.NODES_PER_PAGE;
+        final int localNodeIndex=nodeIndex % ODirectoryPage.NODES_PER_PAGE;
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true,diskCache);
         cacheEntry.acquireExclusiveLock();
         try {
-          ODirectoryPage page=new ODirectoryPage(cacheEntry,ODurablePage.TrackMode.NONE,cacheEntry);
+          ODirectoryPage page=new ODirectoryPage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),cacheEntry);
           page.setPointer(localNodeIndex,0,firstPage.getTombstone());
           firstPage.setTombstone(nodeIndex);
-          cacheEntry.markDirty();
-          logPageChanges(page,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
   finally {
           cacheEntry.releaseExclusiveLock();
-          diskCache.release(cacheEntry);
+          releasePage(atomicOperation,cacheEntry,diskCache);
         }
       }
-      logPageChanges(firstPage,firstEntry.getFileId(),firstEntry.getPageIndex(),false);
     }
   finally {
       firstEntry.releaseExclusiveLock();
-      diskCache.release(firstEntry);
+      releasePage(atomicOperation,firstEntry,diskCache);
     }
     endAtomicOperation(false);
   }

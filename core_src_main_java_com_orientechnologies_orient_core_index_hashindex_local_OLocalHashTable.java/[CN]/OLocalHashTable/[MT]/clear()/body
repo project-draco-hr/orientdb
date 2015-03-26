@@ -1,27 +1,25 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
-    diskCache.loadPinnedPage(hashStateEntry);
+    final OAtomicOperation atomicOperation=startAtomicOperation();
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
     hashStateEntry.acquireExclusiveLock();
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getTrackMode(),false);
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
       for (int i=0; i < HASH_CODE_SIZE; i++) {
         if (!page.isRemoved(i)) {
-          diskCache.truncateFile(page.getFileId(i));
+          truncateFile(atomicOperation,page.getFileId(i),diskCache);
           page.setBucketsCount(i,0);
           page.setTombstoneIndex(i,-1);
         }
       }
-      hashStateEntry.markDirty();
-      logPageChanges(page,hashStateEntry.getFileId(),hashStateEntry.getPageIndex(),false);
     }
   finally {
       hashStateEntry.releaseExclusiveLock();
-      diskCache.release(hashStateEntry);
+      releasePage(atomicOperation,hashStateEntry,diskCache);
     }
-    if (nullKeyIsSupported)     diskCache.truncateFile(nullBucketFileId);
-    initHashTreeState();
+    if (nullKeyIsSupported)     truncateFile(atomicOperation,nullBucketFileId,diskCache);
+    initHashTreeState(atomicOperation);
     endAtomicOperation(false);
   }
  catch (  IOException e) {

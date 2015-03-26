@@ -6,12 +6,11 @@
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(position);
       if (positionEntry == null)       return false;
       long pageIndex=positionEntry.getPageIndex();
-      if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex)       return false;
       startAtomicOperation();
       try {
-        lockTillAtomicOperationCompletes();
-        final OClusterPage.TrackMode trackMode=getTrackMode();
-        updateClusterState(trackMode,-1,0);
+        updateClusterState(-1,0,atomicOperation);
         clusterPositionMap.remove(position);
         endAtomicOperation(false);
         return true;

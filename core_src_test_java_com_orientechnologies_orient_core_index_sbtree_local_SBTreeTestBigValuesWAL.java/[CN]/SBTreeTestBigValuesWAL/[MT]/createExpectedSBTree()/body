@@ -1,6 +1,7 @@
 {
   expectedStorageConfiguration.clusters=new ArrayList<OStorageClusterConfiguration>();
   expectedStorageConfiguration.fileTemplate=new OStorageSegmentConfiguration();
+  expectedStorageConfiguration.binaryFormatVersion=Integer.MAX_VALUE;
   expectedStorageDir=buildDirectory + "/sbtreeWithBigValuesWALTestExpected";
   when(expectedStorage.getStoragePath()).thenReturn(expectedStorageDir);
   when(expectedStorage.getName()).thenReturn("sbtreeWithBigValuesWALTesExpected");
@@ -8,15 +9,18 @@
   if (!buildDir.exists())   buildDir.mkdirs();
   File expectedStorageDirFile=new File(expectedStorageDir);
   if (!expectedStorageDirFile.exists())   expectedStorageDirFile.mkdirs();
-  expectedDiskCache=new OReadWriteDiskCache(400L * 1024 * 1024* 1024,1648L * 1024 * 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,1000000,100,expectedStorage,null,false,false);
   OStorageVariableParser variableParser=new OStorageVariableParser(expectedStorageDir);
+  when(expectedStorage.getVariableParser()).thenReturn(variableParser);
+  when(expectedStorage.getComponentsFactory()).thenReturn(new OCurrentStorageComponentsFactory(expectedStorageConfiguration));
+  OAtomicOperationsManager atomicOperationsManager=new OAtomicOperationsManager(expectedStorage);
+  expectedDiskCache=new OReadWriteDiskCache(400L * 1024 * 1024* 1024,1648L * 1024 * 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,1000000,100,expectedStorage,null,false,false);
   when(expectedStorage.getStorageTransaction()).thenReturn(null);
   when(expectedStorage.getDiskCache()).thenReturn(expectedDiskCache);
   when(expectedStorage.getWALInstance()).thenReturn(null);
-  when(expectedStorage.getVariableParser()).thenReturn(variableParser);
   when(expectedStorage.getConfiguration()).thenReturn(expectedStorageConfiguration);
   when(expectedStorage.getMode()).thenReturn("rw");
+  when(expectedStorage.getAtomicOperationsManager()).thenReturn(atomicOperationsManager);
   when(expectedStorageConfiguration.getDirectory()).thenReturn(expectedStorageDir);
-  expectedSBTree=new OSBTree<Integer,byte[]>(".sbt",true,".nbt",null);
+  expectedSBTree=new OSBTree<Integer,byte[]>(".sbt",true,".nbt");
   expectedSBTree.create("expectedSBTree",OIntegerSerializer.INSTANCE,OBinaryTypeSerializer.INSTANCE,null,expectedStorage,1,false);
 }

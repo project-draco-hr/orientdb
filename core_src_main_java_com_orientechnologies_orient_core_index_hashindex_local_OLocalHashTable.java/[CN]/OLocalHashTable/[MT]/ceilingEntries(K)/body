@@ -1,6 +1,7 @@
 {
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     key=keySerializer.preprocess(key,(Object[])keyTypes);
     if (keyHashFunction instanceof OMurmurHash3HashFunction) {
       ((OMurmurHash3HashFunction)keyHashFunction).setValueSerializer(keySerializer);
@@ -10,18 +11,18 @@
     long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
     int fileLevel=getFileLevel(bucketPointer);
     long pageIndex=getPageIndex(bucketPointer);
-    OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+    OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
+      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       while (bucket.size() == 0) {
         bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
         if (bucketPath == null)         return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
         final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
         fileLevel=getFileLevel(nextPointer);
         pageIndex=getPageIndex(nextPointer);
-        cacheEntry=loadPageEntry(pageIndex,fileLevel);
-        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
+        cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
       }
       final int index=bucket.getIndex(hashCode,key);
       final int startIndex;
@@ -31,7 +32,7 @@
       return convertBucketToEntries(bucket,startIndex,endIndex);
     }
   finally {
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
   }
  catch (  IOException ioe) {

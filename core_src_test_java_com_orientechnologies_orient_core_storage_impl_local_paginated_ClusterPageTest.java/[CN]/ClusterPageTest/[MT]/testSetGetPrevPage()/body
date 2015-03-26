@@ -3,13 +3,19 @@
   OCachePointer cachePointer=new OCachePointer(pagePointer,new OLogSequenceNumber(0,0));
   cachePointer.incrementReferrer();
   OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
+  ODirectMemoryPointer directPagePointer=new ODirectMemoryPointer(new byte[OClusterPage.PAGE_SIZE + ODurablePage.PAGE_PADDING]);
+  OCachePointer directCachePointer=new OCachePointer(directPagePointer,new OLogSequenceNumber(0,0));
+  directCachePointer.incrementReferrer();
+  OCacheEntry directCacheEntry=new OCacheEntry(0,0,directCachePointer,false);
   try {
-    OClusterPage localPage=new OClusterPage(cacheEntry,true,ODurablePage.TrackMode.FULL);
-    localPage.setPrevPage(1034);
-    Assert.assertEquals(localPage.getPrevPage(),1034);
-    assertChangesTracking(localPage,pagePointer);
+    OClusterPage localPage=new OClusterPage(cacheEntry,true,new OWALChangesTree());
+    OClusterPage directLocalPage=new OClusterPage(directCacheEntry,true,null);
+    setGetPrevPage(localPage);
+    setGetPrevPage(directLocalPage);
+    assertChangesTracking(localPage,directPagePointer);
   }
   finally {
     cachePointer.decrementReferrer();
+    directCachePointer.decrementReferrer();
   }
 }

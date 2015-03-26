@@ -1,18 +1,19 @@
 {
   acquireSharedLock();
   try {
-    final long filledUpTo=diskCache.getFilledUpTo(fileId);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    final long filledUpTo=getFilledUpTo(atomicOperation,diskCache,fileId);
     for (long pageIndex=filledUpTo - 1; pageIndex >= 0; pageIndex--) {
-      OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
       try {
-        OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
+        OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
         final int bucketSize=bucket.getSize();
         for (int index=bucketSize - 1; index >= 0; index--) {
           if (bucket.exists(index))           return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;
         }
       }
   finally {
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
     }
     return ORID.CLUSTER_POS_INVALID;

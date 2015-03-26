@@ -7,23 +7,23 @@
     this.diskCache=storage.getDiskCache();
     this.name=name;
     this.keySerializer=keySerializer;
+    if (keySerializer == null)     System.out.println("sdf");
     this.valueSerializer=valueSerializer;
     this.nullPointerSupport=nullPointerSupport;
-    fileId=diskCache.openFile(name + dataFileExtension);
-    if (nullPointerSupport)     nullBucketFileId=diskCache.openFile(name + nullFileExtension);
+    OAtomicOperation atomicOperation=storageLocal.getAtomicOperationsManager().getCurrentOperation();
+    fileId=addFile(atomicOperation,name + dataFileExtension,diskCache);
+    if (nullPointerSupport)     nullBucketFileId=addFile(atomicOperation,name + nullFileExtension,diskCache);
     initDurableComponent(storageLocal);
-    OCacheEntry rootCacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+    OCacheEntry rootCacheEntry=addPage(atomicOperation,fileId,diskCache);
     rootCacheEntry.acquireExclusiveLock();
     try {
       super.startAtomicOperation();
-      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,true,keySerializer,keyTypes,valueSerializer,getTrackMode());
+      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,true,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
       rootBucket.setTreeSize(0);
-      super.logPageChanges(rootBucket,fileId,ROOT_INDEX,true);
-      rootCacheEntry.markDirty();
     }
   finally {
       rootCacheEntry.releaseExclusiveLock();
-      diskCache.release(rootCacheEntry);
+      releasePage(atomicOperation,rootCacheEntry,diskCache);
     }
     super.endAtomicOperation(false);
   }

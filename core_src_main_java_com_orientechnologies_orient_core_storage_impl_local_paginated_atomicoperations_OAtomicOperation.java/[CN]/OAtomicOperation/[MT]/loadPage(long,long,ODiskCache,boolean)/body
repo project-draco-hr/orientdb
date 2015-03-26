@@ -1,0 +1,25 @@
+{
+  if (deletedFiles.contains(fileId))   throw new OStorageException("File with id " + fileId + " is deleted.");
+  FileChanges changesContainer=fileChanges.get(fileId);
+  if (changesContainer == null) {
+    changesContainer=new FileChanges();
+    fileChanges.put(fileId,changesContainer);
+  }
+  FilePageChanges pageChangesContainer=changesContainer.pageChangesMap.get(pageIndex);
+  if (changesContainer.isNew) {
+    if (pageIndex <= changesContainer.maxNewPageIndex)     return new OCacheEntry(fileId,pageIndex,new OCachePointer((ODirectMemoryPointer)null,new OLogSequenceNumber(-1,-1)),false);
+ else     return null;
+  }
+ else {
+    final long filledUpTo=filledUpTo(fileId,diskCache);
+    if (pageIndex < filledUpTo) {
+      if (pageChangesContainer == null) {
+        pageChangesContainer=new FilePageChanges();
+        changesContainer.pageChangesMap.put(pageIndex,pageChangesContainer);
+      }
+      if (pageChangesContainer.isNew)       return new OCacheEntry(fileId,pageIndex,new OCachePointer((ODirectMemoryPointer)null,new OLogSequenceNumber(-1,-1)),false);
+ else       return diskCache.load(fileId,pageIndex,checkPinnedPages);
+    }
+  }
+  return null;
+}

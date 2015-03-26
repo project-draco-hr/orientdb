@@ -8,43 +8,47 @@
       if (positionEntry == null)       return false;
       long pageIndex=positionEntry.getPageIndex();
       int recordPosition=positionEntry.getRecordPosition();
-      if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
-      final OClusterPage.TrackMode trackMode=getTrackMode();
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex)       return false;
       long nextPagePointer=-1;
       int removedContentSize=0;
+      atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
       do {
-        final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
         cacheEntry.acquireExclusiveLock();
         int initialFreePageIndex;
         try {
-          final OClusterPage localPage=new OClusterPage(cacheEntry,false,trackMode);
+          OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
           initialFreePageIndex=calculateFreePageIndex(localPage);
           if (localPage.isDeleted(recordPosition)) {
             if (removedContentSize == 0)             return false;
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0) {
-            startAtomicOperation();
+            cacheEntry.releaseExclusiveLock();
+            releasePage(atomicOperation,cacheEntry,diskCache);
+            atomicOperation=startAtomicOperation();
+            cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
+            cacheEntry.acquireExclusiveLock();
+            localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
             operationStarted=true;
-            lockTillAtomicOperationCompletes();
           }
           byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
           int initialFreeSpace=localPage.getFreeSpace();
           localPage.deleteRecord(recordPosition);
           removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
           nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
-          logPageChanges(localPage,fileId,pageIndex,false);
         }
   finally {
           cacheEntry.releaseExclusiveLock();
-          diskCache.release(cacheEntry);
+          releasePage(atomicOperation,cacheEntry,diskCache);
         }
-        updateFreePagesIndex(initialFreePageIndex,pageIndex,trackMode);
+        updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
         pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
         recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
       }
  while (nextPagePointer >= 0);
-      updateClusterState(trackMode,-1,-removedContentSize);
+      updateClusterState(-1,-removedContentSize,atomicOperation);
       clusterPositionMap.remove(clusterPosition);
       endAtomicOperation(false);
       return true;

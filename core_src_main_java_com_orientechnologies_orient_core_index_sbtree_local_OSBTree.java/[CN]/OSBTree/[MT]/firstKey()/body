@@ -1,15 +1,16 @@
 {
   acquireSharedLock();
   try {
-    final BucketSearchResult searchResult=firstItem();
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    final BucketSearchResult searchResult=firstItem(atomicOperation);
     if (searchResult == null)     return null;
-    final OCacheEntry cacheEntry=diskCache.load(fileId,searchResult.getLastPathItem(),false);
+    final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,searchResult.getLastPathItem(),false,diskCache);
     try {
-      OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+      OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       return bucket.getKey(searchResult.itemIndex);
     }
   finally {
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
   }
  catch (  IOException e) {

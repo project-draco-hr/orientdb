@@ -3,14 +3,15 @@
   try {
     long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
     int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
-    if (pageIndex >= diskCache.getFilledUpTo(fileId))     return null;
-    final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    if (pageIndex >= getFilledUpTo(atomicOperation,diskCache,fileId))     return null;
+    final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
     try {
-      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
+      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       return bucket.get(index);
     }
   finally {
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
   }
   finally {

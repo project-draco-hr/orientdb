@@ -1,22 +1,23 @@
 {
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
     if (positionEntry == null)     return null;
     int recordPosition=positionEntry.getRecordPosition();
     long pageIndex=positionEntry.getPageIndex();
-    if (diskCache.getFilledUpTo(fileId) <= pageIndex)     return null;
+    if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex)     return null;
     ORecordVersion recordVersion=null;
-    OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
     try {
-      final OClusterPage localPage=new OClusterPage(cacheEntry,false,ODurablePage.TrackMode.NONE);
+      final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
       if (localPage.isDeleted(recordPosition))       return null;
       recordVersion=localPage.getRecordVersion(recordPosition);
     }
   finally {
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
-    byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition);
+    byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
     if (fullContent == null)     return null;
     if (useCRC32) {
       CRC32 crc32=new CRC32();

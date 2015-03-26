@@ -1,30 +1,24 @@
 {
   acquireExclusiveLock();
   try {
-    long lastPage=diskCache.getFilledUpTo(fileId) - 1;
-    boolean isNewPage=false;
-    if (lastPage < 0) {
-      lastPage=0;
-      isNewPage=true;
-    }
-    OCacheEntry cacheEntry=diskCache.load(fileId,lastPage,false);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    long lastPage=getFilledUpTo(atomicOperation,diskCache,fileId) - 1;
+    OCacheEntry cacheEntry;
+    if (lastPage < 0)     cacheEntry=addPage(atomicOperation,fileId,diskCache);
+ else     cacheEntry=loadPage(atomicOperation,fileId,lastPage,false,diskCache);
     cacheEntry.acquireExclusiveLock();
     try {
-      startAtomicOperation();
-      final ODurablePage.TrackMode trackMode=getTrackMode();
-      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,trackMode);
+      atomicOperation=startAtomicOperation();
+      OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       if (bucket.isFull()) {
         cacheEntry.releaseExclusiveLock();
-        diskCache.release(cacheEntry);
-        isNewPage=true;
-        cacheEntry=diskCache.allocateNewPage(fileId);
+        releasePage(atomicOperation,cacheEntry,diskCache);
+        cacheEntry=addPage(atomicOperation,fileId,diskCache);
         cacheEntry.acquireExclusiveLock();
-        bucket=new OClusterPositionMapBucket(cacheEntry,trackMode);
+        bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       }
       final long index=bucket.add(pageIndex,recordPosition);
       final long result=index + cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES;
-      logPageChanges(bucket,fileId,cacheEntry.getPageIndex(),isNewPage);
-      cacheEntry.markDirty();
       endAtomicOperation(false);
       return result;
     }
@@ -34,7 +28,7 @@
     }
  finally {
       cacheEntry.releaseExclusiveLock();
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry,diskCache);
     }
   }
   finally {

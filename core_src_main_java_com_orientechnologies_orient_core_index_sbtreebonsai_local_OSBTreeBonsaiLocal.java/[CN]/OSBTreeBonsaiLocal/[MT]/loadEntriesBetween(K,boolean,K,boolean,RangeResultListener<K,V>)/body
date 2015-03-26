@@ -1,7 +1,8 @@
 {
   acquireSharedLock();
   try {
-    BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom,atomicOperation);
     OBonsaiBucketPointer bucketPointerFrom=bucketSearchResultFrom.getLastPathItem();
     int indexFrom;
     if (bucketSearchResultFrom.itemIndex >= 0) {
@@ -10,7 +11,7 @@
  else {
       indexFrom=-bucketSearchResultFrom.itemIndex - 1;
     }
-    BucketSearchResult bucketSearchResultTo=findBucket(keyTo);
+    BucketSearchResult bucketSearchResultTo=findBucket(keyTo,atomicOperation);
     OBonsaiBucketPointer bucketPointerTo=bucketSearchResultTo.getLastPathItem();
     int indexTo;
     if (bucketSearchResultTo.itemIndex >= 0) {
@@ -23,9 +24,9 @@
     int endIndex;
     OBonsaiBucketPointer bucketPointer=bucketPointerFrom;
     resultsLoop:     while (true) {
-      final OCacheEntry cacheEntry=diskCache.load(fileId,bucketPointer.getPageIndex(),false);
+      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
       try {
-        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+        OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (!bucketPointer.equals(bucketPointerTo))         endIndex=bucket.size() - 1;
  else         endIndex=indexTo;
         for (int i=startIndex; i <= endIndex; i++) {
@@ -36,7 +37,7 @@
         if (bucketPointer.getPageIndex() < 0)         break;
       }
   finally {
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
       startIndex=0;
     }

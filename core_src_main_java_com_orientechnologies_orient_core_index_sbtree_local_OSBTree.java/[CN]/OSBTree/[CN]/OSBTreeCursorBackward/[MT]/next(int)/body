@@ -5,19 +5,20 @@
   if (prefetchSize < 0 || prefetchSize > OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger())   prefetchSize=OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger();
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     while (dataCache.size() < prefetchSize) {
-      if (pageIndex >= diskCache.getFilledUpTo(fileId))       pageIndex=diskCache.getFilledUpTo(fileId) - 1;
+      if (pageIndex >= getFilledUpTo(atomicOperation,diskCache,fileId))       pageIndex=getFilledUpTo(atomicOperation,diskCache,fileId) - 1;
       if (pageIndex == -1)       break;
-      final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
       try {
-        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (itemIndex >= bucket.size())         itemIndex=bucket.size() - 1;
         if (itemIndex < 0) {
           pageIndex=bucket.getLeftSibling();
           itemIndex=Integer.MAX_VALUE;
           continue;
         }
-        final Map.Entry<K,V> entry=convertToMapEntry(bucket.getEntry(itemIndex));
+        final Map.Entry<K,V> entry=convertToMapEntry(bucket.getEntry(itemIndex),atomicOperation);
         itemIndex--;
         if (toKey != null && (toKeyInclusive ? comparator.compare(entry.getKey(),toKey) > 0 : comparator.compare(entry.getKey(),toKey) >= 0))         continue;
         if (fromKey != null && (fromKeyInclusive ? comparator.compare(entry.getKey(),fromKey) < 0 : comparator.compare(entry.getKey(),fromKey) <= 0)) {
@@ -27,7 +28,7 @@
         dataCache.add(entry);
       }
   finally {
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
     }
   }

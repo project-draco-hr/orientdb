@@ -1,0 +1,16 @@
+{
+  if (writeAheadLog == null)   return null;
+  OAtomicOperation operation=currentOperation.get();
+  if (operation != null) {
+    operation.incrementCounter();
+    if (durableComponent != null)     lockTillOperationComplete(durableComponent);
+    return operation;
+  }
+  final OOperationUnitId unitId=OOperationUnitId.generateId();
+  final OLogSequenceNumber lsn=writeAheadLog.logAtomicOperationStartRecord(true,unitId);
+  operation=new OAtomicOperation(lsn,unitId);
+  currentOperation.set(operation);
+  if (storage.getStorageTransaction() == null)   writeAheadLog.log(new ONonTxOperationPerformedWALRecord());
+  if (durableComponent != null)   lockTillOperationComplete(durableComponent);
+  return operation;
+}

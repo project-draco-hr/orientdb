@@ -7,21 +7,23 @@
     diskCache=storage.getDiskCache();
     this.name=name;
     init(storage);
-    fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
-    hashStateEntry=diskCache.load(fileStateId,0,true);
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,0,true,diskCache);
+    hashStateEntryIndex=hashStateEntry.getPageIndex();
     directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
     directory.open();
-    diskCache.pinPage(hashStateEntry);
+    pinPage(atomicOperation,hashStateEntry,diskCache);
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,ODurablePage.TrackMode.NONE,false);
+      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
       keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getKeySerializerId());
       valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(page.getValueSerializerId());
-      for (int i=0; i < HASH_CODE_SIZE; i++)       if (!page.isRemoved(i))       diskCache.openFile(page.getFileId(i));
+      for (int i=0; i < HASH_CODE_SIZE; i++)       if (!page.isRemoved(i))       openFile(atomicOperation,page.getFileId(i),diskCache);
     }
   finally {
-      diskCache.release(hashStateEntry);
+      releasePage(atomicOperation,hashStateEntry,diskCache);
     }
-    if (nullKeyIsSupported)     nullBucketFileId=diskCache.openFile(name + nullBucketFileExtension);
+    if (nullKeyIsSupported)     nullBucketFileId=openFile(atomicOperation,name + nullBucketFileExtension,diskCache);
   }
  catch (  IOException e) {
     throw new OIndexException("Exception during hash table loading",e);

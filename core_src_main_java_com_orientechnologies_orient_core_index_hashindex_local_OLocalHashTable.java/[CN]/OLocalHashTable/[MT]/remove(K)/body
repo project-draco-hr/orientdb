@@ -1,7 +1,7 @@
 {
   acquireExclusiveLock();
   try {
-    startAtomicOperation();
+    final OAtomicOperation atomicOperation=startAtomicOperation();
     checkNullSupport(key);
     int sizeDiff=0;
     if (key != null) {
@@ -15,10 +15,10 @@
       final long pageIndex=getPageIndex(bucketPointer);
       final int fileLevel=getFileLevel(bucketPointer);
       final V removed;
-      final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+      final OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
       cacheEntry.acquireExclusiveLock();
       try {
-        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getTrackMode());
+        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
         final int positionIndex=bucket.getIndex(hashCode,key);
         if (positionIndex < 0) {
           endAtomicOperation(false);
@@ -26,43 +26,40 @@
         }
         removed=bucket.deleteEntry(positionIndex).value;
         sizeDiff--;
-        mergeBucketsAfterDeletion(nodePath,bucket);
-        cacheEntry.markDirty();
-        logPageChanges(bucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
+        mergeBucketsAfterDeletion(nodePath,bucket,atomicOperation);
       }
   finally {
         cacheEntry.releaseExclusiveLock();
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
       if (nodePath.parent != null) {
         final int hashMapSize=1 << nodePath.nodeLocalDepth;
         final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(directory.getNode(nodePath.nodeIndex),hashMapSize);
         if (allMapsContainSameBucket)         mergeNodeToParent(nodePath);
       }
-      changeSize(sizeDiff);
+      changeSize(sizeDiff,atomicOperation);
       endAtomicOperation(false);
       return removed;
     }
  else {
-      if (diskCache.getFilledUpTo(nullBucketFileId) == 0)       return null;
+      if (getFilledUpTo(atomicOperation,diskCache,nullBucketFileId) == 0)       return null;
       V removed=null;
-      OCacheEntry cacheEntry=diskCache.load(nullBucketFileId,0,false);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false,diskCache);
+      if (cacheEntry == null)       cacheEntry=addPage(atomicOperation,nullBucketFileId,diskCache);
       cacheEntry.acquireExclusiveLock();
       try {
-        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getTrackMode(),valueSerializer,false);
+        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChangesTree(atomicOperation,cacheEntry),valueSerializer,false);
         removed=nullBucket.getValue();
         if (removed != null) {
           nullBucket.removeValue();
           sizeDiff--;
-          cacheEntry.markDirty();
-          logPageChanges(nullBucket,cacheEntry.getFileId(),cacheEntry.getPageIndex(),false);
         }
       }
   finally {
         cacheEntry.releaseExclusiveLock();
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
-      changeSize(sizeDiff);
+      changeSize(sizeDiff,atomicOperation);
       endAtomicOperation(false);
       return removed;
     }

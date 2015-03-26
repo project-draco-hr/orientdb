@@ -4,19 +4,20 @@
     this.storage=storageLocal;
     this.rootBucketPointer=rootBucketPointer;
     diskCache=storage.getDiskCache();
-    diskCache.openFile(fileId);
+    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    openFile(atomicOperation,fileId,diskCache);
     this.fileId=fileId;
-    this.name=resolveTreeName(fileId);
-    OCacheEntry rootCacheEntry=diskCache.load(this.fileId,this.rootBucketPointer.getPageIndex(),false);
+    this.name=resolveTreeName(fileId,atomicOperation);
+    OCacheEntry rootCacheEntry=loadPage(atomicOperation,this.fileId,this.rootBucketPointer.getPageIndex(),false,diskCache);
     rootCacheEntry.acquireSharedLock();
     try {
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,ODurablePage.TrackMode.NONE);
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
       keySerializer=(OBinarySerializer<K>)OBinarySerializerFactory.getInstance().getObjectSerializer(rootBucket.getKeySerializerId());
       valueSerializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(rootBucket.getValueSerializerId());
     }
   finally {
       rootCacheEntry.releaseSharedLock();
-      diskCache.release(rootCacheEntry);
+      releasePage(atomicOperation,rootCacheEntry,diskCache);
     }
     initDurableComponent(storageLocal);
   }

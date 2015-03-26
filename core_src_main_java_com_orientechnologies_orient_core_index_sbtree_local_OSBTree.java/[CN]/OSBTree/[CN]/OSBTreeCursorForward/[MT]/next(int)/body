@@ -6,21 +6,22 @@
   if (prefetchSize == 0)   prefetchSize=1;
   acquireSharedLock();
   try {
+    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
     while (dataCache.size() < prefetchSize) {
       if (pageIndex == -1)       break;
-      if (pageIndex >= diskCache.getFilledUpTo(fileId)) {
+      if (pageIndex >= getFilledUpTo(atomicOperation,diskCache,fileId)) {
         pageIndex=-1;
         break;
       }
-      final OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
+      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
       try {
-        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
+        final OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
         if (itemIndex >= bucket.size()) {
           pageIndex=bucket.getRightSibling();
           itemIndex=0;
           continue;
         }
-        final Map.Entry<K,V> entry=convertToMapEntry(bucket.getEntry(itemIndex));
+        final Map.Entry<K,V> entry=convertToMapEntry(bucket.getEntry(itemIndex),atomicOperation);
         itemIndex++;
         if (fromKey != null && (fromKeyInclusive ? comparator.compare(entry.getKey(),fromKey) < 0 : comparator.compare(entry.getKey(),fromKey) <= 0))         continue;
         if (toKey != null && (toKeyInclusive ? comparator.compare(entry.getKey(),toKey) > 0 : comparator.compare(entry.getKey(),toKey) >= 0)) {
@@ -30,7 +31,7 @@
         dataCache.add(entry);
       }
   finally {
-        diskCache.release(cacheEntry);
+        releasePage(atomicOperation,cacheEntry,diskCache);
       }
     }
   }

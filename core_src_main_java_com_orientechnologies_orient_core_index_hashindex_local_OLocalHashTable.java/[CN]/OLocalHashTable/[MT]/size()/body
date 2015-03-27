@@ -1,14 +1,21 @@
 {
   acquireSharedLock();
   try {
-    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+    OAtomicOperationsManager operationsManager=storage.getAtomicOperationsManager();
+    operationsManager.acquireReadLock(this);
     try {
-      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
-      return metadataPage.getRecordsCount();
+      final OAtomicOperation atomicOperation=operationsManager.getCurrentOperation();
+      final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+      try {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        return metadataPage.getRecordsCount();
+      }
+  finally {
+        releasePage(atomicOperation,hashStateEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,hashStateEntry,diskCache);
+      operationsManager.releaseReadLock(this);
     }
   }
  catch (  IOException e) {

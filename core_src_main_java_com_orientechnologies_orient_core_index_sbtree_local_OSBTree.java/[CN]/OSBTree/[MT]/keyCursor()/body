@@ -1,15 +1,22 @@
 {
   acquireSharedLock();
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final BucketSearchResult searchResult=firstItem(atomicOperation);
-    if (searchResult == null)     return new OSBTreeKeyCursor<K>(){
-      @Override public K next(      int prefetchSize){
-        return null;
+    OAtomicOperationsManager operationsManager=storage.getAtomicOperationsManager();
+    operationsManager.acquireReadLock(this);
+    try {
+      OAtomicOperation atomicOperation=operationsManager.getCurrentOperation();
+      final BucketSearchResult searchResult=firstItem(atomicOperation);
+      if (searchResult == null)       return new OSBTreeKeyCursor<K>(){
+        @Override public K next(        int prefetchSize){
+          return null;
+        }
       }
-    }
 ;
-    return new OSBTreeFullKeyCursor(searchResult.getLastPathItem());
+      return new OSBTreeFullKeyCursor(searchResult.getLastPathItem());
+    }
+  finally {
+      operationsManager.releaseReadLock(this);
+    }
   }
  catch (  IOException e) {
     throw new OSBTreeException("Error during finding first key in sbtree [" + name + "]");

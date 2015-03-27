@@ -1,9 +1,16 @@
 {
   acquireSharedLock();
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    if (!ascSortOrder)     return iterateEntriesMinorDesc(key,inclusive,atomicOperation);
-    return iterateEntriesMinorAsc(key,inclusive,atomicOperation);
+    OAtomicOperationsManager operationsManager=storage.getAtomicOperationsManager();
+    operationsManager.acquireReadLock(this);
+    try {
+      OAtomicOperation atomicOperation=operationsManager.getCurrentOperation();
+      if (!ascSortOrder)       return iterateEntriesMinorDesc(key,inclusive,atomicOperation);
+      return iterateEntriesMinorAsc(key,inclusive,atomicOperation);
+    }
+  finally {
+      operationsManager.releaseReadLock(this);
+    }
   }
  catch (  IOException ioe) {
     throw new OSBTreeException("Error during iteration of minor values for key " + key + " in sbtree "+ name);

@@ -1,13 +1,20 @@
 {
   acquireSharedLock();
   try {
-    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true,diskCache);
+    final OAtomicOperationsManager atomicOperationsManager=storage.getAtomicOperationsManager();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getRecordsSize();
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true,diskCache);
+      try {
+        return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getRecordsSize();
+      }
+  finally {
+        releasePage(atomicOperation,pinnedStateEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,pinnedStateEntry,diskCache);
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
   finally {

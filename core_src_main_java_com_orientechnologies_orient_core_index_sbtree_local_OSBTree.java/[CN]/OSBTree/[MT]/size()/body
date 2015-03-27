@@ -1,14 +1,21 @@
 {
   acquireSharedLock();
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false,diskCache);
+    OAtomicOperationsManager operationsManager=storage.getAtomicOperationsManager();
+    operationsManager.acquireReadLock(this);
     try {
-      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
-      return rootBucket.getTreeSize();
+      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+      OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false,diskCache);
+      try {
+        OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(rootCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
+        return rootBucket.getTreeSize();
+      }
+  finally {
+        releasePage(atomicOperation,rootCacheEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,rootCacheEntry,diskCache);
+      operationsManager.releaseReadLock(this);
     }
   }
  catch (  IOException e) {

@@ -4,14 +4,20 @@
   try {
     acquireExclusiveLock();
     try {
-      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+      OAtomicOperation atomicOperation=startAtomicOperation();
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
-      if (positionEntry == null)       return;
+      if (positionEntry == null) {
+        endAtomicOperation(false);
+        return;
+      }
       int recordPosition=positionEntry.getRecordPosition();
       long pageIndex=positionEntry.getPageIndex();
       long pagePointer=createPagePointer(pageIndex,recordPosition);
       byte[] fullEntryContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
-      if (fullEntryContent == null)       return;
+      if (fullEntryContent == null) {
+        endAtomicOperation(false);
+        return;
+      }
       if (useCRC32) {
         CRC32 crc32=new CRC32();
         final int crcPosition=fullEntryContent.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE- OIntegerSerializer.INT_SIZE;
@@ -28,7 +34,6 @@
         if (!useCRC32)         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE];
  else         recordEntry=new byte[grownContent + OByteSerializer.BYTE_SIZE + 2 * OIntegerSerializer.INT_SIZE];
       }
-      atomicOperation=startAtomicOperation();
       try {
         int entryPosition=0;
         recordEntry[entryPosition]=recordType;

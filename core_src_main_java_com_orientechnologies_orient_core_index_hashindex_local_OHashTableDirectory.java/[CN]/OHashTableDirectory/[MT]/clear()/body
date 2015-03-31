@@ -1,11 +1,20 @@
 {
   acquireExclusiveLock();
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    OAtomicOperation atomicOperation=startAtomicOperation();
     truncateFile(atomicOperation,fileId,diskCache);
     init();
+    endAtomicOperation(false);
   }
-  finally {
+ catch (  IOException e) {
+    endAtomicOperation(true);
+    throw e;
+  }
+catch (  Exception e) {
+    endAtomicOperation(true);
+    throw new OStorageException("Error during removing of hash table directory content.",e);
+  }
+ finally {
     releaseExclusiveLock();
   }
 }

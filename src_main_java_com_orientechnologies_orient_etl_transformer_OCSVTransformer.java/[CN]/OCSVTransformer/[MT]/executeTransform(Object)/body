@@ -1,19 +1,8 @@
 {
-  line++;
-  if (skipFrom > -1) {
-    if (skipTo > -1) {
-      if (line >= skipFrom && line <= skipTo)       return null;
-    }
- else     if (line >= skipFrom)     return null;
-  }
+  if (skipTransform())   return null;
   log(OETLProcessor.LOG_LEVELS.DEBUG,"parsing=%s",input);
   final List<String> fields=OStringSerializerHelper.smartSplit(input.toString(),new char[]{separator},0,-1,false,false,false,false);
-  if (columnNames == null) {
-    if (!columnsOnFirstLine)     throw new OTransformException(getName() + ": columnsOnFirstLine=false and no columns declared");
-    columnNames=fields;
-    for (int i=0; i < columnNames.size(); ++i)     columnNames.set(i,getCellContent(columnNames.get(i)));
-    return null;
-  }
+  if (!isColumnNamesCorrect(fields))   return null;
   final ODocument doc=new ODocument();
   for (int i=0; i < columnNames.size() && i < fields.size(); ++i) {
     final String fieldName=columnNames.get(i);
@@ -33,35 +22,7 @@
         }
       }
  else       if (fieldStringValue != null && !fieldStringValue.isEmpty()) {
-        final char firstChar=fieldStringValue.charAt(0);
-        if (Character.isDigit(firstChar)) {
-          DateFormat df=new SimpleDateFormat("yyyy-MM-dd");
-          df.setLenient(true);
-          try {
-            fieldValue=df.parse(fieldStringValue);
-          }
- catch (          ParseException pe) {
-            try {
-              if (fieldStringValue.contains(".") || fieldStringValue.contains(",")) {
-                String numberAsString=fieldStringValue.replaceAll(",",".");
-                fieldValue=new Float(numberAsString);
-                if (!isFinite((Float)fieldValue)) {
-                  fieldValue=new Double(numberAsString);
-                }
-              }
- else               try {
-                fieldValue=new Integer(fieldStringValue);
-              }
- catch (              Exception e) {
-                fieldValue=new Long(fieldStringValue);
-              }
-            }
- catch (            NumberFormatException nf) {
-              fieldValue=fieldStringValue;
-            }
-          }
-        }
- else         fieldValue=fieldStringValue;
+        fieldValue=determineTheType(fieldStringValue);
         if (nullValue != null && nullValue.equals(fieldValue))         continue;
         doc.field(fieldName,fieldValue);
       }

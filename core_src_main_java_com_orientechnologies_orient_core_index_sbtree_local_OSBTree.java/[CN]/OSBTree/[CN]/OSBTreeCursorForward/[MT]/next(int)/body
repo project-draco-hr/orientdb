@@ -4,9 +4,9 @@
   dataCache.clear();
   if (prefetchSize < 0 || prefetchSize > OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger())   prefetchSize=OGlobalConfiguration.INDEX_CURSOR_PREFETCH_SIZE.getValueAsInteger();
   if (prefetchSize == 0)   prefetchSize=1;
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(OSBTree.this);
   try {
-    atomicOperationsManager.acquireReadLock(OSBTree.this);
+    acquireSharedLock();
     try {
       OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
       while (dataCache.size() < prefetchSize) {
@@ -38,14 +38,14 @@
       }
     }
   finally {
-      atomicOperationsManager.releaseReadLock(OSBTree.this);
+      releaseSharedLock();
     }
   }
  catch (  IOException e) {
     throw new OSBTreeException("Error during element iteration",e);
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(OSBTree.this);
   }
   if (dataCache.isEmpty()) {
     dataCacheIterator=null;

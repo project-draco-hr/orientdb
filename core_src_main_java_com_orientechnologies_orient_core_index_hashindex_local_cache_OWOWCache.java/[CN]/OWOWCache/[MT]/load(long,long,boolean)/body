@@ -1,0 +1,29 @@
+{
+  filesLock.acquireReadLock();
+  try {
+    final GroupKey groupKey=new GroupKey(fileId,pageIndex >>> 4);
+    Lock groupLock=lockManager.acquireSharedLock(groupKey);
+    try {
+      final WriteGroup writeGroup=writeGroups.get(groupKey);
+      OCachePointer pagePointer;
+      if (writeGroup == null) {
+        pagePointer=cacheFileContent(fileId,pageIndex,addNewPages);
+        if (pagePointer == null)         return null;
+        pagePointer.incrementReferrer();
+        return pagePointer;
+      }
+      final int entryIndex=(int)(pageIndex & 15);
+      pagePointer=writeGroup.pages[entryIndex];
+      if (pagePointer == null)       pagePointer=cacheFileContent(fileId,pageIndex,addNewPages);
+      if (pagePointer == null)       return null;
+      pagePointer.incrementReferrer();
+      return pagePointer;
+    }
+  finally {
+      lockManager.releaseLock(groupLock);
+    }
+  }
+  finally {
+    filesLock.releaseReadLock();
+  }
+}

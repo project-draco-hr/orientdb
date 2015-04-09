@@ -1,9 +1,18 @@
 {
   final OAbstractPaginatedStorage storage=(OAbstractPaginatedStorage)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
   try {
-    return storage.getDiskCache().openFile(fileName);
+    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
+    final ODiskCache diskCache=storage.getDiskCache();
+    if (atomicOperation == null) {
+      if (diskCache.exists(fileName))       return diskCache.openFile(fileName);
+      return diskCache.addFile(fileName);
+    }
+ else {
+      if (atomicOperation.isFileExists(fileName,diskCache))       return atomicOperation.openFile(fileName,diskCache);
+      return atomicOperation.addFile(fileName,diskCache);
+    }
   }
  catch (  IOException e) {
-    throw new OSBTreeException("Error creation of sbtree with name" + fileName,e);
+    throw new OSBTreeException("Error creation of sbtree with name " + fileName,e);
   }
 }

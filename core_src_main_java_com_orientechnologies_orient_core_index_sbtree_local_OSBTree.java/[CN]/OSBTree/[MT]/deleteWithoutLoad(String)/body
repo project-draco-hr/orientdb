@@ -1,0 +1,33 @@
+{
+  final OAtomicOperation atomicOperation;
+  try {
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during sbtree deletion.",e);
+  }
+  acquireExclusiveLock();
+  try {
+    final ODiskCache diskCache=storage.getDiskCache();
+    if (isFileExists(atomicOperation,name + dataFileExtension,diskCache)) {
+      final long fileId=openFile(atomicOperation,name + dataFileExtension,diskCache);
+      deleteFile(atomicOperation,fileId,diskCache);
+    }
+    if (isFileExists(atomicOperation,name + nullFileExtension,diskCache)) {
+      final long nullFileId=openFile(atomicOperation,name + nullFileExtension,diskCache);
+      deleteFile(atomicOperation,nullFileId,diskCache);
+    }
+    endAtomicOperation(false);
+  }
+ catch (  IOException ioe) {
+    rollback();
+    throw new OSBTreeException("Exception during deletion of sbtree " + name,ioe);
+  }
+catch (  Exception e) {
+    rollback();
+    throw new OSBTreeException("Exception during deletion of sbtree " + name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

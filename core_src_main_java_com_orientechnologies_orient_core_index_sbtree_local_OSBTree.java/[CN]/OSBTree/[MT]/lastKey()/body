@@ -1,21 +1,28 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    final BucketSearchResult searchResult=lastItem();
-    if (searchResult == null)     return null;
-    final OCacheEntry cacheEntry=diskCache.load(fileId,searchResult.getLastPathItem(),false);
+    acquireSharedLock();
     try {
-      OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,ODurablePage.TrackMode.NONE);
-      return bucket.getKey(searchResult.itemIndex);
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final BucketSearchResult searchResult=lastItem(atomicOperation);
+      if (searchResult == null)       return null;
+      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,searchResult.getLastPathItem(),false,diskCache);
+      try {
+        OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+        return bucket.getKey(searchResult.itemIndex);
+      }
+  finally {
+        releasePage(atomicOperation,cacheEntry,diskCache);
+      }
     }
   finally {
-      diskCache.release(cacheEntry);
+      releaseSharedLock();
     }
   }
  catch (  IOException e) {
     throw new OSBTreeException("Error during finding last key in sbtree [" + name + "]");
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

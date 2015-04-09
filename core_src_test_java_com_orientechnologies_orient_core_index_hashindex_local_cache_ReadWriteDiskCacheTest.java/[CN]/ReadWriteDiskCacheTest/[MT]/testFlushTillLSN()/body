@@ -6,10 +6,14 @@
   final OStorageSegmentConfiguration segmentConfiguration=new OStorageSegmentConfiguration(storageLocal.getConfiguration(),"readWriteDiskCacheTest.tst",0);
   segmentConfiguration.fileType=OFileClassic.NAME;
   buffer=new OReadWriteDiskCache(4 * (8 + systemOffset + 2 * OWOWCache.PAGE_PADDING),2 * (8 + systemOffset + 2 * OWOWCache.PAGE_PADDING),8 + systemOffset,10000,-1,storageLocal,writeAheadLog,true,false);
-  long fileId=buffer.openFile(fileName);
+  long fileId=buffer.addFile(fileName);
   OLogSequenceNumber lsnToFlush=null;
   for (int i=0; i < 8; i++) {
     OCacheEntry cacheEntry=buffer.load(fileId,i,false);
+    if (cacheEntry == null) {
+      cacheEntry=buffer.allocateNewPage(fileId);
+      Assert.assertEquals(cacheEntry.getPageIndex(),i);
+    }
     OCachePointer dataPointer=cacheEntry.getCachePointer();
     dataPointer.acquireExclusiveLock();
     OLogSequenceNumber pageLSN=writeAheadLog.log(new WriteAheadLogTest.TestRecord(30,false));

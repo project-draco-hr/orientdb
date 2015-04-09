@@ -1,0 +1,25 @@
+{
+  long pageIndex=path.get(path.size() - 1);
+  OCacheEntry bucketEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
+  bucketEntry.acquireExclusiveLock();
+  try {
+    OSBTreeBucket<K,V> bucketToSplit=new OSBTreeBucket<K,V>(bucketEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,bucketEntry));
+    final boolean splitLeaf=bucketToSplit.isLeaf();
+    final int bucketSize=bucketToSplit.size();
+    int indexToSplit=bucketSize >>> 1;
+    final K separationKey=bucketToSplit.getKey(indexToSplit);
+    final List<OSBTreeBucket.SBTreeEntry<K,V>> rightEntries=new ArrayList<OSBTreeBucket.SBTreeEntry<K,V>>(indexToSplit);
+    final int startRightIndex=splitLeaf ? indexToSplit : indexToSplit + 1;
+    for (int i=startRightIndex; i < bucketSize; i++)     rightEntries.add(bucketToSplit.getEntry(i));
+    if (pageIndex != ROOT_INDEX) {
+      return splitNonRootBucket(path,keyIndex,keyToInsert,pageIndex,bucketToSplit,splitLeaf,indexToSplit,separationKey,rightEntries,atomicOperation);
+    }
+ else {
+      return splitRootBucket(path,keyIndex,keyToInsert,pageIndex,bucketEntry,bucketToSplit,splitLeaf,indexToSplit,separationKey,rightEntries,atomicOperation);
+    }
+  }
+  finally {
+    bucketEntry.releaseExclusiveLock();
+    releasePage(atomicOperation,bucketEntry,diskCache);
+  }
+}

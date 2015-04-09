@@ -1,23 +1,30 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    final long filledUpTo=diskCache.getFilledUpTo(fileId);
-    for (long pageIndex=filledUpTo - 1; pageIndex >= 0; pageIndex--) {
-      OCacheEntry cacheEntry=diskCache.load(fileId,pageIndex,false);
-      try {
-        OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,ODurablePage.TrackMode.NONE);
-        final int bucketSize=bucket.getSize();
-        for (int index=bucketSize - 1; index >= 0; index--) {
-          if (bucket.exists(index))           return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;
+    acquireSharedLock();
+    try {
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final long filledUpTo=getFilledUpTo(atomicOperation,diskCache,fileId);
+      for (long pageIndex=filledUpTo - 1; pageIndex >= 0; pageIndex--) {
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
+        try {
+          OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
+          final int bucketSize=bucket.getSize();
+          for (int index=bucketSize - 1; index >= 0; index--) {
+            if (bucket.exists(index))             return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;
+          }
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry,diskCache);
         }
       }
-  finally {
-        diskCache.release(cacheEntry);
-      }
+      return ORID.CLUSTER_POS_INVALID;
     }
-    return ORID.CLUSTER_POS_INVALID;
+  finally {
+      releaseSharedLock();
+    }
   }
   finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

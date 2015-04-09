@@ -1,0 +1,35 @@
+{
+  OBonsaiBucketPointer head=OBonsaiBucketPointer.NULL;
+  OBonsaiBucketPointer tail=subTreesToDelete.peek();
+  int bucketCount=0;
+  while (!subTreesToDelete.isEmpty()) {
+    final OBonsaiBucketPointer bucketPointer=subTreesToDelete.poll();
+    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
+    cacheEntry.acquireExclusiveLock();
+    try {
+      final OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+      addChildrenToQueue(subTreesToDelete,bucket);
+      bucket.setFreeListPointer(head);
+      head=bucketPointer;
+    }
+  finally {
+      cacheEntry.releaseExclusiveLock();
+      releasePage(atomicOperation,cacheEntry,diskCache);
+    }
+    bucketCount++;
+  }
+  if (head.isValid()) {
+    final OCacheEntry sysCacheEntry=loadPage(atomicOperation,fileId,SYS_BUCKET.getPageIndex(),false,diskCache);
+    sysCacheEntry.acquireExclusiveLock();
+    try {
+      final OSysBucket sysBucket=new OSysBucket(sysCacheEntry,getChangesTree(atomicOperation,sysCacheEntry));
+      attachFreeListHead(tail,sysBucket.getFreeListHead(),atomicOperation);
+      sysBucket.setFreeListHead(head);
+      sysBucket.setFreeListLength(sysBucket.freeListLength() + bucketCount);
+    }
+  finally {
+      sysCacheEntry.releaseExclusiveLock();
+      releasePage(atomicOperation,sysCacheEntry,diskCache);
+    }
+  }
+}

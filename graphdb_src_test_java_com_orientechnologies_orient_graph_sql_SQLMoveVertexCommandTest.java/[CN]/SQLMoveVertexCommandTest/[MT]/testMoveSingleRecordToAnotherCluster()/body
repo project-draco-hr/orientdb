@@ -8,12 +8,14 @@
   v2.addEdge("knows",v1);
   Assert.assertEquals(v1.getIdentity().getClusterId(),customer.getDefaultClusterId());
   Iterable<OrientVertex> result=graph.command(new OCommandSQL("MOVE VERTEX " + v1.getIdentity() + " TO CLUSTER:Customer_genius")).execute();
+  final ArrayList<OIdentifiable> newRids=new ArrayList<OIdentifiable>();
   int tot=0;
   for (  OrientVertex v : result) {
     tot++;
     ODocument fromTo=v.getRecord();
     OIdentifiable from=fromTo.field("old");
     OIdentifiable to=fromTo.field("new");
+    newRids.add(to);
     Assert.assertEquals(from,v1.getIdentity());
     Assert.assertEquals(to.getIdentity().getClusterId(),customerGeniusCluster);
     ODocument newDocument=to.getRecord();
@@ -21,4 +23,6 @@
     Assert.assertEquals(newDocument.field("test"),"testMoveSingleRecordToAnotherCluster");
   }
   Assert.assertEquals(tot,1);
+  Iterable<OrientEdge> result2=graph.command(new OCommandSQL("SELECT FROM knows where out = " + v1.getIdentity() + " or in = "+ v1.getIdentity())).execute();
+  Assert.assertFalse(result2.iterator().hasNext());
 }

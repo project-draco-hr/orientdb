@@ -1,14 +1,19 @@
 {
   externalModificationLock.requestModificationLock();
   try {
+    OAtomicOperation atomicOperation=startAtomicOperation();
     acquireExclusiveLock();
     try {
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(position);
-      if (positionEntry == null)       return false;
+      if (positionEntry == null) {
+        endAtomicOperation(false);
+        return false;
+      }
       long pageIndex=positionEntry.getPageIndex();
-      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex)       return false;
-      startAtomicOperation();
+      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex) {
+        endAtomicOperation(false);
+        return false;
+      }
       try {
         updateClusterState(-1,0,atomicOperation);
         clusterPositionMap.remove(position);

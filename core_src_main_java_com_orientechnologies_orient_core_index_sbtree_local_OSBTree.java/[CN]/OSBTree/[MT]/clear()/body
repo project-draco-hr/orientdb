@@ -1,8 +1,13 @@
 {
-  acquireExclusiveLock();
-  OStorageTransaction transaction=storage.getStorageTransaction();
+  final OAtomicOperation atomicOperation;
   try {
-    OAtomicOperation atomicOperation=startAtomicOperation();
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during sbtree clear.",e);
+  }
+  acquireExclusiveLock();
+  try {
     truncateFile(atomicOperation,fileId,diskCache);
     if (nullPointerSupport)     truncateFile(atomicOperation,nullBucketFileId,diskCache);
     OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false,diskCache);
@@ -21,11 +26,11 @@
     endAtomicOperation(false);
   }
  catch (  IOException e) {
-    rollback(transaction);
+    rollback();
     throw new OSBTreeException("Error during clear of sbtree with name " + name,e);
   }
 catch (  Throwable e) {
-    rollback(transaction);
+    rollback();
     throw new OSBTreeException(e);
   }
  finally {

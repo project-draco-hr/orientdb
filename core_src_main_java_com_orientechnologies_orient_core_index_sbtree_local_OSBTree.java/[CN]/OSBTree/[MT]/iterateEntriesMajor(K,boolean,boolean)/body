@@ -1,14 +1,20 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    if (ascSortOrder)     return iterateEntriesMajorAsc(key,inclusive,atomicOperation);
-    return iterateEntriesMajorDesc(key,inclusive,atomicOperation);
+    acquireSharedLock();
+    try {
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      if (ascSortOrder)       return iterateEntriesMajorAsc(key,inclusive,atomicOperation);
+      return iterateEntriesMajorDesc(key,inclusive,atomicOperation);
+    }
+  finally {
+      releaseSharedLock();
+    }
   }
  catch (  IOException ioe) {
     throw new OSBTreeException("Error during iteration of major values for key " + key + " in sbtree "+ name);
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

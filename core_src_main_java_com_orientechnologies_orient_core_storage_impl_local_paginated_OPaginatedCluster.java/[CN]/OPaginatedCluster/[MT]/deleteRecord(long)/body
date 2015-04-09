@@ -1,18 +1,22 @@
 {
   externalModificationLock.requestModificationLock();
-  boolean operationStarted=false;
   try {
+    OAtomicOperation atomicOperation=startAtomicOperation();
     acquireExclusiveLock();
     try {
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
-      if (positionEntry == null)       return false;
+      if (positionEntry == null) {
+        endAtomicOperation(false);
+        return false;
+      }
       long pageIndex=positionEntry.getPageIndex();
       int recordPosition=positionEntry.getRecordPosition();
-      OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex)       return false;
+      if (getFilledUpTo(atomicOperation,diskCache,fileId) <= pageIndex) {
+        endAtomicOperation(false);
+        return false;
+      }
       long nextPagePointer=-1;
       int removedContentSize=0;
-      atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
       do {
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
         cacheEntry.acquireExclusiveLock();
@@ -27,11 +31,9 @@
  else           if (removedContentSize == 0) {
             cacheEntry.releaseExclusiveLock();
             releasePage(atomicOperation,cacheEntry,diskCache);
-            atomicOperation=startAtomicOperation();
             cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
             cacheEntry.acquireExclusiveLock();
             localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-            operationStarted=true;
           }
           byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
           int initialFreeSpace=localPage.getFreeSpace();
@@ -54,7 +56,7 @@
       return true;
     }
  catch (    Throwable e) {
-      if (operationStarted)       endAtomicOperation(true);
+      endAtomicOperation(true);
       throw new OStorageException(null,e);
     }
  finally {

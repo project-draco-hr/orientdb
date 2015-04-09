@@ -1,20 +1,26 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+    acquireSharedLock();
     try {
-      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
-      return metadataPage.getRecordsCount();
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+      try {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        return metadataPage.getRecordsCount();
+      }
+  finally {
+        releasePage(atomicOperation,hashStateEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,hashStateEntry,diskCache);
+      releaseSharedLock();
     }
   }
  catch (  IOException e) {
     throw new OIndexException("Error during index size request.",e);
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

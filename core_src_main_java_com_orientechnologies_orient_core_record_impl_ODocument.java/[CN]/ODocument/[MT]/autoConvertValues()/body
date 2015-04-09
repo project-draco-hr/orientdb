@@ -7,29 +7,34 @@
       if (linkedType == null)       continue;
       Object value=field(prop.getName());
       if (value == null)       continue;
-      if (type == OType.EMBEDDEDLIST) {
-        List<Object> list=new OTrackedList<Object>(this);
-        Collection<Object> values=(Collection<Object>)value;
-        for (        Object object : values) {
-          list.add(OType.convert(object,linkedType.getDefaultJavaType()));
+      try {
+        if (type == OType.EMBEDDEDLIST) {
+          List<Object> list=new OTrackedList<Object>(this);
+          Collection<Object> values=(Collection<Object>)value;
+          for (          Object object : values) {
+            list.add(OType.convert(object,linkedType.getDefaultJavaType()));
+          }
+          field(prop.getName(),list);
         }
-        field(prop.getName(),list);
+ else         if (type == OType.EMBEDDEDMAP) {
+          Map<Object,Object> map=new OTrackedMap<Object>(this);
+          Map<Object,Object> values=(Map<Object,Object>)value;
+          for (          Entry<Object,Object> object : values.entrySet()) {
+            map.put(object.getKey(),OType.convert(object.getValue(),linkedType.getDefaultJavaType()));
+          }
+          field(prop.getName(),map);
+        }
+ else         if (type == OType.EMBEDDEDSET && linkedType != null) {
+          Set<Object> list=new OTrackedSet<Object>(this);
+          Collection<Object> values=(Collection<Object>)value;
+          for (          Object object : values) {
+            list.add(OType.convert(object,linkedType.getDefaultJavaType()));
+          }
+          field(prop.getName(),list);
+        }
       }
- else       if (type == OType.EMBEDDEDMAP) {
-        Map<Object,Object> map=new OTrackedMap<Object>(this);
-        Map<Object,Object> values=(Map<Object,Object>)value;
-        for (        Entry<Object,Object> object : values.entrySet()) {
-          map.put(object.getKey(),OType.convert(object.getValue(),linkedType.getDefaultJavaType()));
-        }
-        field(prop.getName(),map);
-      }
- else       if (type == OType.EMBEDDEDSET && linkedType != null) {
-        Set<Object> list=new OTrackedSet<Object>(this);
-        Collection<Object> values=(Collection<Object>)value;
-        for (        Object object : values) {
-          list.add(OType.convert(object,linkedType.getDefaultJavaType()));
-        }
-        field(prop.getName(),list);
+ catch (      Exception e) {
+        throw new OValidationException("impossible to convert value of field \"" + prop.getName() + "\"",e);
       }
     }
   }

@@ -1,20 +1,26 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,rootBucketPointer.getPageIndex(),false,diskCache);
+    acquireSharedLock();
     try {
-      OSBTreeBonsaiBucket rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
-      return rootBucket.getTreeSize();
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,rootBucketPointer.getPageIndex(),false,diskCache);
+      try {
+        OSBTreeBonsaiBucket rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry));
+        return rootBucket.getTreeSize();
+      }
+  finally {
+        releasePage(atomicOperation,rootCacheEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,rootCacheEntry,diskCache);
+      releaseSharedLock();
     }
   }
  catch (  IOException e) {
     throw new OSBTreeException("Error during retrieving of size of index " + name);
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

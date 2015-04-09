@@ -1,19 +1,25 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true,diskCache);
+    acquireSharedLock();
     try {
-      return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getSize();
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true,diskCache);
+      try {
+        return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getSize();
+      }
+  finally {
+        releasePage(atomicOperation,pinnedStateEntry,diskCache);
+      }
     }
   finally {
-      releasePage(atomicOperation,pinnedStateEntry,diskCache);
+      releaseSharedLock();
     }
   }
  catch (  IOException ioe) {
     throw new OStorageException("Error during retrieval of size of " + name + " cluster.");
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

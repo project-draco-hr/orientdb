@@ -4,7 +4,7 @@
   if (entry != null && entry.exist()) {
     fieldValue=entry.value;
     if (p.isNotNull() && fieldValue == null)     throw new OValidationException("The field '" + p.getFullName() + "' cannot be null, record: "+ iRecord);
-    if (fieldValue != null && p.getRegexp() != null) {
+    if (fieldValue != null && p.getRegexp() != null && p.getType().equals(OType.STRING)) {
       if (!((String)fieldValue).matches(p.getRegexp()))       throw new OValidationException("The field '" + p.getFullName() + "' does not match the regular expression '"+ p.getRegexp()+ "'. Field value is: "+ fieldValue+ ", record: "+ iRecord);
     }
   }
@@ -74,45 +74,49 @@ break;
 }
 if (p.getMin() != null && fieldValue != null) {
 final String min=p.getMin();
-if (p.getType().equals(OType.STRING)) {
-if (((String)fieldValue).length() < Integer.parseInt(min)) throw new OValidationException("The field '" + p.getFullName() + "' contains fewer characters than "+ min+ " requested");
-}
- else if (p.getType().equals(OType.DATE)) {
-Date dateOnly=ODocumentHelper.convertField(iRecord,p.getName(),Date.class,min);
-if (((Date)fieldValue).before(dateOnly)) throw new OValidationException("The field '" + p.getFullName() + "' contains the date "+ fieldValue+ " which precedes the first acceptable date ("+ min+ ")");
-}
- else if (fieldValue instanceof Comparable<?>) {
-Object value=ODocumentHelper.convertField(iRecord,p.getName(),p.getType().getDefaultJavaType(),min);
-if (((Comparable<Object>)entry.value).compareTo(value) < 0) {
+if (p.getMinComparable().compareTo(fieldValue) > 0) {
+switch (p.getType()) {
+case STRING:
+throw new OValidationException("The field '" + p.getFullName() + "' contains fewer characters than "+ min+ " requested");
+case DATE:
+case DATETIME:
+throw new OValidationException("The field '" + p.getFullName() + "' contains the date "+ fieldValue+ " which precedes the first acceptable date ("+ min+ ")");
+case BINARY:
+throw new OValidationException("The field '" + p.getFullName() + "' contains fewer bytes than "+ min+ " requested");
+case EMBEDDEDLIST:
+case EMBEDDEDSET:
+case LINKLIST:
+case LINKSET:
+case EMBEDDEDMAP:
+case LINKMAP:
+throw new OValidationException("The field '" + p.getFullName() + "' contains fewer items than "+ min+ " requested");
+default :
 throw new OValidationException("The field '" + p.getFullName() + "' is less than "+ min);
 }
 }
- else if (p.getType().equals(OType.BINARY) && ((byte[])fieldValue).length < Integer.parseInt(min)) throw new OValidationException("The field '" + p.getFullName() + "' contains fewer bytes than "+ min+ " requested");
- else if ((p.getType().equals(OType.EMBEDDEDLIST) || p.getType().equals(OType.EMBEDDEDSET) || p.getType().equals(OType.LINKLIST)|| p.getType().equals(OType.LINKSET)) && ((Collection<?>)fieldValue).size() < Integer.parseInt(min)) throw new OValidationException("The field '" + p.getFullName() + "' contains fewer items than "+ min+ " requested");
- else if ((p.getType().equals(OType.EMBEDDEDMAP) || p.getType().equals(OType.LINKMAP)) && (((Map<?,?>)fieldValue).size() < Integer.parseInt(min))) throw new OValidationException("The field '" + p.getFullName() + "' contains more items than "+ min+ " requested");
 }
-if (p.getMax() != null && fieldValue != null) {
+if (p.getMaxComparable() != null && fieldValue != null) {
 final String max=p.getMax();
-if (p.getType().equals(OType.STRING)) {
-if (((String)fieldValue).length() > Integer.parseInt(max)) throw new OValidationException("The field '" + p.getFullName() + "' contains more characters than "+ max+ " requested");
-}
- else if (p.getType().equals(OType.DATE)) {
-Date dateOnly=ODocumentHelper.convertField(iRecord,p.getName(),Date.class,max);
-Calendar cal=Calendar.getInstance();
-cal.setTime(dateOnly);
-cal.add(Calendar.DAY_OF_MONTH,1);
-dateOnly=cal.getTime();
-if (((Date)fieldValue).after(dateOnly)) throw new OValidationException("The field '" + p.getFullName() + "' contains the date "+ fieldValue+ " which is after the last acceptable date ("+ max+ ")");
-}
- else if (fieldValue instanceof Comparable<?>) {
-Object value=ODocumentHelper.convertField(iRecord,p.getName(),p.getType().getDefaultJavaType(),max);
-if (((Comparable<Object>)entry.value).compareTo(value) > 0) {
+if (p.getMaxComparable().compareTo(fieldValue) < 0) {
+switch (p.getType()) {
+case STRING:
+throw new OValidationException("The field '" + p.getFullName() + "' contains more characters than "+ max+ " requested");
+case DATE:
+case DATETIME:
+throw new OValidationException("The field '" + p.getFullName() + "' contains the date "+ fieldValue+ " which is after the last acceptable date ("+ max+ ")");
+case BINARY:
+throw new OValidationException("The field '" + p.getFullName() + "' contains more bytes than "+ max+ " requested");
+case EMBEDDEDLIST:
+case EMBEDDEDSET:
+case LINKLIST:
+case LINKSET:
+case EMBEDDEDMAP:
+case LINKMAP:
+throw new OValidationException("The field '" + p.getFullName() + "' contains more items than "+ max+ " requested");
+default :
 throw new OValidationException("The field '" + p.getFullName() + "' is greater than "+ max);
 }
 }
- else if (p.getType().equals(OType.BINARY) && ((byte[])fieldValue).length > Integer.parseInt(max)) throw new OValidationException("The field '" + p.getFullName() + "' contains more bytes than "+ max+ " requested");
- else if ((p.getType().equals(OType.EMBEDDEDLIST) || p.getType().equals(OType.EMBEDDEDSET) || p.getType().equals(OType.LINKLIST)|| p.getType().equals(OType.LINKSET)) && ((Collection<?>)fieldValue).size() > Integer.parseInt(max)) throw new OValidationException("The field '" + p.getFullName() + "' contains more items than "+ max+ " requested");
- else if ((p.getType().equals(OType.EMBEDDEDMAP) || p.getType().equals(OType.LINKMAP)) && (((Map<?,?>)fieldValue).size() > Integer.parseInt(max))) throw new OValidationException("The field '" + p.getFullName() + "' contains more items than "+ max+ " requested");
 }
 if (p.isReadonly() && iRecord instanceof ODocument && !iRecord.getRecordVersion().isTombstone()) {
 if ((entry.changed || entry.timeLine != null) && !entry.created) {

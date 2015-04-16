@@ -41,15 +41,24 @@
     }
     classes.clear();
     classes.putAll(newClasses);
-    String superClassName;
+    List<String> superClassNames;
+    String legacySuperClassName;
+    List<OClass> superClasses;
     OClass superClass;
     for (    ODocument c : storedClasses) {
-      superClassName=c.field("superClass");
-      if (superClassName != null) {
+      superClassNames=c.field("superClasses");
+      legacySuperClassName=c.field("superClass");
+      if (superClassNames == null)       superClassNames=new ArrayList<String>();
+      if (legacySuperClassName != null && !superClassNames.contains(legacySuperClassName))       superClassNames.add(legacySuperClassName);
+      if (!superClassNames.isEmpty()) {
         cls=(OClassImpl)classes.get(((String)c.field("name")).toLowerCase());
-        superClass=classes.get(superClassName.toLowerCase());
-        if (superClass == null)         throw new OConfigurationException("Super class '" + superClassName + "' was declared in class '"+ cls.getName()+ "' but was not found in schema. Remove the dependency or create the class to continue.");
-        cls.setSuperClassInternal(superClass);
+        superClasses=new ArrayList<OClass>(superClassNames.size());
+        for (        String superClassName : superClassNames) {
+          superClass=classes.get(superClassName.toLowerCase());
+          if (superClass == null)           throw new OConfigurationException("Super class '" + superClassName + "' was declared in class '"+ cls.getName()+ "' but was not found in schema. Remove the dependency or create the class to continue.");
+          superClasses.add(superClass);
+        }
+        cls.setSuperClassesInternal(superClasses);
       }
     }
     if (!hasGlobalProperties) {

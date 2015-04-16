@@ -1,0 +1,51 @@
+{
+  atomicOperationsManager.acquireReadLock(this);
+  try {
+    acquireSharedLock();
+    try {
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      checkNullSupport(key);
+      if (key == null) {
+        if (getFilledUpTo(atomicOperation,diskCache,nullBucketFileId) == 0)         return null;
+        V result=null;
+        OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false,diskCache);
+        try {
+          ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChangesTree(atomicOperation,cacheEntry),valueSerializer,false);
+          result=nullBucket.getValue();
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry,diskCache);
+        }
+        return result;
+      }
+ else {
+        key=keySerializer.preprocess(key,(Object[])keyTypes);
+        final long hashCode=keyHashFunction.hashCode(key);
+        BucketPath bucketPath=getBucket(hashCode);
+        final long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
+        if (bucketPointer == 0)         return null;
+        long pageIndex=getPageIndex(bucketPointer);
+        int fileLevel=getFileLevel(bucketPointer);
+        OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+        try {
+          final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+          OHashIndexBucket.Entry<K,V> entry=bucket.find(key,hashCode);
+          if (entry == null)           return null;
+          return entry.value;
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry,diskCache);
+        }
+      }
+    }
+  finally {
+      releaseSharedLock();
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Exception during index value retrieval",e);
+  }
+ finally {
+    atomicOperationsManager.releaseReadLock(this);
+  }
+}

@@ -11,27 +11,17 @@
     final ODiskCache diskCache=storage.getDiskCache();
     if (isFileExists(atomicOperation,name + metadataConfigurationFileExtension,diskCache)) {
       fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
-      OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,0,true,diskCache);
-      try {
-        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
-        for (int i=0; i < HASH_CODE_SIZE; i++) {
-          if (!metadataPage.isRemoved(i)) {
-            final long fileId=metadataPage.getFileId(i);
-            openFile(atomicOperation,fileId,diskCache);
-            deleteFile(atomicOperation,fileId,diskCache);
-          }
-        }
-      }
-  finally {
-        releasePage(atomicOperation,hashStateEntry,diskCache);
-      }
-      if (isFileExists(atomicOperation,fileStateId,diskCache))       deleteFile(atomicOperation,fileStateId,diskCache);
-      directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
-      directory.deleteWithoutOpen();
-      if (isFileExists(atomicOperation,name + nullBucketFileExtension,diskCache)) {
-        final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension,diskCache);
-        deleteFile(atomicOperation,nullBucketId,diskCache);
-      }
+      deleteFile(atomicOperation,fileStateId,diskCache);
+    }
+    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+    directory.deleteWithoutOpen();
+    if (isFileExists(atomicOperation,name + nullBucketFileExtension,diskCache)) {
+      final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension,diskCache);
+      deleteFile(atomicOperation,nullBucketId,diskCache);
+    }
+    if (isFileExists(atomicOperation,name + bucketFileExtension,diskCache)) {
+      final long fileId=openFile(atomicOperation,name + bucketFileExtension,diskCache);
+      deleteFile(atomicOperation,fileId,diskCache);
     }
     endAtomicOperation(false);
   }

@@ -1,0 +1,48 @@
+{
+  atomicOperationsManager.acquireReadLock(this);
+  try {
+    acquireSharedLock();
+    try {
+      key=keySerializer.preprocess(key,(Object[])keyTypes);
+      final long hashCode=keyHashFunction.hashCode(key);
+      BucketPath bucketPath=getBucket(hashCode);
+      long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
+      int fileLevel=getFileLevel(bucketPointer);
+      long pageIndex=getPageIndex(bucketPointer);
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+      try {
+        OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+        while (bucket.size() == 0 || comparator.compare(bucket.getKey(0),key) >= 0) {
+          final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
+          if (prevBucketPath == null)           return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+          releasePage(atomicOperation,cacheEntry,diskCache);
+          final long prevPointer=directory.getNodePointer(prevBucketPath.nodeIndex,prevBucketPath.itemIndex + prevBucketPath.hashMapOffset);
+          fileLevel=getFileLevel(prevPointer);
+          pageIndex=getPageIndex(prevPointer);
+          cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+          bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+          bucketPath=prevBucketPath;
+        }
+        final int startIndex=0;
+        final int index=bucket.getIndex(hashCode,key);
+        final int endIndex;
+        if (index >= 0)         endIndex=index;
+ else         endIndex=-index - 1;
+        return convertBucketToEntries(bucket,startIndex,endIndex);
+      }
+  finally {
+        releasePage(atomicOperation,cacheEntry,diskCache);
+      }
+    }
+  finally {
+      releaseSharedLock();
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Exception during data read",ioe);
+  }
+ finally {
+    atomicOperationsManager.releaseReadLock(this);
+  }
+}

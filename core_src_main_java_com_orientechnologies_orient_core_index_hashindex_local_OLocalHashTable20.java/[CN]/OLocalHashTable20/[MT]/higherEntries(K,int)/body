@@ -1,0 +1,49 @@
+{
+  atomicOperationsManager.acquireReadLock(this);
+  try {
+    acquireSharedLock();
+    try {
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      key=keySerializer.preprocess(key,(Object[])keyTypes);
+      final long hashCode=keyHashFunction.hashCode(key);
+      BucketPath bucketPath=getBucket(hashCode);
+      long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
+      int fileLevel=getFileLevel(bucketPointer);
+      long pageIndex=getPageIndex(bucketPointer);
+      OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+      try {
+        OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+        while (bucket.size() == 0 || comparator.compare(bucket.getKey(bucket.size() - 1),key) <= 0) {
+          bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
+          if (bucketPath == null)           return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+          releasePage(atomicOperation,cacheEntry,diskCache);
+          final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
+          fileLevel=getFileLevel(nextPointer);
+          pageIndex=getPageIndex(nextPointer);
+          cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+          bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+        }
+        final int index=bucket.getIndex(hashCode,key);
+        final int startIndex;
+        if (index >= 0)         startIndex=index + 1;
+ else         startIndex=-index - 1;
+        final int endIndex;
+        if (limit <= 0)         endIndex=bucket.size();
+ else         endIndex=Math.min(bucket.size(),startIndex + limit);
+        return convertBucketToEntries(bucket,startIndex,endIndex);
+      }
+  finally {
+        releasePage(atomicOperation,cacheEntry,diskCache);
+      }
+    }
+  finally {
+      releaseSharedLock();
+    }
+  }
+ catch (  IOException ioe) {
+    throw new OIndexException("Exception during data retrieval",ioe);
+  }
+ finally {
+    atomicOperationsManager.releaseReadLock(this);
+  }
+}

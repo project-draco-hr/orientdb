@@ -3,12 +3,11 @@
   try {
     acquireSharedLock();
     try {
-      BucketPath bucketPath=getBucket(HASH_CODE_MIN_VALUE);
+      OHashTable.BucketPath bucketPath=getBucket(HASH_CODE_MIN_VALUE);
       long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex);
-      int fileLevel=getFileLevel(bucketPointer);
       long pageIndex=getPageIndex(bucketPointer);
       OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
       try {
         OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
         while (bucket.size() == 0) {
@@ -16,9 +15,8 @@
           if (bucketPath == null)           return null;
           releasePage(atomicOperation,cacheEntry,diskCache);
           final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
-          fileLevel=getFileLevel(nextPointer);
           pageIndex=getPageIndex(nextPointer);
-          cacheEntry=loadPageEntry(pageIndex,fileLevel,atomicOperation);
+          cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,diskCache);
           bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
         }
         return bucket.getEntry(0);

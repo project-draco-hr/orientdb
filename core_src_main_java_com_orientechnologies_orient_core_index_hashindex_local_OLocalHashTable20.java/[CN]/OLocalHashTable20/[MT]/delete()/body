@@ -1,0 +1,39 @@
+{
+  final OAtomicOperation atomicOperation;
+  try {
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during hash table deletion.",e);
+  }
+  acquireExclusiveLock();
+  try {
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+    try {
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        if (!metadataPage.isRemoved(i)) {
+          deleteFile(atomicOperation,metadataPage.getFileId(i),diskCache);
+        }
+      }
+    }
+  finally {
+      releasePage(atomicOperation,hashStateEntry,diskCache);
+    }
+    directory.delete();
+    deleteFile(atomicOperation,fileStateId,diskCache);
+    if (nullKeyIsSupported)     deleteFile(atomicOperation,nullBucketFileId,diskCache);
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    rollback();
+    throw new OIndexException("Exception during index deletion",e);
+  }
+catch (  Exception e) {
+    rollback();
+    throw new OIndexException("Exception during index deletion",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

@@ -1,20 +1,20 @@
 {
-  OCacheEntry cacheEntry=buffer.load(fileIds.get(fileNumber),pageIndex,false);
+  OCacheEntry cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer);
   if (cacheEntry == null) {
     do {
-      if (cacheEntry != null)       buffer.release(cacheEntry);
-      cacheEntry=buffer.allocateNewPage(fileIds.get(fileNumber));
+      if (cacheEntry != null)       readBuffer.release(cacheEntry,writeBuffer);
+      cacheEntry=readBuffer.allocateNewPage(fileIds.get(fileNumber),writeBuffer);
     }
  while (cacheEntry.getPageIndex() < pageIndex);
   }
   if (cacheEntry.getPageIndex() > pageIndex) {
-    buffer.release(cacheEntry);
-    cacheEntry=buffer.load(fileIds.get(fileNumber),pageIndex,false);
+    readBuffer.release(cacheEntry,writeBuffer);
+    cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer);
   }
   OCachePointer pointer=cacheEntry.getCachePointer();
   pointer.acquireExclusiveLock();
   pointer.getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{version.byteValue(),2,3,seed,5,6,(byte)fileNumber,(byte)(pageIndex & 0xFF)},0,8);
   cacheEntry.markDirty();
   pointer.releaseExclusiveLock();
-  buffer.release(cacheEntry);
+  readBuffer.release(cacheEntry,writeBuffer);
 }

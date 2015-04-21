@@ -4,19 +4,19 @@
     flush();
     OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
     directory.close();
-    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true,diskCache);
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true);
     try {
       for (int i=0; i < HASH_CODE_SIZE; i++) {
         OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
         if (!metadataPage.isRemoved(i)) {
-          diskCache.closeFile(metadataPage.getFileId(i));
+          writeCache.close(metadataPage.getFileId(i),true);
         }
       }
     }
   finally {
-      releasePage(atomicOperation,hashStateEntry,diskCache);
+      releasePage(atomicOperation,hashStateEntry);
     }
-    diskCache.closeFile(fileStateId);
+    writeCache.close(fileStateId,tryAcquireExclusiveLock());
   }
  catch (  IOException e) {
     throw new OIndexException("Error during hash table close",e);

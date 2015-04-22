@@ -1,0 +1,39 @@
+{
+  this.transformation=transformation;
+  this.algorithmName=algorithmName;
+  try {
+    this.password=password;
+    if (password == null)     password="";
+    this.salt=salt;
+    byte[] saltBytes=salt.getBytes("UTF-8");
+    this.pswdIterations=pswdIterations;
+    this.keySize=keySize;
+    PBEKeySpec spec=new PBEKeySpec(password.toCharArray(),saltBytes,pswdIterations,keySize);
+    this.spec=spec;
+    this.factory=SecretKeyFactory.getInstance(secretKeyFactoryAlgorithmName);
+    this.secretKey=factory.generateSecret(spec);
+    SecretKeySpec secret=getSecretKeySpec();
+    Cipher cipher=getCipher();
+    cipher.init(Cipher.ENCRYPT_MODE,secret);
+    AlgorithmParameters params=cipher.getParameters();
+    iv=params.getParameterSpec(IvParameterSpec.class).getIV();
+  }
+ catch (  NoSuchAlgorithmException e) {
+    throw new OSecurityException(e.getMessage(),e);
+  }
+catch (  InvalidKeySpecException e) {
+    throw new OSecurityException(e.getMessage(),e);
+  }
+catch (  NoSuchPaddingException e) {
+    throw new OSecurityException("The given 'salt' could be wrong (" + e.getMessage() + ")",e);
+  }
+catch (  InvalidParameterSpecException e) {
+    throw new OSecurityException(e.getMessage(),e);
+  }
+catch (  InvalidKeyException e) {
+    throw new OSecurityException(e.getMessage(),e);
+  }
+catch (  UnsupportedEncodingException e) {
+    throw new IllegalArgumentException(e.getMessage(),e);
+  }
+}

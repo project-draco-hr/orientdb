@@ -13,34 +13,36 @@
       addHost(host);
     }
   }
-  if (serverURLs.size() == 1 && OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_ENABLED.getValueAsBoolean()) {
-    final String primaryServer=lastHost;
-    OLogManager.instance().debug(this,"Retrieving URLs from DNS '%s' (timeout=%d)...",primaryServer,OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsInteger());
-    try {
-      final Hashtable<String,String> env=new Hashtable<String,String>();
-      env.put("java.naming.factory.initial","com.sun.jndi.dns.DnsContextFactory");
-      env.put("com.sun.jndi.ldap.connect.timeout",OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsString());
-      final DirContext ictx=new InitialDirContext(env);
-      final String hostName=!primaryServer.contains(":") ? primaryServer : primaryServer.substring(0,primaryServer.indexOf(":"));
-      final Attributes attrs=ictx.getAttributes(hostName,new String[]{"TXT"});
-      final Attribute attr=attrs.get("TXT");
-      if (attr != null) {
-        for (int i=0; i < attr.size(); ++i) {
-          String configuration=(String)attr.get(i);
-          if (configuration.startsWith("\""))           configuration=configuration.substring(1,configuration.length() - 1);
-          if (configuration != null) {
-            serverURLs.clear();
-            final String[] parts=configuration.split(" ");
-            for (            String part : parts) {
-              if (part.startsWith("s=")) {
-                addHost(part.substring("s=".length()));
+synchronized (serverURLs) {
+    if (serverURLs.size() == 1 && OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_ENABLED.getValueAsBoolean()) {
+      final String primaryServer=lastHost;
+      OLogManager.instance().debug(this,"Retrieving URLs from DNS '%s' (timeout=%d)...",primaryServer,OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsInteger());
+      try {
+        final Hashtable<String,String> env=new Hashtable<String,String>();
+        env.put("java.naming.factory.initial","com.sun.jndi.dns.DnsContextFactory");
+        env.put("com.sun.jndi.ldap.connect.timeout",OGlobalConfiguration.NETWORK_BINARY_DNS_LOADBALANCING_TIMEOUT.getValueAsString());
+        final DirContext ictx=new InitialDirContext(env);
+        final String hostName=!primaryServer.contains(":") ? primaryServer : primaryServer.substring(0,primaryServer.indexOf(":"));
+        final Attributes attrs=ictx.getAttributes(hostName,new String[]{"TXT"});
+        final Attribute attr=attrs.get("TXT");
+        if (attr != null) {
+          for (int i=0; i < attr.size(); ++i) {
+            String configuration=(String)attr.get(i);
+            if (configuration.startsWith("\""))             configuration=configuration.substring(1,configuration.length() - 1);
+            if (configuration != null) {
+              serverURLs.clear();
+              final String[] parts=configuration.split(" ");
+              for (              String part : parts) {
+                if (part.startsWith("s=")) {
+                  addHost(part.substring("s=".length()));
+                }
               }
             }
           }
         }
       }
-    }
- catch (    NamingException ignore) {
+ catch (      NamingException ignore) {
+      }
     }
   }
 }

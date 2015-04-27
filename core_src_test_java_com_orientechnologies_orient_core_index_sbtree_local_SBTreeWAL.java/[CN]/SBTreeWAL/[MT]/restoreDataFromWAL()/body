@@ -17,11 +17,11 @@
         final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
         final long fileId=updatePageRecord.getFileId();
         final long pageIndex=updatePageRecord.getPageIndex();
-        if (!expectedDiskCache.isOpen(fileId))         expectedDiskCache.openFile(fileId);
-        OCacheEntry cacheEntry=expectedDiskCache.load(fileId,pageIndex,true);
+        if (!expectedWriteCache.isOpen(fileId))         expectedReadCache.openFile(fileId,expectedWriteCache);
+        OCacheEntry cacheEntry=expectedReadCache.load(fileId,pageIndex,true,expectedWriteCache);
         if (cacheEntry == null) {
           do {
-            cacheEntry=expectedDiskCache.allocateNewPage(fileId);
+            cacheEntry=expectedReadCache.allocateNewPage(fileId,expectedWriteCache);
           }
  while (cacheEntry.getPageIndex() != pageIndex);
         }
@@ -34,7 +34,7 @@
         }
   finally {
           cacheEntry.releaseExclusiveLock();
-          expectedDiskCache.release(cacheEntry);
+          expectedReadCache.release(cacheEntry,expectedWriteCache);
         }
       }
       atomicUnit.clear();

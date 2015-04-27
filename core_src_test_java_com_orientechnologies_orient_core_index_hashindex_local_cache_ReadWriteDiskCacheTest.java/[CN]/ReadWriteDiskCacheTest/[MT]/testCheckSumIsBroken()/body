@@ -1,24 +1,24 @@
 {
-  long fileId=buffer.addFile(fileName);
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
   OCacheEntry[] entries=new OCacheEntry[6];
   for (int i=0; i < 6; i++) {
-    entries[i]=buffer.load(fileId,i,false);
+    entries[i]=readBuffer.load(fileId,i,false,writeBuffer);
     if (entries[i] == null) {
-      entries[i]=buffer.allocateNewPage(fileId);
+      entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer);
       Assert.assertEquals(entries[i].getPageIndex(),i);
     }
     entries[i].getCachePointer().acquireExclusiveLock();
     entries[i].markDirty();
     entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
     entries[i].getCachePointer().releaseExclusiveLock();
-    buffer.release(entries[i]);
+    readBuffer.release(entries[i],writeBuffer);
   }
-  buffer.flushBuffer();
+  writeBuffer.flush();
   byte[] brokenByte=new byte[1];
   brokenByte[0]=13;
   updateFilePage(2,systemOffset + 2,brokenByte);
   updateFilePage(4,systemOffset + 4,brokenByte);
-  OPageDataVerificationError[] pageErrors=buffer.checkStoredPages(null);
+  OPageDataVerificationError[] pageErrors=writeBuffer.checkStoredPages(null);
   Assert.assertEquals(2,pageErrors.length);
   Assert.assertFalse(pageErrors[0].incorrectMagicNumber);
   Assert.assertTrue(pageErrors[0].incorrectCheckSum);

@@ -1,30 +1,30 @@
 {
   boolean oldIncreaseOnDemand=OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.getValueAsBoolean();
   OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.setValue(true);
-  long fileId=buffer.addFile(fileName);
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
   OCacheEntry[] entries=new OCacheEntry[5];
   for (int i=0; i < 5; i++) {
-    entries[i]=buffer.load(fileId,i,false);
+    entries[i]=readBuffer.load(fileId,i,false,writeBuffer);
     if (entries[i] == null) {
-      entries[i]=buffer.allocateNewPage(fileId);
+      entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer);
       Assert.assertEquals(entries[i].getPageIndex(),i);
     }
     entries[i].getCachePointer().acquireExclusiveLock();
     entries[i].markDirty();
     entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
     if (i - 4 >= 0) {
-      buffer.load(fileId,i - 4,false);
+      readBuffer.load(fileId,i - 4,false,writeBuffer);
       entries[i - 4].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)(i - 4),1,2,seed,4,5,6,7},0,8);
     }
   }
   for (int i=0; i < 5; i++) {
     entries[i].getCachePointer().releaseExclusiveLock();
-    buffer.release(entries[i]);
+    readBuffer.release(entries[i],writeBuffer);
     if (i - 4 >= 0) {
-      buffer.release(entries[i - 4]);
+      readBuffer.release(entries[i - 4],writeBuffer);
     }
   }
-  int maxSize=buffer.getMaxSize();
+  int maxSize=readBuffer.getMaxSize();
   Assert.assertEquals(maxSize,5);
   OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.setValue(oldIncreaseOnDemand);
 }

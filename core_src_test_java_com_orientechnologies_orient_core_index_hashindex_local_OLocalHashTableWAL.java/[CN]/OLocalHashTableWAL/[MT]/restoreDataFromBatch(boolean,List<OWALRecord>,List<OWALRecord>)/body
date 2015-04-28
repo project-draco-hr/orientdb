@@ -1,5 +1,6 @@
 {
-  final ODiskCache expectedDiskCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getDiskCache();
+  final OReadCache expectedReadCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getReadCache();
+  final OWriteCache expectedWriteCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getWriteCache();
   for (  OWALRecord walRecord : records) {
     atomicUnit.add(walRecord);
     if (!atomicChangeIsProcessed && walRecord instanceof OAtomicUnitStartRecord) {
@@ -13,10 +14,10 @@
           final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
           final long fileId=updatePageRecord.getFileId();
           final long pageIndex=updatePageRecord.getPageIndex();
-          if (!expectedDiskCache.isOpen(fileId))           expectedDiskCache.openFile(fileId);
-          OCacheEntry cacheEntry=expectedDiskCache.load(fileId,pageIndex,true);
+          if (!expectedWriteCache.isOpen(fileId))           expectedReadCache.openFile(fileId,expectedWriteCache);
+          OCacheEntry cacheEntry=expectedReadCache.load(fileId,pageIndex,true,expectedWriteCache);
           if (cacheEntry == null)           do {
-            cacheEntry=expectedDiskCache.allocateNewPage(fileId);
+            cacheEntry=expectedReadCache.allocateNewPage(fileId,expectedWriteCache);
           }
  while (cacheEntry.getPageIndex() != pageIndex);
           cacheEntry.acquireExclusiveLock();
@@ -27,14 +28,14 @@
           }
   finally {
             cacheEntry.releaseExclusiveLock();
-            expectedDiskCache.release(cacheEntry);
+            expectedReadCache.release(cacheEntry,expectedWriteCache);
           }
         }
  else         if (restoreRecord instanceof OFileCreatedWALRecord) {
           final OFileCreatedWALRecord fileCreatedCreatedRecord=(OFileCreatedWALRecord)restoreRecord;
           String fileName=fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable");
-          if (expectedDiskCache.exists(fileName))           expectedDiskCache.openFile(fileName,fileCreatedCreatedRecord.getFileId());
- else           expectedDiskCache.addFile(fileName);
+          if (expectedWriteCache.exists(fileName))           expectedReadCache.openFile(fileName,fileCreatedCreatedRecord.getFileId(),expectedWriteCache);
+ else           expectedReadCache.addFile(fileName,expectedWriteCache);
         }
       }
       atomicUnit.clear();

@@ -1,0 +1,96 @@
+{
+  Object lastResult=null;
+  int maxRetry=1;
+  context.setVariable("transactionRetries",0);
+  for (int retry=1; retry <= maxRetry; retry++) {
+    try {
+      int txBegunAtLine=-1;
+      int txBegunAtPart=-1;
+      lastResult=null;
+      final BufferedReader reader=new BufferedReader(new StringReader(iText));
+      int line=0;
+      int linePart=0;
+      String lastLine;
+      boolean txBegun=false;
+      for (; line < txBegunAtLine; ++line)       reader.readLine();
+      for (; (lastLine=reader.readLine()) != null; ++line) {
+        lastLine=lastLine.trim();
+        final List<String> lineParts=OStringSerializerHelper.smartSplit(lastLine,';');
+        if (line == txBegunAtLine)         linePart=txBegunAtPart;
+ else         linePart=0;
+        for (; linePart < lineParts.size(); ++linePart) {
+          final String lastCommand=lineParts.get(linePart);
+          if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"let ")) {
+            lastResult=executeLet(lastCommand,db);
+          }
+ else           if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"begin")) {
+            if (txBegun)             throw new OCommandSQLParsingException("Transaction already begun");
+            if (db.getTransaction().isActive())             db.commit();
+            txBegun=true;
+            txBegunAtLine=line;
+            txBegunAtPart=linePart;
+            db.begin();
+            if (lastCommand.length() > "begin ".length()) {
+              String next=lastCommand.substring("begin ".length()).trim();
+              if (OStringSerializerHelper.startsWithIgnoreCase(next,"isolation ")) {
+                next=next.substring("isolation ".length()).trim();
+                db.getTransaction().setIsolationLevel(OTransaction.ISOLATION_LEVEL.valueOf(next.toUpperCase()));
+              }
+            }
+          }
+ else           if ("rollback".equalsIgnoreCase(lastCommand)) {
+            if (!txBegun)             throw new OCommandSQLParsingException("Transaction not begun");
+            db.rollback();
+            txBegun=false;
+            txBegunAtLine=-1;
+            txBegunAtPart=-1;
+          }
+ else           if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"commit")) {
+            if (txBegunAtLine < 0)             throw new OCommandSQLParsingException("Transaction not begun");
+            if (retry == 1 && lastCommand.length() > "commit ".length()) {
+              String next=lastCommand.substring("commit ".length()).trim();
+              if (OStringSerializerHelper.startsWithIgnoreCase(next,"retry ")) {
+                next=next.substring("retry ".length()).trim();
+                maxRetry=Integer.parseInt(next);
+              }
+            }
+            db.commit();
+            txBegun=false;
+            txBegunAtLine=-1;
+            txBegunAtPart=-1;
+          }
+ else           if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"sleep ")) {
+            executeSleep(lastCommand);
+          }
+ else           if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"return ")) {
+            lastResult=executeReturn(lastCommand,lastResult);
+            break;
+          }
+ else           if (lastCommand != null && lastCommand.length() > 0)           lastResult=executeCommand(lastCommand,db);
+        }
+      }
+      break;
+    }
+ catch (    OTransactionException e) {
+      context.setVariable("retries",retry);
+      getDatabase().getLocalCache().clear();
+      if (retry >= maxRetry)       throw e;
+    }
+catch (    ORecordDuplicatedException e) {
+      context.setVariable("retries",retry);
+      getDatabase().getLocalCache().clear();
+      if (retry >= maxRetry)       throw e;
+    }
+catch (    ORecordNotFoundException e) {
+      context.setVariable("retries",retry);
+      getDatabase().getLocalCache().clear();
+      if (retry >= maxRetry)       throw e;
+    }
+catch (    ONeedRetryException e) {
+      context.setVariable("retries",retry);
+      getDatabase().getLocalCache().clear();
+      if (retry >= maxRetry)       throw e;
+    }
+  }
+  return lastResult;
+}

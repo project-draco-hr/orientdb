@@ -6,6 +6,10 @@
   Object lastResult=null;
   try {
     db=getProfiledDatabaseInstance(iRequest);
+    if (db.getTransaction().isActive()) {
+      OLogManager.instance().warn(this,"Found database instance from the pool with a pending transaction. Forcing rollback before using it");
+      db.rollback(true);
+    }
     batch=new ODocument().fromJSON(iRequest.content);
     Boolean tx=batch.field("transaction");
     if (tx == null)     tx=false;
@@ -17,7 +21,11 @@
       throw new IllegalArgumentException("Expected 'operations' field as a collection of objects");
     }
     if (operations == null || operations.isEmpty())     throw new IllegalArgumentException("Input JSON has no operations to execute");
-    if (tx)     db.begin();
+    boolean txBegun=false;
+    if (tx && !db.getTransaction().isActive()) {
+      db.begin();
+      txBegun=true;
+    }
     for (    Map<Object,Object> operation : operations) {
       final String type=(String)operation.get("type");
       if (type.equals("c")) {
@@ -71,9 +79,15 @@
         lastResult=db.command(new OCommandScript(language,text.toString())).execute();
       }
     }
-    if (tx)     db.commit();
-    iResponse.writeResult(lastResult);
-    iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,null,null);
+    if (txBegun)     db.commit();
+    try {
+      iResponse.writeResult(lastResult);
+      iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,null,null);
+    }
+ catch (    RuntimeException e) {
+      OLogManager.instance().error(this,"Error (%s) on serializing result of batch command:\n%s",e,batch.toJSON("prettyPrint"));
+      throw e;
+    }
   }
   finally {
     if (db != null)     db.close();

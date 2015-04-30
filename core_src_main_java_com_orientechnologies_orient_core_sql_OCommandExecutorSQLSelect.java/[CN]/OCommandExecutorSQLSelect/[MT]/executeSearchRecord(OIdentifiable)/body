@@ -12,10 +12,14 @@
     if (id instanceof ORecord) {
       record=(ORecord)id;
       if (localLockingStrategy == LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK) {
-        record.lock(true);
+        LOCKING_STRATEGY strategy=record.lockingStrategy();
+        if (strategy == null)         record.lock(true);
+ else         if (strategy != LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK)         throw new OCommandExecutionException("Record is locked but different locking strategy is used : " + strategy);
       }
  else       if (localLockingStrategy == LOCKING_STRATEGY.KEEP_SHARED_LOCK) {
-        record.lock(false);
+        LOCKING_STRATEGY strategy=record.lockingStrategy();
+        if (strategy == null)         record.lock(false);
+ else         if (strategy != LOCKING_STRATEGY.KEEP_SHARED_LOCK)         throw new OCommandExecutionException("Record is locked but different locking strategy is used : " + strategy);
       }
     }
  else {
@@ -42,11 +46,9 @@
     }
   }
   finally {
-    if (record != null) {
-      if (localLockingStrategy != null) {
-        if (localLockingStrategy == LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK || localLockingStrategy == LOCKING_STRATEGY.KEEP_SHARED_LOCK) {
-          record.unlock();
-        }
+    if (record != null && localLockingStrategy != null && record.isLocked()) {
+      if (localLockingStrategy == LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK || localLockingStrategy == LOCKING_STRATEGY.KEEP_SHARED_LOCK) {
+        record.unlock();
       }
     }
   }

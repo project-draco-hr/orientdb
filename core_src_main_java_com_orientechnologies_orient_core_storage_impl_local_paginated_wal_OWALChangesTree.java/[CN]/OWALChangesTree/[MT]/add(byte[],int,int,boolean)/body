@@ -1,0 +1,68 @@
+{
+  if (value == null || value.length == 0)   return;
+  final Node fnode=bsearch(start);
+  final Node node=new Node(value,start,RED,version);
+  if (fnode == null) {
+    root=node;
+    root.color=BLACK;
+    if (debug)     assertInvariants();
+    if (updateSerializedSize)     serializedSize+=serializedSize(value.length);
+    return;
+  }
+  if (start < fnode.start) {
+    fnode.left=node;
+    node.parent=fnode;
+    if (updateSerializedSize)     serializedSize+=serializedSize(value.length);
+    updateMaxEndAfterAppend(node);
+    insertCaseOne(node);
+  }
+ else   if (start > fnode.start) {
+    fnode.right=node;
+    node.parent=fnode;
+    if (updateSerializedSize)     serializedSize+=serializedSize(value.length);
+    updateMaxEndAfterAppend(node);
+    insertCaseOne(node);
+  }
+ else {
+    final int end=start + value.length;
+    if (end == fnode.end) {
+      if (fnode.version < version) {
+        if (updateSerializedSize)         serializedSize-=fnode.value.length;
+        fnode.value=value;
+        fnode.version=version;
+        if (updateSerializedSize)         serializedSize+=fnode.value.length;
+      }
+    }
+ else     if (end < fnode.end) {
+      if (fnode.version < version) {
+        final byte[] cvalue=Arrays.copyOfRange(fnode.value,end - start,fnode.end - start);
+        final int cversion=fnode.version;
+        final int cstart=end;
+        if (updateSerializedSize)         serializedSize-=fnode.value.length;
+        fnode.end=end;
+        fnode.value=value;
+        fnode.version=version;
+        if (updateSerializedSize)         serializedSize+=fnode.value.length;
+        updateMaxEndAccordingToChildren(fnode);
+        add(cvalue,cstart,cversion,updateSerializedSize);
+      }
+    }
+ else {
+      if (fnode.version > version) {
+        final byte[] cvalue=Arrays.copyOfRange(value,fnode.end - start,end - start);
+        final int cversion=version;
+        final int cstart=fnode.end;
+        add(cvalue,cstart,cversion,updateSerializedSize);
+      }
+ else {
+        if (updateSerializedSize)         serializedSize-=fnode.value.length;
+        fnode.end=end;
+        fnode.value=value;
+        fnode.version=version;
+        if (updateSerializedSize)         serializedSize+=fnode.value.length;
+        updateMaxEndAccordingToChildren(fnode);
+      }
+    }
+  }
+  if (debug)   assertInvariants();
+}

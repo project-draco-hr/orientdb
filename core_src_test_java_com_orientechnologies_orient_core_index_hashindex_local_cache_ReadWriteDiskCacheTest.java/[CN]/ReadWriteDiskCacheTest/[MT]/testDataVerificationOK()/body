@@ -1,13 +1,17 @@
 {
-  long fileId=buffer.openFile(fileName);
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
   OCacheEntry[] entries=new OCacheEntry[6];
   for (int i=0; i < 6; i++) {
-    entries[i]=buffer.load(fileId,i,false);
+    entries[i]=readBuffer.load(fileId,i,false,writeBuffer);
+    if (entries[i] == null) {
+      entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer);
+      Assert.assertEquals(entries[i].getPageIndex(),i);
+    }
     entries[i].getCachePointer().acquireExclusiveLock();
     entries[i].markDirty();
     entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
     entries[i].getCachePointer().releaseExclusiveLock();
-    buffer.release(entries[i]);
+    readBuffer.release(entries[i],writeBuffer);
   }
-  Assert.assertTrue(buffer.checkStoredPages(null).length == 0);
+  Assert.assertTrue(writeBuffer.checkStoredPages(null).length == 0);
 }

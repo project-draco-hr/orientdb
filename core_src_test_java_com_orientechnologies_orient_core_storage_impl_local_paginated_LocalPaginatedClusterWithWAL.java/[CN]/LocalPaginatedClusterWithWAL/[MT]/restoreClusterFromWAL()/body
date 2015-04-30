@@ -13,28 +13,35 @@
  else     if (walRecord instanceof OAtomicUnitEndRecord) {
       atomicChangeIsProcessed=false;
       for (      OWALRecord restoreRecord : atomicUnit) {
-        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord)         continue;
+        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord || restoreRecord instanceof OFileCreatedWALRecord|| restoreRecord instanceof ONonTxOperationPerformedWALRecord)         continue;
         final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
         final long fileId=updatePageRecord.getFileId();
         final long pageIndex=updatePageRecord.getPageIndex();
-        if (!testDiskCache.isOpen(fileId))         testDiskCache.openFile(fileId);
-        final OCacheEntry cacheEntry=testDiskCache.load(fileId,pageIndex,true);
+        if (!testWriteCache.isOpen(fileId))         testReadCache.openFile(fileId,testWriteCache);
+        OCacheEntry cacheEntry=testReadCache.load(fileId,pageIndex,true,testWriteCache);
+        if (cacheEntry == null) {
+          do {
+            if (cacheEntry != null)             readCache.release(cacheEntry,testWriteCache);
+            cacheEntry=testReadCache.allocateNewPage(fileId,testWriteCache);
+          }
+ while (cacheEntry.getPageIndex() != pageIndex);
+        }
         cacheEntry.acquireExclusiveLock();
         try {
-          ODurablePage durablePage=new ODurablePage(cacheEntry,ODurablePage.TrackMode.NONE);
+          ODurablePage durablePage=new ODurablePage(cacheEntry,null);
           durablePage.restoreChanges(updatePageRecord.getChanges());
           durablePage.setLsn(updatePageRecord.getLsn());
           cacheEntry.markDirty();
         }
   finally {
           cacheEntry.releaseExclusiveLock();
-          testDiskCache.release(cacheEntry);
+          testReadCache.release(cacheEntry,testWriteCache);
         }
       }
       atomicUnit.clear();
     }
  else {
-      Assert.assertTrue(walRecord instanceof OUpdatePageRecord);
+      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedWALRecord || walRecord instanceof ONonTxOperationPerformedWALRecord);
     }
     lsn=log.next(lsn);
   }

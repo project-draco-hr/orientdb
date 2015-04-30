@@ -2,5 +2,15 @@
   ODatabaseRecordThreadLocal.INSTANCE.set(this);
   final OClass cls=((OMetadataInternal)getMetadata()).getImmutableSchemaSnapshot().getClass(iClassName);
   if (cls == null)   throw new IllegalArgumentException("Class '" + iClassName + "' not found in database");
-  return cls.count(iPolymorphic);
+  long totalOnDb=cls.count(iPolymorphic);
+  long deletedInTx=0;
+  if (getTransaction().isActive())   for (  ORecordOperation op : getTransaction().getCurrentRecordEntries()) {
+    if (op.type == ORecordOperation.DELETED) {
+      final ORecord rec=op.getRecord();
+      if (rec != null && rec instanceof ODocument) {
+        if (((ODocument)rec).getSchemaClass().isSubClassOf(iClassName))         deletedInTx++;
+      }
+    }
+  }
+  return totalOnDb - deletedInTx;
 }

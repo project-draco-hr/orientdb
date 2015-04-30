@@ -4,14 +4,16 @@
     servers=new ArrayList<String>();
     iCommand.getContext().setVariable("servers",servers);
   }
-  servers.add(dManager.getLocalNodeName());
+  final String localNodeName=dManager.getLocalNodeName();
+  servers.add(localNodeName);
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.command(iCommand);
   final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
-  if (!dbCfg.isReplicationActive(null,dManager.getLocalNodeName()))   return wrapped.command(iCommand);
+  if (!dbCfg.isReplicationActive(null,localNodeName))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
   executor.parse(iCommand);
   final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
+  if (!exec.isIdempotent())   checkNodeIsMaster(localNodeName,dbCfg);
   try {
     final OAbstractCommandTask task=iCommand instanceof OCommandScript ? new OScriptTask(iCommand) : new OSQLCommandTask(iCommand);
     Object result=null;
@@ -39,7 +41,7 @@ case SHARDED:
     final Collection<String> involvedClusters=exec.getInvolvedClusters();
     final Collection<String> nodes;
     task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.UNION);
-    nodes=dbCfg.getOneServerPerCluster(involvedClusters,dManager.getLocalNodeName());
+    nodes=dbCfg.getOneServerPerCluster(involvedClusters,localNodeName);
     if (iCommand instanceof ODistributedCommand)     nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
     boolean executeLocally=false;
     if (exec.isIdempotent()) {
@@ -49,9 +51,9 @@ case SHARDED:
         maxReadQuorum=0;
         for (        String cl : involvedClusters)         maxReadQuorum=Math.max(maxReadQuorum,dbCfg.getReadQuorum(cl));
       }
-      if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()) && maxReadQuorum <= 1)       executeLocally=true;
+      if (nodes.size() == 1 && nodes.iterator().next().equals(localNodeName) && maxReadQuorum <= 1)       executeLocally=true;
     }
- else     if (nodes.size() == 1 && nodes.iterator().next().equals(dManager.getLocalNodeName()))     executeLocally=true;
+ else     if (nodes.size() == 1 && nodes.iterator().next().equals(localNodeName))     executeLocally=true;
     if (executeLocally)     return wrapped.command(iCommand);
     result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
     if (result instanceof Map) {

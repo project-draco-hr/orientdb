@@ -1,37 +1,36 @@
 {
+  final OAtomicOperation atomicOperation;
+  try {
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during hash table deletion.",e);
+  }
   acquireExclusiveLock();
   try {
-    storage=storageLocal;
-    final ODiskCache diskCache=storage.getDiskCache();
-    if (diskCache.exists(name + metadataConfigurationFileExtension)) {
-      fileStateId=diskCache.openFile(name + metadataConfigurationFileExtension);
-      hashStateEntry=diskCache.load(fileStateId,0,true);
-      try {
-        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,ODurablePage.TrackMode.NONE,false);
-        for (int i=0; i < HASH_CODE_SIZE; i++) {
-          if (!metadataPage.isRemoved(i)) {
-            final long fileId=metadataPage.getFileId(i);
-            if (diskCache.exists(fileId)) {
-              diskCache.openFile(fileId);
-              diskCache.deleteFile(fileId);
-            }
-          }
-        }
-      }
-  finally {
-        diskCache.release(hashStateEntry);
-      }
-      diskCache.deleteFile(fileStateId);
-      directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
-      directory.deleteWithoutOpen();
-      if (diskCache.exists(name + nullBucketFileExtension)) {
-        final long nullBucketId=diskCache.openFile(name + nullBucketFileExtension);
-        diskCache.deleteFile(nullBucketId);
-      }
+    if (isFileExists(atomicOperation,name + metadataConfigurationFileExtension)) {
+      fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension);
+      deleteFile(atomicOperation,fileStateId);
     }
+    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+    directory.deleteWithoutOpen();
+    if (isFileExists(atomicOperation,name + nullBucketFileExtension)) {
+      final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension);
+      deleteFile(atomicOperation,nullBucketId);
+    }
+    if (isFileExists(atomicOperation,name + bucketFileExtension)) {
+      final long fileId=openFile(atomicOperation,name + bucketFileExtension);
+      deleteFile(atomicOperation,fileId);
+    }
+    endAtomicOperation(false);
   }
  catch (  IOException ioe) {
+    rollback();
     throw new OIndexException("Can not delete hash table with name " + name,ioe);
+  }
+catch (  Exception e) {
+    rollback();
+    throw new OIndexException("Can not delete hash table with name " + name,e);
   }
  finally {
     releaseExclusiveLock();

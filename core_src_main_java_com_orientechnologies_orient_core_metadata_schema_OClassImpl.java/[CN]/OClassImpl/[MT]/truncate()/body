@@ -1,11 +1,19 @@
 {
   getDatabase().checkSecurity(ORule.ResourceGeneric.CLASS,ORole.PERMISSION_UPDATE);
-  if (isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME))   throw new OSecurityException("Class " + getName() + " cannot be truncated because has record level security enabled (extends "+ OSecurityShared.RESTRICTED_CLASSNAME+ ")");
+  if (isSubClassOf(OSecurityShared.RESTRICTED_CLASSNAME)) {
+    throw new OSecurityException("Class " + getName() + " cannot be truncated because has record level security enabled (extends "+ OSecurityShared.RESTRICTED_CLASSNAME+ ")");
+  }
   final OStorage storage=getDatabase().getStorage();
   acquireSchemaReadLock();
   try {
     for (    int id : clusterIds)     storage.getClusterById(id).truncate();
     for (    OIndex<?> index : getClassIndexes())     index.clear();
+    Set<OIndex<?>> superclassIndexes=new HashSet<OIndex<?>>();
+    superclassIndexes.addAll(getIndexes());
+    superclassIndexes.removeAll(getClassIndexes());
+    for (    OIndex index : superclassIndexes) {
+      index.rebuild();
+    }
   }
   finally {
     releaseSchemaReadLock();

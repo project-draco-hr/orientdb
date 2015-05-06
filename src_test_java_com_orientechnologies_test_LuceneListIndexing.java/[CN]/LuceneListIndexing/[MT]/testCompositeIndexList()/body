@@ -1,0 +1,54 @@
+{
+  OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  ODocument doc=new ODocument("Person");
+  doc.field("name","Enrico");
+  doc.field("tags",new ArrayList<String>(){
+{
+      add("Funny");
+      add("Tall");
+      add("Geek");
+    }
+  }
+);
+  Set<?> set=new HashSet<>();
+  databaseDocumentTx.save(doc);
+  OIndex idx=schema.getClass("Person").getClassIndex("Person.name_tags");
+  Collection<?> coll=(Collection<?>)idx.get("Enrico");
+  set=new HashSet(coll);
+  Assert.assertEquals(set.size(),1);
+  doc=new ODocument("Person");
+  doc.field("name","Jared");
+  doc.field("tags",new ArrayList<String>(){
+{
+      add("Funny");
+      add("Tall");
+    }
+  }
+);
+  databaseDocumentTx.save(doc);
+  coll=(Collection<?>)idx.get("Jared");
+  set=new HashSet(coll);
+  Assert.assertEquals(set.size(),1);
+  List<String> tags=doc.field("tags");
+  tags.remove("Funny");
+  tags.add("Geek");
+  databaseDocumentTx.save(doc);
+  coll=(Collection<?>)idx.get("Funny");
+  set=new HashSet(coll);
+  Assert.assertEquals(set.size(),1);
+  coll=(Collection<?>)idx.get("Geek");
+  set=new HashSet(coll);
+  Assert.assertEquals(set.size(),2);
+  List<?> query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from Person where [name,tags] lucene 'Enrico'"));
+  Assert.assertEquals(query.size(),1);
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from (select from Person where [name,tags] lucene 'Enrico')"));
+  Assert.assertEquals(query.size(),1);
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from Person where [name,tags] lucene 'Jared'"));
+  Assert.assertEquals(query.size(),1);
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from Person where [name,tags] lucene 'Funny'"));
+  Assert.assertEquals(query.size(),1);
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from Person where [name,tags] lucene 'Geek'"));
+  Assert.assertEquals(query.size(),2);
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from Person where [name,tags] lucene '(name:Enrico AND tags:Geek)'"));
+  Assert.assertEquals(query.size(),1);
+}

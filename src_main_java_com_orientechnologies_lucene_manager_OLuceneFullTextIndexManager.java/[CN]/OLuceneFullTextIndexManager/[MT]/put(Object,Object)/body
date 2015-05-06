@@ -13,8 +13,29 @@
  else {
         val=key;
       }
-      if (val != null)       doc.add(OLuceneIndexType.createField(f,oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
+      if (val != null) {
+        if (facetManager.supportsFacets() && facetManager.isFacetField(f)) {
+          doc.add(facetManager.buildFacetField(f,val));
+        }
+ else {
+          if (isToStore(f).equals(Field.Store.YES)) {
+            doc.add(OLuceneIndexType.createField(f + STORED,oIdentifiable,val,Field.Store.YES,Field.Index.NOT_ANALYZED_NO_NORMS));
+          }
+          doc.add(OLuceneIndexType.createField(f,oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
+        }
+      }
     }
-    addDocument(doc);
+    if (facetManager.supportsFacets()) {
+      try {
+        addDocument(facetManager.buildDocument(doc));
+      }
+ catch (      IOException e) {
+        e.printStackTrace();
+      }
+    }
+ else {
+      addDocument(doc);
+    }
+    facetManager.commit();
   }
 }

@@ -1,0 +1,36 @@
+{
+  checkOpeness();
+  if (!rid.isPersistent())   throw new IllegalArgumentException("Cannot read record " + rid + " since the position is invalid in database '"+ name+ '\'');
+  if (transaction.get() != null) {
+    final long timer=Orient.instance().getProfiler().startChrono();
+    try {
+      return doReadRecord(clusterSegment,rid);
+    }
+  finally {
+      Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+    }
+  }
+  final long timer=Orient.instance().getProfiler().startChrono();
+  clusterSegment.getExternalModificationLock().requestModificationLock();
+  try {
+    lockManager.acquireLock(this,rid,OLockManager.LOCK.SHARED);
+    try {
+      ORawBuffer buff;
+      lock.acquireSharedLock();
+      try {
+        buff=doReadRecord(clusterSegment,rid);
+        return buff;
+      }
+  finally {
+        lock.releaseSharedLock();
+      }
+    }
+  finally {
+      lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
+    }
+  }
+  finally {
+    clusterSegment.getExternalModificationLock().releaseModificationLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+  }
+}

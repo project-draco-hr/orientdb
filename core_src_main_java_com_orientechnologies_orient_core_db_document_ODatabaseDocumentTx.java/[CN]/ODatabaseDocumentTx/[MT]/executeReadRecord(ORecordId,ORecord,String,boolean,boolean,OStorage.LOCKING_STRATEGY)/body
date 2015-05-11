@@ -16,8 +16,14 @@
       OFetchHelper.checkFetchPlanValid(iFetchPlan);
       if (callbackHooks(ORecordHook.TYPE.BEFORE_READ,record) == ORecordHook.RESULT.SKIP)       return null;
       if (record.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)       record.reload();
-      if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK)       record.lock(false);
- else       if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK)       record.lock(true);
+      if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK) {
+        OLogManager.instance().warn(this,"You use depricated record locking strategy : %s it may lead to deadlocks " + iLockingStrategy);
+        record.lock(false);
+      }
+ else       if (iLockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK) {
+        OLogManager.instance().warn(this,"You use depricated record locking strategy : %s it may lead to deadlocks " + iLockingStrategy);
+        record.lock(true);
+      }
       callbackHooks(ORecordHook.TYPE.AFTER_READ,record);
       return (RET)record;
     }
@@ -25,7 +31,7 @@
     if (!rid.isValid())     recordBuffer=null;
  else {
       OFetchHelper.checkFetchPlanValid(iFetchPlan);
-      recordBuffer=storage.readRecord(rid,iFetchPlan,iIgnoreCache,null,loadTombstones,iLockingStrategy).getResult();
+      recordBuffer=storage.readRecord(rid,iFetchPlan,iIgnoreCache,null).getResult();
     }
     if (recordBuffer == null)     return null;
     if (iRecord == null || ORecordInternal.getRecordType(iRecord) != recordBuffer.recordType)     iRecord=Orient.instance().getRecordFactoryManager().newInstance(recordBuffer.recordType);

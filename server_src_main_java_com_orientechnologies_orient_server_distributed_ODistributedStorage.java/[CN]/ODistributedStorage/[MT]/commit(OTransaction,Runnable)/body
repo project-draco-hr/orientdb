@@ -33,23 +33,31 @@
         final ORecordId rid=(ORecordId)record.getIdentity();
 switch (op.type) {
 case ORecordOperation.CREATED:
-          if (rid.isNew()) {
-            final ORecord rec=executionModeSynch ? record : record.copy();
-            task=new OCreateRecordTask(rec);
-            if (record instanceof ODocument)             ((ODocument)record).validate();
-            break;
+{
+            if (rid.isNew()) {
+              final ORecord rec=executionModeSynch ? record : record.copy();
+              task=new OCreateRecordTask(rec);
+              if (record instanceof ODocument)               ((ODocument)record).validate();
+              break;
+            }
           }
 case ORecordOperation.UPDATED:
-        if (record instanceof ODocument)         ((ODocument)record).validate();
-      final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null);
-    if (previousContent.getResult() == null)     throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
-  task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),record.getRecordVersion(),ORecordInternal.getRecordType(record));
-break;
+{
+          if (record instanceof ODocument)           ((ODocument)record).validate();
+          final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null);
+          if (previousContent.getResult() == null)           throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+          final ORecordVersion v=executionModeSynch ? record.getRecordVersion() : record.getRecordVersion().copy();
+          task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),v,ORecordInternal.getRecordType(record));
+          break;
+        }
 case ORecordOperation.DELETED:
-task=new ODeleteRecordTask(rid,record.getRecordVersion());
-break;
+{
+        final ORecordVersion v=executionModeSynch ? record.getRecordVersion() : record.getRecordVersion().copy();
+        task=new ODeleteRecordTask(rid,v);
+        break;
+      }
 default :
-continue;
+    continue;
 }
 involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
@@ -61,23 +69,23 @@ final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask
 if (result instanceof List<?>) {
 final List<Object> list=(List<Object>)result;
 for (int i=0; i < txTask.getTasks().size(); ++i) {
-final Object o=list.get(i);
-final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
-if (task instanceof OCreateRecordTask) {
-final OCreateRecordTask t=(OCreateRecordTask)task;
-t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
-t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
-}
- else if (task instanceof OUpdateRecordTask) {
-final OUpdateRecordTask t=(OUpdateRecordTask)task;
-t.getVersion().copyFrom((ORecordVersion)o);
-}
- else if (task instanceof ODeleteRecordTask) {
-}
+  final Object o=list.get(i);
+  final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
+  if (task instanceof OCreateRecordTask) {
+    final OCreateRecordTask t=(OCreateRecordTask)task;
+    t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
+    t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+  }
+ else   if (task instanceof OUpdateRecordTask) {
+    final OUpdateRecordTask t=(OUpdateRecordTask)task;
+    t.getVersion().copyFrom((ORecordVersion)o);
+  }
+ else   if (task instanceof ODeleteRecordTask) {
+  }
 }
 for (ORecordOperation op : tmpEntries) {
-final ORecord record=op.getRecord();
-if (record != null) ORecordInternal.unsetDirty(record);
+  final ORecord record=op.getRecord();
+  if (record != null)   ORecordInternal.unsetDirty(record);
 }
 }
  else if (result instanceof Throwable) {

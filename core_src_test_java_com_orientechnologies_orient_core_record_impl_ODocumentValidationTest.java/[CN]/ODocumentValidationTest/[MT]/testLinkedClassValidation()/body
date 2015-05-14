@@ -1,0 +1,40 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + ODocumentValidationTest.class.getSimpleName());
+  db.create();
+  try {
+    OClass clazz=db.getMetadata().getSchema().createClass("Validation");
+    OClass clazz1=db.getMetadata().getSchema().createClass("Validation1");
+    clazz.createProperty("link",OType.LINK).setLinkedClass(clazz1);
+    clazz.createProperty("embedded",OType.EMBEDDED).setLinkedClass(clazz1);
+    clazz.createProperty("linkList",OType.LINKLIST).setLinkedClass(clazz1);
+    clazz.createProperty("linkSet",OType.LINKSET).setLinkedClass(clazz1);
+    clazz.createProperty("linkMap",OType.LINKMAP).setLinkedClass(clazz1);
+    ODocument d=new ODocument(clazz);
+    d.field("link",new ODocument(clazz1));
+    d.field("embedded",new ODocument(clazz1));
+    List<ODocument> list=Arrays.asList(new ODocument(clazz1));
+    d.field("linkList",list);
+    Set<ODocument> set=new HashSet<ODocument>(list);
+    d.field("linkSet",set);
+    Map<String,ODocument> map=new HashMap<String,ODocument>();
+    map.put("a",new ODocument(clazz1));
+    d.field("linkMap",map);
+    d.validate();
+    checkField(d,"link",new ODocument(clazz));
+    checkField(d,"embedded",new ODocument(clazz));
+    checkField(d,"linkList",Arrays.asList("a","b"));
+    checkField(d,"linkSet",new HashSet<String>(Arrays.asList("a","b")));
+    Map<String,String> map1=new HashMap<String,String>();
+    map1.put("a","a1");
+    map1.put("b","a2");
+    checkField(d,"linkMap",map1);
+    checkField(d,"linkList",Arrays.asList(new ODocument(clazz)));
+    checkField(d,"linkSet",new HashSet<ODocument>(Arrays.asList(new ODocument(clazz))));
+    Map<String,ODocument> map2=new HashMap<String,ODocument>();
+    map2.put("a",new ODocument(clazz));
+    checkField(d,"linkMap",map2);
+  }
+  finally {
+    db.drop();
+  }
+}

@@ -1,34 +1,39 @@
 {
-  acquireSharedLock();
+  atomicOperationsManager.acquireReadLock(this);
   try {
-    BucketPath bucketPath=getBucket(HASH_CODE_MAX_VALUE);
-    long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
-    int fileLevel=getFileLevel(bucketPointer);
-    long pageIndex=getPageIndex(bucketPointer);
-    OCacheEntry cacheEntry=loadPageEntry(pageIndex,fileLevel);
+    acquireSharedLock();
     try {
-      OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
-      while (bucket.size() == 0) {
-        final BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
-        if (prevBucketPath == null)         return null;
-        diskCache.release(cacheEntry);
-        final long prevPointer=directory.getNodePointer(prevBucketPath.nodeIndex,prevBucketPath.itemIndex + prevBucketPath.hashMapOffset);
-        fileLevel=getFileLevel(prevPointer);
-        pageIndex=getPageIndex(prevPointer);
-        cacheEntry=loadPageEntry(pageIndex,fileLevel);
-        bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,ODurablePage.TrackMode.NONE);
-        bucketPath=prevBucketPath;
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      OHashTable.BucketPath bucketPath=getBucket(HASH_CODE_MAX_VALUE);
+      long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
+      long pageIndex=getPageIndex(bucketPointer);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+      try {
+        OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+        while (bucket.size() == 0) {
+          final OHashTable.BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
+          if (prevBucketPath == null)           return null;
+          releasePage(atomicOperation,cacheEntry);
+          final long prevPointer=directory.getNodePointer(prevBucketPath.nodeIndex,prevBucketPath.itemIndex + prevBucketPath.hashMapOffset);
+          pageIndex=getPageIndex(prevPointer);
+          cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+          bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+          bucketPath=prevBucketPath;
+        }
+        return bucket.getEntry(bucket.size() - 1);
       }
-      return bucket.getEntry(bucket.size() - 1);
+  finally {
+        releasePage(atomicOperation,cacheEntry);
+      }
     }
   finally {
-      diskCache.release(cacheEntry);
+      releaseSharedLock();
     }
   }
  catch (  IOException ioe) {
     throw new OIndexException("Exception during data read",ioe);
   }
  finally {
-    releaseSharedLock();
+    atomicOperationsManager.releaseReadLock(this);
   }
 }

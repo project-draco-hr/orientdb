@@ -1,7 +1,10 @@
 {
   if (iURL == null || iURL.length() == 0)   throw new IllegalArgumentException("URL missed");
   if (iURL.endsWith("/"))   iURL=iURL.substring(0,iURL.length() - 1);
-  iURL=iURL.replace("//","/");
+  if (isWindowsOS()) {
+    iURL=iURL.charAt(0) + iURL.substring(1).replace("//","/");
+  }
+ else   iURL=iURL.replace("//","/");
   int pos=iURL.indexOf(':');
   if (pos <= 0)   throw new OConfigurationException("Error in database URL: the engine was not specified. Syntax is: " + URL_SYNTAX + ". URL was: "+ iURL);
   final String engineName=iURL.substring(0,pos);
@@ -31,7 +34,10 @@
     if (engine.isShared()) {
       storage=storages.get(dbName);
       if (storage == null) {
-        storage=engine.createStorage(dbPath,parameters);
+        do {
+          storage=engine.createStorage(dbPath,parameters);
+        }
+ while ((storage instanceof OIdentifiableStorage) && storageIds.putIfAbsent(((OIdentifiableStorage)storage).getId(),Boolean.TRUE) != null);
         final OStorage oldStorage=storages.putIfAbsent(dbName,storage);
         if (oldStorage != null)         storage=oldStorage;
       }

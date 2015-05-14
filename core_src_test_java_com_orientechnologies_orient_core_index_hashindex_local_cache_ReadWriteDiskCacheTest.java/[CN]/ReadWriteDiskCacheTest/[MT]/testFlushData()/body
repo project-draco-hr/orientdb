@@ -1,27 +1,31 @@
 {
-  long fileId=buffer.openFile(fileName);
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
   OCacheEntry[] entries=new OCacheEntry[4];
   for (int i=0; i < 4; i++) {
     for (int j=0; j < 4; ++j) {
-      entries[i]=buffer.load(fileId,i,false);
+      entries[i]=readBuffer.load(fileId,i,false,writeBuffer);
+      if (entries[i] == null) {
+        entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer);
+        Assert.assertEquals(entries[i].getPageIndex(),i);
+      }
       entries[i].getCachePointer().acquireExclusiveLock();
       entries[i].markDirty();
       entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,(byte)j,(byte)i},0,8);
       entries[i].getCachePointer().releaseExclusiveLock();
-      buffer.release(entries[i]);
+      readBuffer.release(entries[i],writeBuffer);
     }
   }
-  LRUList am=buffer.getAm();
-  LRUList a1in=buffer.getA1in();
-  LRUList a1out=buffer.getA1out();
+  LRUList am=readBuffer.getAm();
+  LRUList a1in=readBuffer.getA1in();
+  LRUList a1out=readBuffer.getA1out();
   Assert.assertEquals(am.size(),0);
   Assert.assertEquals(a1out.size(),0);
   for (int i=0; i < 4; i++) {
     OCacheEntry entry=generateEntry(fileId,i,entries[i].getCachePointer().getDataPointer(),false,new OLogSequenceNumber(0,0));
     Assert.assertEquals(a1in.get(entry.fileId,entry.pageIndex),entry);
   }
-  Assert.assertEquals(buffer.getFilledUpTo(fileId),4);
-  buffer.flushFile(fileId);
+  Assert.assertEquals(writeBuffer.getFilledUpTo(fileId),4);
+  writeBuffer.flush(fileId);
   for (int i=0; i < 4; i++) {
     assertFile(i,new byte[]{(byte)i,1,2,seed,4,5,3,(byte)i},new OLogSequenceNumber(0,0));
   }

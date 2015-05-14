@@ -1,42 +1,47 @@
 {
-  final ODiskCache expectedDiskCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getDiskCache();
+  final OReadCache expectedReadCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getReadCache();
+  final OWriteCache expectedWriteCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getWriteCache();
   for (  OWALRecord walRecord : records) {
     atomicUnit.add(walRecord);
-    if (!atomicChangeIsProcessed) {
-      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
+    if (!atomicChangeIsProcessed && walRecord instanceof OAtomicUnitStartRecord) {
       atomicChangeIsProcessed=true;
     }
  else     if (walRecord instanceof OAtomicUnitEndRecord) {
       atomicChangeIsProcessed=false;
       for (      OWALRecord restoreRecord : atomicUnit) {
-        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord)         continue;
+        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord || restoreRecord instanceof ONonTxOperationPerformedWALRecord|| restoreRecord instanceof OFullCheckpointStartRecord|| restoreRecord instanceof OCheckpointEndRecord)         continue;
         if (restoreRecord instanceof OUpdatePageRecord) {
           final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
           final long fileId=updatePageRecord.getFileId();
           final long pageIndex=updatePageRecord.getPageIndex();
-          if (!expectedDiskCache.isOpen(fileId))           expectedDiskCache.openFile(fileId);
-          final OCacheEntry cacheEntry=expectedDiskCache.load(fileId,pageIndex,true);
+          if (!expectedWriteCache.isOpen(fileId))           expectedReadCache.openFile(fileId,expectedWriteCache);
+          OCacheEntry cacheEntry=expectedReadCache.load(fileId,pageIndex,true,expectedWriteCache);
+          if (cacheEntry == null)           do {
+            cacheEntry=expectedReadCache.allocateNewPage(fileId,expectedWriteCache);
+          }
+ while (cacheEntry.getPageIndex() != pageIndex);
           cacheEntry.acquireExclusiveLock();
           try {
-            ODurablePage durablePage=new ODurablePage(cacheEntry,ODurablePage.TrackMode.NONE);
+            ODurablePage durablePage=new ODurablePage(cacheEntry,null);
             durablePage.restoreChanges(updatePageRecord.getChanges());
             durablePage.setLsn(updatePageRecord.getLsn());
-            cacheEntry.markDirty();
           }
   finally {
             cacheEntry.releaseExclusiveLock();
-            expectedDiskCache.release(cacheEntry);
+            expectedReadCache.release(cacheEntry,expectedWriteCache);
           }
         }
- else         if (restoreRecord instanceof OFileCreatedCreatedWALRecord) {
-          final OFileCreatedCreatedWALRecord fileCreatedCreatedRecord=(OFileCreatedCreatedWALRecord)restoreRecord;
-          expectedDiskCache.openFile(fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable"),fileCreatedCreatedRecord.getFileId());
+ else         if (restoreRecord instanceof OFileCreatedWALRecord) {
+          final OFileCreatedWALRecord fileCreatedCreatedRecord=(OFileCreatedWALRecord)restoreRecord;
+          String fileName=fileCreatedCreatedRecord.getFileName().replace("actualLocalHashTable","expectedLocalHashTable");
+          if (expectedWriteCache.exists(fileName))           expectedReadCache.openFile(fileName,fileCreatedCreatedRecord.getFileId(),expectedWriteCache);
+ else           expectedReadCache.addFile(fileName,expectedWriteCache);
         }
       }
       atomicUnit.clear();
     }
  else {
-      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedCreatedWALRecord);
+      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof OFileCreatedWALRecord || walRecord instanceof ONonTxOperationPerformedWALRecord|| walRecord instanceof OFullCheckpointStartRecord|| walRecord instanceof OCheckpointEndRecord);
     }
   }
   return atomicChangeIsProcessed;

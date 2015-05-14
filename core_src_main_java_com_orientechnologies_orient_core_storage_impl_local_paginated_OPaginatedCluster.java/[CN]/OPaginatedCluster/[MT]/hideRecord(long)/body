@@ -1,17 +1,21 @@
 {
   externalModificationLock.requestModificationLock();
   try {
+    OAtomicOperation atomicOperation=startAtomicOperation();
     acquireExclusiveLock();
     try {
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(position);
-      if (positionEntry == null)       return false;
+      if (positionEntry == null) {
+        endAtomicOperation(false);
+        return false;
+      }
       long pageIndex=positionEntry.getPageIndex();
-      if (diskCache.getFilledUpTo(fileId) <= pageIndex)       return false;
-      startAtomicOperation();
+      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
+        endAtomicOperation(false);
+        return false;
+      }
       try {
-        lockTillAtomicOperationCompletes();
-        final OClusterPage.TrackMode trackMode=getTrackMode();
-        updateClusterState(trackMode,-1,0);
+        updateClusterState(-1,0,atomicOperation);
         clusterPositionMap.remove(position);
         endAtomicOperation(false);
         return true;

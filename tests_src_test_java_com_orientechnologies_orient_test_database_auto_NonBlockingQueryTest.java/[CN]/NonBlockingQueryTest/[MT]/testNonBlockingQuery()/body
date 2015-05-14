@@ -1,0 +1,29 @@
+{
+  ODatabaseDocumentTx db=database;
+  final AtomicInteger counter=new AtomicInteger(0);
+  for (int i=0; i < 1000; i++) {
+    db.command(new OCommandSQL("insert into Foo (a) values ('bar')")).execute();
+  }
+  Future future=db.query(new OSQLNonBlockingQuery<Object>("select from Foo",new OCommandResultListener(){
+    @Override public boolean result(    Object iRecord){
+      counter.incrementAndGet();
+      return true;
+    }
+    @Override public void end(){
+    }
+  }
+));
+  Assert.assertFalse(counter.get() == 1000);
+  try {
+    future.get();
+    Assert.assertEquals(counter.get(),1000);
+  }
+ catch (  InterruptedException e) {
+    Assert.fail();
+    e.printStackTrace();
+  }
+catch (  ExecutionException e) {
+    Assert.fail();
+    e.printStackTrace();
+  }
+}

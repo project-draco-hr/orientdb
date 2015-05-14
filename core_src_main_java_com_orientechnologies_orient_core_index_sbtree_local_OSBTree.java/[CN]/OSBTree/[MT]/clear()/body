@@ -1,30 +1,36 @@
 {
-  acquireExclusiveLock();
-  OStorageTransaction transaction=storage.getStorageTransaction();
+  final OAtomicOperation atomicOperation;
   try {
-    startAtomicOperation();
-    diskCache.truncateFile(fileId);
-    if (nullPointerSupport)     diskCache.truncateFile(nullBucketFileId);
-    OCacheEntry cacheEntry=diskCache.load(fileId,ROOT_INDEX,false);
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during sbtree clear.",e);
+  }
+  acquireExclusiveLock();
+  try {
+    truncateFile(atomicOperation,fileId);
+    if (nullPointerSupport)     truncateFile(atomicOperation,nullBucketFileId);
+    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false);
+    if (cacheEntry == null) {
+      cacheEntry=addPage(atomicOperation,fileId);
+    }
     cacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getTrackMode());
+      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
       rootBucket.setTreeSize(0);
-      logPageChanges(rootBucket,fileId,ROOT_INDEX,true);
-      cacheEntry.markDirty();
     }
   finally {
       cacheEntry.releaseExclusiveLock();
-      diskCache.release(cacheEntry);
+      releasePage(atomicOperation,cacheEntry);
     }
     endAtomicOperation(false);
   }
  catch (  IOException e) {
-    rollback(transaction);
+    rollback();
     throw new OSBTreeException("Error during clear of sbtree with name " + name,e);
   }
 catch (  Throwable e) {
-    rollback(transaction);
+    rollback();
     throw new OSBTreeException(e);
   }
  finally {

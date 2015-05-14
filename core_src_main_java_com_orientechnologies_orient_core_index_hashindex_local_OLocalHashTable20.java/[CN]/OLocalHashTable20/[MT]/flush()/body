@@ -1,0 +1,25 @@
+{
+  acquireExclusiveLock();
+  try {
+    OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true);
+    try {
+      for (int i=0; i < HASH_CODE_SIZE; i++) {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        if (!metadataPage.isRemoved(i))         writeCache.flush(metadataPage.getFileId(i));
+      }
+    }
+  finally {
+      releasePage(atomicOperation,hashStateEntry);
+    }
+    writeCache.flush(fileStateId);
+    directory.flush();
+    if (nullKeyIsSupported)     writeCache.flush(nullBucketFileId);
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during hash table flush",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

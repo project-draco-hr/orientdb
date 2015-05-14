@@ -1,12 +1,22 @@
 {
   externalModificationLock.requestModificationLock();
   try {
+    final OAtomicOperation atomicOperation=startAtomicOperation();
     acquireExclusiveLock();
     try {
-      diskCache.deleteFile(fileId);
+      deleteFile(atomicOperation,fileId);
       clusterPositionMap.delete();
+      endAtomicOperation(false);
     }
-  finally {
+ catch (    IOException ioe) {
+      endAtomicOperation(true);
+      throw ioe;
+    }
+catch (    Exception e) {
+      endAtomicOperation(true);
+      throw new OStorageException("Error during deletion of cluset " + name,e);
+    }
+ finally {
       releaseExclusiveLock();
     }
   }

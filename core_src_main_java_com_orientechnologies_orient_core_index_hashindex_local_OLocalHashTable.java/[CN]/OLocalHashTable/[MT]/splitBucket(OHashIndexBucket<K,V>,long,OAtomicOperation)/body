@@ -1,0 +1,18 @@
+{
+  int bucketDepth=bucket.getDepth();
+  int newBucketDepth=bucketDepth + 1;
+  final long updatedBucketIndex=pageIndex;
+  final OCacheEntry newBucketCacheEntry=addPage(atomicOperation,fileId);
+  newBucketCacheEntry.acquireExclusiveLock();
+  try {
+    final OHashIndexBucket<K,V> newBucket=new OHashIndexBucket<K,V>(newBucketDepth,newBucketCacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,newBucketCacheEntry));
+    splitBucketContent(bucket,newBucket,newBucketDepth);
+    final long updatedBucketPointer=createBucketPointer(updatedBucketIndex);
+    final long newBucketPointer=createBucketPointer(newBucketCacheEntry.getPageIndex());
+    return new OHashTable.BucketSplitResult(updatedBucketPointer,newBucketPointer,newBucketDepth);
+  }
+  finally {
+    newBucketCacheEntry.releaseExclusiveLock();
+    releasePage(atomicOperation,newBucketCacheEntry);
+  }
+}

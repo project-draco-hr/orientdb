@@ -14,7 +14,7 @@
   query.setUseCache(false);
   query.setContext(context);
   returnHandler.reset();
-  if (lockStrategy.equals("RECORD"))   query.getContext().setVariable("$locking",OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK);
+  if (lockStrategy.equals("RECORD"))   query.getContext().setVariable("$locking",OStorage.LOCKING_STRATEGY.EXCLUSIVE_LOCK);
   for (int r=0; r < retry; ++r) {
     try {
       getDatabase().query(query,queryArgs);
@@ -33,7 +33,21 @@
     final ODocument doc=subjectName != null ? new ODocument(subjectName) : new ODocument();
     final String suspendedLockStrategy=lockStrategy;
     lockStrategy="NONE";
-    result(doc);
+    try {
+      result(doc);
+    }
+ catch (    ORecordDuplicatedException e) {
+      if (upsertMode)       getDatabase().query(query,queryArgs);
+ else       throw e;
+    }
+catch (    ORecordNotFoundException e) {
+      if (upsertMode)       getDatabase().query(query,queryArgs);
+ else       throw e;
+    }
+catch (    OConcurrentModificationException e) {
+      if (upsertMode)       getDatabase().query(query,queryArgs);
+ else       throw e;
+    }
     lockStrategy=suspendedLockStrategy;
   }
   return returnHandler.ret();

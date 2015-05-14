@@ -1,3 +1,30 @@
 {
-  create(name,keySerializer,valueSerializer,(OAbstractPaginatedStorage)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying());
+  final OAtomicOperation atomicOperation;
+  try {
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OSBTreeException("Error during sbtree creation.",e);
+  }
+  acquireExclusiveLock();
+  try {
+    this.keySerializer=keySerializer;
+    this.valueSerializer=valueSerializer;
+    if (isFileExists(atomicOperation,name + dataFileExtension))     this.fileId=openFile(atomicOperation,name + dataFileExtension);
+ else     this.fileId=addFile(atomicOperation,name + dataFileExtension);
+    this.name=name;
+    initAfterCreate(atomicOperation);
+    endAtomicOperation(false);
+  }
+ catch (  IOException e) {
+    rollback();
+    throw new OSBTreeException("Error creation of sbtree with name" + name,e);
+  }
+catch (  Exception e) {
+    rollback();
+    throw new OSBTreeException("Error creation of sbtree with name" + name,e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
 }

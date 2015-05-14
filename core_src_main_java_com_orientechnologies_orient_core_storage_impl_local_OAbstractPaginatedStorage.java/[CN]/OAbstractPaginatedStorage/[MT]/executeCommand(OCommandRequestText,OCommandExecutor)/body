@@ -2,7 +2,16 @@
   if (iCommand.isIdempotent() && !executor.isIdempotent())   throw new OCommandExecutionException("Cannot execute non idempotent command");
   long beginTime=Orient.instance().getProfiler().startChrono();
   try {
-    return executor.execute(iCommand.getParameters());
+    ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    Iterable<ODatabaseListener> listeners=db.getListeners();
+    for (    ODatabaseListener oDatabaseListener : listeners) {
+      oDatabaseListener.onBeforeCommand(iCommand,executor);
+    }
+    Object result=executor.execute(iCommand.getParameters());
+    for (    ODatabaseListener oDatabaseListener : listeners) {
+      oDatabaseListener.onAfterCommand(iCommand,executor,result);
+    }
+    return result;
   }
  catch (  OException e) {
     throw e;
@@ -11,6 +20,10 @@ catch (  Exception e) {
     throw new OCommandExecutionException("Error on execution of command: " + iCommand,e);
   }
  finally {
-    if (Orient.instance().getProfiler().isRecording())     Orient.instance().getProfiler().stopChrono("db." + ODatabaseRecordThreadLocal.INSTANCE.get().getName() + ".command."+ iCommand.toString(),"Command executed against the database",beginTime,"db.*.command.*");
+    if (Orient.instance().getProfiler().isRecording()) {
+      OSecurityUser user=ODatabaseRecordThreadLocal.INSTANCE.get().getUser();
+      String userString=user != null ? user.toString() : null;
+      Orient.instance().getProfiler().stopChrono("db." + ODatabaseRecordThreadLocal.INSTANCE.get().getName() + ".command."+ iCommand.toString(),"Command executed against the database",beginTime,"db.*.command.*",null,userString);
+    }
   }
 }

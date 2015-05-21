@@ -65,44 +65,55 @@ txTask.add(task);
 }
 OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
 if (executionModeSynch) {
-final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
+final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
+final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
+Object result=null;
+for (int retry=1; retry <= maxAutoRetry; ++retry) {
+result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
 if (result instanceof OTxTaskResult) {
-final OTxTaskResult txResult=((OTxTaskResult)result);
-final List<Object> list=txResult.results;
-for (int i=0; i < txTask.getTasks().size(); ++i) {
-  final Object o=list.get(i);
-  final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
-  if (task instanceof OCreateRecordTask) {
-    final OCreateRecordTask t=(OCreateRecordTask)task;
-    t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
-    t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+  final OTxTaskResult txResult=((OTxTaskResult)result);
+  final List<Object> list=txResult.results;
+  for (int i=0; i < txTask.getTasks().size(); ++i) {
+    final Object o=list.get(i);
+    final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
+    if (task instanceof OCreateRecordTask) {
+      final OCreateRecordTask t=(OCreateRecordTask)task;
+      t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
+      t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+    }
+ else     if (task instanceof OUpdateRecordTask) {
+      final OUpdateRecordTask t=(OUpdateRecordTask)task;
+      t.getVersion().copyFrom((ORecordVersion)o);
+    }
+ else     if (task instanceof ODeleteRecordTask) {
+    }
   }
- else   if (task instanceof OUpdateRecordTask) {
-    final OUpdateRecordTask t=(OUpdateRecordTask)task;
-    t.getVersion().copyFrom((ORecordVersion)o);
+  for (  ORecordOperation op : tmpEntries) {
+    final ORecord record=op.getRecord();
+    if (record != null)     ORecordInternal.unsetDirty(record);
   }
- else   if (task instanceof ODeleteRecordTask) {
+  final Object completedResult=dManager.sendRequest(getName(),involvedClusters,nodes,new OCompletedTxTask(txResult.locks),EXECUTION_MODE.RESPONSE);
+  if (!(completedResult instanceof Boolean) || !((Boolean)completedResult).booleanValue()) {
+    ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction complete error: %s",completedResult);
   }
 }
-for (ORecordOperation op : tmpEntries) {
-  final ORecord record=op.getRecord();
-  if (record != null)   ORecordInternal.unsetDirty(record);
-}
-final Object completedResult=dManager.sendRequest(getName(),involvedClusters,nodes,new OCompletedTxTask(txResult.locks),EXECUTION_MODE.RESPONSE);
-if (!(completedResult instanceof Boolean) || !((Boolean)completedResult).booleanValue()) {
-  ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction complete error: %s",completedResult);
-}
+ else if (result instanceof ODistributedRecordLockedException) {
+  if (autoRetryDelay > 0)   Thread.sleep(autoRetryDelay);
+  continue;
 }
  else if (result instanceof Throwable) {
-if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error: %s",result,result.toString());
-if (result instanceof OTransactionException || result instanceof ONeedRetryException) throw (RuntimeException)result;
-throw new OTransactionException("Error on committing distributed transaction",(Throwable)result);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error: %s",result,result.toString());
+  if (result instanceof OTransactionException || result instanceof ONeedRetryException)   throw (RuntimeException)result;
+  throw new OTransactionException("Error on committing distributed transaction",(Throwable)result);
 }
  else {
-if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
-throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
+  throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
 }
 return;
+}
+if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
+throw (ODistributedRecordLockedException)result;
 }
 ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
 @Override public Object call() throws Exception {

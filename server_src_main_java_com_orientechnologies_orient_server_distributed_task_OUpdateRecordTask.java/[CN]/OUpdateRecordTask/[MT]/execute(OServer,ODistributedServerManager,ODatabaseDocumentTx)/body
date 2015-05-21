@@ -1,18 +1,27 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"updating record %s/%s v.%s",database.getName(),rid.toString(),version.toString());
-  ORecord loadedRecord=rid.getRecord();
-  if (loadedRecord == null)   throw new ORecordNotFoundException("Record " + rid + " was not found on update");
-  if (loadedRecord instanceof ODocument) {
-    final ODocument newDocument=(ODocument)getRecord();
-    ODocument loadedDocument=(ODocument)loadedRecord;
-    ORecordVersion loadedRecordVersion=loadedDocument.merge(newDocument,false,false).getRecordVersion();
-    if (loadedRecordVersion.getCounter() != version.getCounter()) {
-      loadedDocument.setDirty();
-    }
-    loadedRecordVersion.copyFrom(version);
+  final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+  if (!inTx) {
+    if (!ddb.lockRecord(rid,nodeSource))     throw new ODistributedRecordLockedException(rid);
   }
- else   ORecordInternal.fill(loadedRecord,rid,version,content,true);
-  loadedRecord=database.save(loadedRecord);
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> updated record %s/%s v.%s",database.getName(),rid.toString(),loadedRecord.getRecordVersion().toString());
-  return loadedRecord.getRecordVersion();
+  try {
+    ORecord loadedRecord=rid.getRecord();
+    if (loadedRecord == null)     throw new ORecordNotFoundException("Record " + rid + " was not found on update");
+    if (loadedRecord instanceof ODocument) {
+      final ODocument newDocument=(ODocument)getRecord();
+      ODocument loadedDocument=(ODocument)loadedRecord;
+      ORecordVersion loadedRecordVersion=loadedDocument.merge(newDocument,false,false).getRecordVersion();
+      if (loadedRecordVersion.getCounter() != version.getCounter()) {
+        loadedDocument.setDirty();
+      }
+      loadedRecordVersion.copyFrom(version);
+    }
+ else     ORecordInternal.fill(loadedRecord,rid,version,content,true);
+    loadedRecord=database.save(loadedRecord);
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> updated record %s/%s v.%s",database.getName(),rid.toString(),loadedRecord.getRecordVersion().toString());
+    return loadedRecord.getRecordVersion();
+  }
+  finally {
+    if (!inTx)     ddb.unlockRecord(rid);
+  }
 }

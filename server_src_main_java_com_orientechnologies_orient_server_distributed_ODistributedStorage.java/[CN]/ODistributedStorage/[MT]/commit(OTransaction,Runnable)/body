@@ -66,8 +66,9 @@ txTask.add(task);
 OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
 if (executionModeSynch) {
 final Object result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
-if (result instanceof List<?>) {
-final List<Object> list=(List<Object>)result;
+if (result instanceof OTxTaskResult) {
+final OTxTaskResult txResult=((OTxTaskResult)result);
+final List<Object> list=txResult.results;
 for (int i=0; i < txTask.getTasks().size(); ++i) {
   final Object o=list.get(i);
   final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
@@ -86,6 +87,10 @@ for (int i=0; i < txTask.getTasks().size(); ++i) {
 for (ORecordOperation op : tmpEntries) {
   final ORecord record=op.getRecord();
   if (record != null)   ORecordInternal.unsetDirty(record);
+}
+final Object completedResult=dManager.sendRequest(getName(),involvedClusters,nodes,new OCompletedTxTask(txResult.locks),EXECUTION_MODE.RESPONSE);
+if (!(completedResult instanceof Boolean) || !((Boolean)completedResult).booleanValue()) {
+  ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction complete error: %s",completedResult);
 }
 }
  else if (result instanceof Throwable) {

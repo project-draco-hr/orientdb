@@ -1,10 +1,19 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),null,DIRECTION.IN,"delete record %s/%s v.%s",database.getName(),rid.toString(),version.toString());
-  final ORecord record=database.load(rid);
-  if (record != null) {
-    if (delayed)     if (record.getRecordVersion().equals(version))     ((ODistributedStorage)database.getStorage()).pushDeletedRecord(rid,version);
- else     throw new OConcurrentModificationException(rid,record.getRecordVersion(),version,ORecordOperation.DELETED);
- else     record.delete();
+  final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+  if (!inTx) {
+    if (!ddb.lockRecord(rid,nodeSource))     throw new ODistributedRecordLockedException(rid);
+  }
+  try {
+    final ORecord record=database.load(rid);
+    if (record != null) {
+      if (delayed)       if (record.getRecordVersion().equals(version))       ((ODistributedStorage)database.getStorage()).pushDeletedRecord(rid,version);
+ else       throw new OConcurrentModificationException(rid,record.getRecordVersion(),version,ORecordOperation.DELETED);
+ else       record.delete();
+    }
+  }
+  finally {
+    if (!inTx)     ddb.unlockRecord(rid);
   }
   return true;
 }

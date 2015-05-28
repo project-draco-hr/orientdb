@@ -1,30 +1,25 @@
 {
-  final GroupKey firstKey=new GroupKey(fileId,0);
-  final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
-  NavigableMap<GroupKey,WriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
-  Iterator<Map.Entry<GroupKey,WriteGroup>> entryIterator=subMap.entrySet().iterator();
-  groupsLoop:   while (entryIterator.hasNext()) {
-    Map.Entry<GroupKey,WriteGroup> entry=entryIterator.next();
-    final WriteGroup writeGroup=entry.getValue();
-    final GroupKey groupKey=entry.getKey();
-    Lock groupLock=lockManager.acquireExclusiveLock(groupKey);
+  final PagedKey firstKey=new PagedKey(fileId,0);
+  final PagedKey lastKey=new PagedKey(fileId,Long.MAX_VALUE);
+  NavigableMap<PagedKey,PageGroup> subMap=writePages.subMap(firstKey,true,lastKey,true);
+  Iterator<Map.Entry<PagedKey,PageGroup>> entryIterator=subMap.entrySet().iterator();
+  while (entryIterator.hasNext()) {
+    Map.Entry<PagedKey,PageGroup> entry=entryIterator.next();
+    final PageGroup pageGroup=entry.getValue();
+    final PagedKey pagedKey=entry.getKey();
+    Lock groupLock=lockManager.acquireExclusiveLock(pagedKey);
     try {
-      int flushedPages=0;
-      for (int i=0; i < 16; i++) {
-        OCachePointer pagePointer=writeGroup.pages[i];
-        if (pagePointer != null) {
-          if (!pagePointer.tryAcquireSharedLock())           continue groupsLoop;
-          try {
-            flushPage(groupKey.fileId,(groupKey.groupIndex << 4) + i,pagePointer.getDataPointer());
-            flushedPages++;
-          }
-  finally {
-            pagePointer.releaseSharedLock();
-          }
-        }
+      final OCachePointer pagePointer=pageGroup.page;
+      if (!pagePointer.tryAcquireSharedLock())       continue;
+      try {
+        flushPage(pagedKey.fileId,pagedKey.pageIndex,pagePointer.getDataPointer());
       }
-      for (      OCachePointer pagePointer : writeGroup.pages)       if (pagePointer != null)       pagePointer.decrementReferrer();
-      cacheSize.addAndGet(-flushedPages);
+  finally {
+        pagePointer.releaseSharedLock();
+      }
+      pagePointer.decrementWritersReferrer();
+      pagePointer.setWritersListener(null);
+      cacheSize.decrement();
       entryIterator.remove();
     }
   finally {

@@ -1,25 +1,23 @@
 {
-  final GroupKey firstKey=new GroupKey(fileId,0);
-  final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
-  NavigableMap<GroupKey,WriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
-  Iterator<Map.Entry<GroupKey,WriteGroup>> entryIterator=subMap.entrySet().iterator();
+  final PagedKey firstKey=new PagedKey(fileId,0);
+  final PagedKey lastKey=new PagedKey(fileId,Long.MAX_VALUE);
+  NavigableMap<PagedKey,PageGroup> subMap=writePages.subMap(firstKey,true,lastKey,true);
+  Iterator<Map.Entry<PagedKey,PageGroup>> entryIterator=subMap.entrySet().iterator();
   while (entryIterator.hasNext()) {
-    Map.Entry<GroupKey,WriteGroup> entry=entryIterator.next();
-    WriteGroup writeGroup=entry.getValue();
-    GroupKey groupKey=entry.getKey();
-    Lock groupLock=lockManager.acquireExclusiveLock(groupKey);
+    Map.Entry<PagedKey,PageGroup> entry=entryIterator.next();
+    PageGroup pageGroup=entry.getValue();
+    PagedKey pagedKey=entry.getKey();
+    Lock groupLock=lockManager.acquireExclusiveLock(pagedKey);
     try {
-      for (      OCachePointer pagePointer : writeGroup.pages) {
-        if (pagePointer != null) {
-          pagePointer.acquireExclusiveLock();
-          try {
-            pagePointer.decrementReferrer();
-            cacheSize.decrementAndGet();
-          }
+      final OCachePointer pagePointer=pageGroup.page;
+      pagePointer.acquireExclusiveLock();
+      try {
+        pagePointer.decrementWritersReferrer();
+        pagePointer.setWritersListener(null);
+        cacheSize.decrement();
+      }
   finally {
-            pagePointer.releaseExclusiveLock();
-          }
-        }
+        pagePointer.releaseExclusiveLock();
       }
       entryIterator.remove();
     }

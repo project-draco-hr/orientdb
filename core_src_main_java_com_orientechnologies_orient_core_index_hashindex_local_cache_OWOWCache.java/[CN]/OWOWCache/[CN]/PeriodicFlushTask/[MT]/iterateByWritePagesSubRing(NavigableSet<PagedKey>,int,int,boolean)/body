@@ -1,26 +1,25 @@
 {
-  Iterator<Map.Entry<PagedKey,PageGroup>> entriesIterator=subMap.entrySet().iterator();
+  Iterator<PagedKey> entriesIterator=subSet.iterator();
   long currentTime=System.currentTimeMillis();
   int flushedRegions=0;
   long lastPageIndex=-1;
   while (entriesIterator.hasNext() && (flushedWritePages < writePagesToFlush || flushedRegions < 2)) {
-    Map.Entry<PagedKey,PageGroup> entry=entriesIterator.next();
-    final PageGroup group=entry.getValue();
-    final PagedKey pagedKey=entry.getKey();
-    final boolean weakLockMode=group.creationTime - currentTime < groupTTL && !forceFlush;
-    if (group.recencyBit && weakLockMode) {
-      group.recencyBit=false;
-      continue;
-    }
-    Lock groupLock=lockManager.acquireExclusiveLock(entry.getKey());
+    PagedKey entry=entriesIterator.next();
+    Lock groupLock=lockManager.acquireExclusiveLock(entry);
     try {
+      final PageGroup group=cachePages.get(entry);
+      if (group == null) {
+        entriesIterator.remove();
+        continue;
+      }
+      final boolean weakLockMode=group.creationTime - currentTime < groupTTL && !forceFlush;
       if (group.recencyBit && weakLockMode)       group.recencyBit=false;
  else {
         group.recencyBit=false;
         final OCachePointer pagePointer=group.page;
         if (!pagePointer.tryAcquireSharedLock())         continue;
         try {
-          flushPage(pagedKey.fileId,pagedKey.pageIndex,pagePointer.getDataPointer());
+          flushPage(entry.fileId,entry.pageIndex,pagePointer.getDataPointer());
           final OLogSequenceNumber flushedLSN=ODurablePage.getLogSequenceNumberFromPage(pagePointer.getDataPointer());
           pagePointer.setLastFlushedLsn(flushedLSN);
         }
@@ -30,15 +29,16 @@
         pagePointer.decrementWritersReferrer();
         pagePointer.setWritersListener(null);
         entriesIterator.remove();
+        cachePages.remove(entry);
       }
     }
   finally {
       lockManager.releaseLock(groupLock);
     }
-    lastPageKey=pagedKey;
+    lastPageKey=entry;
     flushedWritePages++;
-    if (lastPageIndex >= 0 && lastPageIndex + 1 != pagedKey.pageIndex)     flushedRegions++;
-    lastPageIndex=pagedKey.pageIndex;
+    if (lastPageIndex >= 0 && lastPageIndex + 1 != entry.pageIndex)     flushedRegions++;
+    lastPageIndex=entry.pageIndex;
     cacheSize.decrement();
   }
   return flushedWritePages;

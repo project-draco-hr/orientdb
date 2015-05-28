@@ -1,16 +1,39 @@
 {
   try {
-    if (writePages.isEmpty())     return;
+    if (cachePages.isEmpty())     return;
     int writePagesToFlush=0;
+    final long wcs=writeCacheSize.get();
     final long cs=cacheSize.get();
-    final double threshold=((double)cs) / cacheMaxSize;
-    if (threshold > 0.7)     writePagesToFlush=(int)Math.floor((threshold - 0.7) * cs);
-    if (lastCacheSize > 0 && cs - lastCacheSize > writePagesToFlush)     writePagesToFlush=(int)Math.ceil((cs - lastCacheSize) * 1.2);
-    lastCacheSize=cs;
+    boolean iterateByWritePagesFirst=false;
+    boolean forceFlush=false;
+    double writeCacheThreshold=((double)wcs) / writeCacheMaxSize;
+    if (writeCacheThreshold > 0.3) {
+      if (writeCacheThreshold > 0.7) {
+        writeCacheThreshold=0.7;
+        forceFlush=true;
+      }
+      writePagesToFlush=(int)Math.floor(writeCacheThreshold * wcs);
+      iterateByWritePagesFirst=true;
+    }
+    double cacheThreshold=((double)cs) / cacheMaxSize;
+    if (cacheThreshold > 0.3) {
+      if (cacheThreshold > 0.7) {
+        cacheThreshold=0.7;
+        forceFlush=true;
+      }
+      final int pagesToFlush=(int)Math.floor((cacheThreshold - 0.7) * cs);
+      writePagesToFlush=Math.max(pagesToFlush,writePagesToFlush);
+    }
+    if (lastCacheSize > 0)     writePagesToFlush=Math.max((int)(Math.ceil(cs - lastCacheSize) * 1.2),writePagesToFlush);
     if (writePagesToFlush < 4)     writePagesToFlush=4;
+    lastCacheSize=cs;
     int flushedPages=0;
-    flushedPages=flushRing(writePagesToFlush,flushedPages,false);
-    if (flushedPages < writePagesToFlush)     flushRing(writePagesToFlush,flushedPages,true);
+    flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    if (flushedPages < writePagesToFlush && iterateByWritePagesFirst)     flushedPages=flushRing(writePagesToFlush,flushedPages,false,false);
+    if (flushedPages < writePagesToFlush && forceFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,true,iterateByWritePagesFirst);
+      if (flushedPages < writePagesToFlush && iterateByWritePagesFirst)       flushedPages=flushRing(writePagesToFlush,flushedPages,true,false);
+    }
   }
  catch (  Exception e) {
     OLogManager.instance().error(this,"Exception during data flush.",e);

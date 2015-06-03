@@ -1,36 +1,7 @@
 {
-  final GroupKey firstKey=new GroupKey(fileId,0);
-  final GroupKey lastKey=new GroupKey(fileId,Long.MAX_VALUE);
-  NavigableMap<GroupKey,WriteGroup> subMap=writeGroups.subMap(firstKey,true,lastKey,true);
-  Iterator<Map.Entry<GroupKey,WriteGroup>> entryIterator=subMap.entrySet().iterator();
-  groupsLoop:   while (entryIterator.hasNext()) {
-    Map.Entry<GroupKey,WriteGroup> entry=entryIterator.next();
-    final WriteGroup writeGroup=entry.getValue();
-    final GroupKey groupKey=entry.getKey();
-    Lock groupLock=lockManager.acquireExclusiveLock(groupKey);
-    try {
-      int flushedPages=0;
-      for (int i=0; i < 16; i++) {
-        OCachePointer pagePointer=writeGroup.pages[i];
-        if (pagePointer != null) {
-          if (!pagePointer.tryAcquireSharedLock())           continue groupsLoop;
-          try {
-            flushPage(groupKey.fileId,(groupKey.groupIndex << 4) + i,pagePointer.getDataPointer());
-            flushedPages++;
-          }
-  finally {
-            pagePointer.releaseSharedLock();
-          }
-        }
-      }
-      for (      OCachePointer pagePointer : writeGroup.pages)       if (pagePointer != null)       pagePointer.decrementReferrer();
-      cacheSize.addAndGet(-flushedPages);
-      entryIterator.remove();
-    }
-  finally {
-      lockManager.releaseLock(groupLock);
-    }
-  }
+  final PagedKey firstKey=new PagedKey(fileId,0);
+  final PagedKey lastKey=new PagedKey(fileId,Long.MAX_VALUE);
+  flushRing(cachePages.subMap(firstKey,true,lastKey,true));
   files.get(fileId).synch();
   return null;
 }

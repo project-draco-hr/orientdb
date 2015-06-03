@@ -3,10 +3,16 @@
   long currentTime=System.currentTimeMillis();
   int flushedRegions=0;
   long lastPageIndex=-1;
-  while (entriesIterator.hasNext() && (flushedWritePages < writePagesToFlush || flushedRegions < 2)) {
+  while (entriesIterator.hasNext()) {
     Map.Entry<PagedKey,PageGroup> entry=entriesIterator.next();
     final PageGroup group=entry.getValue();
     final PagedKey pagedKey=entry.getKey();
+    if (lastPageIndex >= 0) {
+      if (pagedKey.pageIndex != lastPageIndex + 1) {
+        flushedRegions++;
+        if (flushedWritePages > writePagesToFlush && flushedRegions >= 4)         break;
+      }
+    }
     final boolean weakLockMode=group.creationTime - currentTime < groupTTL && !forceFlush;
     if (group.recencyBit && weakLockMode) {
       group.recencyBit=false;
@@ -30,7 +36,6 @@
         pagePointer.decrementWritersReferrer();
         pagePointer.setWritersListener(null);
         entriesIterator.remove();
-        writePages.remove(entry.getKey());
       }
     }
   finally {
@@ -38,7 +43,6 @@
     }
     lastPageKey=pagedKey;
     flushedWritePages++;
-    if (lastPageIndex >= 0 && lastPageIndex + 1 != pagedKey.pageIndex)     flushedRegions++;
     lastPageIndex=pagedKey.pageIndex;
     cacheSize.decrement();
   }

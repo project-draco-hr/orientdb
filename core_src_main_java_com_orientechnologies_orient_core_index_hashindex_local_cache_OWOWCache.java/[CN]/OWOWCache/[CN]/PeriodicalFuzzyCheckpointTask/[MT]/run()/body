@@ -1,20 +1,6 @@
 {
   OLogSequenceNumber minLsn=writeAheadLog.getFlushedLSN();
-  for (  Map.Entry<PagedKey,PageGroup> entry : cachePages.entrySet()) {
-    Lock groupLock=lockManager.acquireExclusiveLock(entry.getKey());
-    try {
-      PageGroup group=entry.getValue();
-      final OCachePointer pagePointer=group.page;
-      if (pagePointer.getLastFlushedLsn() != null) {
-        if (minLsn.compareTo(pagePointer.getLastFlushedLsn()) > 0) {
-          minLsn=pagePointer.getLastFlushedLsn();
-        }
-      }
-    }
-  finally {
-      lockManager.releaseLock(groupLock);
-    }
-  }
+  minLsn=findMinLsn(minLsn,cachePages);
   OLogManager.instance().debug(this,"Start fuzzy checkpoint flushed LSN is %s",minLsn);
   try {
     writeAheadLog.logFuzzyCheckPointStart(minLsn);

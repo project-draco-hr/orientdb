@@ -8,29 +8,33 @@
     boolean forceFlush=false;
     double writeCacheThreshold=((double)wcs) / writeCacheMaxSize;
     if (writeCacheThreshold > 0.3) {
-      if (writeCacheThreshold > 0.7) {
-        writeCacheThreshold=0.7;
-        forceFlush=true;
-      }
-      writePagesToFlush=(int)Math.floor(writeCacheThreshold * wcs);
+      writePagesToFlush=(int)Math.floor(((writeCacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
       iterateByWritePagesFirst=true;
+      if (writeCacheThreshold > 0.7)       forceFlush=true;
     }
     double cacheThreshold=((double)cs) / cacheMaxSize;
     if (cacheThreshold > 0.3) {
-      if (cacheThreshold > 0.7) {
-        cacheThreshold=0.7;
-        forceFlush=true;
-      }
-      final int pagesToFlush=(int)Math.floor((cacheThreshold - 0.7) * cs);
+      final int pagesToFlush=(int)Math.floor(((cacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
       writePagesToFlush=Math.max(pagesToFlush,writePagesToFlush);
+      if (cacheThreshold > 0.7)       forceFlush=true;
     }
-    if (writePagesToFlush < 4)     writePagesToFlush=4;
+    writePagesToFlush=Math.max(4,Math.min(MAX_PAGES_PER_FLUSH,writePagesToFlush));
     int flushedPages=0;
     flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
-    if (flushedPages < writePagesToFlush && iterateByWritePagesFirst)     flushedPages=flushRing(writePagesToFlush,flushedPages,false,false);
+    if (flushedPages < writePagesToFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    }
+    if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,false);
+    }
     if (flushedPages < writePagesToFlush && forceFlush) {
       flushedPages=flushRing(writePagesToFlush,flushedPages,true,iterateByWritePagesFirst);
-      if (flushedPages < writePagesToFlush && iterateByWritePagesFirst)       flushedPages=flushRing(writePagesToFlush,flushedPages,true,false);
+      if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+        flushRing(writePagesToFlush,flushedPages,true,false);
+        if (flushedPages < writePagesToFlush) {
+          flushRing(writePagesToFlush,flushedPages,true,false);
+        }
+      }
     }
   }
  catch (  Exception e) {

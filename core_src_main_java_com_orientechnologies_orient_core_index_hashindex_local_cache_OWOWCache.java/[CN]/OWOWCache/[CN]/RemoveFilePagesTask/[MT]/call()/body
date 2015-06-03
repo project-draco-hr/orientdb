@@ -1,29 +1,6 @@
 {
   final PagedKey firstKey=new PagedKey(fileId,0);
   final PagedKey lastKey=new PagedKey(fileId,Long.MAX_VALUE);
-  NavigableMap<PagedKey,PageGroup> subMap=cachePages.subMap(firstKey,true,lastKey,true);
-  Iterator<Map.Entry<PagedKey,PageGroup>> entryIterator=subMap.entrySet().iterator();
-  while (entryIterator.hasNext()) {
-    Map.Entry<PagedKey,PageGroup> entry=entryIterator.next();
-    PageGroup pageGroup=entry.getValue();
-    PagedKey pagedKey=entry.getKey();
-    Lock groupLock=lockManager.acquireExclusiveLock(pagedKey);
-    try {
-      final OCachePointer pagePointer=pageGroup.page;
-      pagePointer.acquireExclusiveLock();
-      try {
-        pagePointer.decrementWritersReferrer();
-        pagePointer.setWritersListener(null);
-        cacheSize.decrement();
-      }
-  finally {
-        pagePointer.releaseExclusiveLock();
-      }
-      entryIterator.remove();
-    }
-  finally {
-      lockManager.releaseLock(groupLock);
-    }
-  }
+  removeFromRing(cachePages.subMap(firstKey,true,lastKey,true));
   return null;
 }

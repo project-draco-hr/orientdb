@@ -3,11 +3,17 @@
   long currentTime=System.currentTimeMillis();
   int flushedRegions=0;
   long lastPageIndex=-1;
-  while (entriesIterator.hasNext() && (flushedWritePages < writePagesToFlush || flushedRegions < 2)) {
+  while (entriesIterator.hasNext()) {
     PagedKey entry=entriesIterator.next();
+    if (lastPageIndex >= 0) {
+      if (entry.pageIndex != lastPageIndex + 1) {
+        flushedRegions++;
+      }
+    }
+    if (flushedWritePages > writePagesToFlush && flushedRegions >= 4)     break;
     Lock groupLock=lockManager.acquireExclusiveLock(entry);
     try {
-      final PageGroup group=cachePages.get(entry);
+      PageGroup group=cachePages.get(entry);
       if (group == null) {
         entriesIterator.remove();
         continue;
@@ -35,9 +41,8 @@
   finally {
       lockManager.releaseLock(groupLock);
     }
-    lastPageKey=entry;
+    lastWritePageKey=entry;
     flushedWritePages++;
-    if (lastPageIndex >= 0 && lastPageIndex + 1 != entry.pageIndex)     flushedRegions++;
     lastPageIndex=entry.pageIndex;
     cacheSize.decrement();
   }

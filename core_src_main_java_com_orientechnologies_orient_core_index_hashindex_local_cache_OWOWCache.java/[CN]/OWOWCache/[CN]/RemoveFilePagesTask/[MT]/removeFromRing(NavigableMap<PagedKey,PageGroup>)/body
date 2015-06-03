@@ -1,0 +1,25 @@
+{
+  Iterator<Map.Entry<PagedKey,PageGroup>> entryIterator=subMap.entrySet().iterator();
+  while (entryIterator.hasNext()) {
+    Map.Entry<PagedKey,PageGroup> entry=entryIterator.next();
+    PageGroup pageGroup=entry.getValue();
+    PagedKey pagedKey=entry.getKey();
+    Lock groupLock=lockManager.acquireExclusiveLock(pagedKey);
+    try {
+      final OCachePointer pagePointer=pageGroup.page;
+      pagePointer.acquireExclusiveLock();
+      try {
+        pagePointer.decrementWritersReferrer();
+        pagePointer.setWritersListener(null);
+        cacheSize.decrement();
+      }
+  finally {
+        pagePointer.releaseExclusiveLock();
+      }
+      entryIterator.remove();
+    }
+  finally {
+      lockManager.releaseLock(groupLock);
+    }
+  }
+}

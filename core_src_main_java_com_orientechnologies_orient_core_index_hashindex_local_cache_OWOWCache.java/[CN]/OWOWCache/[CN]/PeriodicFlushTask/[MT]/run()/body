@@ -1,30 +1,39 @@
 {
   try {
-    if (writeGroups.isEmpty())     return;
-    int writeGroupsToFlush;
-    boolean useForceSync=false;
-    double threshold=((double)cacheSize.get()) / cacheMaxSize;
-    if (threshold > 0.8) {
-      writeGroupsToFlush=(int)(0.2 * writeGroups.size());
-      useForceSync=true;
+    if (cachePages.isEmpty())     return;
+    int writePagesToFlush=0;
+    final long wcs=writeCacheSize.get();
+    final long cs=cacheSize.get();
+    boolean iterateByWritePagesFirst=false;
+    boolean forceFlush=false;
+    double writeCacheThreshold=((double)wcs) / writeCacheMaxSize;
+    if (writeCacheThreshold > 0.3) {
+      writePagesToFlush=(int)Math.floor(((writeCacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
+      iterateByWritePagesFirst=true;
+      if (writeCacheThreshold > 0.7)       forceFlush=true;
     }
- else     if (threshold > 0.9) {
-      writeGroupsToFlush=(int)(0.4 * writeGroups.size());
-      useForceSync=true;
+    double cacheThreshold=((double)cs) / cacheMaxSize;
+    if (cacheThreshold > 0.3) {
+      final int pagesToFlush=(int)Math.floor(((cacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
+      writePagesToFlush=Math.max(pagesToFlush,writePagesToFlush);
+      if (cacheThreshold > 0.7)       forceFlush=true;
     }
- else     writeGroupsToFlush=1;
-    if (writeGroupsToFlush < 1)     writeGroupsToFlush=1;
-    int flushedGroups=0;
-    flushedGroups=flushRing(writeGroupsToFlush,flushedGroups,false);
-    if (flushedGroups < writeGroupsToFlush && useForceSync)     flushedGroups=flushRing(writeGroupsToFlush,flushedGroups,true);
-    if (flushedGroups < writeGroupsToFlush && cacheSize.get() > cacheMaxSize) {
-      if (OGlobalConfiguration.SERVER_CACHE_INCREASE_ON_DEMAND.getValueAsBoolean()) {
-        final long oldCacheMaxSize=cacheMaxSize;
-        cacheMaxSize=(int)Math.ceil(cacheMaxSize * (1 + OGlobalConfiguration.SERVER_CACHE_INCREASE_STEP.getValueAsFloat()));
-        OLogManager.instance().warn(this,"Write cache size is increased from %d to %d",oldCacheMaxSize,cacheMaxSize);
-      }
- else {
-        throw new OAllCacheEntriesAreUsedException("All records in write cache are used!");
+    writePagesToFlush=Math.max(4,Math.min(MAX_PAGES_PER_FLUSH,writePagesToFlush));
+    int flushedPages=0;
+    flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    if (flushedPages < writePagesToFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    }
+    if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,false);
+    }
+    if (flushedPages < writePagesToFlush && forceFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,true,iterateByWritePagesFirst);
+      if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+        flushRing(writePagesToFlush,flushedPages,true,false);
+        if (flushedPages < writePagesToFlush) {
+          flushRing(writePagesToFlush,flushedPages,true,false);
+        }
       }
     }
   }

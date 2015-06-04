@@ -1,12 +1,22 @@
 {
   try {
+    ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
     for (int i=0; i < PESSIMISTIC_CYCLES; i++) {
       String cmd="update " + rid + " increment total = 1";
       if (lock)       cmd+=" lock record";
-      for (int retry=0; retry < MAX_RETRIES; ++retry) {
+      int retries=0;
+      while (true) {
         try {
-          db.command(new OCommandSQL(cmd)).execute();
-          counter.incrementAndGet();
+          retries++;
+          db.open("admin","admin");
+          try {
+            db.command(new OCommandSQL(cmd)).execute();
+            counter.incrementAndGet();
+          }
+  finally {
+            db.close();
+          }
+          if (retries % 10 == 0)           System.out.println(retries + " retries for thread " + threadName);
           break;
         }
  catch (        OResponseProcessingException e) {

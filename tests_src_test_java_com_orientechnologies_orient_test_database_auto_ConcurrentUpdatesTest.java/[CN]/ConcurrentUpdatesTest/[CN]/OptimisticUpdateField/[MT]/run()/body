@@ -1,26 +1,36 @@
 {
   try {
+    ODatabaseDocumentTx db=new ODatabaseDocumentTx(url);
     for (int i=0; i < OPTIMISTIC_CYCLES; i++) {
-      for (int retry=0; retry < MAX_RETRIES; ++retry) {
+      int retries=0;
+      while (true) {
+        retries++;
+        if (retries % 10 == 0)         System.out.println(retries + " retries for thread " + threadName);
         try {
-          db.begin(TXTYPE.OPTIMISTIC);
-          ODocument vDoc1=db.load(rid1,null,true);
-          vDoc1.field(threadName,vDoc1.field(threadName) + ";" + i);
-          vDoc1.save();
-          ODocument vDoc2=db.load(rid2,null,true);
-          vDoc2.field(threadName,vDoc2.field(threadName) + ";" + i);
-          vDoc2.save();
-          db.commit();
+          db.open("admin","admin");
+          try {
+            db.begin(TXTYPE.OPTIMISTIC);
+            ODocument vDoc1=db.load(rid1,null,true);
+            vDoc1.field(threadName,vDoc1.field(threadName) + ";" + i);
+            vDoc1.save();
+            ODocument vDoc2=db.load(rid2,null,true);
+            vDoc2.field(threadName,vDoc2.field(threadName) + ";" + i);
+            vDoc2.save();
+            db.commit();
+          }
+  finally {
+            db.close();
+          }
           counter.incrementAndGet();
-          totalRetries.addAndGet(retry);
+          totalRetries.addAndGet(retries);
           break;
         }
  catch (        OResponseProcessingException e) {
           Assert.assertTrue(e.getCause() instanceof ONeedRetryException);
-          Thread.sleep(retry * 10);
+          Thread.sleep(retries * 10);
         }
 catch (        ONeedRetryException e) {
-          Thread.sleep(retry * 10);
+          Thread.sleep(retries * 10);
         }
       }
       fieldValue+=";" + i;

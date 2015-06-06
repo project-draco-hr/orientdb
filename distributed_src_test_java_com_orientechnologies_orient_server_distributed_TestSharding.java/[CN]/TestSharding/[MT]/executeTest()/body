@@ -102,8 +102,8 @@
           String clusterName="client";
           if (i > 0)           clusterName+="_" + nodeName;
           String query="select from cluster:" + clusterName;
-          final OrientVertex explain=g.command(new OCommandSQL("explain " + query)).execute();
-          System.out.println("explain " + query + " -> "+ ((ODocument)explain.getRecord()).field("servers"));
+          final Object explain=g.getRawGraph().command(new OCommandSQL("explain " + query)).execute();
+          System.out.println("explain " + query + " -> "+ explain);
           Iterable<OrientVertex> result=g.command(new OCommandSQL(query)).execute();
           Assert.assertTrue("Error on query against '" + clusterName + "' on server '"+ server+ "': "+ query,result.iterator().hasNext());
           OrientVertex v=result.iterator().next();
@@ -191,6 +191,9 @@
       long totalAfterDelete=0;
       for (      OrientVertex v : countResultAfterDelete)       totalAfterDelete++;
       Assert.assertEquals(totalBeforeDelete - count,totalAfterDelete);
+      g.command(new OCommandSQL("create vertex Client set name = 'temp1'")).execute();
+      g.command(new OCommandSQL("create vertex Client set name = 'temp2'")).execute();
+      g.command(new OCommandSQL("create vertex Client set name = 'temp3'")).execute();
       g.command(new OCommandSQL("delete vertex Client")).execute();
       Iterable<OrientVertex> countResultAfterFullDelete=g.command(new OCommandSQL("select from Client")).execute();
       long totalAfterFullDelete=0;
@@ -199,6 +202,35 @@
     }
   finally {
       g.shutdown();
+    }
+    OrientVertex v1, v2;
+    OrientGraph gTx=f.getTx();
+    try {
+      v1=gTx.addVertex("class:Client");
+      v1.setProperty("name","test1");
+      v2=gTx.addVertex("class:Client");
+      v2.setProperty("name","test1");
+    }
+  finally {
+      gTx.shutdown();
+    }
+    gTx=f.getTx();
+    try {
+      v1.remove();
+      v2.remove();
+    }
+  finally {
+      gTx.shutdown();
+    }
+    gTx=f.getTx();
+    try {
+      Iterable<OrientVertex> countResultAfterFullDelete=gTx.command(new OCommandSQL("select from Client")).execute();
+      long totalAfterFullDelete=0;
+      for (      OrientVertex v : countResultAfterFullDelete)       totalAfterFullDelete++;
+      Assert.assertEquals(0,totalAfterFullDelete);
+    }
+  finally {
+      gTx.shutdown();
     }
   }
  catch (  Exception e) {

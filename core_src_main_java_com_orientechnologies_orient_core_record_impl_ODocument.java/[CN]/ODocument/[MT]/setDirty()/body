@@ -7,5 +7,26 @@
     }
   }
   checkForFields();
-  return super.setDirty();
+  super.setDirty();
+  boolean addToChangedList=false;
+  ORecordElement owner;
+  if (!isEmbedded())   owner=this;
+ else {
+    owner=getOwner();
+    while (owner != null && owner.getOwner() != null) {
+      owner=owner.getOwner();
+    }
+  }
+  if (owner instanceof ODocument && ((ODocument)owner).isTrackingChanges() && ((ODocument)owner).getIdentity().isPersistent())   addToChangedList=true;
+  if (addToChangedList) {
+    final ODatabaseDocument database=getDatabaseIfDefined();
+    if (database != null) {
+      final OTransaction transaction=database.getTransaction();
+      if (transaction instanceof OTransactionOptimistic) {
+        OTransactionOptimistic transactionOptimistic=(OTransactionOptimistic)transaction;
+        transactionOptimistic.addChangedDocument(this);
+      }
+    }
+  }
+  return this;
 }

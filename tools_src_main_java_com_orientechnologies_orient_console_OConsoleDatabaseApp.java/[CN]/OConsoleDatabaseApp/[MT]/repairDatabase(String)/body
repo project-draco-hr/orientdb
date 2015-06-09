@@ -2,51 +2,70 @@
   checkForDatabase();
   message("\nRepairing database...");
   boolean verbose=iOptions != null && iOptions.contains("-v");
+  boolean fix_ridbags=iOptions != null && iOptions.contains("--fix-ridbags");
   long fixedLinks=0l;
   long modifiedDocuments=0l;
   long errors=0l;
   message("\n- Fixing dirty links...");
   try {
-    for (    String clusterName : currentDatabase.getClusterNames()) {
-      for (      ORecord rec : currentDatabase.browseCluster(clusterName)) {
-        try {
-          if (rec instanceof ODocument) {
-            boolean changed=false;
-            final ODocument doc=(ODocument)rec;
-            for (            String fieldName : doc.fieldNames()) {
-              final Object fieldValue=doc.rawField(fieldName);
-              if (fieldValue instanceof OIdentifiable) {
-                if (fixLink(fieldValue)) {
-                  doc.field(fieldName,(OIdentifiable)null);
-                  fixedLinks++;
-                  changed=true;
-                  if (verbose)                   message("\n--- reset link " + ((OIdentifiable)fieldValue).getIdentity() + " in field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
-                }
-              }
- else               if (fieldValue instanceof Iterable<?>) {
-                if (fieldValue instanceof ORecordLazyMultiValue)                 ((ORecordLazyMultiValue)fieldValue).setAutoConvertToRecord(false);
-                final Iterator<Object> it=((Iterable)fieldValue).iterator();
-                for (int i=0; it.hasNext(); ++i) {
-                  final Object v=it.next();
-                  if (fixLink(v)) {
-                    it.remove();
+    if (!fix_ridbags) {
+      for (      String clusterName : currentDatabase.getClusterNames()) {
+        for (        ORecord rec : currentDatabase.browseCluster(clusterName)) {
+          try {
+            if (rec instanceof ODocument) {
+              boolean changed=false;
+              final ODocument doc=(ODocument)rec;
+              for (              String fieldName : doc.fieldNames()) {
+                final Object fieldValue=doc.rawField(fieldName);
+                if (fieldValue instanceof OIdentifiable) {
+                  if (fixLink(fieldValue)) {
+                    doc.field(fieldName,(OIdentifiable)null);
                     fixedLinks++;
                     changed=true;
-                    if (verbose)                     message("\n--- reset link " + ((OIdentifiable)v).getIdentity() + " as item "+ i+ " in collection of field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
+                    if (verbose)                     message("\n--- reset link " + ((OIdentifiable)fieldValue).getIdentity() + " in field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
+                  }
+                }
+ else                 if (fieldValue instanceof Iterable<?>) {
+                  if (fieldValue instanceof ORecordLazyMultiValue)                   ((ORecordLazyMultiValue)fieldValue).setAutoConvertToRecord(false);
+                  final Iterator<Object> it=((Iterable)fieldValue).iterator();
+                  for (int i=0; it.hasNext(); ++i) {
+                    final Object v=it.next();
+                    if (fixLink(v)) {
+                      it.remove();
+                      fixedLinks++;
+                      changed=true;
+                      if (verbose)                       message("\n--- reset link " + ((OIdentifiable)v).getIdentity() + " as item "+ i+ " in collection of field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
+                    }
                   }
                 }
               }
-            }
-            if (changed) {
-              modifiedDocuments++;
-              doc.save();
-              if (verbose)               message("\n-- updated document " + doc.getIdentity());
+              if (changed) {
+                modifiedDocuments++;
+                doc.save();
+                if (verbose)                 message("\n-- updated document " + doc.getIdentity());
+              }
             }
           }
+ catch (          Exception e) {
+            errors++;
+          }
         }
- catch (        Exception e) {
-          errors++;
+      }
+    }
+ else     if (fix_ridbags) {
+      boolean lightweight=false;
+      final List<OStorageEntryConfiguration> custom=(List<OStorageEntryConfiguration>)currentDatabase.get(ATTRIBUTES.CUSTOM);
+      for (      OStorageEntryConfiguration c : custom) {
+        if (c.name.equals("useLightweightEdges") && Boolean.TRUE.equals(Boolean.parseBoolean(c.value))) {
+          lightweight=true;
         }
+      }
+      if (!lightweight) {
+        OBonsaiTreeRepair repairer=new OBonsaiTreeRepair();
+        repairer.repairDatabaseRidbags(currentDatabase);
+      }
+ else {
+        message("cannot execute fix ridbags on a db with ligthweight edges");
       }
     }
     if (verbose)     message("\n");

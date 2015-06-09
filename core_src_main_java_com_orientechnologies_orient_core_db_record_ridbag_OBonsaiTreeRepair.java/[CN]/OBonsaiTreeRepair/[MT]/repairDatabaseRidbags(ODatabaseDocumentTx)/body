@@ -1,0 +1,67 @@
+{
+  Set<String> clusters=db.getStorage().getClusterNames();
+  for (  String clusterName : clusters) {
+    List<DoubleReferenceItem> doubles=new ArrayList<DoubleReferenceItem>();
+    Map<OBonsaiBucketPointer,Map<ORidBag,String>> map=new HashMap<OBonsaiBucketPointer,Map<ORidBag,String>>();
+    for (    ORecord rec : db.browseCluster(clusterName)) {
+      try {
+        if (rec instanceof ODocument) {
+          final ODocument doc=(ODocument)rec;
+          for (          String fieldName : doc.fieldNames()) {
+            final Object fieldValue=doc.rawField(fieldName);
+            if (fieldValue instanceof ORidBag) {
+              ORidBag ridBag=(ORidBag)fieldValue;
+              if (ridBag.getPointer().isValid()) {
+                OSBTreeBonsaiLocal<OIdentifiable,Integer> tree=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)db.getSbTreeCollectionManager().loadSBTree(ridBag.getPointer());
+                long fileId=tree.getFileId();
+                List<OBonsaiBucketPointer> buckets=tree.listBuckets();
+                for (                OBonsaiBucketPointer oBonsaiBucketPointer : buckets) {
+                  Map<ORidBag,String> refBag=map.get(oBonsaiBucketPointer);
+                  if (refBag != null) {
+                    for (                    Map.Entry<ORidBag,String> entry : refBag.entrySet()) {
+                      DoubleReferenceItem ref=new DoubleReferenceItem(fieldName,ridBag,entry.getValue(),entry.getKey(),oBonsaiBucketPointer);
+                      doubles.add(ref);
+                    }
+                  }
+ else                   refBag=new HashMap<ORidBag,String>();
+                  refBag.put(ridBag,fieldName);
+                  map.put(oBonsaiBucketPointer,refBag);
+                }
+              }
+            }
+          }
+        }
+      }
+ catch (      Exception e) {
+        e.printStackTrace();
+      }
+    }
+    for (    DoubleReferenceItem doubleRef : doubles) {
+      try {
+        ORidBag ridBagOne=doubleRef.getRidBagOne();
+        ODocument docOne=(ODocument)ridBagOne.getDelegate().getOwner();
+        OSBTreeBonsaiLocal<OIdentifiable,Integer> tree=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)db.getSbTreeCollectionManager().loadSBTree(ridBagOne.getPointer());
+        tree.removeBucketsFromFreeList();
+        tree.clear();
+        ORidBag ridBagTwo=doubleRef.getRidBagTwo();
+        OSBTreeBonsaiLocal<OIdentifiable,Integer> tree2=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)db.getSbTreeCollectionManager().loadSBTree(ridBagOne.getPointer());
+        tree2.removeBucketsFromFreeList();
+        tree2.clear();
+        ODocument docTwo=(ODocument)ridBagTwo.getDelegate().getOwner();
+        List<ODocument> list=regenerateRidBag(docOne,doubleRef.getFieldNameOne(),db);
+        for (        ODocument oDocument : list) {
+          ridBagOne.add((OIdentifiable)oDocument.field("res"));
+        }
+        db.save(docOne);
+        List<ODocument> list1=regenerateRidBag(docTwo,doubleRef.getFieldNameTwo(),db);
+        for (        ODocument oDocument : list1) {
+          ridBagTwo.add((OIdentifiable)oDocument.field("res"));
+        }
+        db.save(docTwo);
+      }
+ catch (      IOException ex) {
+        ex.printStackTrace();
+      }
+    }
+  }
+}

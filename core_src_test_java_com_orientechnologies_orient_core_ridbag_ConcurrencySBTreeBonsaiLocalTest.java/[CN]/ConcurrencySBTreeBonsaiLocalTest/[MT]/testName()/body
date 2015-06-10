@@ -1,0 +1,54 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:" + ConcurrencySBTreeBonsaiLocalTest.class.getName());
+  db.create();
+  ExecutorService exec=Executors.newCachedThreadPool();
+  try {
+    OSBTreeCollectionManager coll=db.getSbTreeCollectionManager();
+    OBonsaiCollectionPointer treePointer=coll.createSBTree(3,null);
+    OSBTreeBonsaiLocal<OIdentifiable,Integer> tree=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)coll.loadSBTree(treePointer);
+    OBonsaiCollectionPointer treePointer1=coll.createSBTree(3,null);
+    final OSBTreeBonsaiLocal<OIdentifiable,Integer> tree1=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)coll.loadSBTree(treePointer1);
+    final OAtomicOperationsManager atomManager=((OAbstractPaginatedStorage)db.getStorage()).getAtomicOperationsManager();
+    atomManager.startAtomicOperation(tree);
+    for (int i=1000; i < 2000; i++)     tree.put(new ORecordId(10,i),1);
+    Future<?> ex=null;
+    try {
+      ex=exec.submit(new Runnable(){
+        @Override public void run(){
+          try {
+            atomManager.startAtomicOperation(tree1);
+            for (int i=2000; i < 3000; i++)             tree1.put(new ORecordId(10,i),1);
+            atomManager.endAtomicOperation(false);
+          }
+ catch (          Exception e) {
+            throw new RuntimeException(e);
+          }
+        }
+      }
+);
+      ex.get(10,TimeUnit.MILLISECONDS);
+    }
+ catch (    TimeoutException e) {
+    }
+    atomManager.endAtomicOperation(false);
+    ex.get();
+    OSBTreeRidBag bag=new OSBTreeRidBag();
+    bag.setCollectionPointer(tree.getCollectionPointer());
+    bag.setAutoConvertToRecord(false);
+    Assert.assertEquals(tree.size(),1000);
+    for (    OIdentifiable id : bag) {
+      if (id.getIdentity().getClusterPosition() > 2000)       Assert.fail("found a wrong rid in the ridbag");
+    }
+    OSBTreeRidBag secondBag=new OSBTreeRidBag();
+    secondBag.setAutoConvertToRecord(false);
+    secondBag.setCollectionPointer(tree1.getCollectionPointer());
+    Assert.assertEquals(tree1.size(),1000);
+    for (    OIdentifiable id : secondBag) {
+      if (id.getIdentity().getClusterPosition() < 2000)       Assert.fail("found a wrong rid in the ridbag");
+    }
+  }
+  finally {
+    exec.shutdown();
+    db.drop();
+  }
+}

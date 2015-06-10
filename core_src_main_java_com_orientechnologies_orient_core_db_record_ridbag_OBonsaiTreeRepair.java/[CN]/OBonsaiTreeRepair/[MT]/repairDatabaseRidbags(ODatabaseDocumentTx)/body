@@ -1,4 +1,5 @@
 {
+  StringBuilder report=new StringBuilder();
   Set<String> clusters=db.getStorage().getClusterNames();
   for (  String clusterName : clusters) {
     List<DoubleReferenceItem> doubles=new ArrayList<DoubleReferenceItem>();
@@ -13,7 +14,6 @@
               ORidBag ridBag=(ORidBag)fieldValue;
               if (ridBag.getPointer().isValid()) {
                 OSBTreeBonsaiLocal<OIdentifiable,Integer> tree=(OSBTreeBonsaiLocal<OIdentifiable,Integer>)db.getSbTreeCollectionManager().loadSBTree(ridBag.getPointer());
-                long fileId=tree.getFileId();
                 List<OBonsaiBucketPointer> buckets=tree.listBuckets();
                 for (                OBonsaiBucketPointer oBonsaiBucketPointer : buckets) {
                   Map<ORidBag,String> refBag=map.get(oBonsaiBucketPointer);
@@ -36,6 +36,7 @@
         e.printStackTrace();
       }
     }
+    Map<ODocument,Set<String>> fixedSet=new HashMap<ODocument,Set<String>>();
     for (    DoubleReferenceItem doubleRef : doubles) {
       try {
         ORidBag ridBagOne=doubleRef.getRidBagOne();
@@ -58,10 +59,31 @@
           ridBagTwo.add((OIdentifiable)oDocument.field("res"));
         }
         db.save(docTwo);
+        Set<String> res=fixedSet.get(docOne);
+        if (res == null) {
+          res=new HashSet<String>();
+          fixedSet.put(docOne,res);
+        }
+        res.add(doubleRef.getFieldNameOne());
+        res=fixedSet.get(docTwo);
+        if (res == null) {
+          res=new HashSet<String>();
+          fixedSet.put(docTwo,res);
+        }
+        res.add(doubleRef.getFieldNameTwo());
       }
  catch (      IOException ex) {
         ex.printStackTrace();
       }
     }
+    if (!fixedSet.isEmpty()) {
+      report.append("In cluster: " + clusterName + " fixed ridbags of records: \n");
+      for (      Entry<ODocument,Set<String>> entry : fixedSet.entrySet()) {
+        ODocument doc=entry.getKey();
+        report.append("\t").append(doc.getIdentity()).append("\n");
+        for (        String field : entry.getValue())         report.append("\t\t").append(field).append("\n");
+      }
+    }
   }
+  return report.toString();
 }

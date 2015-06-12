@@ -1,0 +1,24 @@
+{
+  setDataCommandInfo("Remove Key from index");
+  if (!isConnectionAlive())   return;
+  final String indexName=channel.readString();
+  List<String> keyList=channel.readStringList();
+  ORecordId value=channel.readRID();
+  OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
+  Object key=index.getDefinition().createValue(keyList);
+  if (!isConnectionAlive())   return;
+  beginResponse();
+  try {
+    try {
+      index.put(key,value);
+      sendOk(clientTxId);
+    }
+ catch (    ORecordDuplicatedException ex) {
+      sendError(clientTxId,ex);
+    }
+  }
+  finally {
+    connection.data.command=null;
+    endResponse();
+  }
+}

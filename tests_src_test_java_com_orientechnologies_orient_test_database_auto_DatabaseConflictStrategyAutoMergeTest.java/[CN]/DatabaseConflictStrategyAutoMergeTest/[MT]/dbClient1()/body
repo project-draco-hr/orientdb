@@ -1,0 +1,34 @@
+{
+  sleep(1000);
+synchronized (LOCK) {
+    OrientBaseGraph graph=new OrientGraph(CLIENT_ORIENT_URL_MAIN);
+    ArrayList<OrientVertex> cachedVertices=new ArrayList<OrientVertex>();
+    try {
+      for (int i=0; i < 10; i++) {
+        OrientVertex v=graph.addVertex("vertextype",(String)null);
+        graph.commit();
+        assertEquals(1,v.getRecord().getVersion());
+        verticeIds.add(v.getId());
+        cachedVertices.add(v);
+      }
+      pause();
+      for (      OrientVertex cachedVertex : cachedVertices) {
+        cachedVertex.setProperty("p2","v2");
+        graph.commit();
+        cachedVertex.reload();
+        assertEquals("v1",cachedVertex.getProperty("p1"));
+        assertEquals("v2",cachedVertex.getProperty("p2"));
+        assertEquals(3,cachedVertex.getRecord().getVersion());
+      }
+    }
+ catch (    Throwable e) {
+      if (exceptionInThread == null) {
+        exceptionInThread=e;
+      }
+    }
+ finally {
+      graph.shutdown();
+      LOCK.notifyAll();
+    }
+  }
+}

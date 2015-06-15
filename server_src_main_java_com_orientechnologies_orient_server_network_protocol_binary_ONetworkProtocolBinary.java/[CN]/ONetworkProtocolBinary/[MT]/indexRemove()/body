@@ -1,0 +1,20 @@
+{
+  setDataCommandInfo("Remove an entry from index");
+  if (!isConnectionAlive())   return;
+  final String indexName=channel.readString();
+  Object key=new ODocument().fromStream(channel.readBytes()).field("key");
+  final OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
+  if (index == null)   throw new OException("index with name '" + indexName + "' not found");
+  key=index.getDefinition().createValue(key);
+  if (!isConnectionAlive())   return;
+  final boolean res=index.remove(key);
+  beginResponse();
+  try {
+    sendOk(clientTxId);
+    channel.writeBoolean(res);
+  }
+  finally {
+    connection.data.command=null;
+    endResponse();
+  }
+}

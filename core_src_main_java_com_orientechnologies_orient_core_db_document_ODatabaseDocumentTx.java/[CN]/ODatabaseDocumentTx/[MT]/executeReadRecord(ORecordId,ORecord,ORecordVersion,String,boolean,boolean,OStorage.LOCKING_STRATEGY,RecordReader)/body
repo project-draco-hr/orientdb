@@ -7,6 +7,7 @@
     checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_READ,getClusterNameById(rid.getClusterId()));
     ORecord record=getTransaction().getRecord(rid);
     if (record == OTransactionRealAbstract.DELETED_RECORD)     return null;
+    if (record == null && !ignoreCache)     record=getGlobalCache().findRecord(rid);
     if (record == null && !ignoreCache)     record=getLocalCache().findRecord(rid);
     if (record != null) {
       if (iRecord != null) {
@@ -18,11 +19,11 @@
       if (callbackHooks(ORecordHook.TYPE.BEFORE_READ,record) == ORecordHook.RESULT.SKIP)       return null;
       if (record.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)       record.reload();
       if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_SHARED_LOCK) {
-        OLogManager.instance().warn(this,"You use depricated record locking strategy : %s it may lead to deadlocks " + lockingStrategy);
+        OLogManager.instance().warn(this,"You use deprecated record locking strategy: %s It may lead to deadlocks",lockingStrategy);
         record.lock(false);
       }
  else       if (lockingStrategy == OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK) {
-        OLogManager.instance().warn(this,"You use depricated record locking strategy : %s it may lead to deadlocks " + lockingStrategy);
+        OLogManager.instance().warn(this,"You use deprecated record locking strategy: %s. It may lead to deadlocks",lockingStrategy);
         record.lock(true);
       }
       callbackHooks(ORecordHook.TYPE.AFTER_READ,record);
@@ -46,17 +47,19 @@
     iRecord.fromStream(recordBuffer.buffer);
     callbackHooks(ORecordHook.TYPE.AFTER_READ,iRecord);
     if (!ignoreCache)     getLocalCache().updateRecord(iRecord);
+    final OGlobalRecordCache globalCache=getGlobalCache();
+    if (globalCache != null)     globalCache.updateRecord(iRecord);
     return (RET)iRecord;
   }
  catch (  OOfflineClusterException t) {
     throw t;
   }
 catch (  Throwable t) {
-    if (rid.isTemporary())     throw new ODatabaseException("Error on retrieving record using temporary RecordId: " + rid,t);
+    if (rid.isTemporary())     throw new ODatabaseException("Error on retrieving record using temporary RID: " + rid,t);
  else     throw new ODatabaseException("Error on retrieving record " + rid + " (cluster: "+ storage.getPhysicalClusterNameById(rid.clusterId)+ ")",t);
   }
  finally {
     ORecordSerializationContext.pullContext();
-    ((OMetadataInternal)getMetadata()).clearThreadLocalSchemaSnapshot();
+    getMetadata().clearThreadLocalSchemaSnapshot();
   }
 }

@@ -1,55 +1,20 @@
 {
-  setDataCommandInfo("Get from index ");
+  setDataCommandInfo("Retrieve an entry from index");
   if (!isConnectionAlive())   return;
   final String indexName=channel.readString();
-  List<String> keys=channel.readStringList();
+  Object key=new ODocument().fromStream(channel.readBytes()).field("key");
   final String fetchPlan=channel.readString();
-  OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
-  if (index == null)   throw new OException("index with name " + indexName + "not found");
-  Object key=index.getDefinition().createValue(keys);
-  OAbstractCommandResultListener listener=null;
-  listener=new OSyncCommandResultListener();
+  final OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
+  if (index == null)   throw new OException("index with name '" + indexName + "' not found");
+  key=index.getDefinition().createValue(key);
+  OAbstractCommandResultListener listener=new OSyncCommandResultListener();
   if (!isConnectionAlive())   return;
   listener.setFetchPlan(fetchPlan);
   Object result=index.get(key);
   beginResponse();
   try {
     sendOk(clientTxId);
-    if (result == null) {
-      channel.writeByte((byte)'n');
-    }
- else     if (result instanceof OIdentifiable) {
-      channel.writeByte((byte)'r');
-      listener.result(result);
-      writeIdentifiable((OIdentifiable)result);
-    }
- else     if (result instanceof ODocumentWrapper) {
-      channel.writeByte((byte)'r');
-      final ODocument doc=((ODocumentWrapper)result).getDocument();
-      listener.result(doc);
-      writeIdentifiable(doc);
-    }
- else     if (OMultiValue.isMultiValue(result)) {
-      channel.writeByte((byte)'l');
-      channel.writeInt(OMultiValue.getSize(result));
-      for (      Object o : OMultiValue.getMultiValueIterable(result)) {
-        try {
-          listener.result(o);
-          writeIdentifiable((OIdentifiable)o);
-        }
- catch (        Exception e) {
-          OLogManager.instance().warn(this,"Cannot serialize record: " + o);
-          writeIdentifiable(null);
-        }
-      }
-    }
- else {
-      channel.writeByte((byte)'a');
-      final StringBuilder value=new StringBuilder(64);
-      listener.result(result);
-      ORecordSerializerStringAbstract.fieldTypeToString(value,OType.getTypeByClass(result.getClass()),result);
-      channel.writeString(value.toString());
-    }
+    serializeValue(listener,result);
     if (connection.data.protocolVersion >= 17 && listener instanceof OSyncCommandResultListener) {
       for (      ORecord rec : ((OSyncCommandResultListener)listener).getFetchedRecordsToSend()) {
         channel.writeByte((byte)2);

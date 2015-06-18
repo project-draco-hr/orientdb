@@ -8,9 +8,10 @@
   for (  Map.Entry<String,Long> entryPoint : estimatedRootEntries.entrySet()) {
     if (entryPoint.getValue() < threshold) {
       String nextAlias=entryPoint.getKey();
-      Iterable<OIdentifiable> matches=query(aliasClasses.get(nextAlias),aliasFilters.get(nextAlias));
+      Iterable<OIdentifiable> matches=calculateMatches(nextAlias,aliasFilters,iCommandContext,aliasClasses);
+      Set<OIdentifiable> ids=new HashSet<OIdentifiable>();
       if (!matches.iterator().hasNext()) {
-        return;
+        return true;
       }
       rootContext.candidates.put(nextAlias,matches);
       long thisAmount;
@@ -29,9 +30,9 @@
   }
   if (!rootFound) {
     String nextAlias=getNextAlias(estimatedRootEntries,matchContext);
-    Iterable<OIdentifiable> matches=query(aliasClasses.get(nextAlias),aliasFilters.get(nextAlias));
+    Iterable<OIdentifiable> matches=calculateMatches(nextAlias,aliasFilters,iCommandContext,aliasClasses);
     if (!matches.iterator().hasNext()) {
-      return;
+      return true;
     }
     smallestAlias=nextAlias;
     rootContext.candidates.put(nextAlias,matches);
@@ -42,6 +43,9 @@
     activeContexts.add(childContext);
   }
   while (!activeContexts.isEmpty()) {
-    processContext(pattern,estimatedRootEntries,activeContexts.remove(0),aliasClasses,aliasFilters,result,iCommandContext);
+    if (!processContext(pattern,estimatedRootEntries,activeContexts.remove(0),aliasClasses,aliasFilters,iCommandContext,request)) {
+      return true;
+    }
   }
+  return true;
 }

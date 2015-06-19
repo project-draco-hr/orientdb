@@ -1,26 +1,54 @@
 {
 synchronized (configuration) {
     if (iClusterNames == null || iClusterNames.isEmpty())     iClusterNames=Collections.singleton("*");
-    final Set<String> partitions=new HashSet<String>(iClusterNames.size());
+    final Set<String> servers=new HashSet<String>(iClusterNames.size());
+    boolean canUseLocalNode=true;
     for (    String p : iClusterNames) {
       final List<String> serverList=getClusterConfiguration(p).field("servers");
-      if (serverList != null) {
-        boolean found=false;
-        for (        String s : serverList)         if (s.equals(iLocalNode)) {
-          partitions.add(s);
-          found=true;
-          break;
-        }
-        if (!found)         for (        String s : serverList)         if (partitions.contains(s)) {
-          found=true;
-          break;
-        }
-        if (!found)         for (        String s : serverList)         if (!s.equals(NEW_NODE_TAG)) {
-          partitions.add(s);
-          break;
-        }
+      if (serverList != null && !serverList.contains(iLocalNode)) {
+        canUseLocalNode=false;
+        break;
       }
     }
-    return partitions;
+    if (canUseLocalNode) {
+      servers.add(iLocalNode);
+      return servers;
+    }
+    if (iClusterNames.size() == 1) {
+      final List<String> serverList=getClusterConfiguration(iClusterNames.iterator().next()).field("servers");
+      servers.add(serverList.get(0));
+      return servers;
+    }
+    final Map<String,Set<String>> serverMap=new HashMap<String,Set<String>>();
+    for (    String p : iClusterNames) {
+      final List<String> serverList=getClusterConfiguration(p).field("servers");
+      for (      String s : serverList) {
+        Set<String> clustersInServer=serverMap.get(s);
+        if (clustersInServer == null) {
+          clustersInServer=new HashSet<String>();
+          serverMap.put(s,clustersInServer);
+        }
+        clustersInServer.add(p);
+      }
+    }
+    if (serverMap.size() == 1) {
+      servers.add(serverMap.keySet().iterator().next());
+      return servers;
+    }
+    final List<String> orderedServers=new ArrayList<String>(serverMap.keySet());
+    Collections.sort(orderedServers,new Comparator<String>(){
+      @Override public int compare(      final String o1,      final String o2){
+        return ((Integer)serverMap.get(o2).size()).compareTo((Integer)serverMap.get(o1).size());
+      }
+    }
+);
+    final Set<String> missingClusters=new HashSet<String>(iClusterNames);
+    for (    String s : orderedServers) {
+      final Set<String> clusters=serverMap.get(s);
+      servers.add(s);
+      missingClusters.removeAll(clusters);
+      if (missingClusters.isEmpty())       break;
+    }
+    return servers;
   }
 }

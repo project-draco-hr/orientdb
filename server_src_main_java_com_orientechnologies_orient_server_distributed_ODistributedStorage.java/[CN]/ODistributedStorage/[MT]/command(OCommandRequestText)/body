@@ -30,6 +30,7 @@ case LOCAL:
       return wrapped.command(iCommand);
 case REPLICATE:
 {
+      if (exec.isLocalExecution())       return wrapped.command(iCommand);
       final Collection<String> involvedClusters=exec.getInvolvedClusters();
       final Collection<String> nodes;
       if (resultMgmt == OCommandDistributedReplicateRequest.DISTRIBUTED_RESULT_MGMT.MERGE) {
@@ -42,18 +43,7 @@ case REPLICATE:
       }
       if (iCommand instanceof ODistributedCommand)       nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
       if (nodes.isEmpty())       return null;
-      boolean executeLocally=false;
-      if (exec.isIdempotent()) {
-        int maxReadQuorum;
-        if (involvedClusters.isEmpty())         maxReadQuorum=dbCfg.getReadQuorum(null);
- else {
-          maxReadQuorum=0;
-          for (          String cl : involvedClusters)           maxReadQuorum=Math.max(maxReadQuorum,dbCfg.getReadQuorum(cl));
-        }
-        if (nodes.size() == 1 && nodes.iterator().next().equals(localNodeName) && maxReadQuorum <= 1)         executeLocally=true;
-      }
- else       if (nodes.size() == 1 && nodes.iterator().next().equals(localNodeName))       executeLocally=true;
-      if (executeLocally)       return wrapped.command(iCommand);
+      if (executeLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))       return wrapped.command(iCommand);
       result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
       if (exec.involveSchema())       dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
       if (resultMgmt == OCommandDistributedReplicateRequest.DISTRIBUTED_RESULT_MGMT.MERGE && result instanceof Map) {

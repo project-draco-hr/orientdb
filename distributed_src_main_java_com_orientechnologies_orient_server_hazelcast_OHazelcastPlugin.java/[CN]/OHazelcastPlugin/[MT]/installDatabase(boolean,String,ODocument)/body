@@ -31,8 +31,8 @@
   final List<String> firstNode=new ArrayList<String>();
   if (nodes.iterator().hasNext())   firstNode.add(nodes.iterator().next());
   ODistributedServerLog.warn(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"requesting deploy of database '%s' on local server...",databaseName);
-  final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,firstNode,new ODeployDatabaseTask(null),EXECUTION_MODE.RESPONSE);
-  ODistributedServerLog.warn(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"deploy returned: %s",results);
+  final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,firstNode,new OSyncDatabaseTask(OSyncDatabaseTask.MODE.FULL_REPLACE),EXECUTION_MODE.RESPONSE);
+  ODistributedServerLog.debug(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"deploy returned: %s",results);
   for (  Entry<String,Object> r : results.entrySet()) {
     final Object value=r.getValue();
     if (value instanceof Boolean) {
@@ -42,74 +42,9 @@
       ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s",(Exception)value,databaseName,dbPath);
     }
  else     if (value instanceof ODistributedDatabaseChunk) {
-      ODistributedDatabaseChunk chunk=(ODistributedDatabaseChunk)value;
-      distrDatabase.setWaitForMessage(chunk.getLastOperationId());
-      final String fileName=Orient.getTempPath() + "install_" + databaseName+ ".zip";
-      ODistributedServerLog.info(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"copying remote database '%s' to: %s",databaseName,fileName);
-      final File file=new File(fileName);
-      if (file.exists())       file.delete();
-      try {
-        file.getParentFile().mkdirs();
-        file.createNewFile();
-      }
- catch (      IOException e) {
-        throw new ODistributedException("Error on creating temp database file to install locally",e);
-      }
-      FileOutputStream out=null;
-      try {
-        out=new FileOutputStream(fileName,false);
-        long fileSize=writeDatabaseChunk(1,chunk,out);
-        for (int chunkNum=2; !chunk.last; chunkNum++) {
-          final Object result=sendRequest(databaseName,null,Collections.singleton(r.getKey()),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
-          if (result instanceof Boolean)           continue;
- else           if (result instanceof Exception) {
-            ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s (chunk #%d)",(Exception)result,databaseName,dbPath,chunkNum);
-          }
- else           if (result instanceof ODistributedDatabaseChunk) {
-            chunk=(ODistributedDatabaseChunk)result;
-            fileSize+=writeDatabaseChunk(chunkNum,chunk,out);
-          }
-        }
-        ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
-      }
- catch (      Exception e) {
-        ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
-        throw new ODistributedException("Error on transferring database",e);
-      }
- finally {
-        try {
-          if (out != null) {
-            out.flush();
-            out.close();
-          }
-        }
- catch (        IOException e) {
-        }
-      }
-      final ODatabaseDocumentTx db=installDatabaseOnLocalNode(distrDatabase,databaseName,dbPath,r.getKey(),fileName);
-      if (db != null) {
-        db.close();
-        final OStorage stg=Orient.instance().getStorage(databaseName);
-        if (stg != null)         stg.close();
-        final Lock lock=getLock("orientdb." + databaseName + ".install");
-        lock.lock();
-        try {
-          distrDatabase.configureDatabase(false,true,new Callable<Void>(){
-            @Override public Void call() throws Exception {
-              final boolean distribCfgDirty=installDbClustersForLocalNode(db,cfg);
-              if (distribCfgDirty) {
-                OLogManager.instance().warn(this,"Distributed configuration modified");
-                updateCachedDatabaseConfiguration(db.getName(),cfg.serialize(),true,true);
-              }
-              return null;
-            }
-          }
-);
-        }
-  finally {
-          lock.unlock();
-        }
-        db.close();
+      final Set<String> toSyncClusters=installDatabaseFromNetwork(dbPath,databaseName,distrDatabase,cfg,r.getKey(),(ODistributedDatabaseChunk)value);
+      for (      String cl : toSyncClusters) {
+        OCommandExecutorSQLSyncCluster.replaceCluster(this,serverInstance,databaseName,cl);
       }
       return true;
     }

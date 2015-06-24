@@ -7,7 +7,12 @@
     for (    ODatabaseListener oDatabaseListener : listeners) {
       oDatabaseListener.onBeforeCommand(iCommand,executor);
     }
-    Object result=executor.execute(iCommand.getParameters());
+    Object result=null;
+    if (iCommand.isCacheableResult() && executor.isIdempotent())     result=db.getMetadata().getCommandCache().get(db.getUser(),iCommand.getText(),iCommand.getLimit());
+    if (result == null) {
+      result=executor.execute(iCommand.getParameters());
+      if (result != null && iCommand.isCacheableResult() && executor.isIdempotent() && iCommand.getParameters() == null)       db.getMetadata().getCommandCache().put(db.getUser(),iCommand.getText(),result,iCommand.getLimit(),executor.getInvolvedClusters(),System.currentTimeMillis() - beginTime);
+    }
     for (    ODatabaseListener oDatabaseListener : listeners) {
       oDatabaseListener.onAfterCommand(iCommand,executor,result);
     }

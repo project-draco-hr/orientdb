@@ -1,15 +1,23 @@
 {
   if (!enable)   return null;
   final String key=getKey(iUser,queryText,iLimit);
-  final WeakReference<OCachedResult> value;
+  Object result;
   lock.lock();
   try {
-    value=cache.get(key);
+    final WeakReference<OCachedResult> value=cache.get(key);
+    result=get(value);
+    if (result != null)     if (result instanceof ORecord)     ((ORecord)result).toStream();
+ else     if (OMultiValue.isMultiValue(result)) {
+      for (      Object rc : OMultiValue.getMultiValueIterable(result)) {
+        if (rc != null && rc instanceof ORecord) {
+          ((ORecord)rc).toStream();
+        }
+      }
+    }
   }
   finally {
     lock.unlock();
   }
-  final Object result=get(value);
   final OProfilerMBean profiler=Orient.instance().getProfiler();
   if (profiler.isRecording()) {
     if (result != null) {

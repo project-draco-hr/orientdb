@@ -1,0 +1,39 @@
+{
+  LinkedList<ODocument> path=new LinkedList<ODocument>();
+  ORecord next=document;
+  do {
+    if (next instanceof ODocument) {
+      path.push((ODocument)next);
+      ORecord nextToInspect=null;
+      List<OIdentifiable> toSave=manager.getPointed(document);
+      if (toSave != null) {
+        for (        OIdentifiable oIdentifiable : toSave) {
+          if (oIdentifiable.getIdentity().isNew()) {
+            if (oIdentifiable instanceof ORecord)             nextToInspect=(ORecord)oIdentifiable;
+ else             nextToInspect=oIdentifiable.getRecord();
+            break;
+          }
+        }
+      }
+      if (nextToInspect != null) {
+        if (path.contains(nextToInspect)) {
+          OSerializationSetThreadLocal.checkAndAdd((ODocument)nextToInspect);
+          tx.save(nextToInspect);
+          path.pollFirst();
+          next=path.pollFirst();
+        }
+ else         next=nextToInspect;
+      }
+ else {
+        tx.save(next);
+        path.pollFirst();
+        next=path.pollFirst();
+      }
+    }
+ else {
+      tx.save(next);
+      next=path.pollFirst();
+    }
+  }
+ while (next != null);
+}

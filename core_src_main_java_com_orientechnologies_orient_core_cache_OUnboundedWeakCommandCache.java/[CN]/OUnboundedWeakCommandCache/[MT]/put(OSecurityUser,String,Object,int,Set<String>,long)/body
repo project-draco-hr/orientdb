@@ -1,13 +1,18 @@
 {
-  if (queryText == null || iResult == null || iInvolvedClusters == null || iInvolvedClusters.isEmpty())   return;
+  if (queryText == null || iResult == null)   return;
   if (!enable)   return;
   if (iExecutionTime < minExecutionTime)   return;
-  if (iResult instanceof OResultSet && ((OResultSet)iResult).size() > maxResultsetSize)   return;
+  int resultsetSize=1;
+  if (iResult instanceof OResultSet) {
+    resultsetSize=((OResultSet)iResult).size();
+    if (resultsetSize > maxResultsetSize)     return;
+  }
   if (evictStrategy != STRATEGY.PER_CLUSTER)   iInvolvedClusters=null;
   final String key=getKey(iUser,queryText,iLimit);
-  final WeakReference<OCachedResult> value=new WeakReference<OCachedResult>(new OCachedResult(iResult,iInvolvedClusters));
+  final OCachedResult value=new OCachedResult(iResult,iInvolvedClusters);
   lock.lock();
   try {
+    OLogManager.instance().debug(this,"Storing resultset in cache size=%d",resultsetSize);
     cache.put(key,value);
   }
   finally {

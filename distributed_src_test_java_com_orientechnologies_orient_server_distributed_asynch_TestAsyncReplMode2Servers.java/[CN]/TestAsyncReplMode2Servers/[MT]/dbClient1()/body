@@ -1,0 +1,52 @@
+{
+synchronized (LOCK) {
+    OrientBaseGraph graph=new OrientGraph(getRemoteURL());
+    try {
+      OrientVertex parentV1=graph.addVertex("vertextype",(String)null);
+      graph.commit();
+      assertEquals(1,parentV1.getRecord().getVersion());
+      parentV1Id=parentV1.getId();
+      OrientVertex parentV2=graph.addVertex("vertextype",(String)null);
+      graph.commit();
+      assertEquals(1,parentV2.getRecord().getVersion());
+      parentV2Id=parentV2.getId();
+      int countPropValue=0;
+      for (int i=0; i < NUM_OF_LOOP_ITERATIONS; i++) {
+        pause();
+        if (exceptionInThread != null)         break;
+        for (int attempt=0; attempt < NUM_OF_RETRIES; attempt++) {
+          try {
+            parentV1.setProperty(CNT_PROP_NAME,++countPropValue);
+            graph.commit();
+            break;
+          }
+ catch (          OConcurrentModificationException c) {
+            graph.rollback();
+            parentV1.reload();
+          }
+        }
+        for (int attempt=0; attempt < NUM_OF_RETRIES; attempt++) {
+          try {
+            parentV2.setProperty(CNT_PROP_NAME,countPropValue);
+            graph.commit();
+            break;
+          }
+ catch (          OConcurrentModificationException c) {
+            graph.rollback();
+            parentV2.reload();
+          }
+        }
+      }
+    }
+ catch (    Throwable e) {
+      if (exceptionInThread == null) {
+        exceptionInThread=e;
+      }
+    }
+ finally {
+      System.out.println("Shutting down");
+      graph.shutdown();
+      LOCK.notifyAll();
+    }
+  }
+}

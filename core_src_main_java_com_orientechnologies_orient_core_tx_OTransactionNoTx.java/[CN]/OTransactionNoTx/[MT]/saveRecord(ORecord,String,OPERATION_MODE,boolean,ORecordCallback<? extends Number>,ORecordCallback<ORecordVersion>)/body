@@ -1,6 +1,23 @@
 {
   try {
-    return database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,null);
+    ORecord orignal=iRecord;
+    ODirtyManager dirtyManager=ORecordInternal.getDirtyManager(orignal);
+    Set<ORecord> newRecord=dirtyManager.getNewRecord();
+    Set<ORecord> updatedRecord=dirtyManager.getUpdateRecord();
+    dirtyManager.cleanForSave();
+    if (newRecord != null) {
+      for (      ORecord rec : newRecord) {
+        if (rec.getIdentity().isNew() && rec instanceof ODocument) {
+          saveNew((ODocument)rec,dirtyManager);
+        }
+      }
+    }
+    if (updatedRecord != null) {
+      for (      ORecord rec : updatedRecord) {
+        if (!rec.equals(orignal))         database.executeSaveRecord(rec,null,rec.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+      }
+    }
+    return database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
   }
  catch (  Exception e) {
     final ORecordId rid=(ORecordId)iRecord.getIdentity();

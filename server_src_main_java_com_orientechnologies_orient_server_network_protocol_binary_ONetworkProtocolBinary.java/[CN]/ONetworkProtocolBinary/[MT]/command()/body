@@ -17,16 +17,39 @@
     connection.data.command=command;
     OAbstractCommandResultListener listener=null;
     OLiveCommandResultListener liveListener=null;
+    OCommandResultListener cmdResultListener=command.getResultListener();
     if (live) {
-      liveListener=new OLiveCommandResultListener(this,clientTxId,command.getResultListener());
-      listener=new OSyncCommandResultListener();
+      liveListener=new OLiveCommandResultListener(this,clientTxId,cmdResultListener);
+      listener=new OSyncCommandResultListener(null);
       command.setResultListener(liveListener);
     }
  else     if (asynch) {
-      listener=new OAsyncCommandResultListener(this,clientTxId,command.getResultListener());
+      final OCommandCache cmdCache=connection.database.getMetadata().getCommandCache();
+      if (cmdCache.isEnabled() && cmdResultListener == null)       cmdResultListener=new OAbstractCommandResultListener(null){
+        private List<ORecord> collector=new ArrayList<ORecord>();
+        @Override public boolean isEmpty(){
+          return collector != null && collector.isEmpty();
+        }
+        @Override public boolean result(        Object iRecord){
+          if (collector != null) {
+            if (collector.size() > cmdCache.getMaxResultsetSize()) {
+              collector=null;
+            }
+ else             if (iRecord != null && iRecord instanceof ORecord)             collector.add((ORecord)iRecord);
+          }
+          return true;
+        }
+        @Override public Object getResult(){
+          return collector;
+        }
+      }
+;
+      listener=new OAsyncCommandResultListener(this,clientTxId,cmdResultListener);
       command.setResultListener(listener);
     }
- else     listener=new OSyncCommandResultListener();
+ else {
+      listener=new OSyncCommandResultListener(null);
+    }
     final long serverTimeout=OGlobalConfiguration.COMMAND_TIMEOUT.getValueAsLong();
     if (serverTimeout > 0 && command.getTimeoutTime() > serverTimeout)     command.setTimeout(serverTimeout,command.getTimeoutStrategy());
     if (!isConnectionAlive())     return;

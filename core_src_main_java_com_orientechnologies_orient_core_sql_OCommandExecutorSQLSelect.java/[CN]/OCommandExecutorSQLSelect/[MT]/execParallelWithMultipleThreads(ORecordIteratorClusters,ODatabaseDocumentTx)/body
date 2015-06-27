@@ -1,0 +1,36 @@
+{
+  final int[] clusterIds=iTarget.getClusterIds();
+  OLogManager.instance().debug(this,"Executing parallel query with strategy one thread per cluster. clusterIds=%d",clusterIds.length);
+  final List<Integer> iterators=new ArrayList<Integer>();
+  for (int i=0; i < clusterIds.length; ++i)   if (db.getStorage().getClusterById(clusterIds[i]).getEntries() > 0)   iterators.add(clusterIds[i]);
+  final int threadNumber=iterators.size();
+  final Thread[] threads=new Thread[threadNumber];
+  for (int i=0; i < threadNumber; ++i) {
+    final int current=i;
+    threads[i]=new Thread(new Runnable(){
+      @Override public void run(){
+        final ODatabaseDocumentTx localDatabase=db.copy();
+        try {
+          final ORecordIteratorCluster it=new ORecordIteratorCluster(localDatabase,localDatabase,iterators.get(current),true);
+          while (it.hasNext()) {
+            final ORecord next=it.next();
+            if (next == null)             break;
+            if (!executeSearchRecord(next))             break;
+          }
+        }
+  finally {
+          localDatabase.close();
+        }
+      }
+    }
+);
+    threads[i].start();
+  }
+  for (int i=0; i < threadNumber; ++i) {
+    try {
+      threads[i].join();
+    }
+ catch (    InterruptedException e) {
+    }
+  }
+}

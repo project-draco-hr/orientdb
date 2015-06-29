@@ -20,33 +20,21 @@
       return;
     }
     final FileOutputStream archiveOutputStream=new FileOutputStream(archiveFile);
-    final ZipOutputStream archiveZipOutputStream=new ZipOutputStream(archiveOutputStream);
+    final ZipOutputStream archiveZipOutputStream=new ZipOutputStream(new BufferedOutputStream(archiveOutputStream));
     final ZipEntry metadataEntry=new ZipEntry(metadataName);
     archiveZipOutputStream.putNextEntry(metadataEntry);
     final PrintWriter metadataFileWriter=new PrintWriter(archiveZipOutputStream);
-    metadataFileWriter.append("Storage name : ").append(getName()).append("\n");
-    metadataFileWriter.append("Date : ").append(strDate).append("\n");
-    metadataFileWriter.append("Stacktrace : \n");
+    metadataFileWriter.append("Storage name : ").append(getName()).append("\r\n");
+    metadataFileWriter.append("Date : ").append(strDate).append("\r\n");
+    metadataFileWriter.append("Stacktrace : \r\n");
     e.printStackTrace(metadataFileWriter);
     metadataFileWriter.flush();
     archiveZipOutputStream.closeEntry();
-    final List<String> walPaths=((ODiskWriteAheadLog)writeAheadLog).getFiles();
+    final List<String> walPaths=((ODiskWriteAheadLog)writeAheadLog).getWalFiles();
     for (    String walSegment : walPaths) {
-      final File walFile=new File(walSegment);
-      final ZipEntry walZipEntry=new ZipEntry(walFile.getName());
-      archiveZipOutputStream.putNextEntry(walZipEntry);
-      final FileInputStream walInputStream=new FileInputStream(walFile);
-      final BufferedInputStream walBufferedInputStream=new BufferedInputStream(walInputStream);
-      final BufferedOutputStream walBufferedOutputStream=new BufferedOutputStream(archiveOutputStream);
-      final byte[] buffer=new byte[1024];
-      int readBytes=0;
-      while ((readBytes=walBufferedInputStream.read(buffer)) > -1) {
-        walBufferedOutputStream.write(buffer,0,readBytes);
-      }
-      walInputStream.close();
-      walBufferedOutputStream.flush();
-      archiveZipOutputStream.closeEntry();
+      archiveEntry(archiveZipOutputStream,walSegment);
     }
+    archiveEntry(archiveZipOutputStream,((ODiskWriteAheadLog)writeAheadLog).getWMRFile());
     archiveZipOutputStream.close();
   }
  catch (  Exception ioe) {

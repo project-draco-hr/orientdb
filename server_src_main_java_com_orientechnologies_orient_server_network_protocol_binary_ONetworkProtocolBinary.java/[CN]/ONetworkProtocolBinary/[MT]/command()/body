@@ -9,8 +9,16 @@
     ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(name);
     ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
   }
-  final OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+  OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
   ONetworkThreadLocalSerializer.setNetworkSerializer(null);
+  if (asynch && command instanceof OSQLSynchQuery) {
+    final OSQLAsynchQuery asynchQuery=new OSQLAsynchQuery(command.getText());
+    asynchQuery.setFetchPlan(command.getFetchPlan());
+    asynchQuery.setLimit(command.getLimit());
+    asynchQuery.setTimeout(command.getTimeoutTime(),command.getTimeoutStrategy());
+    asynchQuery.setUseCache(((OSQLSynchQuery)command).isUseCache());
+    command=asynchQuery;
+  }
   connection.data.commandDetail=command.getText();
   beginResponse();
   try {
@@ -25,22 +33,25 @@
     }
  else     if (asynch) {
       final OCommandCache cmdCache=connection.database.getMetadata().getCommandCache();
-      if (cmdCache.isEnabled() && cmdResultListener == null)       cmdResultListener=new OAbstractCommandResultListener(null){
-        private List<ORecord> collector=new ArrayList<ORecord>();
+      if (cmdCache.isEnabled())       cmdResultListener=new OAbstractCommandResultListener(cmdResultListener){
+        private OResultSet collector=new OConcurrentResultSet<ORecord>();
         @Override public boolean isEmpty(){
           return collector != null && collector.isEmpty();
         }
         @Override public boolean result(        final Object iRecord){
           if (collector != null) {
-            if (collector.size() > cmdCache.getMaxResultsetSize()) {
+            if (collector.currentSize() > cmdCache.getMaxResultsetSize()) {
               collector=null;
             }
- else             if (iRecord != null && iRecord instanceof ORecord)             collector.add((ORecord)iRecord);
+ else             if (iRecord != null && iRecord instanceof ORecord)             collector.add(iRecord);
           }
           return true;
         }
         @Override public Object getResult(){
           return collector;
+        }
+        @Override public void end(){
+          collector.setCompleted();
         }
       }
 ;

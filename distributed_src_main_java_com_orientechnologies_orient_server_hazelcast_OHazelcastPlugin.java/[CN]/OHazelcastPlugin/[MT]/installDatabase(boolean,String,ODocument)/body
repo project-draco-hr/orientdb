@@ -1,19 +1,9 @@
 {
   final Boolean hotAlignment=config.field("hotAlignment");
-  final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
+  final boolean backupDatabase=iStartup && hotAlignment != null && !hotAlignment;
   final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
   if (configuredDatabases.contains(databaseName)) {
-    if (iStartup && hotAlignment != null && !hotAlignment) {
-      Orient.instance().unregisterStorageByName(databaseName);
-      final String backupPath=serverInstance.getDatabaseDirectory() + "/" + BACKUP_DIR+ "/"+ databaseName;
-      final File f=new File(BACKUP_DIR);
-      if (f.exists())       OFileUtils.deleteRecursively(new File(backupPath));
- else       f.mkdirs();
-      ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"moving existent database '%s' in '%s' to '%s' and get a fresh copy from a remote node...",databaseName,dbPath,backupPath);
-      final File oldDirectory=new File(dbPath);
-      oldDirectory.renameTo(new File(backupPath));
-    }
- else     return false;
+    if (!backupDatabase)     return false;
   }
   final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
   try {
@@ -33,6 +23,7 @@
   ODistributedServerLog.warn(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"requesting deploy of database '%s' on local server...",databaseName);
   final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,firstNode,new OSyncDatabaseTask(OSyncDatabaseTask.MODE.FULL_REPLACE),EXECUTION_MODE.RESPONSE);
   ODistributedServerLog.debug(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"deploy returned: %s",results);
+  final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
   for (  Entry<String,Object> r : results.entrySet()) {
     final Object value=r.getValue();
     if (value instanceof Boolean) {
@@ -42,6 +33,7 @@
       ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s",(Exception)value,databaseName,dbPath);
     }
  else     if (value instanceof ODistributedDatabaseChunk) {
+      if (backupDatabase)       backupCurrentDatabase(databaseName);
       final Set<String> toSyncClusters=installDatabaseFromNetwork(dbPath,databaseName,distrDatabase,cfg,r.getKey(),(ODistributedDatabaseChunk)value);
       for (      String cl : toSyncClusters) {
         OCommandExecutorSQLSyncCluster.replaceCluster(this,serverInstance,databaseName,cl);

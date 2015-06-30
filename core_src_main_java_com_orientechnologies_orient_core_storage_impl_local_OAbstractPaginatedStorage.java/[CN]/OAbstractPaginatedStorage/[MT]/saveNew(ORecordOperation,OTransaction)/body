@@ -1,7 +1,8 @@
 {
-  List<ODocument> toResave=new ArrayList<ODocument>();
+  List<ORecordOperation> toResave=new ArrayList<ORecordOperation>();
   LinkedList<ODocument> path=new LinkedList<ODocument>();
-  ORecord next=document;
+  ORecord next=txEntry.getRecord();
+  ODirtyManager manager=ORecordInternal.getDirtyManager(next);
   do {
     if (next instanceof ODocument) {
       ORecord nextToInspect=null;
@@ -18,9 +19,10 @@
       if (nextToInspect != null) {
         if (path.contains(nextToInspect)) {
           OSerializationSetThreadLocal.checkAndAdd((ODocument)nextToInspect);
-          database.executeSaveRecord(nextToInspect,null,nextToInspect.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+          ORecordOperation toCommit=tx.getRecordEntry(nextToInspect.getIdentity());
+          commitEntry(tx,toCommit);
           OSerializationSetThreadLocal.removeCheck((ODocument)nextToInspect);
-          toResave.add((ODocument)nextToInspect);
+          toResave.add(toCommit);
         }
  else {
           path.push((ODocument)next);
@@ -28,18 +30,20 @@
         }
       }
  else {
-        database.executeSaveRecord(next,null,next.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+        ORecordOperation toCommit=tx.getRecordEntry(next.getIdentity());
+        commitEntry(tx,toCommit);
         next=path.pollFirst();
       }
     }
  else {
-      database.executeSaveRecord(next,null,next.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+      ORecordOperation toCommit=tx.getRecordEntry(next.getIdentity());
+      commitEntry(tx,toCommit);
       next=path.pollFirst();
     }
   }
  while (next != null);
-  for (  ODocument op : toResave) {
-    op.setDirty();
-    database.executeSaveRecord(op,null,op.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+  for (  ORecordOperation op : toResave) {
+    op.getRecord().setDirty();
+    commitEntry(tx,op);
   }
 }

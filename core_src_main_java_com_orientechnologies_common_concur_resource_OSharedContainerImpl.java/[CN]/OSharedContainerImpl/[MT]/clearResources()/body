@@ -1,9 +1,20 @@
 {
   final ExecutorService service=Executors.newSingleThreadExecutor(new CloseTaskFactory());
-  final List<OCloseable> resourcesToClose=new ArrayList<OCloseable>();
-  for (  Object resource : sharedResources.values()) {
-    if (resource instanceof OCloseable)     resourcesToClose.add(((OCloseable)resource));
+  try {
+    final List<OCloseable> resourcesToClose=new ArrayList<OCloseable>();
+    for (    Object resource : sharedResources.values()) {
+      if (resource instanceof OCloseable)       resourcesToClose.add(((OCloseable)resource));
+    }
+    sharedResources.clear();
+    service.submit(new CloseTask(resourcesToClose));
   }
-  sharedResources.clear();
-  service.submit(new CloseTask(resourcesToClose));
+  finally {
+    service.shutdown();
+    try {
+      service.awaitTermination(1,TimeUnit.MINUTES);
+    }
+ catch (    InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
 }

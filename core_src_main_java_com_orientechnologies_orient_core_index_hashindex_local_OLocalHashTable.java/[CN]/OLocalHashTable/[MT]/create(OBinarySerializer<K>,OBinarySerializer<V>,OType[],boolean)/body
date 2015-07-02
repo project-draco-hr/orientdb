@@ -1,0 +1,51 @@
+{
+  final OAtomicOperation atomicOperation;
+  try {
+    atomicOperation=startAtomicOperation();
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during hash table creation.",e);
+  }
+  acquireExclusiveLock();
+  try {
+    try {
+      this.keyTypes=keyTypes;
+      this.nullKeyIsSupported=nullKeyIsSupported;
+      this.directory=new OHashTableDirectory(treeStateFileExtension,getName(),durableInNonTxMode,storage);
+      fileStateId=addFile(atomicOperation,getName() + metadataConfigurationFileExtension);
+      directory.create();
+      final OCacheEntry hashStateEntry=addPage(atomicOperation,fileStateId);
+      pinPage(atomicOperation,hashStateEntry);
+      hashStateEntry.acquireExclusiveLock();
+      try {
+        OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),true);
+        hashStateEntryIndex=hashStateEntry.getPageIndex();
+      }
+  finally {
+        hashStateEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,hashStateEntry);
+      }
+      final String fileName=getFullName();
+      fileId=addFile(atomicOperation,fileName);
+      setKeySerializer(keySerializer);
+      setValueSerializer(valueSerializer);
+      initHashTreeState(atomicOperation);
+      if (nullKeyIsSupported)       nullBucketFileId=addFile(atomicOperation,getName() + nullBucketFileExtension);
+      endAtomicOperation(false);
+    }
+ catch (    IOException e) {
+      endAtomicOperation(true);
+      throw e;
+    }
+catch (    Throwable e) {
+      endAtomicOperation(true);
+      throw new OStorageException(null,e);
+    }
+  }
+ catch (  IOException e) {
+    throw new OIndexException("Error during local hash table creation.",e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+}

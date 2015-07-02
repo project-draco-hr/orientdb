@@ -1,0 +1,54 @@
+{
+  final ODatabaseDocumentInternal db=getDatabase();
+  long transformed=0;
+  if (db.getTransaction().isActive())   db.commit();
+  db.begin();
+  try {
+    for (    ODocument doc : db.browseClass("E")) {
+      if (Thread.currentThread().isInterrupted())       break;
+      if (doc != null) {
+        if (doc.fields() == 2) {
+          final ORID edgeIdentity=doc.getIdentity();
+          final ODocument outV=doc.field("out");
+          final ODocument inV=doc.field("in");
+          final Object outField=outV.field("out_" + doc.getClassName());
+          if (outField instanceof ORidBag) {
+            final Iterator<OIdentifiable> it=((ORidBag)outField).iterator();
+            while (it.hasNext()) {
+              OIdentifiable v=it.next();
+              if (edgeIdentity.equals(v)) {
+                it.remove();
+                ((ORidBag)outField).add(inV.getIdentity());
+                break;
+              }
+            }
+          }
+          outV.save();
+          final Object inField=inV.field("in_" + doc.getClassName());
+          if (outField instanceof ORidBag) {
+            final Iterator<OIdentifiable> it=((ORidBag)inField).iterator();
+            while (it.hasNext()) {
+              OIdentifiable v=it.next();
+              if (edgeIdentity.equals(v)) {
+                it.remove();
+                ((ORidBag)inField).add(outV.getIdentity());
+                break;
+              }
+            }
+          }
+          inV.save();
+          doc.delete();
+          if (++transformed % batch == 0) {
+            db.commit();
+            db.begin();
+          }
+        }
+      }
+    }
+    db.commit();
+  }
+  finally {
+    if (db.getTransaction().isActive())     db.rollback();
+  }
+  return "Transformed " + transformed + " regular edges in lightweight edges";
+}

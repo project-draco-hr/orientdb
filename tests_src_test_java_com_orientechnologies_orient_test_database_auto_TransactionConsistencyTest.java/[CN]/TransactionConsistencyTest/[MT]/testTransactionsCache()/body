@@ -1,0 +1,27 @@
+{
+  OObjectDatabaseTx database=new OObjectDatabaseTx(url);
+  database.open("admin","admin");
+  try {
+    Assert.assertFalse(database.getTransaction().isActive());
+    OSchema schema=database.getMetadata().getSchema();
+    OClass classA=schema.createClass("TransA");
+    classA.createProperty("name",OType.STRING);
+    ODocument doc=new ODocument(classA);
+    doc.field("name","test1");
+    doc.save();
+    ORID orid=doc.getIdentity();
+    database.begin();
+    Assert.assertTrue(database.getTransaction().isActive());
+    doc=orid.getRecord();
+    Assert.assertEquals("test1",doc.field("name"));
+    doc.field("name","test2");
+    doc=orid.getRecord();
+    Assert.assertEquals("test2",doc.field("name"));
+    database.commit();
+    doc=orid.getRecord();
+    Assert.assertEquals("test1",doc.field("name"));
+  }
+  finally {
+    database.close();
+  }
+}

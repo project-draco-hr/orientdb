@@ -1,2 +1,21 @@
 {
+  ODocument oldConfig;
+  ODocument newConfig;
+  do {
+    oldConfig=configuration.get();
+    newConfig=new ODocument().setTrackingChanges(false);
+    if (oldConfig.hasOwners()) {
+      ODocumentInternal.addOwner(newConfig,oldConfig.getOwner());
+    }
+    oldConfig.copyTo(newConfig);
+    newConfig.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+    try {
+      doConfigurationUpdate(newConfig);
+    }
+  finally {
+      newConfig.setInternalStatus(ORecordElement.STATUS.LOADED);
+    }
+  }
+ while (!configuration.compareAndSet(oldConfig,newConfig));
+  return newConfig;
 }

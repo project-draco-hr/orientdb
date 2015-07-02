@@ -1,0 +1,43 @@
+{
+  if (result instanceof OTxTaskResult) {
+    final OTxTaskResult txResult=((OTxTaskResult)result);
+    final List<Object> list=txResult.results;
+    for (int i=0; i < txTask.getTasks().size(); ++i) {
+      final Object o=list.get(i);
+      final OAbstractRecordReplicatedTask task=txTask.getTasks().get(i);
+      if (task instanceof OCreateRecordTask) {
+        final OCreateRecordTask t=(OCreateRecordTask)task;
+        t.getRid().copyFrom(((OPlaceholder)o).getIdentity());
+        t.getVersion().copyFrom(((OPlaceholder)o).getRecordVersion());
+      }
+ else       if (task instanceof OUpdateRecordTask) {
+        final OUpdateRecordTask t=(OUpdateRecordTask)task;
+        t.getVersion().copyFrom((ORecordVersion)o);
+      }
+ else       if (task instanceof ODeleteRecordTask) {
+      }
+    }
+    for (    ORecordOperation op : tmpEntries) {
+      final ORecord record=op.getRecord();
+      if (record != null)       ORecordInternal.unsetDirty(record);
+    }
+    final Object completedResult=dManager.sendRequest(getName(),involvedClusters,nodes,new OCompletedTxTask(txResult.locks),EXECUTION_MODE.RESPONSE);
+    if (!(completedResult instanceof Boolean) || !((Boolean)completedResult).booleanValue()) {
+      ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction complete error: %s",completedResult);
+    }
+  }
+ else   if (result instanceof ODistributedRecordLockedException) {
+    if (autoRetryDelay > 0)     Thread.sleep(autoRetryDelay);
+    return false;
+  }
+ else   if (result instanceof Throwable) {
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error: %s",result,result.toString());
+    if (result instanceof OTransactionException || result instanceof ONeedRetryException)     throw (RuntimeException)result;
+    throw new OTransactionException("Error on committing distributed transaction",(Throwable)result);
+  }
+ else {
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"distributed transaction error, received unknown response type: %s",result);
+    throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
+  }
+  return true;
+}

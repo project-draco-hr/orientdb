@@ -2,34 +2,8 @@
   final ODatabaseDocument database=getDatabase();
   OClass identityClass=database.getMetadata().getSchema().getClass(IDENTITY_CLASSNAME);
   if (identityClass == null)   identityClass=database.getMetadata().getSchema().createAbstractClass(IDENTITY_CLASSNAME);
-  OClass roleClass=database.getMetadata().getSchema().getClass("ORole");
-  if (roleClass == null)   roleClass=database.getMetadata().getSchema().createClass("ORole",identityClass);
- else   if (!roleClass.getSuperClasses().contains(identityClass))   roleClass.setSuperClasses(Arrays.asList(identityClass));
-  if (!roleClass.existsProperty("name")) {
-    roleClass.createProperty("name",OType.STRING).setMandatory(true).setNotNull(true).setCollate("ci");
-    roleClass.createIndex("ORole.name",INDEX_TYPE.UNIQUE,ONullOutputListener.INSTANCE,"name");
-  }
- else {
-    final OProperty name=roleClass.getProperty("name");
-    if (name.getAllIndexes().isEmpty())     roleClass.createIndex("ORole.name",INDEX_TYPE.UNIQUE,ONullOutputListener.INSTANCE,"name");
-  }
-  if (!roleClass.existsProperty("mode"))   roleClass.createProperty("mode",OType.BYTE);
-  if (!roleClass.existsProperty("rules"))   roleClass.createProperty("rules",OType.EMBEDDEDMAP,OType.BYTE);
-  if (!roleClass.existsProperty("inheritedRole"))   roleClass.createProperty("inheritedRole",OType.LINK,roleClass);
-  OClass userClass=database.getMetadata().getSchema().getClass("OUser");
-  if (userClass == null)   userClass=database.getMetadata().getSchema().createClass("OUser",identityClass);
- else   if (!userClass.getSuperClasses().contains(identityClass))   userClass.setSuperClasses(Arrays.asList(identityClass));
-  if (!userClass.existsProperty("name")) {
-    userClass.createProperty("name",OType.STRING).setMandatory(true).setNotNull(true).setCollate("ci");
-    userClass.createIndex("OUser.name",INDEX_TYPE.UNIQUE,ONullOutputListener.INSTANCE,"name");
-  }
- else {
-    final OProperty name=userClass.getProperty("name");
-    if (name.getAllIndexes().isEmpty())     userClass.createIndex("OUser.name",INDEX_TYPE.UNIQUE,ONullOutputListener.INSTANCE,"name");
-  }
-  if (!userClass.existsProperty("password"))   userClass.createProperty("password",OType.STRING).setMandatory(true).setNotNull(true);
-  if (!userClass.existsProperty("roles"))   userClass.createProperty("roles",OType.LINKSET,roleClass);
-  if (!userClass.existsProperty("status"))   userClass.createProperty("status",OType.STRING).setMandatory(true).setNotNull(true);
+  OClass roleClass=createOrUpdateORoleClass(database,identityClass);
+  createOrUpdateOUserClass(database,identityClass,roleClass);
   ORole adminRole=getRole(ORole.ADMIN,false);
   if (adminRole == null) {
     adminRole=createRole(ORole.ADMIN,ORole.ALLOW_MODES.ALLOW_ALL_BUT);
@@ -37,11 +11,6 @@
   }
   OUser adminUser=getUser(OUser.ADMIN,false);
   if (adminUser == null)   adminUser=createUser(OUser.ADMIN,OUser.ADMIN,adminRole);
-  OClass restrictedClass=database.getMetadata().getSchema().getClass(RESTRICTED_CLASSNAME);
-  if (restrictedClass == null)   restrictedClass=database.getMetadata().getSchema().createAbstractClass(RESTRICTED_CLASSNAME);
-  if (!restrictedClass.existsProperty(ALLOW_ALL_FIELD))   restrictedClass.createProperty(ALLOW_ALL_FIELD,OType.LINKSET,database.getMetadata().getSchema().getClass(IDENTITY_CLASSNAME));
-  if (!restrictedClass.existsProperty(ALLOW_READ_FIELD))   restrictedClass.createProperty(ALLOW_READ_FIELD,OType.LINKSET,database.getMetadata().getSchema().getClass(IDENTITY_CLASSNAME));
-  if (!restrictedClass.existsProperty(ALLOW_UPDATE_FIELD))   restrictedClass.createProperty(ALLOW_UPDATE_FIELD,OType.LINKSET,database.getMetadata().getSchema().getClass(IDENTITY_CLASSNAME));
-  if (!restrictedClass.existsProperty(ALLOW_DELETE_FIELD))   restrictedClass.createProperty(ALLOW_DELETE_FIELD,OType.LINKSET,database.getMetadata().getSchema().getClass(IDENTITY_CLASSNAME));
+  createOrUpdateORestrictedClass(database);
   return adminUser;
 }

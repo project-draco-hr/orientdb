@@ -1,0 +1,50 @@
+{
+  Iterator<Map.Entry<PagedKey,PageGroup>> entriesIterator=subMap.entrySet().iterator();
+  long currentTime=System.currentTimeMillis();
+  int flushedRegions=0;
+  long lastPageIndex=-1;
+  while (entriesIterator.hasNext()) {
+    Map.Entry<PagedKey,PageGroup> entry=entriesIterator.next();
+    final PageGroup group=entry.getValue();
+    final PagedKey pagedKey=entry.getKey();
+    if (lastPageIndex >= 0) {
+      if (pagedKey.pageIndex != lastPageIndex + 1) {
+        flushedRegions++;
+        if (flushedWritePages > writePagesToFlush && flushedRegions >= 4)         break;
+      }
+    }
+    final boolean weakLockMode=group.creationTime - currentTime < groupTTL && !forceFlush;
+    if (group.recencyBit && weakLockMode) {
+      group.recencyBit=false;
+      continue;
+    }
+    Lock groupLock=lockManager.acquireExclusiveLock(entry.getKey());
+    try {
+      if (group.recencyBit && weakLockMode)       group.recencyBit=false;
+ else {
+        group.recencyBit=false;
+        final OCachePointer pagePointer=group.page;
+        if (!pagePointer.tryAcquireSharedLock())         continue;
+        try {
+          flushPage(pagedKey.fileId,pagedKey.pageIndex,pagePointer.getDataPointer());
+          final OLogSequenceNumber flushedLSN=ODurablePage.getLogSequenceNumberFromPage(pagePointer.getDataPointer());
+          pagePointer.setLastFlushedLsn(flushedLSN);
+        }
+  finally {
+          pagePointer.releaseSharedLock();
+        }
+        pagePointer.decrementWritersReferrer();
+        pagePointer.setWritersListener(null);
+        entriesIterator.remove();
+      }
+    }
+  finally {
+      lockManager.releaseLock(groupLock);
+    }
+    lastPageKey=pagedKey;
+    flushedWritePages++;
+    lastPageIndex=pagedKey.pageIndex;
+    writeCacheSize.decrement();
+  }
+  return flushedWritePages;
+}

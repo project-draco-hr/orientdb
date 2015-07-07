@@ -1,20 +1,22 @@
 {
   if (!enable)   return null;
-  final String key=getKey(iUser,queryText,iLimit);
   OCachedResult result;
-  result=cache.get(key);
-  if (result != null) {
-    int resultsetSize=1;
-    if (result.result instanceof ORecord)     ((ORecord)result.result).toStream();
- else     if (OMultiValue.isMultiValue(result.result)) {
-      resultsetSize=OMultiValue.getSize(result.result);
-      for (      Object rc : OMultiValue.getMultiValueIterable(result.result)) {
-        if (rc != null && rc instanceof ORecord) {
-          ((ORecord)rc).toStream();
+synchronized (this) {
+    final String key=getKey(iUser,queryText,iLimit);
+    result=cache.get(key);
+    if (result != null) {
+      int resultsetSize=1;
+      if (result.result instanceof ORecord)       ((ORecord)result.result).toStream();
+ else       if (OMultiValue.isMultiValue(result.result)) {
+        resultsetSize=OMultiValue.getSize(result.result);
+        for (        Object rc : OMultiValue.getMultiValueIterable(result.result)) {
+          if (rc != null && rc instanceof ORecord) {
+            ((ORecord)rc).toStream();
+          }
         }
       }
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Reused cached resultset size=%d",resultsetSize);
     }
-    OLogManager.instance().debug(this,"Reused cached resultset size=%d",resultsetSize);
   }
   final OProfilerMBean profiler=Orient.instance().getProfiler();
   if (profiler.isRecording()) {

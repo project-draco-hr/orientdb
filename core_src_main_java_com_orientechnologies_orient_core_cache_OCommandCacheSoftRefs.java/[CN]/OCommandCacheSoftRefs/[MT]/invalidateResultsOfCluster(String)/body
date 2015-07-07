@@ -1,20 +1,26 @@
 {
   if (!enable)   return;
-  if (cache.size() == 0)   return;
-  if (evictStrategy == STRATEGY.INVALIDATE_ALL) {
-    OLogManager.instance().debug(this,"Invalidate all cached results (%d)  ",size());
-    clear();
-    return;
-  }
-  int evicted=0;
-  for (Iterator<Map.Entry<String,OCachedResult>> it=cache.entrySet().iterator(); it.hasNext(); ) {
-    final OCachedResult cached=it.next().getValue();
-    if (cached != null) {
-      if (cached.involvedClusters == null || cached.involvedClusters.isEmpty() || cached.involvedClusters.contains(iCluster)) {
-        cached.clear();
-        it.remove();
+synchronized (this) {
+    if (cache.size() == 0)     return;
+    if (evictStrategy == STRATEGY.INVALIDATE_ALL) {
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Invalidate all cached results (%d)  ",size());
+      clear();
+      return;
+    }
+    if (!clusters.remove(iCluster)) {
+      if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"No results found for '%s'",iCluster);
+      return;
+    }
+    int evicted=0;
+    for (Iterator<Map.Entry<String,OCachedResult>> it=cache.entrySet().iterator(); it.hasNext(); ) {
+      final OCachedResult cached=it.next().getValue();
+      if (cached != null) {
+        if (cached.involvedClusters == null || cached.involvedClusters.isEmpty() || cached.involvedClusters.contains(iCluster)) {
+          cached.clear();
+          it.remove();
+        }
       }
     }
+    if (evicted > 0 && OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Invalidate %d cached results associated to the cluster '%s'",evicted,iCluster);
   }
-  if (evicted > 0)   OLogManager.instance().debug(this,"Invalidate %d cached results associated to the cluster '%s'",evicted,iCluster);
 }

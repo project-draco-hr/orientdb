@@ -2,11 +2,18 @@
   final Map<String,Object> results=new HashMap<String,Object>(nodeClusterMap.size());
   final List<String> nodes=new ArrayList<String>(1);
   for (  Map.Entry<String,Collection<String>> c : nodeClusterMap.entrySet()) {
-    final OAbstractCommandTask task=iCommand instanceof OCommandScript ? new OScriptTask(iCommand) : new OSQLCommandTask(iCommand,c.getValue());
-    task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
-    nodes.clear();
-    nodes.add(c.getKey());
-    results.put(c.getKey(),dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE));
+    final String nodeName=c.getKey();
+    if (!dManager.isNodeAvailable(nodeName,getName())) {
+      ODistributedServerLog.warn(this,dManager.getLocalNodeName(),nodeName,ODistributedServerLog.DIRECTION.OUT,"Node '%s' is involved in the command '%s' against database '%s', but the node is not active. Excluding it",nodeName,iCommand,wrapped.getName());
+    }
+ else {
+      final OAbstractCommandTask task=iCommand instanceof OCommandScript ? new OScriptTask(iCommand) : new OSQLCommandTask(iCommand,c.getValue());
+      task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
+      nodes.clear();
+      nodes.add(nodeName);
+      results.put(nodeName,dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE));
+    }
   }
+  if (results.isEmpty())   throw new ODistributedException("No active nodes found to execute command: " + iCommand);
   return results;
 }

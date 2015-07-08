@@ -1,0 +1,31 @@
+{
+  String property="java.io.tmpdir";
+  String file=System.getProperty(property) + "test.json";
+  List<?> query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from City where name lucene 'Rome'"));
+  Assert.assertEquals(query.size(),1);
+  try {
+    new ODatabaseExport(databaseDocumentTx,file,new OCommandOutputListener(){
+      @Override public void onMessage(      String s){
+      }
+    }
+).exportDatabase();
+    databaseDocumentTx.drop();
+    databaseDocumentTx.create();
+    GZIPInputStream stream=new GZIPInputStream(new FileInputStream(file + ".gz"));
+    new ODatabaseImport(databaseDocumentTx,stream,new OCommandOutputListener(){
+      @Override public void onMessage(      String s){
+      }
+    }
+).importDatabase();
+  }
+ catch (  IOException e) {
+    e.printStackTrace();
+  }
+  long city=databaseDocumentTx.countClass("City");
+  Assert.assertEquals(city,1);
+  OIndex<?> index=databaseDocumentTx.getMetadata().getIndexManager().getIndex("City.name");
+  Assert.assertNotNull(index);
+  Assert.assertEquals(index.getType(),"FULLTEXT");
+  query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from City where name lucene 'Rome'"));
+  Assert.assertEquals(query.size(),1);
+}

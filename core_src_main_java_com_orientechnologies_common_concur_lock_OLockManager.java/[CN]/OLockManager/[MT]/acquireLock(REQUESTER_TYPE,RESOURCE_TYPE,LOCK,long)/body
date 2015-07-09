@@ -1,28 +1,31 @@
 {
   if (!enabled)   return;
+  final RESOURCE_TYPE immutableResource=getImmutableResourceId(iResourceId);
   CountableLock lock;
-  final Object internalLock=internalLock(iResourceId);
-synchronized (internalLock) {
-    lock=map.get(iResourceId);
-    if (lock == null) {
-      final CountableLock newLock=new CountableLock();
-      lock=map.putIfAbsent(getImmutableResourceId(iResourceId),newLock);
-      if (lock == null)       lock=newLock;
+  while (true) {
+    lock=new CountableLock();
+    CountableLock oldLock=map.putIfAbsent(immutableResource,lock);
+    if (oldLock == null)     break;
+    lock=oldLock;
+    final int oldValue=lock.countLocks.get();
+    if (oldValue > 0) {
+      if (lock.countLocks.compareAndSet(oldValue,oldValue + 1)) {
+        if (map.get(immutableResource) == lock)         break;
+      }
     }
-    lock.countLocks++;
   }
   try {
     if (iTimeout <= 0) {
-      if (iLockType == LOCK.SHARED)       lock.readLock().lock();
- else       lock.writeLock().lock();
+      if (iLockType == LOCK.SHARED)       lock.readWriteLock.readLock().lock();
+ else       lock.readWriteLock.writeLock().lock();
     }
  else {
       try {
         if (iLockType == LOCK.SHARED) {
-          if (!lock.readLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Timeout (" + iTimeout + "ms) on acquiring resource '"+ iResourceId+ "' because is locked from another thread");
+          if (!lock.readWriteLock.readLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Timeout (" + iTimeout + "ms) on acquiring resource '"+ iResourceId+ "' because is locked from another thread");
         }
  else {
-          if (!lock.writeLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Timeout (" + iTimeout + "ms) on acquiring resource '"+ iResourceId+ "' because is locked from another thread");
+          if (!lock.readWriteLock.writeLock().tryLock(iTimeout,TimeUnit.MILLISECONDS))           throw new OLockException("Timeout (" + iTimeout + "ms) on acquiring resource '"+ iResourceId+ "' because is locked from another thread");
         }
       }
  catch (      InterruptedException e) {
@@ -32,10 +35,8 @@ synchronized (internalLock) {
     }
   }
  catch (  RuntimeException e) {
-synchronized (internalLock) {
-      lock.countLocks--;
-      if (lock.countLocks == 0)       map.remove(iResourceId);
-    }
+    lock.countLocks.decrementAndGet();
+    if (lock.countLocks.get() == 0)     map.remove(iResourceId);
     throw e;
   }
 }

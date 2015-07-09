@@ -1,0 +1,41 @@
+{
+  if (pointing instanceof ODocument) {
+    if (((ODocument)pointing).isEmbedded()) {
+      ORecordElement ele=pointing.getOwner();
+      while (!(ele instanceof ODocument) && ele != null && ele.getOwner() != null)       ele=ele.getOwner();
+      if (ele != null)       pointing=(ORecord)ele;
+    }
+  }
+  if (pointed.getIdentity().isNew() && pointing.getIdentity().isNew()) {
+    if (!(pointed instanceof ODocument) || !((ODocument)pointed).isEmbedded()) {
+      if (references == null) {
+        references=new IdentityHashMap<ODocument,List<OIdentifiable>>();
+      }
+      List<OIdentifiable> refs=references.get(pointing);
+      if (refs == null) {
+        refs=new ArrayList<OIdentifiable>();
+        references.put((ODocument)pointing,refs);
+      }
+      refs.add(pointed);
+    }
+ else     if (pointed instanceof ODocument) {
+      List<OIdentifiable> point=ORecordInternal.getDirtyManager((ORecord)pointed).getPointed((ORecord)pointed);
+      if (point != null && point.size() > 0) {
+        if (references == null) {
+          references=new IdentityHashMap<ODocument,List<OIdentifiable>>();
+        }
+        List<OIdentifiable> refs=references.get(pointing);
+        if (refs == null) {
+          refs=new ArrayList<OIdentifiable>();
+          references.put((ODocument)pointing,refs);
+        }
+        for (        OIdentifiable embPoint : point) {
+          refs.add(embPoint);
+        }
+      }
+    }
+  }
+  if (pointed instanceof ORecord) {
+    ORecordInternal.setDirtyManager((ORecord)pointed,this);
+  }
+}

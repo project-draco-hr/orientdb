@@ -4,25 +4,48 @@
     Document doc=new Document();
     doc.add(OLuceneIndexType.createField(RID,oIdentifiable,oIdentifiable.getIdentity().toString(),Field.Store.YES,Field.Index.NOT_ANALYZED_NO_NORMS));
     int i=0;
-    for (    String f : index.getFields()) {
+    if (index.isAutomatic()) {
+      for (      String f : index.getFields()) {
+        Object val=null;
+        if (key instanceof OCompositeKey) {
+          val=((OCompositeKey)key).getKeys().get(i);
+          i++;
+        }
+ else {
+          val=key;
+        }
+        if (val != null) {
+          if (facetManager.supportsFacets() && facetManager.isFacetField(f)) {
+            doc.add(facetManager.buildFacetField(f,val));
+          }
+ else {
+            if (isToStore(f).equals(Field.Store.YES)) {
+              doc.add(OLuceneIndexType.createField(f + STORED,oIdentifiable,val,Field.Store.YES,Field.Index.NOT_ANALYZED_NO_NORMS));
+            }
+            doc.add(OLuceneIndexType.createField(f,oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
+          }
+        }
+      }
+    }
+ else {
       Object val=null;
       if (key instanceof OCompositeKey) {
-        val=((OCompositeKey)key).getKeys().get(i);
-        i++;
+        List<Object> keys=((OCompositeKey)key).getKeys();
+        int k=0;
+        for (        Object o : keys) {
+          doc.add(OLuceneIndexType.createField("k" + k,oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
+        }
+      }
+ else       if (key instanceof Collection) {
+        Collection<Object> keys=(Collection<Object>)key;
+        int k=0;
+        for (        Object o : keys) {
+          doc.add(OLuceneIndexType.createField("k" + k,oIdentifiable,o,Field.Store.NO,Field.Index.ANALYZED));
+        }
       }
  else {
         val=key;
-      }
-      if (val != null) {
-        if (facetManager.supportsFacets() && facetManager.isFacetField(f)) {
-          doc.add(facetManager.buildFacetField(f,val));
-        }
- else {
-          if (isToStore(f).equals(Field.Store.YES)) {
-            doc.add(OLuceneIndexType.createField(f + STORED,oIdentifiable,val,Field.Store.YES,Field.Index.NOT_ANALYZED_NO_NORMS));
-          }
-          doc.add(OLuceneIndexType.createField(f,oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
-        }
+        doc.add(OLuceneIndexType.createField("k0",oIdentifiable,val,Field.Store.NO,Field.Index.ANALYZED));
       }
     }
     if (facetManager.supportsFacets()) {
@@ -37,5 +60,8 @@
       addDocument(doc);
     }
     facetManager.commit();
+    if (!index.isAutomatic()) {
+      commit();
+    }
   }
 }

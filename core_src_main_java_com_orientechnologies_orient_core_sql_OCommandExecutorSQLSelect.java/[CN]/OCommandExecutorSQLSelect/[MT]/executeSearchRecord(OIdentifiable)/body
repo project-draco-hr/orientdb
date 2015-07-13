@@ -1,10 +1,12 @@
 {
-  if (Thread.interrupted()) {
-    throw new OCommandExecutionException("The select execution has been interrupted");
+  if (id == null)   return false;
+  final ORID identity=id.getIdentity();
+  if (uniqueResult != null) {
+    if (uniqueResult.containsKey(identity))     return true;
+    if (identity.isValid())     uniqueResult.put(identity,identity);
   }
-  if (!context.checkTimeout()) {
-    return false;
-  }
+  if (Thread.interrupted())   throw new OCommandExecutionException("The select execution has been interrupted");
+  if (!context.checkTimeout())   return false;
   final LOCKING_STRATEGY contextLockingStrategy=context.getVariable("$locking") != null ? (LOCKING_STRATEGY)context.getVariable("$locking") : null;
   final LOCKING_STRATEGY localLockingStrategy=contextLockingStrategy != null ? contextLockingStrategy : lockingStrategy;
   if (localLockingStrategy != null && !(localLockingStrategy == LOCKING_STRATEGY.DEFAULT || localLockingStrategy == LOCKING_STRATEGY.NONE || localLockingStrategy == LOCKING_STRATEGY.EXCLUSIVE_LOCK || localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK))   throw new IllegalStateException("Unsupported locking strategy " + localLockingStrategy);
@@ -22,9 +24,7 @@
     record=(ORecord)id;
   }
   context.updateMetric("recordReads",+1);
-  if (record == null || ORecordInternal.getRecordType(record) != ODocument.RECORD_TYPE) {
-    return true;
-  }
+  if (record == null || ORecordInternal.getRecordType(record) != ODocument.RECORD_TYPE)   return true;
   context.updateMetric("documentReads",+1);
   if (localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK) {
     record.lock(false);

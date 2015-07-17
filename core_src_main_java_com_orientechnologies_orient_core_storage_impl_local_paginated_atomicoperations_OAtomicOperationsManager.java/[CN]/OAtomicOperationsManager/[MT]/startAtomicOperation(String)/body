@@ -8,13 +8,12 @@
   }
   final OOperationUnitId unitId=OOperationUnitId.generateId();
   final OLogSequenceNumber lsn=writeAheadLog.logAtomicOperationStartRecord(true,unitId);
-  if (storage instanceof OIdentifiableStorage) {
-    operation=new OAtomicOperation(lsn,unitId,readCache,writeCache,((OIdentifiableStorage)storage).getId());
-  }
- else {
-    operation=new OAtomicOperation(lsn,unitId,readCache,writeCache,-1);
-  }
+  operation=new OAtomicOperation(lsn,unitId,readCache,writeCache,storage.getId());
   currentOperation.set(operation);
+  if (trackAtomicOperations) {
+    final Thread thread=Thread.currentThread();
+    activeAtomicOperations.put(unitId,new OPair<String,StackTraceElement[]>(thread.getName(),thread.getStackTrace()));
+  }
   if (storage.getStorageTransaction() == null)   writeAheadLog.log(new ONonTxOperationPerformedWALRecord());
   if (fullName != null)   acquireExclusiveLockTillOperationComplete(fullName);
   return operation;

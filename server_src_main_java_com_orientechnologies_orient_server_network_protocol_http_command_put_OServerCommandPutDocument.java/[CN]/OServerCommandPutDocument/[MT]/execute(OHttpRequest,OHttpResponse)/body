@@ -17,7 +17,6 @@
     doc.fromJSON(iRequest.content);
     if (iRequest.ifMatch != null)     doc.getRecordVersion().getSerializer().fromString(iRequest.ifMatch,doc.getRecordVersion());
     if (!recordId.isValid())     recordId=(ORecordId)doc.getIdentity();
- else     ORecordInternal.setIdentity(doc,recordId);
     if (!recordId.isValid())     throw new IllegalArgumentException("Invalid Record ID in request: " + recordId);
     final ODocument currentDocument=db.load(recordId);
     if (currentDocument == null) {
@@ -31,10 +30,10 @@
     if (mode != null && mode.equalsIgnoreCase("partial"))     partialUpdateMode=true;
     currentDocument.merge(doc,partialUpdateMode,false);
     if (currentDocument.isDirty()) {
-      if (doc.getRecordVersion().isValid())       currentDocument.getRecordVersion().copyFrom(doc.getRecordVersion());
+      if (doc.getVersion() > 0)       currentDocument.getRecordVersion().copyFrom(doc.getRecordVersion());
       currentDocument.save();
     }
-    iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,currentDocument.toJSON(),OHttpUtils.HEADER_ETAG + doc.getVersion());
+    iResponse.send(OHttpUtils.STATUS_OK_CODE,OHttpUtils.STATUS_OK_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,currentDocument.toJSON(),OHttpUtils.HEADER_ETAG + currentDocument.getVersion());
   }
   finally {
     if (db != null)     db.close();

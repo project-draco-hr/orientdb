@@ -18,12 +18,23 @@
       result=index.get(joinValue);
     }
  else     result=pipeline.getDocumentDatabase().query(sqlQuery,joinValue);
-    if (result != null)     if (result instanceof Collection) {
-      if (!((Collection)result).isEmpty())       result=((Collection<OIdentifiable>)result).iterator().next().getRecord();
+    if (result != null && result instanceof Collection) {
+      final Collection coll=(Collection)result;
+      if (!coll.isEmpty()) {
+        if (iReturnRIDS) {
+          final List<ORID> resultRIDs=new ArrayList<ORID>(coll.size());
+          for (          Object o : coll) {
+            if (o instanceof OIdentifiable)             resultRIDs.add(((OIdentifiable)o).getIdentity());
+          }
+          result=resultRIDs;
+        }
+      }
  else       result=null;
     }
- else     if (result instanceof OIdentifiable)     result=((OIdentifiable)result).getRecord();
-    if (iReturnRIDS && result instanceof ORecord)     result=((ORecord)result).getIdentity();
+ else     if (result instanceof OIdentifiable) {
+      if (iReturnRIDS)       result=((OIdentifiable)result).getIdentity();
+ else       result=((OIdentifiable)result).getRecord();
+    }
   }
   return result;
 }

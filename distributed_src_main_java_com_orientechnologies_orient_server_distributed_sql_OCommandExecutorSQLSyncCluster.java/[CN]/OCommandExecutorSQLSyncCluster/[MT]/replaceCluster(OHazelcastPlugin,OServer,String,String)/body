@@ -40,7 +40,15 @@
         }
       }
     }
-    OZIPCompressionUtil.uncompressDirectory(new FileInputStream(tempFile),dbPath,null);
+    final String tempDirectoryPath=Orient.getTempPath() + "/backup_" + databaseName+ "_"+ clusterName+ "_toInstall";
+    final File tempDirectory=new File(tempDirectoryPath);
+    tempDirectory.mkdirs();
+    OZIPCompressionUtil.uncompressDirectory(new FileInputStream(tempFile),tempDirectory.getAbsolutePath(),null);
+    final OAbstractPaginatedStorage stg=(OAbstractPaginatedStorage)getDatabase().getStorage().getUnderlying();
+    final OPaginatedCluster cluster=(OPaginatedCluster)stg.getClusterByName(clusterName);
+    final File tempClusterFile=new File(tempDirectoryPath + "/" + clusterName+ OPaginatedCluster.DEF_EXTENSION);
+    cluster.replaceFile(tempClusterFile);
+    getDatabase().getLocalCache().invalidate();
     return String.format("Cluster correctly replaced, transferred %d bytes",fileSize);
   }
  catch (  Exception e) {

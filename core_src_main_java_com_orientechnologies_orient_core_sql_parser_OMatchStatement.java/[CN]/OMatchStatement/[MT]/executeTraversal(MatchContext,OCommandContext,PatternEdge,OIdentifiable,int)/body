@@ -1,0 +1,37 @@
+{
+  OWhereClause filter=outEdge.item.filter.getFilter();
+  OWhereClause whileCondition=outEdge.item.filter.getWhileCondition();
+  Set<OIdentifiable> result=new HashSet<OIdentifiable>();
+  if (whileCondition == null) {
+    Iterable<OIdentifiable> queryResult=(Iterable)outEdge.item.method.execute(startingPoint,iCommandContext);
+    if (outEdge.item.filter == null || outEdge.item.filter.getFilter() == null) {
+      return queryResult;
+    }
+    for (    OIdentifiable origin : queryResult) {
+      if (filter == null || filter.matchesFilters(origin,iCommandContext)) {
+        result.add(origin);
+      }
+    }
+  }
+ else {
+    iCommandContext.setVariable("$depth",depth);
+    if (whileCondition.matchesFilters(startingPoint,iCommandContext)) {
+      if (filter == null || filter.matchesFilters(startingPoint,iCommandContext)) {
+        result.add(startingPoint);
+      }
+      Iterable<OIdentifiable> queryResult=(Iterable)outEdge.item.method.execute(startingPoint,iCommandContext);
+      for (      OIdentifiable origin : queryResult) {
+        Iterable<OIdentifiable> subResult=executeTraversal(matchContext,iCommandContext,outEdge,origin,depth + 1);
+        if (subResult instanceof Collection) {
+          result.addAll((Collection<? extends OIdentifiable>)subResult);
+        }
+ else {
+          for (          OIdentifiable i : subResult) {
+            result.add(i);
+          }
+        }
+      }
+    }
+  }
+  return result;
+}

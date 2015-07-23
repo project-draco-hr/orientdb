@@ -3,13 +3,22 @@
   if (id.getIdentity().isValid()) {
     final ODocument record=id.getRecord();
     final OrientVertex v=graph.getVertex(record);
-    if (v != null) {
-      v.remove();
-      if (returning.equalsIgnoreCase("BEFORE"))       allDeletedRecords.add(record);
- else       removed++;
-      if (!txAlreadyBegun && batch > 0 && removed % batch == 0) {
-        graph.commit();
-        graph.begin();
+    for (int retry=0; retry < 20; ++retry) {
+      try {
+        if (v != null) {
+          v.remove();
+          if (!txAlreadyBegun && batch > 0 && removed % batch == 0) {
+            graph.commit();
+            graph.begin();
+          }
+          if (returning.equalsIgnoreCase("BEFORE"))           allDeletedRecords.add(record);
+          removed++;
+        }
+        break;
+      }
+ catch (      ONeedRetryException ex) {
+        getDatabase().getLocalCache().invalidate();
+        v.reload();
       }
     }
   }

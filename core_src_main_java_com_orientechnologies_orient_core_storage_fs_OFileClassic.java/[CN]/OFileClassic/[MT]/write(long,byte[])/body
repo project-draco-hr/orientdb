@@ -1,16 +1,26 @@
 {
-  long allocationDiff=0;
-  acquireWriteLock();
-  try {
-    if (iSourceBuffer != null) {
-      final long start=accessFile.length();
-      writeInternal(iOffset,iSourceBuffer,iSourceBuffer.length,0);
-      final long end=accessFile.length();
-      allocationDiff=end - start;
+  int attempts=0;
+  while (true) {
+    try {
+      long allocationDiff=0;
+      acquireWriteLock();
+      try {
+        if (iSourceBuffer != null) {
+          final long start=accessFile.length();
+          writeInternal(iOffset,iSourceBuffer,iSourceBuffer.length,0);
+          final long end=accessFile.length();
+          allocationDiff=end - start;
+        }
+      }
+  finally {
+        releaseWriteLock();
+        attempts++;
+      }
+      return allocationDiff;
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during write of data for file " + getName() + " "+ attempts+ "-th attempt.",e);
+      reopenFile(attempts,e);
     }
   }
-  finally {
-    releaseWriteLock();
-  }
-  return allocationDiff;
 }

@@ -1,8 +1,5 @@
 {
-  List<MatchContext> activeContexts=new LinkedList<MatchContext>();
   MatchContext rootContext=new MatchContext();
-  String smallestAlias=null;
-  Long smallestAmount=Long.MAX_VALUE;
   boolean rootFound=false;
   for (  Map.Entry<String,Long> entryPoint : estimatedRootEntries.entrySet()) {
     if (entryPoint.getValue() < threshold) {
@@ -13,17 +10,6 @@
         return true;
       }
       rootContext.candidates.put(nextAlias,matches);
-      long thisAmount;
-      if (matches instanceof Collection) {
-        thisAmount=(long)((Collection)matches).size();
-      }
- else {
-        thisAmount=estimatedRootEntries.get(nextAlias);
-      }
-      if (thisAmount <= smallestAmount) {
-        smallestAlias=nextAlias;
-        smallestAmount=thisAmount;
-      }
       rootFound=true;
     }
   }
@@ -33,13 +19,21 @@
     if (!matches.iterator().hasNext()) {
       return true;
     }
-    smallestAlias=nextAlias;
     rootContext.candidates.put(nextAlias,matches);
+  }
+  EdgeTraversal firstEdge=executionPlan.sortedEdges.size() == 0 ? null : executionPlan.sortedEdges.get(0);
+  String smallestAlias=null;
+  if (firstEdge != null) {
+    smallestAlias=firstEdge.out ? firstEdge.edge.out.alias : firstEdge.edge.in.alias;
+  }
+ else {
+    smallestAlias=pattern.aliasToNode.values().iterator().next().alias;
   }
   Iterable<OIdentifiable> allCandidates=rootContext.candidates.get(smallestAlias);
   for (  OIdentifiable id : allCandidates) {
     MatchContext childContext=rootContext.copy(smallestAlias,id);
-    if (!processContext(pattern,estimatedRootEntries,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+    childContext.currentEdgeNumber=0;
+    if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
       return false;
     }
   }

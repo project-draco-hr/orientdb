@@ -1,0 +1,53 @@
+{
+  db.command(new OCommandSQL("CREATE class Employee extends V")).execute();
+  db.command(new OCommandSQL("CREATE class Department extends V")).execute();
+  db.command(new OCommandSQL("CREATE class ParentDepartment extends E")).execute();
+  db.command(new OCommandSQL("CREATE class WorksAt extends E")).execute();
+  db.command(new OCommandSQL("CREATE class ManagerOf extends E")).execute();
+  int[][] deptHierarchy=new int[10][];
+  deptHierarchy[0]=new int[]{1,2};
+  deptHierarchy[1]=new int[]{3,4};
+  deptHierarchy[2]=new int[]{5,6};
+  deptHierarchy[3]=new int[]{7,8};
+  deptHierarchy[4]=new int[]{};
+  deptHierarchy[5]=new int[]{};
+  deptHierarchy[6]=new int[]{};
+  deptHierarchy[7]=new int[]{9};
+  deptHierarchy[8]=new int[]{};
+  deptHierarchy[9]=new int[]{};
+  String[] deptManagers={"a","b","d",null,null,null,null,"c",null,null};
+  String[][] employees=new String[10][];
+  employees[0]=new String[]{"p1"};
+  employees[1]=new String[]{"p2","p3"};
+  employees[2]=new String[]{"p4","p5"};
+  employees[3]=new String[]{"p6"};
+  employees[4]=new String[]{"p7"};
+  employees[5]=new String[]{"p8"};
+  employees[6]=new String[]{"p9"};
+  employees[7]=new String[]{"p10"};
+  employees[8]=new String[]{"p11"};
+  employees[9]=new String[]{"p12","p13"};
+  for (int i=0; i < deptHierarchy.length; i++) {
+    db.command(new OCommandSQL("CREATE VERTEX Department set name = 'department" + i + "' ")).execute();
+  }
+  for (int parent=0; parent < deptHierarchy.length; parent++) {
+    int[] children=deptHierarchy[parent];
+    for (    int child : children) {
+      db.command(new OCommandSQL("CREATE EDGE ParentDepartment from (select from Department where name = 'department" + child + "') to (select from Department where name = 'department"+ parent+ "') ")).execute();
+    }
+  }
+  for (int dept=0; dept < deptManagers.length; dept++) {
+    String manager=deptManagers[dept];
+    if (manager != null) {
+      db.command(new OCommandSQL("CREATE Vertex Employee set name = '" + manager + "' ")).execute();
+      db.command(new OCommandSQL("CREATE EDGE ManagerOf from (select from Employee where name = '" + manager + ""+ "') to (select from Department where name = 'department"+ dept+ "') ")).execute();
+    }
+  }
+  for (int dept=0; dept < employees.length; dept++) {
+    String[] employeesForDept=employees[dept];
+    for (    String employee : employeesForDept) {
+      db.command(new OCommandSQL("CREATE Vertex Employee set name = '" + employee + "' ")).execute();
+      db.command(new OCommandSQL("CREATE EDGE WorksAt from (select from Employee where name = '" + employee + ""+ "') to (select from Department where name = 'department"+ dept+ "') ")).execute();
+    }
+  }
+}

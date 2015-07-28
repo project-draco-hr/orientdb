@@ -1,15 +1,21 @@
 {
   if (clusterId == -1)   throw new OStorageException("Cluster Id " + clusterId + " is invalid in database '"+ name+ "'");
   checkOpeness();
-  lock.acquireSharedLock();
+  stateLock.acquireReadLock();
   try {
-    checkOpeness();
-    final OCluster cluster=clusters.get(clusterId);
-    if (cluster == null)     return 0;
-    if (countTombstones)     return cluster.getEntries();
-    return cluster.getEntries() - cluster.getTombstonesCount();
+    dataLock.acquireSharedLock();
+    try {
+      checkOpeness();
+      final OCluster cluster=clusters.get(clusterId);
+      if (cluster == null)       return 0;
+      if (countTombstones)       return cluster.getEntries();
+      return cluster.getEntries() - cluster.getTombstonesCount();
+    }
+  finally {
+      dataLock.releaseSharedLock();
+    }
   }
   finally {
-    lock.releaseSharedLock();
+    stateLock.releaseReadLock();
   }
 }

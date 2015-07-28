@@ -13,25 +13,31 @@
     }
   }
   final long timer=Orient.instance().getProfiler().startChrono();
-  cluster.getExternalModificationLock().requestModificationLock();
+  stateLock.acquireReadLock();
   try {
-    modificationLock.requestModificationLock();
+    cluster.getExternalModificationLock().requestModificationLock();
     try {
-      lock.acquireSharedLock();
+      modificationLock.requestModificationLock();
       try {
-        checkOpeness();
-        return doCreateRecord(rid,content,recordVersion,recordType,callback,cluster,ppos);
+        dataLock.acquireSharedLock();
+        try {
+          checkOpeness();
+          return doCreateRecord(rid,content,recordVersion,recordType,callback,cluster,ppos);
+        }
+  finally {
+          dataLock.releaseSharedLock();
+        }
       }
   finally {
-        lock.releaseSharedLock();
+        modificationLock.releaseModificationLock();
       }
     }
   finally {
-      modificationLock.releaseModificationLock();
+      cluster.getExternalModificationLock().releaseModificationLock();
+      Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in database",timer,"db.*.createRecord");
     }
   }
   finally {
-    cluster.getExternalModificationLock().releaseModificationLock();
-    Orient.instance().getProfiler().stopChrono(PROFILER_CREATE_RECORD,"Create a record in database",timer,"db.*.createRecord");
+    stateLock.releaseReadLock();
   }
 }

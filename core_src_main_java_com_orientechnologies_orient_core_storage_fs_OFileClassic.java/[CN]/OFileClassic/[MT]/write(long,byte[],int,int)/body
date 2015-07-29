@@ -1,9 +1,20 @@
 {
-  acquireWriteLock();
-  try {
-    writeInternal(iOffset,iData,iSize,iArrayOffset);
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireWriteLock();
+      try {
+        writeInternal(iOffset,iData,iSize,iArrayOffset);
+        break;
+      }
   finally {
-    releaseWriteLock();
+        releaseWriteLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during data write for file  " + getName() + " "+ attempts+ "-th attempt.",e);
+      reopenFile(attempts,e);
+    }
   }
 }

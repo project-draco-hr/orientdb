@@ -11,32 +11,38 @@
       Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
     }
   }
-  final long timer=Orient.instance().getProfiler().startChrono();
-  cluster.getExternalModificationLock().requestModificationLock();
+  stateLock.acquireReadLock();
   try {
-    modificationLock.requestModificationLock();
+    final long timer=Orient.instance().getProfiler().startChrono();
+    cluster.getExternalModificationLock().requestModificationLock();
     try {
-      lockManager.acquireLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
+      modificationLock.requestModificationLock();
       try {
-        lock.acquireSharedLock();
+        lockManager.acquireLock(rid,OLockManager.LOCK.EXCLUSIVE);
         try {
-          checkOpeness();
-          return doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
+          dataLock.acquireSharedLock();
+          try {
+            checkOpeness();
+            return doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
+          }
+  finally {
+            dataLock.releaseSharedLock();
+          }
         }
   finally {
-          lock.releaseSharedLock();
+          lockManager.releaseLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
         }
       }
   finally {
-        lockManager.releaseLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
+        modificationLock.releaseModificationLock();
       }
     }
   finally {
-      modificationLock.releaseModificationLock();
+      cluster.getExternalModificationLock().releaseModificationLock();
+      Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
     }
   }
   finally {
-    cluster.getExternalModificationLock().releaseModificationLock();
-    Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
+    stateLock.releaseReadLock();
   }
 }

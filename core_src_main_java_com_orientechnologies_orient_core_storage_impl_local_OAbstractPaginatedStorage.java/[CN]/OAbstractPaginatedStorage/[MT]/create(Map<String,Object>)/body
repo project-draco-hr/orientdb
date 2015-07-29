@@ -1,12 +1,18 @@
 {
-  lock.acquireExclusiveLock();
+  stateLock.acquireWriteLock();
   try {
-    if (status != STATUS.CLOSED)     throw new OStorageException("Cannot create new storage '" + name + "' because it is not closed");
-    if (exists())     throw new OStorageException("Cannot create new storage '" + name + "' because it already exists");
+    if (status != STATUS.CLOSED)     throw new OStorageException("Cannot create new storage '" + getURL() + "' because it is not closed");
+    if (exists())     throw new OStorageException("Cannot create new storage '" + getURL() + "' because it already exists");
     if (!configuration.getContextConfiguration().getContextKeys().contains(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD.getKey()))     configuration.getContextConfiguration().setValue(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD,OGlobalConfiguration.STORAGE_COMPRESSION_METHOD.getValue());
     componentsFactory=new OCurrentStorageComponentsFactory(configuration);
     initWalAndDiskCache();
     atomicOperationsManager=new OAtomicOperationsManager(this);
+    try {
+      atomicOperationsManager.registerMBean();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"MBean for atomic operations manager can not be registered.",e);
+    }
     preCreateSteps();
     status=STATUS.OPEN;
     doAddCluster(OMetadataDefault.CLUSTER_INTERNAL_NAME,false,null);
@@ -28,6 +34,6 @@ catch (  IOException e) {
     throw new OStorageException("Error on creation of storage '" + name + "'",e);
   }
  finally {
-    lock.releaseExclusiveLock();
+    stateLock.releaseWriteLock();
   }
 }

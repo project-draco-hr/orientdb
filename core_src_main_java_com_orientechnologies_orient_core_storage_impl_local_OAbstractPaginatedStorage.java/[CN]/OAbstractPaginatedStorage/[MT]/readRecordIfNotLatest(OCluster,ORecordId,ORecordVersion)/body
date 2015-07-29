@@ -10,28 +10,34 @@
       Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
     }
   }
-  final long timer=Orient.instance().getProfiler().startChrono();
-  cluster.getExternalModificationLock().requestModificationLock();
+  stateLock.acquireReadLock();
   try {
-    lockManager.acquireLock(this,rid,OLockManager.LOCK.SHARED);
+    final long timer=Orient.instance().getProfiler().startChrono();
+    cluster.getExternalModificationLock().requestModificationLock();
     try {
-      ORawBuffer buff;
-      lock.acquireSharedLock();
+      lockManager.acquireLock(rid,OLockManager.LOCK.SHARED);
       try {
-        checkOpeness();
-        buff=doReadRecordIfNotLatest(cluster,rid,recordVersion);
-        return buff;
+        ORawBuffer buff;
+        dataLock.acquireSharedLock();
+        try {
+          checkOpeness();
+          buff=doReadRecordIfNotLatest(cluster,rid,recordVersion);
+          return buff;
+        }
+  finally {
+          dataLock.releaseSharedLock();
+        }
       }
   finally {
-        lock.releaseSharedLock();
+        lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
       }
     }
   finally {
-      lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
+      cluster.getExternalModificationLock().releaseModificationLock();
+      Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
     }
   }
   finally {
-    cluster.getExternalModificationLock().releaseModificationLock();
-    Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+    stateLock.releaseReadLock();
   }
 }

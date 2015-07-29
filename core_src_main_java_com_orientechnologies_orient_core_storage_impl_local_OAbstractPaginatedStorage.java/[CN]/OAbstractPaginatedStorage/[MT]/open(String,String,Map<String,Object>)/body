@@ -1,6 +1,12 @@
 {
-  if (status == STATUS.OPEN)   return;
-  lock.acquireExclusiveLock();
+  stateLock.acquireReadLock();
+  try {
+    if (status == STATUS.OPEN)     return;
+  }
+  finally {
+    stateLock.releaseReadLock();
+  }
+  stateLock.acquireWriteLock();
   try {
     if (status == STATUS.OPEN)     return;
     if (!exists())     throw new OStorageException("Cannot open the storage '" + name + "' because it does not exist in path: "+ url);
@@ -9,6 +15,12 @@
     preOpenSteps();
     initWalAndDiskCache();
     atomicOperationsManager=new OAtomicOperationsManager(this);
+    try {
+      atomicOperationsManager.registerMBean();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"MBean for atomic operations manager can not be registered.",e);
+    }
     restoreIfNeeded();
     int pos;
     addDefaultClusters();
@@ -44,6 +56,6 @@
     throw new OStorageException("Cannot open local storage '" + url + "' with mode="+ mode,e);
   }
  finally {
-    lock.releaseExclusiveLock();
+    stateLock.releaseWriteLock();
   }
 }

@@ -6,13 +6,13 @@
     try {
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
       if (positionEntry == null) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return false;
       }
       long pageIndex=positionEntry.getPageIndex();
       int recordPosition=positionEntry.getRecordPosition();
       if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return false;
       }
       long nextPagePointer=-1;
@@ -26,7 +26,7 @@
           initialFreePageIndex=calculateFreePageIndex(localPage);
           if (localPage.isDeleted(recordPosition)) {
             if (removedContentSize == 0) {
-              endAtomicOperation(false);
+              endAtomicOperation(false,null);
               return false;
             }
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
@@ -49,17 +49,17 @@
           releasePage(atomicOperation,cacheEntry);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
-        pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
-        recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
+        pageIndex=getPageIndex(nextPagePointer);
+        recordPosition=getRecordPosition(nextPagePointer);
       }
  while (nextPagePointer >= 0);
       updateClusterState(-1,-removedContentSize,atomicOperation);
       clusterPositionMap.remove(clusterPosition);
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return true;
     }
- catch (    Throwable e) {
-      endAtomicOperation(true);
+ catch (    Exception e) {
+      endAtomicOperation(true,e);
       throw new OStorageException(null,e);
     }
  finally {

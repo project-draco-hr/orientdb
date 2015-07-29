@@ -1,11 +1,29 @@
 {
   super.onServerStarted(server);
-  if (serverStarted++ == (SERVERS - 1))   timer.schedule(new TimerTask(){
-    @Override public void run(){
-      Assert.assertTrue("Insert was too fast",inserting);
-      System.out.println("SIMULATE FAILURE ON SERVER " + (SERVERS - 1));
-      serverInstance.get(SERVERS - 1).crashServer();
+  if (serverStarted++ == (SERVERS - 1)) {
+    lastServerOn=true;
+    timer.schedule(new TimerTask(){
+      @Override public void run(){
+        Assert.assertTrue("Insert was too fast",inserting);
+        timer.schedule(new TimerTask(){
+          @Override public void run(){
+            Assert.assertTrue("Insert was too fast",inserting);
+            log("RESTART SERVER " + (SERVERS - 1));
+            try {
+              serverInstance.get(SERVERS - 1).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
+              lastServerOn=true;
+            }
+ catch (            Exception e) {
+              e.printStackTrace();
+            }
+          }
+        }
+,10000);
+        log("SIMULATE FAILURE ON SERVER " + (SERVERS - 1));
+        serverInstance.get(SERVERS - 1).crashServer();
+        lastServerOn=false;
+      }
     }
-  }
 ,2000);
+  }
 }

@@ -1,0 +1,67 @@
+{
+  if (iCommand == null || iCommand.trim().isEmpty()) {
+    message("\nAVAILABLE COMMANDS:\n");
+    for (    Method m : getConsoleMethods().keySet()) {
+      ConsoleCommand annotation=m.getAnnotation(ConsoleCommand.class);
+      if (annotation == null)       continue;
+      message("* %-85s%s\n",getCorrectMethodName(m),annotation.description());
+    }
+    message("* %-85s%s\n",getClearName("exit"),"Close the console");
+    return;
+  }
+  final String[] commandWords=OStringParser.getWords(iCommand,wordSeparator);
+  boolean onlineMode=commandWords.length > 1 && commandWords[0].equalsIgnoreCase("-online");
+  if (onlineMode)   iCommand=iCommand.substring("-online".length() + 1);
+  final Method m=getMethod(iCommand);
+  if (m != null) {
+    final ConsoleCommand ann=m.getAnnotation(ConsoleCommand.class);
+    message("\nCOMMAND: " + iCommand + "\n\n");
+    if (ann != null) {
+      if (onlineMode && !ann.onlineHelp().isEmpty()) {
+        try {
+          final String text=getOnlineHelp(ONLINE_HELP_URL + ann.onlineHelp() + ONLINE_HELP_EXT);
+          if (text != null && !text.isEmpty()) {
+            message(text);
+            return;
+          }
+        }
+ catch (        Exception e) {
+        }
+        error("!CANNOT FETCH ONLINE DOCUMENTATION, CHECK COMPUTER IS CONNECTED TO THE INTERNET.");
+        return;
+      }
+      message(ann.description() + ".");
+      final StringBuilder syntax=new StringBuilder();
+      syntax.append(m.getName());
+      for (      Parameter p : m.getParameters()) {
+        final ConsoleParameter pAnn=p.getAnnotation(ConsoleParameter.class);
+        syntax.append(" ");
+        if (pAnn != null && pAnn.optional())         syntax.append("[");
+        syntax.append("<");
+        if (pAnn != null) {
+          syntax.append(pAnn.name());
+        }
+ else         syntax.append(p.getName());
+        syntax.append(">");
+        if (pAnn != null && pAnn.optional())         syntax.append("]");
+      }
+      message("\n\nSYNTAX: " + syntax + "\n");
+      if (m.getParameters().length > 0) {
+        message("\nWHERE:");
+        for (        Parameter p : m.getParameters()) {
+          final ConsoleParameter pAnn=p.getAnnotation(ConsoleParameter.class);
+          message("\n- <");
+          if (pAnn != null) {
+            message(pAnn.name());
+          }
+ else           message(p.getName());
+          message(">: ");
+          if (pAnn != null && pAnn.optional())           message("(optional) ");
+          message(pAnn.description());
+        }
+        message("\n");
+      }
+    }
+ else     message("No description available");
+  }
+}

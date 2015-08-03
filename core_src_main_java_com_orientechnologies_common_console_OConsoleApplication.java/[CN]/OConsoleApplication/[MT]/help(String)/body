@@ -32,35 +32,39 @@
       }
       message(ann.description() + ".");
       final StringBuilder syntax=new StringBuilder();
+      final StringBuilder notes=new StringBuilder();
       syntax.append(m.getName());
-      for (      Parameter p : m.getParameters()) {
-        final ConsoleParameter pAnn=p.getAnnotation(ConsoleParameter.class);
+      int paramCounter=0;
+      for (      Annotation[] paramAnnotations : m.getParameterAnnotations()) {
+        ConsoleParameter pAnn=null;
+        for (        Annotation a : paramAnnotations) {
+          if (a instanceof ConsoleParameter) {
+            pAnn=(ConsoleParameter)a;
+            break;
+          }
+        }
         syntax.append(" ");
         if (pAnn != null && pAnn.optional())         syntax.append("[");
         syntax.append("<");
+        notes.append("\n- <");
         if (pAnn != null) {
           syntax.append(pAnn.name());
+          notes.append(pAnn.name());
         }
- else         syntax.append(p.getName());
+ else {
+          syntax.append("param" + paramCounter++);
+          notes.append("param" + paramCounter++);
+        }
         syntax.append(">");
-        if (pAnn != null && pAnn.optional())         syntax.append("]");
+        notes.append(">: ");
+        if (pAnn != null && pAnn.optional()) {
+          syntax.append("]");
+          notes.append("(optional) ");
+        }
+        if (pAnn != null)         notes.append(pAnn.description());
       }
       message("\n\nSYNTAX: " + syntax + "\n");
-      if (m.getParameters().length > 0) {
-        message("\nWHERE:");
-        for (        Parameter p : m.getParameters()) {
-          final ConsoleParameter pAnn=p.getAnnotation(ConsoleParameter.class);
-          message("\n- <");
-          if (pAnn != null) {
-            message(pAnn.name());
-          }
- else           message(p.getName());
-          message(">: ");
-          if (pAnn != null && pAnn.optional())           message("(optional) ");
-          message(pAnn.description());
-        }
-        message("\n");
-      }
+      if (notes.length() > 0)       message("\nWHERE:" + notes + "\n");
     }
  else     message("No description available");
   }

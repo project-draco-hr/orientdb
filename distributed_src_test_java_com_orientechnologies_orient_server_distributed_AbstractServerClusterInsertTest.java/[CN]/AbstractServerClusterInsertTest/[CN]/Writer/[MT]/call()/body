@@ -1,7 +1,7 @@
 {
   String name=Integer.toString(threadId);
   for (int i=0; i < count; i++) {
-    final ODatabaseDocumentTx database=poolFactory.get(databaseUrl,"admin","admin").acquire();
+    final ODatabaseDocumentTx database=new ODatabaseDocumentTx(databaseUrl).open("admin","admin");
     try {
       final int id=baseCount + i;
       int retry=0;
@@ -20,10 +20,18 @@
           Thread.currentThread().interrupt();
           break;
         }
+catch (        ORecordDuplicatedException e) {
+        }
 catch (        ONeedRetryException e) {
           System.out.println("Writer received exception (db=" + database.getURL());
           if (retry >= maxRetries)           e.printStackTrace();
           break;
+        }
+catch (        ODistributedException e) {
+          if (!(e.getCause() instanceof ORecordDuplicatedException)) {
+            database.rollback();
+            throw e;
+          }
         }
 catch (        Throwable e) {
           System.out.println("Writer received exception (db=" + database.getURL());

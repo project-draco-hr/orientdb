@@ -33,12 +33,7 @@ case REPLICATE:
     final Map<String,Collection<String>> nodeClusterMap=dbCfg.getServerClusterMap(involvedClusters,localNodeName);
     final Map<String,Object> results;
     if (nodeClusterMap.size() == 1 && nodeClusterMap.keySet().iterator().next().equals(localNodeName)) {
-      result=ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-        @Override public Object call() throws Exception {
-          return wrapped.command(iCommand);
-        }
-      }
-);
+      result=wrapped.command(iCommand);
       results=new HashMap<String,Object>(1);
       results.put(localNodeName,result);
     }
@@ -50,7 +45,7 @@ case REPLICATE:
       result=mergeResultByAggegation(select,results);
     }
  else {
-      final Set<Object> set=new HashSet<Object>();
+      final ArrayList<Object> set=new ArrayList<Object>();
       for (      Map.Entry<String,Object> entry : ((Map<String,Object>)results).entrySet()) {
         final Object nodeResult=entry.getValue();
         if (nodeResult instanceof Collection)         set.addAll((Collection<?>)nodeResult);
@@ -69,12 +64,7 @@ case REPLICATE:
     final Collection<String> nodes=dbCfg.getServers(involvedClusters);
     if (iCommand instanceof ODistributedCommand)     nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
     if (nodes.isEmpty())     return null;
-    if (executeLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-      @Override public Object call() throws Exception {
-        return wrapped.command(iCommand);
-      }
-    }
-);
+    if (executeLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return wrapped.command(iCommand);
     result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
     if (exec.involveSchema())     dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
   }

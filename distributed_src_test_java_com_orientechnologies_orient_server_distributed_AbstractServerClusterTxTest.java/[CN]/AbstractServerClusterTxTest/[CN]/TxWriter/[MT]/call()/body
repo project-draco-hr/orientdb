@@ -4,9 +4,10 @@
     final ODatabaseDocumentTx database=poolFactory.get(databaseUrl,"admin","admin").acquire();
     try {
       if ((i + 1) % 100 == 0)       System.out.println("\nWriter " + database.getURL() + " managed "+ (i + 1)+ "/"+ count+ " records so far");
+      final int id=baseCount + i;
       database.begin();
       try {
-        ODocument person=createRecord(database,serverId,i);
+        ODocument person=createRecord(database,serverId,id);
         updateRecord(database,person);
         checkRecord(database,person);
         deleteRecord(database,person);
@@ -14,11 +15,19 @@
         database.commit();
         Assert.assertTrue(person.getIdentity().isPersistent());
       }
- catch (      Exception e) {
+ catch (      ORecordDuplicatedException e) {
+      }
+catch (      ODistributedException e) {
+        if (!(e.getCause() instanceof ORecordDuplicatedException)) {
+          database.rollback();
+          throw e;
+        }
+      }
+catch (      Exception e) {
         database.rollback();
         throw e;
       }
-      Thread.sleep(delayWriter);
+      if (delayWriter > 0)       Thread.sleep(delayWriter);
     }
  catch (    InterruptedException e) {
       System.out.println("Writer received interrupt (db=" + database.getURL());

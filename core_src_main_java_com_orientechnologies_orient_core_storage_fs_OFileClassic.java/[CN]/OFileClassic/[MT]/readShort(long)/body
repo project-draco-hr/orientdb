@@ -1,10 +1,20 @@
 {
-  acquireReadLock();
-  try {
-    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_SHORT);
-    return readData(iOffset,OBinaryProtocol.SIZE_SHORT).getShort();
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireReadLock();
+      try {
+        iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_SHORT);
+        return readData(iOffset,OBinaryProtocol.SIZE_SHORT).getShort();
+      }
   finally {
-    releaseReadLock();
+        releaseReadLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during read of short data for file " + getName() + " "+ attempts+ "-th attempt.",e);
+      reopenFile(attempts,e);
+    }
   }
 }

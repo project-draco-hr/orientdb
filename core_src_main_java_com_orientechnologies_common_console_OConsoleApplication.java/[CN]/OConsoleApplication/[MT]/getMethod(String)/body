@@ -1,0 +1,37 @@
+{
+  iCommand=iCommand.trim();
+  if (iCommand.length() == 0)   return null;
+  if (isComment(iCommand))   return null;
+  Method lastMethodInvoked=null;
+  final StringBuilder lastCommandInvoked=new StringBuilder(1024);
+  final String commandLowerCase=iCommand.toLowerCase();
+  for (  Entry<Method,Object> entry : getConsoleMethods().entrySet()) {
+    final Method m=entry.getKey();
+    final String methodName=m.getName();
+    final ConsoleCommand ann=m.getAnnotation(ConsoleCommand.class);
+    final StringBuilder commandName=new StringBuilder();
+    char ch;
+    for (int i=0; i < methodName.length(); ++i) {
+      ch=methodName.charAt(i);
+      if (Character.isUpperCase(ch)) {
+        commandName.append(" ");
+        ch=Character.toLowerCase(ch);
+      }
+      commandName.append(ch);
+    }
+    if (!commandLowerCase.equals(commandName.toString()) && !commandLowerCase.startsWith(commandName.toString() + " ")) {
+      if (ann == null)       continue;
+      String[] aliases=ann.aliases();
+      if (aliases == null || aliases.length == 0)       continue;
+      for (      String alias : aliases) {
+        if (iCommand.startsWith(alias.split(" ")[0])) {
+          return m;
+        }
+      }
+    }
+ else     return m;
+  }
+  if (lastMethodInvoked != null)   syntaxError(lastCommandInvoked.toString(),lastMethodInvoked);
+  error("\n!Unrecognized command: '%s'",iCommand);
+  return null;
+}

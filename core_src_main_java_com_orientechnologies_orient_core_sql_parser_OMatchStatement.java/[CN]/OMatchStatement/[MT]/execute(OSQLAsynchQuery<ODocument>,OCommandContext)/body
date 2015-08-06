@@ -1,0 +1,24 @@
+{
+  Map<Object,Object> iArgs=context.getInputParameters();
+  try {
+    Map<String,OWhereClause> aliasFilters=new LinkedHashMap<String,OWhereClause>();
+    Map<String,String> aliasClasses=new LinkedHashMap<String,String>();
+    for (    OMatchExpression expr : this.matchExpressions) {
+      addAliases(expr,aliasFilters,aliasClasses);
+    }
+    Map<String,Long> estimatedRootEntries=estimateRootEntries(aliasClasses,aliasFilters);
+    if (estimatedRootEntries.values().contains(0l)) {
+      return new OBasicResultSet();
+    }
+    List<EdgeTraversal> sortedEdges=sortEdges(estimatedRootEntries,pattern);
+    MatchExecutionPlan executionPlan=new MatchExecutionPlan();
+    executionPlan.sortedEdges=sortedEdges;
+    calculateMatch(estimatedRootEntries,new MatchContext(),aliasClasses,aliasFilters,context,request,executionPlan);
+    return getResult(request);
+  }
+  finally {
+    if (request.getResultListener() != null) {
+      request.getResultListener().end();
+    }
+  }
+}

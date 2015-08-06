@@ -1,0 +1,33 @@
+{
+  final OCommandRequestText textRequest=(OCommandRequestText)iRequest;
+  if (iRequest instanceof OSQLSynchQuery) {
+    request=(OSQLSynchQuery<ODocument>)iRequest;
+  }
+ else   if (iRequest instanceof OSQLAsynchQuery) {
+    request=(OSQLAsynchQuery<ODocument>)iRequest;
+  }
+ else {
+    request=new OSQLSynchQuery<ODocument>(textRequest.getText());
+    if (textRequest.getResultListener() != null) {
+      request.setResultListener(textRequest.getResultListener());
+    }
+  }
+  String queryText=textRequest.getText();
+  final InputStream is=new ByteArrayInputStream(queryText.getBytes());
+  final OrientSql osql=new OrientSql(is);
+  try {
+    OMatchStatement result=(OMatchStatement)osql.parse();
+    this.matchExpressions=result.matchExpressions;
+    this.returnItems=result.returnItems;
+  }
+ catch (  ParseException e) {
+    throw new OCommandSQLParsingException(e.getMessage(),e);
+  }
+  assignDefaultAliases(this.matchExpressions);
+  pattern=new Pattern();
+  for (  OMatchExpression expr : this.matchExpressions) {
+    pattern.addExpression(expr);
+  }
+  validateReturn();
+  return (RET)this;
+}

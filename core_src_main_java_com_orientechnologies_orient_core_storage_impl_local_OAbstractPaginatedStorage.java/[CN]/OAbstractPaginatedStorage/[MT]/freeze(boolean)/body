@@ -1,18 +1,26 @@
 {
-  modificationLock.prohibitModifications(throwException);
-  synch();
+  checkOpeness();
+  stateLock.acquireReadLock();
   try {
-    unlock();
-    diskCache.setSoftlyClosed(true);
-    if (configuration != null)     configuration.setSoftlyClosed(true);
-  }
- catch (  IOException e) {
-    modificationLock.allowModifications();
+    checkOpeness();
+    modificationLock.prohibitModifications(throwException);
+    synch();
     try {
-      lock();
+      unlock();
+      writeCache.setSoftlyClosed(true);
+      if (configuration != null)       configuration.setSoftlyClosed(true);
     }
- catch (    IOException ignored) {
+ catch (    IOException e) {
+      modificationLock.allowModifications();
+      try {
+        lock();
+      }
+ catch (      IOException ignored) {
+      }
+      throw new OStorageException("Error on freeze of storage '" + name + "'",e);
     }
-    throw new OStorageException("Error on freeze of storage '" + name + "'",e);
+  }
+  finally {
+    stateLock.releaseReadLock();
   }
 }

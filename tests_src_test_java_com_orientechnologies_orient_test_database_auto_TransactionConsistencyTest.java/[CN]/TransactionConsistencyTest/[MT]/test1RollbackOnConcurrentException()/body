@@ -1,6 +1,5 @@
 {
   database1=new ODatabaseDocumentTx(url).open("admin","admin");
-  database2=new ODatabaseDocumentTx(url).open("admin","admin");
   database1.begin(TXTYPE.OPTIMISTIC);
   ODocument vDocA_db1=database1.newInstance();
   vDocA_db1.field(NAME,"docA");
@@ -13,11 +12,13 @@
   ORID vDocB_Rid=vDocB_db1.getIdentity().copy();
   ORecordVersion vDocA_version=OVersionFactory.instance().createUntrackedVersion();
   ORecordVersion vDocB_version=OVersionFactory.instance().createUntrackedVersion();
+  database2=new ODatabaseDocumentTx(url).open("admin","admin");
   database2.begin(TXTYPE.OPTIMISTIC);
   try {
     ODocument vDocA_db2=database2.load(vDocA_Rid);
     vDocA_db2.field(NAME,"docA_v2");
     database2.save(vDocA_db2);
+    database1.activateOnCurrentThread();
     database1.begin(TXTYPE.OPTIMISTIC);
     try {
       vDocA_db1.field(NAME,"docA_v3");
@@ -33,6 +34,7 @@ catch (    OConcurrentModificationException e) {
     Assert.assertEquals(vDocA_db1.field(NAME),"docA_v3");
     vDocA_version=vDocA_db1.getRecordVersion();
     vDocB_version=vDocB_db1.getRecordVersion();
+    database2.activateOnCurrentThread();
     ODocument vDocB_db2=database2.load(vDocB_Rid);
     vDocB_db2.field(NAME,"docB_UpdatedInTranscationThatWillBeRollbacked");
     database2.save(vDocB_db2);
@@ -45,7 +47,9 @@ catch (    OConcurrentModificationException e) {
 catch (  OConcurrentModificationException e) {
     database2.rollback();
   }
+  database1.activateOnCurrentThread();
   database1.close();
+  database2.activateOnCurrentThread();
   database2.getStorage().close();
   database2=new ODatabaseDocumentTx(url).open("admin","admin");
   ODocument vDocA_db2=database2.load(vDocA_Rid);
@@ -54,6 +58,5 @@ catch (  OConcurrentModificationException e) {
   ODocument vDocB_db2=database2.load(vDocB_Rid);
   Assert.assertEquals(vDocB_db2.field(NAME),"docB");
   Assert.assertEquals(vDocB_db2.getRecordVersion(),vDocB_version);
-  database1.close();
   database2.close();
 }

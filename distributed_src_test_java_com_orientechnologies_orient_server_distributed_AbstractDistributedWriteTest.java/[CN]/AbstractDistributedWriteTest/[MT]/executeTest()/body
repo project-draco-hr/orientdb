@@ -1,0 +1,24 @@
+{
+  ODatabaseDocumentTx database=poolFactory.get(getDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+  System.out.println("Creating Writers and Readers threads...");
+  final ExecutorService writerExecutors=Executors.newCachedThreadPool();
+  runningWriters=new CountDownLatch(serverInstance.size() * writerCount);
+  int serverId=0;
+  int threadId=0;
+  List<Callable<Void>> writerWorkers=new ArrayList<Callable<Void>>();
+  for (  ServerRun server : serverInstance) {
+    for (int j=0; j < writerCount; j++) {
+      Callable writer=createWriter(serverId,threadId++,getDatabaseURL(server));
+      writerWorkers.add(writer);
+    }
+    serverId++;
+  }
+  List<Future<Void>> futures=writerExecutors.invokeAll(writerWorkers);
+  System.out.println("Threads started, waiting for the end");
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  writerExecutors.shutdown();
+  Assert.assertTrue(writerExecutors.awaitTermination(1,TimeUnit.MINUTES));
+  System.out.println("All writer threads have finished, shutting down readers");
+}

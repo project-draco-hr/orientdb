@@ -1,6 +1,8 @@
 {
-  lock.acquireExclusiveLock();
+  checkOpeness();
+  stateLock.acquireWriteLock();
   try {
+    checkOpeness();
     if (clusterId < 0 || clusterId >= clusters.size())     throw new IllegalArgumentException("Cluster id '" + clusterId + "' is outside the of range of configured clusters (0-"+ (clusters.size() - 1)+ ") in database '"+ name+ "'");
     final OCluster cluster=clusters.get(clusterId);
     if (cluster == null)     return false;
@@ -11,7 +13,7 @@
       newCluster=new OOfflineCluster(this,clusterId,cluster.getName());
     }
  else {
-      newCluster=OPaginatedClusterFactory.INSTANCE.createCluster(configuration.version,this);
+      newCluster=OPaginatedClusterFactory.INSTANCE.createCluster(cluster.getName(),configuration.version,this);
       newCluster.configure(this,clusterId,cluster.getName());
       newCluster.open();
     }
@@ -26,6 +28,6 @@
     throw new OStorageException("Error while removing cluster '" + clusterId + "'",e);
   }
  finally {
-    lock.releaseExclusiveLock();
+    stateLock.releaseWriteLock();
   }
 }

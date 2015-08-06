@@ -2,7 +2,7 @@
   this.serverInstance=iServer;
   this.dManager=iServer.getDistributedManager();
   this.wrapped=wrapped;
-  ODistributedServerLog.info(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.NONE,"Installing distributed storage on database '%s'",wrapped.getName());
+  ODistributedServerLog.debug(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.NONE,"Installing distributed storage on database '%s'",wrapped.getName());
   purgeDeletedRecordsTask=new TimerTask(){
     @Override public void run(){
       final long now=System.currentTimeMillis();
@@ -33,7 +33,8 @@
       while (running || !asynchronousOperationsQueue.isEmpty()) {
         try {
           final OAsynchDistributedOperation operation=asynchronousOperationsQueue.take();
-          dManager.sendRequest(operation.getDatabaseName(),operation.getClusterNames(),operation.getNodes(),operation.getTask(),EXECUTION_MODE.NO_RESPONSE);
+          final Object result=dManager.sendRequest(operation.getDatabaseName(),operation.getClusterNames(),operation.getNodes(),operation.getTask(),EXECUTION_MODE.RESPONSE);
+          if (operation.getCallback() != null)           operation.getCallback().call(result);
         }
  catch (        InterruptedException e) {
           final int pendingMessages=asynchronousOperationsQueue.size();

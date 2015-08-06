@@ -2,32 +2,32 @@
   OAtomicOperation atomicOperation=startAtomicOperation();
   acquireExclusiveLock();
   try {
-    long lastPage=getFilledUpTo(atomicOperation,diskCache,fileId) - 1;
+    long lastPage=getFilledUpTo(atomicOperation,fileId) - 1;
     OCacheEntry cacheEntry;
-    if (lastPage < 0)     cacheEntry=addPage(atomicOperation,fileId,diskCache);
- else     cacheEntry=loadPage(atomicOperation,fileId,lastPage,false,diskCache);
+    if (lastPage < 0)     cacheEntry=addPage(atomicOperation,fileId);
+ else     cacheEntry=loadPage(atomicOperation,fileId,lastPage,false);
     cacheEntry.acquireExclusiveLock();
     try {
       OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       if (bucket.isFull()) {
         cacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,cacheEntry,diskCache);
-        cacheEntry=addPage(atomicOperation,fileId,diskCache);
+        releasePage(atomicOperation,cacheEntry);
+        cacheEntry=addPage(atomicOperation,fileId);
         cacheEntry.acquireExclusiveLock();
         bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
       }
       final long index=bucket.add(pageIndex,recordPosition);
       final long result=index + cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES;
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return result;
     }
- catch (    Throwable e) {
-      endAtomicOperation(true);
+ catch (    Exception e) {
+      endAtomicOperation(true,e);
       throw new OStorageException("Error during creation of mapping between logical adn physical record position.",e);
     }
  finally {
       cacheEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,cacheEntry,diskCache);
+      releasePage(atomicOperation,cacheEntry);
     }
   }
   finally {

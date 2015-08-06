@@ -1,7 +1,7 @@
 {
   atomicOperationsManager.acquireReadLock(this);
   try {
-    acquireSharedLock();
+    final Lock lock=fileLockManager.acquireSharedLock(fileId);
     try {
       OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
       BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
@@ -15,7 +15,7 @@
       }
       boolean firstBucket=true;
       do {
-        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
         try {
           OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
           if (!firstBucket)           index=bucket.size() - 1;
@@ -26,17 +26,17 @@
           firstBucket=false;
         }
   finally {
-          releasePage(atomicOperation,cacheEntry,diskCache);
+          releasePage(atomicOperation,cacheEntry);
         }
       }
  while (bucketPointer.getPageIndex() >= 0);
     }
   finally {
-      releaseSharedLock();
+      lock.unlock();
     }
   }
  catch (  IOException ioe) {
-    throw new OSBTreeException("Error during fetch of minor values for key " + key + " in sbtree "+ name);
+    throw new OSBTreeException("Error during fetch of minor values for key " + key + " in sbtree "+ getName(),ioe);
   }
  finally {
     atomicOperationsManager.releaseReadLock(this);

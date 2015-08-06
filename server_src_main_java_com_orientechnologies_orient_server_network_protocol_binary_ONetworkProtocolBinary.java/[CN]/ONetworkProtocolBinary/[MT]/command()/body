@@ -9,29 +9,67 @@
     ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(name);
     ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
   }
-  final OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
+  OCommandRequestText command=(OCommandRequestText)OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel.readBytes());
   ONetworkThreadLocalSerializer.setNetworkSerializer(null);
+  final Map<Object,Object> params=command.getParameters();
+  if (asynch && command instanceof OSQLSynchQuery) {
+    final OSQLAsynchQuery asynchQuery=new OSQLAsynchQuery(command.getText());
+    asynchQuery.setFetchPlan(command.getFetchPlan());
+    asynchQuery.setLimit(command.getLimit());
+    asynchQuery.setTimeout(command.getTimeoutTime(),command.getTimeoutStrategy());
+    asynchQuery.setUseCache(((OSQLSynchQuery)command).isUseCache());
+    command=asynchQuery;
+  }
   connection.data.commandDetail=command.getText();
   beginResponse();
   try {
     connection.data.command=command;
     OAbstractCommandResultListener listener=null;
     OLiveCommandResultListener liveListener=null;
+    OCommandResultListener cmdResultListener=command.getResultListener();
     if (live) {
-      liveListener=new OLiveCommandResultListener(this,clientTxId,command.getResultListener());
-      listener=new OSyncCommandResultListener();
+      liveListener=new OLiveCommandResultListener(this,clientTxId,cmdResultListener);
+      listener=new OSyncCommandResultListener(null);
       command.setResultListener(liveListener);
     }
  else     if (asynch) {
-      listener=new OAsyncCommandResultListener(this,clientTxId,command.getResultListener());
+      final OCommandCache cmdCache=connection.database.getMetadata().getCommandCache();
+      if (cmdCache.isEnabled())       cmdResultListener=new OAbstractCommandResultListener(cmdResultListener){
+        private OResultSet collector=new OConcurrentResultSet<ORecord>();
+        @Override public boolean isEmpty(){
+          return collector != null && collector.isEmpty();
+        }
+        @Override public boolean result(        final Object iRecord){
+          if (collector != null) {
+            if (collector.currentSize() > cmdCache.getMaxResultsetSize()) {
+              collector=null;
+            }
+ else             if (iRecord != null && iRecord instanceof ORecord)             collector.add(iRecord);
+          }
+          return true;
+        }
+        @Override public Object getResult(){
+          return collector;
+        }
+        @Override public void end(){
+          collector.setCompleted();
+        }
+      }
+;
+      listener=new OAsyncCommandResultListener(this,clientTxId,cmdResultListener);
       command.setResultListener(listener);
     }
- else     listener=new OSyncCommandResultListener();
+ else {
+      listener=new OSyncCommandResultListener(null);
+    }
     final long serverTimeout=OGlobalConfiguration.COMMAND_TIMEOUT.getValueAsLong();
     if (serverTimeout > 0 && command.getTimeoutTime() > serverTimeout)     command.setTimeout(serverTimeout,command.getTimeoutStrategy());
     if (!isConnectionAlive())     return;
+    command.setCacheableResult(true);
     listener.setFetchPlan(connection.database.command(command).getFetchPlan());
-    final Object result=connection.database.command(command).execute();
+    final Object result;
+    if (params == null)     result=connection.database.command(command).execute();
+ else     result=connection.database.command(command).execute(params);
     listener.setFetchPlan(command.getFetchPlan());
     if (asynch) {
       if (listener.isEmpty())       try {
@@ -43,41 +81,7 @@
     }
  else {
       sendOk(clientTxId);
-      if (result == null) {
-        channel.writeByte((byte)'n');
-      }
- else       if (result instanceof OIdentifiable) {
-        channel.writeByte((byte)'r');
-        listener.result(result);
-        writeIdentifiable((OIdentifiable)result);
-      }
- else       if (result instanceof ODocumentWrapper) {
-        channel.writeByte((byte)'r');
-        final ODocument doc=((ODocumentWrapper)result).getDocument();
-        listener.result(doc);
-        writeIdentifiable(doc);
-      }
- else       if (OMultiValue.isMultiValue(result)) {
-        channel.writeByte((byte)'l');
-        channel.writeInt(OMultiValue.getSize(result));
-        for (        Object o : OMultiValue.getMultiValueIterable(result)) {
-          try {
-            listener.result(o);
-            writeIdentifiable((OIdentifiable)o);
-          }
- catch (          Exception e) {
-            OLogManager.instance().warn(this,"Cannot serialize record: " + o);
-            writeIdentifiable(null);
-          }
-        }
-      }
- else {
-        channel.writeByte((byte)'a');
-        final StringBuilder value=new StringBuilder(64);
-        listener.result(result);
-        ORecordSerializerStringAbstract.fieldTypeToString(value,OType.getTypeByClass(result.getClass()),result);
-        channel.writeString(value.toString());
-      }
+      serializeValue(listener,result,false);
       if (connection.data.protocolVersion >= 17 && listener instanceof OSyncCommandResultListener) {
         for (        ORecord rec : ((OSyncCommandResultListener)listener).getFetchedRecordsToSend()) {
           channel.writeByte((byte)2);

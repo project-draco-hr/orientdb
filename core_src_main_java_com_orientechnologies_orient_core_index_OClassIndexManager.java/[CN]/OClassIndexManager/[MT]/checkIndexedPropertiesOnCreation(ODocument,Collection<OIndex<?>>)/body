@@ -7,26 +7,15 @@
   }
   final TreeMap<OIndex<?>,List<Object>> indexKeysMap=new TreeMap<OIndex<?>,List<Object>>();
   for (  final OIndex<?> index : indexes) {
-    final List<Object> keys=new ArrayList<Object>();
-    final OIndexDefinition indexDefinition=index.getDefinition();
-    final Object key=index.getDefinition().getDocumentValueToIndex(record);
-    if (key instanceof Collection) {
-      for (      final Object keyItem : (Collection<?>)key) {
-        if (!indexDefinition.isNullValuesIgnored() || keyItem != null) {
-          keys.add(copyKeyIfNeeded(keyItem));
-        }
-      }
+    if (index.getInternal() instanceof OIndexUnique) {
+      OIndexRecorder indexRecorder=new OIndexRecorder((OIndexUnique)index.getInternal());
+      addIndexEntry(record,record.getIdentity(),indexRecorder);
+      indexKeysMap.put(index,indexRecorder.getAffectedKeys());
     }
- else {
-      if (!indexDefinition.isNullValuesIgnored() || key != null) {
-        keys.add(copyKeyIfNeeded(key));
-      }
-    }
-    indexKeysMap.put(index,keys);
   }
   for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
     final OIndexInternal<?> index=entry.getKey().getInternal();
-    index.lockKeysForUpdate(entry.getValue());
+    index.lockKeysForUpdateNoTx(entry.getValue());
   }
   indexKeysMapQueue.push(indexKeysMap);
   for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {

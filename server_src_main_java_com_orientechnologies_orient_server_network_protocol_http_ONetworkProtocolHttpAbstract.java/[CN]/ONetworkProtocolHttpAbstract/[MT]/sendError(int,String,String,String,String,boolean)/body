@@ -1,0 +1,23 @@
+{
+  final byte[] binaryContent;
+  if (!jsonResponseError) {
+    sendTextContent(iCode,iReason,iHeaders,iContentType,iContent,iKeepAlive);
+    return;
+  }
+  sendStatus(iCode,iReason);
+  sendResponseHeaders(OHttpUtils.CONTENT_JSON,iKeepAlive);
+  if (iHeaders != null)   writeLine(iHeaders);
+  ODocument response=new ODocument();
+  ODocument error=new ODocument();
+  error.field("code",iCode);
+  error.field("reason",iCode);
+  error.field("content",iContent);
+  List<ODocument> errors=new ArrayList<ODocument>();
+  errors.add(error);
+  response.field("errors",errors);
+  binaryContent=response.toJSON("prettyPrint").getBytes(utf8);
+  writeLine(OHttpUtils.HEADER_CONTENT_LENGTH + (binaryContent != null ? binaryContent.length : 0));
+  writeLine(null);
+  if (binaryContent != null)   channel.writeBytes(binaryContent);
+  channel.flush();
+}

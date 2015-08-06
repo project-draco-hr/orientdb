@@ -1,4 +1,5 @@
 {
+  resetLastValidBackup();
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
   try {
     String clusterName=getClusterNameByRID(iRecordId);
@@ -49,7 +50,14 @@
     final OStorageOperationResult<OPhysicalPosition> localResult;
     localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
       @Override public Object call() throws Exception {
-        return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+        final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+        final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
+        ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
+        db.save(record);
+        final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
+        ppos.clusterPosition=record.getIdentity().getClusterPosition();
+        ppos.recordVersion=record.getRecordVersion();
+        return new OStorageOperationResult<OPhysicalPosition>(ppos);
       }
     }
 );

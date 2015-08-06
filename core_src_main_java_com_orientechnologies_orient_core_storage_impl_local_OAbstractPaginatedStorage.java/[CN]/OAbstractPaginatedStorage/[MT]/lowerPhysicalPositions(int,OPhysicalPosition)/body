@@ -1,15 +1,22 @@
 {
   if (currentClusterId == -1)   return null;
   checkOpeness();
-  lock.acquireSharedLock();
+  stateLock.acquireReadLock();
   try {
-    final OCluster cluster=getClusterById(currentClusterId);
-    return cluster.lowerPositions(physicalPosition);
-  }
- catch (  IOException ioe) {
-    throw new OStorageException("Cluster Id " + currentClusterId + " is invalid in storage '"+ name+ '\'',ioe);
-  }
+    dataLock.acquireSharedLock();
+    try {
+      checkOpeness();
+      final OCluster cluster=getClusterById(currentClusterId);
+      return cluster.lowerPositions(physicalPosition);
+    }
+ catch (    IOException ioe) {
+      throw new OStorageException("Cluster Id " + currentClusterId + " is invalid in storage '"+ name+ '\'',ioe);
+    }
  finally {
-    lock.releaseSharedLock();
+      dataLock.releaseSharedLock();
+    }
+  }
+  finally {
+    stateLock.releaseReadLock();
   }
 }

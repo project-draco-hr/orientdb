@@ -2,7 +2,7 @@
   if (!force && !onDelete)   return;
   if (status == STATUS.CLOSED)   return;
   final long timer=Orient.instance().getProfiler().startChrono();
-  lock.acquireExclusiveLock();
+  stateLock.acquireWriteLock();
   try {
     if (status == STATUS.CLOSED)     return;
     status=STATUS.CLOSING;
@@ -13,22 +13,28 @@
     clusterMap.clear();
     if (configuration != null)     configuration.close();
     super.close(force,onDelete);
-    diskCache.removeLowDiskSpaceListener(this);
+    writeCache.removeLowDiskSpaceListener(this);
     if (writeAheadLog != null)     writeAheadLog.removeFullCheckpointListener(this);
-    if (!onDelete)     diskCache.close();
- else     diskCache.delete();
+    if (!onDelete)     readCache.closeStorage(writeCache);
+ else     readCache.deleteStorage(writeCache);
     if (writeAheadLog != null) {
       writeAheadLog.close();
       if (onDelete)       writeAheadLog.delete();
     }
     postCloseSteps(onDelete);
+    try {
+      atomicOperationsManager.unregisterMBean();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"MBean for atomic opeations manager can not be unregistered.",e);
+    }
     status=STATUS.CLOSED;
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Error on closing of storage '" + name,e,OStorageException.class);
   }
  finally {
-    lock.releaseExclusiveLock();
     Orient.instance().getProfiler().stopChrono("db." + name + ".close","Close a database",timer,"db.*.close");
+    stateLock.releaseWriteLock();
   }
 }

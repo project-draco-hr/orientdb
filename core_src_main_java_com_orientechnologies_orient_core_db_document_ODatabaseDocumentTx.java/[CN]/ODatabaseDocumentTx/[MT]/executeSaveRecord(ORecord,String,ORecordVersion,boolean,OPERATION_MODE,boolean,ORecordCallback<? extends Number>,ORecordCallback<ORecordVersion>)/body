@@ -1,6 +1,6 @@
 {
   checkOpeness();
-  setCurrentDatabaseInThreadLocal();
+  checkIfActive();
   if (!record.isDirty())   return (RET)record;
   final ORecordId rid=(ORecordId)record.getIdentity();
   if (rid == null)   throw new ODatabaseException("Cannot create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
@@ -28,6 +28,7 @@
       if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
       checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
       final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.INSTANCE.checkIfPartial((ODocument)record);
+      if (partialMarshalling && !isNew)       return (RET)record;
       if (stream != null && stream.length > 0 && !partialMarshalling) {
         if (callTriggers) {
           final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
@@ -42,6 +43,7 @@
       }
       if (wasNew && !isNew)       record.setDirty();
  else       if (!record.isDirty())       return (RET)record;
+      ORecordSaveThreadLocal.setLast(record);
       try {
         boolean updateContent=ORecordInternal.isContentChanged(record);
         byte[] content=(stream == null) ? OCommonConst.EMPTY_BYTE_ARRAY : stream;
@@ -72,7 +74,8 @@
   finally {
       callbackHookFinalize(record,callTriggers,wasNew,stream);
       ORecordSerializationContext.pullContext();
-      ((OMetadataInternal)getMetadata()).clearThreadLocalSchemaSnapshot();
+      getMetadata().clearThreadLocalSchemaSnapshot();
+      ORecordSaveThreadLocal.removeLast();
     }
     if (stream != null && stream.length > 0 && !operationResult.isMoved())     getLocalCache().updateRecord(record);
   }

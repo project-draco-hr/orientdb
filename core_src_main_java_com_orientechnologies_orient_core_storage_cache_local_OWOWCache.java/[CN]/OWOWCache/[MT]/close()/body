@@ -1,0 +1,36 @@
+{
+  flush();
+  if (!commitExecutor.isShutdown()) {
+    commitExecutor.shutdown();
+    try {
+      if (!commitExecutor.awaitTermination(5,TimeUnit.MINUTES))       throw new OException("Background data flush task can not be stopped.");
+    }
+ catch (    InterruptedException e) {
+      OLogManager.instance().error(this,"Data flush thread was interrupted");
+      Thread.interrupted();
+      throw new OException("Data flush thread was interrupted",e);
+    }
+  }
+  filesLock.acquireWriteLock();
+  try {
+    long[] result=new long[files.size()];
+    int counter=0;
+    for (    Map.Entry<Integer,OFileClassic> fileEntry : files.entrySet()) {
+      OFileClassic fileClassic=fileEntry.getValue();
+      if (fileClassic.isOpen())       fileClassic.close();
+      result[counter++]=composeFileId(id,fileEntry.getKey());
+    }
+    if (nameIdMapHolder != null) {
+      nameIdMapHolder.setLength(0);
+      for (      Map.Entry<String,Integer> entry : nameIdMap.entrySet()) {
+        writeNameIdEntry(new NameFileIdEntry(entry.getKey(),entry.getValue()),false);
+      }
+      nameIdMapHolder.getFD().sync();
+      nameIdMapHolder.close();
+    }
+    return result;
+  }
+  finally {
+    filesLock.releaseWriteLock();
+  }
+}

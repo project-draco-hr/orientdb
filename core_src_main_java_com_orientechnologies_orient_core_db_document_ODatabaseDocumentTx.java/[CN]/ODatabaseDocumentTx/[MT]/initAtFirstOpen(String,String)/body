@@ -22,21 +22,22 @@
 );
   sbTreeCollectionManager=sbTreeCM != null ? new OSBTreeCollectionManagerProxy(this,sbTreeCM) : null;
   localCache.startup();
+  user=null;
   metadata=new OMetadataDefault();
   metadata.load();
   recordFormat=DEF_RECORD_FORMAT;
   if (!(getStorage() instanceof OStorageProxy)) {
     if (metadata.getIndexManager().autoRecreateIndexesAfterCrash()) {
       metadata.getIndexManager().recreateIndexes();
-      setCurrentDatabaseInThreadLocal();
+      activateOnCurrentThread();
       user=null;
     }
     installHooks();
+    registerHook(new OCommandCacheHook(this),ORecordHook.HOOK_POSITION.REGULAR);
     registerHook(new OSecurityTrackerHook(metadata.getSecurity(),this),ORecordHook.HOOK_POSITION.LAST);
     user=null;
   }
  else   if (iUserName != null && iUserPassword != null)   user=new OImmutableUser(-1,new OUser(iUserName,OUser.encryptPassword(iUserPassword)).addRole(new ORole("passthrough",null,ORole.ALLOW_MODES.ALLOW_ALL_BUT)));
-  if (ORecordSerializerSchemaAware2CSV.NAME.equals(serializeName) && !metadata.getSchema().existsClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME))   metadata.getSchema().createClass(OMVRBTreeRIDProvider.PERSISTENT_CLASS_NAME);
   if (OGlobalConfiguration.DB_MAKE_FULL_CHECKPOINT_ON_SCHEMA_CHANGE.getValueAsBoolean())   metadata.getSchema().setFullCheckpointOnChange(true);
   if (OGlobalConfiguration.DB_MAKE_FULL_CHECKPOINT_ON_INDEX_CHANGE.getValueAsBoolean())   metadata.getIndexManager().setFullCheckpointOnChange(true);
   initialized=true;

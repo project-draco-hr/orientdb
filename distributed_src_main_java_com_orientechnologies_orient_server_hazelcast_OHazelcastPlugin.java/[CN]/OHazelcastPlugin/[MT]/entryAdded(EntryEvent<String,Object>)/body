@@ -12,10 +12,17 @@
           ODistributedServerLog.error(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
           throw new ODistributedException("Found a new node with the same name as current: '" + nodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
         }
+        for (        ODistributedLifecycleListener l : listeners) {
+          if (!l.onNodeJoining(nodeName)) {
+            ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"denied node to join the cluster id=%s name=%s",iEvent.getMember(),getNodeName(iEvent.getMember()));
+            return;
+          }
+        }
         activeNodes.put(nodeName,(Member)iEvent.getMember());
         ODistributedServerLog.info(this,getLocalNodeName(),getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
         installNewDatabases(false);
       }
+      for (      ODistributedLifecycleListener l : listeners)       l.onNodeJoined(nodeName);
     }
  else     if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
       final String databaseName=key.substring(CONFIG_DATABASE_PREFIX.length());

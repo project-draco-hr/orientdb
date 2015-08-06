@@ -1,0 +1,39 @@
+{
+  final Object result;
+  final byte type=network.readByte();
+switch (type) {
+case 'n':
+    result=null;
+  break;
+case 'r':
+result=OChannelBinaryProtocol.readIdentifiable(network);
+if (result instanceof ORecord) database.getLocalCache().updateRecord((ORecord)result);
+break;
+case 'l':
+case 's':
+final int tot=network.readInt();
+final Collection<OIdentifiable> coll=type == 's' ? new HashSet<OIdentifiable>(tot) : new ArrayList<OIdentifiable>(tot);
+for (int i=0; i < tot; ++i) {
+final OIdentifiable resultItem=OChannelBinaryProtocol.readIdentifiable(network);
+if (resultItem instanceof ORecord) database.getLocalCache().updateRecord((ORecord)resultItem);
+coll.add(resultItem);
+}
+result=coll;
+break;
+case 'a':
+final String value=new String(network.readBytes());
+result=ORecordSerializerStringAbstract.fieldTypeFromStream(null,ORecordSerializerStringAbstract.getType(value),value);
+break;
+default :
+OLogManager.instance().warn(this,"Received unexpected result from query: %d",type);
+result=null;
+}
+if (network.getSrvProtocolVersion() >= 17) {
+byte status;
+while ((status=network.readByte()) > 0) {
+final ORecord record=(ORecord)OChannelBinaryProtocol.readIdentifiable(network);
+if (record != null && status == 2) database.getLocalCache().updateRecord(record);
+}
+}
+return result;
+}

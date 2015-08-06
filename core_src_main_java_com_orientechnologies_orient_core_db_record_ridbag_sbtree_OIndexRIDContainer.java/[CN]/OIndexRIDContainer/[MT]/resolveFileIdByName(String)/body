@@ -1,18 +1,28 @@
 {
   final OAbstractPaginatedStorage storage=(OAbstractPaginatedStorage)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
   try {
-    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().getCurrentOperation();
-    final ODiskCache diskCache=storage.getDiskCache();
+    final OAtomicOperation atomicOperation=storage.getAtomicOperationsManager().startAtomicOperation(fileName,true);
+    final OReadCache readCache=storage.getReadCache();
+    final OWriteCache writeCache=storage.getWriteCache();
     if (atomicOperation == null) {
-      if (diskCache.exists(fileName))       return diskCache.openFile(fileName);
-      return diskCache.addFile(fileName);
+      if (writeCache.exists(fileName))       return readCache.openFile(fileName,writeCache);
+      return readCache.addFile(fileName,writeCache);
     }
  else {
-      if (atomicOperation.isFileExists(fileName,diskCache))       return atomicOperation.openFile(fileName,diskCache);
-      return atomicOperation.addFile(fileName,diskCache);
+      long fileId;
+      if (atomicOperation.isFileExists(fileName))       fileId=atomicOperation.openFile(fileName);
+ else       fileId=atomicOperation.addFile(fileName);
+      storage.getAtomicOperationsManager().endAtomicOperation(false,null);
+      return fileId;
     }
   }
  catch (  IOException e) {
+    try {
+      storage.getAtomicOperationsManager().endAtomicOperation(true,e);
+    }
+ catch (    IOException ioe) {
+      throw new OSBTreeException("Error of rollback of atomic operation",ioe);
+    }
     throw new OSBTreeException("Error creation of sbtree with name " + fileName,e);
   }
 }

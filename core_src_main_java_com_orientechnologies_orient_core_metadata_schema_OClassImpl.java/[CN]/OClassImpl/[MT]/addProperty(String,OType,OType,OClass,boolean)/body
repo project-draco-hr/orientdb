@@ -1,0 +1,47 @@
+{
+  if (type == null)   throw new OSchemaException("Property type not defined.");
+  if (propertyName == null || propertyName.length() == 0)   throw new OSchemaException("Property name is null or empty");
+  if (Character.isDigit(propertyName.charAt(0)))   throw new OSchemaException("Found invalid name for property '" + propertyName + "': it cannot start with numbers");
+  if (reserved.contains(propertyName.toLowerCase())) {
+    throw new OSchemaException("Error creating schema: '" + propertyName + "' is a reserved keyword, it cannot be used as a property name");
+  }
+  if (getDatabase().getTransaction().isActive())   throw new OSchemaException("Cannot create property '" + propertyName + "' inside a transaction");
+  final ODatabaseDocumentInternal database=getDatabase();
+  database.checkSecurity(ORule.ResourceGeneric.SCHEMA,ORole.PERMISSION_UPDATE);
+  OProperty property=null;
+  acquireSchemaWriteLock();
+  try {
+    final StringBuilder cmd=new StringBuilder("create property ");
+    cmd.append(name);
+    cmd.append('.');
+    cmd.append(propertyName);
+    cmd.append(' ');
+    cmd.append(type.name);
+    if (linkedType != null) {
+      cmd.append(' ');
+      cmd.append(linkedType.name);
+    }
+ else     if (linkedClass != null) {
+      cmd.append(' ');
+      cmd.append(linkedClass.getName());
+    }
+    if (!iCheckExistentRecords)     cmd.append(" unsafe ");
+    final OStorage storage=database.getStorage();
+    if (storage instanceof OStorageProxy) {
+      database.command(new OCommandSQL(cmd.toString())).execute();
+      reload();
+      return getProperty(propertyName);
+    }
+ else     if (isDistributedCommand()) {
+      final OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
+      commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
+      database.command(commandSQL).execute();
+      property=addPropertyInternal(propertyName,type,linkedType,linkedClass,iCheckExistentRecords);
+    }
+ else     property=addPropertyInternal(propertyName,type,linkedType,linkedClass,iCheckExistentRecords);
+  }
+  finally {
+    releaseSchemaWriteLock();
+  }
+  return property;
+}

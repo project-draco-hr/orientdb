@@ -5,6 +5,7 @@
   OIdentifiable currentRecord=value instanceof OIdentifiable ? (OIdentifiable)value : null;
   int beginPos=iFieldName.charAt(0) == '.' ? 1 : 0;
   int nextSeparatorPos=iFieldName.charAt(0) == '.' ? 1 : 0;
+  boolean firstInChain=true;
   do {
     char nextSeparator=' ';
     for (; nextSeparatorPos < fieldNameLength; ++nextSeparatorPos) {
@@ -145,7 +146,7 @@
             if (filtered != null)             if (filtered instanceof Collection<?>)             values.addAll((Collection<? extends Object>)filtered);
  else             values.add(filtered);
           }
-          if (values.isEmpty())           value=null;
+          if (values.isEmpty())           value=values;
  else           if (values.size() == 1)           value=values.iterator().next();
  else           value=values;
         }
@@ -157,7 +158,19 @@
         continue;
       }
       if (fieldName.startsWith("$"))       value=iContext.getVariable(fieldName);
- else       if (fieldName.contains("("))       value=evaluateFunction(value,fieldName,iContext);
+ else       if (fieldName.contains("(")) {
+        boolean executedMethod=false;
+        if (!firstInChain && fieldName.endsWith("()")) {
+          OSQLMethod method=OSQLEngine.getInstance().getMethod(fieldName.substring(0,fieldName.length() - 2));
+          if (method != null) {
+            value=method.execute(value,currentRecord,iContext,value,new Object[]{});
+            executedMethod=true;
+          }
+        }
+        if (!executedMethod) {
+          value=evaluateFunction(value,fieldName,iContext);
+        }
+      }
  else {
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(fieldName,'=',' ');
         if (indexCondition.size() == 2) {
@@ -190,6 +203,7 @@
     if (value instanceof OIdentifiable)     currentRecord=(OIdentifiable)value;
  else     currentRecord=null;
     beginPos=++nextSeparatorPos;
+    firstInChain=false;
   }
  while (nextSeparatorPos < fieldNameLength && value != null);
   return (RET)value;

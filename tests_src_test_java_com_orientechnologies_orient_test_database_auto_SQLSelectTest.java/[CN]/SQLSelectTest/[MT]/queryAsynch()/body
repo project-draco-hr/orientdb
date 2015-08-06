@@ -1,4 +1,9 @@
 {
+  if (!database.getMetadata().getSchema().existsClass("company")) {
+    database.getMetadata().getSchema().getOrCreateClass("company");
+    for (int i=0; i < 20; ++i)     new ODocument("company").field("id",i).save();
+  }
+  database.getMetadata().getSchema().getOrCreateClass("Account");
   final String sqlOne="select * from company where id between 4 and 7";
   final String sqlTwo="select $names let $names = (select EXPAND( addresses.city ) as city from Account where addresses.size() > 0 )";
   final List<ODocument> synchResultOne=database.command(new OSQLSynchQuery<ODocument>(sqlOne)).execute();
@@ -24,13 +29,19 @@
         @Override public void end(){
           endTwoCalled.set(true);
         }
+        @Override public Object getResult(){
+          return null;
+        }
       }
 )).execute();
+    }
+    @Override public Object getResult(){
+      return null;
     }
   }
 )).execute();
   Assert.assertTrue(endOneCalled.get());
   Assert.assertTrue(endTwoCalled.get());
-  Assert.assertTrue(ODocumentHelper.compareCollections(database,synchResultTwo,database,asynchResultTwo,null));
-  Assert.assertTrue(ODocumentHelper.compareCollections(database,synchResultOne,database,asynchResultOne,null));
+  Assert.assertTrue(ODocumentHelper.compareCollections(database,synchResultTwo,database,asynchResultTwo,null),"synchResultTwo=" + synchResultTwo.size() + " asynchResultTwo="+ asynchResultTwo.size());
+  Assert.assertTrue(ODocumentHelper.compareCollections(database,synchResultOne,database,asynchResultOne,null),"synchResultOne=" + synchResultOne.size() + " asynchResultOne="+ asynchResultOne.size());
 }

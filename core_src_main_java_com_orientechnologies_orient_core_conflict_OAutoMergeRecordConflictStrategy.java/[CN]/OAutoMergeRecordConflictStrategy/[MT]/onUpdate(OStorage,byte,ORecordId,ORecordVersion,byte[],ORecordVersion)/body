@@ -1,10 +1,11 @@
 {
   if (iRecordType == ODocument.RECORD_TYPE) {
-    OStorageOperationResult<ORawBuffer> res=storage.readRecord(rid,null,false,null,false,LOCKING_STRATEGY.NONE);
+    OStorageOperationResult<ORawBuffer> res=storage.readRecord(rid,null,false,null);
     final ODocument storedRecord=new ODocument(rid).fromStream(res.getResult().getBuffer());
-    final ODocument newRecord=new ODocument(rid).fromStream(iRecordContent);
-    storedRecord.merge(newRecord,false,true);
-    iDatabaseVersion.setCounter(Math.max(iDatabaseVersion.getCounter(),iRecordVersion.getCounter()));
+    ODocument newRecord=(ODocument)ORecordSaveThreadLocal.getLast();
+    if (newRecord == null || !newRecord.getIdentity().equals(rid))     newRecord=new ODocument(rid).fromStream(iRecordContent);
+    storedRecord.merge(newRecord,true,true);
+    iDatabaseVersion.setCounter(Math.max(iDatabaseVersion.getCounter(),iRecordVersion.getCounter()) + 1);
     return storedRecord.toStream();
   }
  else   checkVersions(rid,iRecordVersion,iDatabaseVersion);

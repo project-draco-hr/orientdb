@@ -1,0 +1,32 @@
+{
+  setDataCommandInfo("Retrieve an entry from index");
+  if (!isConnectionAlive())   return;
+  final String indexName=channel.readString();
+  ODocument document=new ODocument();
+  fillRecord(new ORecordId(),channel.readBytes(),OVersionFactory.instance().createVersion(),document,connection.database);
+  Object key=document.field("key");
+  final String fetchPlan=channel.readString();
+  final OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
+  if (index == null)   throw new OException("index with name '" + indexName + "' not found");
+  key=index.getDefinition().createValue(key);
+  OAbstractCommandResultListener listener=new OSyncCommandResultListener(null);
+  if (!isConnectionAlive())   return;
+  listener.setFetchPlan(fetchPlan);
+  Object result=index.get(key);
+  beginResponse();
+  try {
+    sendOk(clientTxId);
+    serializeValue(listener,result,true);
+    if (connection.data.protocolVersion >= 17 && listener instanceof OSyncCommandResultListener) {
+      for (      ORecord rec : ((OSyncCommandResultListener)listener).getFetchedRecordsToSend()) {
+        channel.writeByte((byte)2);
+        writeIdentifiable(rec);
+      }
+      channel.writeByte((byte)0);
+    }
+  }
+  finally {
+    connection.data.command=null;
+    endResponse();
+  }
+}

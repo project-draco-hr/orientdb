@@ -1,0 +1,25 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:ClusterDebugInfoTest");
+  db.create();
+  try {
+    OStorage storage=db.getStorage();
+    int defaultId=storage.getDefaultClusterId();
+    OPaginatedCluster cluster=(OPaginatedCluster)storage.getClusterById(defaultId);
+    int size=OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger();
+    int half=size / 2;
+    byte[] content=new byte[half * 1024];
+    OStorageOperationResult<OPhysicalPosition> result=storage.createRecord(new ORecordId(defaultId),content,new OSimpleVersion(),(byte)'b',OPERATION_MODE.SYNCHRONOUS.ordinal(),null);
+    OPaginatedClusterDebug debug=cluster.readDebug(result.getResult().clusterPosition);
+    Assert.assertEquals(debug.clusterPosition,result.getResult().clusterPosition);
+    Assert.assertNotEquals(debug.contentSize,0);
+    Assert.assertFalse(debug.empty);
+    Assert.assertEquals(debug.pages.size(),1);
+    Assert.assertNotEquals(debug.pages.get(0).pageIndex,-1);
+    Assert.assertNotEquals(debug.pages.get(0).inPagePosition,-1);
+    Assert.assertNotEquals(debug.pages.get(0).inPageSize,-1);
+    Assert.assertNotNull(debug.pages.get(0).content);
+  }
+  finally {
+    db.drop();
+  }
+}

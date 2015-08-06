@@ -31,23 +31,32 @@ case REPLICATE:
     final Collection<String> involvedClusters=exec.getInvolvedClusters();
   if (resultMgmt == OCommandDistributedReplicateRequest.DISTRIBUTED_RESULT_MGMT.MERGE) {
     final Map<String,Collection<String>> nodeClusterMap=dbCfg.getServerClusterMap(involvedClusters,localNodeName);
-    if (nodeClusterMap.size() == 1 && nodeClusterMap.keySet().iterator().next().equals(localNodeName))     return wrapped.command(iCommand);
-    final Map<String,Object> results=executeOnServers(iCommand,involvedClusters,nodeClusterMap);
-    if (results.size() == 1)     result=results.values().iterator().next();
+    final Map<String,Object> results;
+    if (nodeClusterMap.size() == 1 && nodeClusterMap.keySet().iterator().next().equals(localNodeName)) {
+      result=wrapped.command(iCommand);
+      results=new HashMap<String,Object>(1);
+      results.put(localNodeName,result);
+    }
  else {
-      final OCommandExecutorSQLSelect select=exec instanceof OCommandExecutorSQLSelect ? (OCommandExecutorSQLSelect)exec : null;
-      if (select != null && select.isAnyFunctionAggregates()) {
-        result=mergeResultByAggegation(select,results);
-      }
+      results=executeOnServers(iCommand,involvedClusters,nodeClusterMap);
+    }
+    final OCommandExecutorSQLSelect select=exec instanceof OCommandExecutorSQLSelect ? (OCommandExecutorSQLSelect)exec : null;
+    if (select != null && select.isAnyFunctionAggregates()) {
+      result=mergeResultByAggegation(select,results);
+    }
  else {
-        final Set<Object> set=new HashSet<Object>();
-        for (        Map.Entry<String,Object> entry : ((Map<String,Object>)results).entrySet()) {
-          final Object nodeResult=entry.getValue();
-          if (nodeResult instanceof Collection)           set.addAll((Collection<?>)nodeResult);
- else           if (nodeResult instanceof Exception)           throw (Exception)nodeResult;
-        }
-        result=new ArrayList<Object>(set);
+      final ArrayList<Object> set=new ArrayList<Object>();
+      for (      Map.Entry<String,Object> entry : ((Map<String,Object>)results).entrySet()) {
+        final Object nodeResult=entry.getValue();
+        if (nodeResult instanceof Collection)         set.addAll((Collection<?>)nodeResult);
+ else         if (nodeResult instanceof Exception)         throw (Exception)nodeResult;
+ else         set.add(nodeResult);
       }
+      if (result instanceof OResultSet) {
+        ((OResultSet)result).clear();
+        ((OResultSet)result).addAll(set);
+      }
+ else       result=new ArrayList<Object>(set);
     }
   }
  else {

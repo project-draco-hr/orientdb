@@ -1,10 +1,20 @@
 {
-  acquireReadLock();
-  try {
-    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_BYTE);
-    return readData(iOffset,OBinaryProtocol.SIZE_BYTE).get();
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireReadLock();
+      try {
+        iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_BYTE);
+        return readData(iOffset,OBinaryProtocol.SIZE_BYTE).get();
+      }
   finally {
-    releaseReadLock();
+        releaseReadLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during read of byte data for file " + getName() + " "+ attempts+ "-th attempt.",e);
+      reopenFile(attempts,e);
+    }
   }
 }

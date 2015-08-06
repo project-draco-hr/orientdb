@@ -1,11 +1,22 @@
 {
-  acquireReadLock();
-  try {
-    iOffset=checkRegions(iOffset,iLength);
-    ByteBuffer buffer=ByteBuffer.wrap(iData,iArrayOffset,iLength);
-    channel.read(buffer,iOffset);
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireReadLock();
+      try {
+        iOffset=checkRegions(iOffset,iLength);
+        ByteBuffer buffer=ByteBuffer.wrap(iData,iArrayOffset,iLength);
+        channel.read(buffer,iOffset);
+        break;
+      }
   finally {
-    releaseReadLock();
+        releaseReadLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during data read for file " + getName() + " "+ attempts+ "-th attempt.",e);
+      reopenFile(attempts,e);
+    }
   }
 }

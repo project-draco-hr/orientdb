@@ -1,8 +1,8 @@
 {
   checkOpeness();
   checkLowDiskSpaceAndFullCheckpointRequests();
-  @SuppressFBWarnings(value="RCN - RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE") final ODatabaseDocumentInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
-  if (databaseRecord != null)   ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  final ODatabaseDocumentInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
+  ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
   stateLock.acquireReadLock();
   try {
     try {
@@ -30,11 +30,11 @@
           endStorageTx();
           OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
         }
- catch (        Exception e) {
-          OLogManager.instance().debug(this,"Error during transaction commit, transaction will be rolled back (tx-id=%d)",e,clientTx.getId());
-          rollback(clientTx);
-          if (e instanceof OException)           throw ((OException)e);
- else           throw new OStorageException("Error during transaction commit.",e);
+ catch (        IOException ioe) {
+          makeRollback(clientTx,ioe);
+        }
+catch (        RuntimeException e) {
+          makeRollback(clientTx,e);
         }
  finally {
           transaction.set(null);
@@ -46,7 +46,7 @@
       }
     }
   finally {
-      if (databaseRecord != null)       ((OMetadataInternal)databaseRecord.getMetadata()).clearThreadLocalSchemaSnapshot();
+      ((OMetadataInternal)databaseRecord.getMetadata()).clearThreadLocalSchemaSnapshot();
     }
   }
   finally {

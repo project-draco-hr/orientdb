@@ -3,8 +3,7 @@
   for (  Map.Entry<String,ODocumentEntry> fieldEntry : _fields.entrySet()) {
     final Object fieldValue=fieldEntry.getValue().value;
     if (!(fieldValue instanceof Collection<?>) && !(fieldValue instanceof Map<?,?>))     continue;
-    if (fieldValue instanceof OTrackedMultiValue) {
-      addCollectionChangeListener(fieldEntry.getKey(),fieldEntry.getValue(),(OTrackedMultiValue<Object,Object>)fieldValue);
+    if (addCollectionChangeListener(fieldEntry.getValue())) {
       continue;
     }
     OType fieldType=fieldEntry.getValue().type;
@@ -16,17 +15,32 @@
       }
     }
     if (fieldType == null)     fieldType=OType.getTypeByValue(fieldValue);
-    if (fieldType == null || !(OType.EMBEDDEDLIST.equals(fieldType) || OType.EMBEDDEDMAP.equals(fieldType) || OType.EMBEDDEDSET.equals(fieldType)|| OType.LINKSET.equals(fieldType)|| OType.LINKLIST.equals(fieldType)|| OType.LINKMAP.equals(fieldType)))     continue;
     Object newValue=null;
-    if (fieldValue instanceof List && fieldType.equals(OType.EMBEDDEDLIST))     newValue=new OTrackedList<Object>(this,(List<?>)fieldValue,null);
- else     if (fieldValue instanceof Set && fieldType.equals(OType.EMBEDDEDSET))     newValue=new OTrackedSet<Object>(this,(Set<OIdentifiable>)fieldValue,null);
- else     if (fieldValue instanceof Map && fieldType.equals(OType.EMBEDDEDMAP))     newValue=new OTrackedMap<OIdentifiable>(this,(Map<Object,OIdentifiable>)fieldValue,null);
- else     if (fieldValue instanceof Set && fieldType.equals(OType.LINKSET))     newValue=new ORecordLazySet(this,(Collection<OIdentifiable>)fieldValue);
- else     if (fieldValue instanceof List && fieldType.equals(OType.LINKLIST))     newValue=new ORecordLazyList(this,(List<OIdentifiable>)fieldValue);
- else     if (fieldValue instanceof Map && fieldType.equals(OType.LINKMAP))     newValue=new ORecordLazyMap(this,(Map<Object,OIdentifiable>)fieldValue);
-    if (newValue != null) {
-      addCollectionChangeListener(fieldEntry.getKey(),fieldEntry.getValue(),(OTrackedMultiValue<Object,Object>)newValue);
-      fieldEntry.getValue().value=newValue;
-    }
-  }
+switch (fieldType) {
+case EMBEDDEDLIST:
+      if (fieldValue instanceof List<?>)       newValue=new OTrackedList<Object>(this,(List<?>)fieldValue,null);
+    break;
+case EMBEDDEDSET:
+  if (fieldValue instanceof Set<?>)   newValue=new OTrackedSet<Object>(this,(Set<OIdentifiable>)fieldValue,null);
+break;
+case EMBEDDEDMAP:
+if (fieldValue instanceof Map<?,?>) newValue=new OTrackedMap<OIdentifiable>(this,(Map<Object,OIdentifiable>)fieldValue,null);
+break;
+case LINKLIST:
+if (fieldValue instanceof List<?>) newValue=new ORecordLazyList(this,(List<OIdentifiable>)fieldValue);
+break;
+case LINKSET:
+if (fieldValue instanceof Set<?>) newValue=new ORecordLazySet(this,(Collection<OIdentifiable>)fieldValue);
+break;
+case LINKMAP:
+if (fieldValue instanceof Map<?,?>) newValue=new ORecordLazyMap(this,(Map<Object,OIdentifiable>)fieldValue);
+break;
+default :
+break;
+}
+if (newValue != null) {
+addCollectionChangeListener(fieldEntry.getValue());
+fieldEntry.getValue().value=newValue;
+}
+}
 }

@@ -18,12 +18,16 @@ case ORecordOperation.LOADED:
       break;
 case ORecordOperation.CREATED:
 {
+      final ORecordId oldRID;
+      if (rid.isNew()) {
+        oldRID=rid.copy();
+      }
+ else       oldRID=rid;
       final byte[] stream=rec.toStream();
       if (stream == null) {
         OLogManager.instance().warn(this,"Null serialization on committing new record %s in transaction",rid);
         break;
       }
-      final ORecordId oldRID=rid.isNew() ? rid.copy() : rid;
       if (rid.isNew()) {
         rid=rid.copy();
         rid.clusterId=cluster.getId();
@@ -46,7 +50,11 @@ case ORecordOperation.UPDATED:
       OLogManager.instance().warn(this,"Null serialization on committing updated record %s in transaction",rid);
       break;
     }
-    rec.getRecordVersion().copyFrom(doUpdateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getRecordVersion(),ORecordInternal.getRecordType(rec),null,cluster).getResult());
+    OStorageOperationResult<ORecordVersion> updateRes=doUpdateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getRecordVersion(),ORecordInternal.getRecordType(rec),null,cluster);
+    rec.getRecordVersion().copyFrom(updateRes.getResult());
+    if (updateRes.getModifiedRecordContent() != null) {
+      ORecordInternal.fill(rec,rid,updateRes.getResult(),updateRes.getModifiedRecordContent(),false);
+    }
     break;
   }
 case ORecordOperation.DELETED:

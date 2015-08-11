@@ -1,0 +1,50 @@
+{
+  ORecord toRet=null;
+  List<ODocument> toResave=new ArrayList<ODocument>();
+  LinkedList<ODocument> path=new LinkedList<ODocument>();
+  ORecord next=document;
+  do {
+    if (next instanceof ODocument) {
+      ORecord nextToInspect=null;
+      List<OIdentifiable> toSave=manager.getPointed(next);
+      if (toSave != null) {
+        for (        OIdentifiable oIdentifiable : toSave) {
+          if (oIdentifiable.getIdentity().isNew()) {
+            if (oIdentifiable instanceof ORecord)             nextToInspect=(ORecord)oIdentifiable;
+ else             nextToInspect=oIdentifiable.getRecord();
+            break;
+          }
+        }
+      }
+      if (nextToInspect != null) {
+        if (path.contains(nextToInspect)) {
+          OSerializationSetThreadLocal.checkAndAdd((ODocument)nextToInspect);
+          if (nextToInspect == original)           toRet=database.executeSaveRecord(nextToInspect,iClusterName,nextToInspect.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+ else           database.executeSaveRecord(nextToInspect,getClusterName(nextToInspect),nextToInspect.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+          OSerializationSetThreadLocal.removeCheck((ODocument)nextToInspect);
+          toResave.add((ODocument)nextToInspect);
+        }
+ else {
+          path.push((ODocument)next);
+          next=nextToInspect;
+        }
+      }
+ else {
+        if (next == original)         toRet=database.executeSaveRecord(next,iClusterName,next.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+ else         database.executeSaveRecord(next,getClusterName(next),next.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+        next=path.pollFirst();
+      }
+    }
+ else {
+      database.executeSaveRecord(next,null,next.getRecordVersion(),true,iMode,false,null,null);
+      next=path.pollFirst();
+    }
+  }
+ while (next != null);
+  for (  ODocument op : toResave) {
+    op.setDirty();
+    ORecord ret=database.executeSaveRecord(op,null,op.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+    if (op == original)     toRet=ret;
+  }
+  return toRet;
+}

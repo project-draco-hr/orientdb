@@ -1,6 +1,28 @@
 {
   try {
-    return database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,null);
+    ORecord toRet=null;
+    ODirtyManager dirtyManager=ORecordInternal.getDirtyManager(iRecord);
+    Set<ORecord> newRecord=dirtyManager.getNewRecord();
+    Set<ORecord> updatedRecord=dirtyManager.getUpdateRecord();
+    dirtyManager.cleanForSave();
+    if (newRecord != null) {
+      for (      ORecord rec : newRecord) {
+        if (rec.getIdentity().isNew() && rec instanceof ODocument) {
+          ORecord ret=saveNew((ODocument)rec,dirtyManager,iClusterName,iRecord,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+          if (ret != null)           toRet=ret;
+        }
+      }
+    }
+    if (updatedRecord != null) {
+      for (      ORecord rec : updatedRecord) {
+        if (rec == iRecord) {
+          toRet=database.executeSaveRecord(rec,iClusterName,rec.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+        }
+ else         database.executeSaveRecord(rec,getClusterName(rec),rec.getRecordVersion(),true,OPERATION_MODE.SYNCHRONOUS,false,null,null);
+      }
+    }
+    if (toRet != null)     return toRet;
+ else     return database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),true,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
   }
  catch (  Exception e) {
     final ORecordId rid=(ORecordId)iRecord.getIdentity();

@@ -1,0 +1,58 @@
+{
+  List<ORecordOperation> toResave=new ArrayList<ORecordOperation>();
+  LinkedList<ODocument> path=new LinkedList<ODocument>();
+  ORecord next=txEntry.getRecord();
+  ODirtyManager manager=ORecordInternal.getDirtyManager(next);
+  do {
+    if (next instanceof ODocument) {
+      ORecord nextToInspect=null;
+      List<OIdentifiable> toSave=manager.getPointed(next);
+      if (toSave == null) {
+        toSave=ORecordInternal.getDirtyManager(next).getPointed(next);
+      }
+      if (toSave != null) {
+        for (        OIdentifiable oIdentifiable : toSave) {
+          if (oIdentifiable.getIdentity().isNew()) {
+            if (oIdentifiable instanceof ORecord) {
+              nextToInspect=(ORecord)oIdentifiable;
+              break;
+            }
+ else {
+              nextToInspect=oIdentifiable.getRecord();
+              if (nextToInspect.getIdentity().isNew())               break;
+ else               nextToInspect=null;
+            }
+          }
+        }
+      }
+      if (nextToInspect != null) {
+        if (path.contains(nextToInspect)) {
+          OSerializationSetThreadLocal.checkAndAdd((ODocument)nextToInspect);
+          ORecordOperation toCommit=tx.getRecordEntry(nextToInspect.getIdentity());
+          commitEntry(tx,toCommit);
+          OSerializationSetThreadLocal.removeCheck((ODocument)nextToInspect);
+          toResave.add(toCommit);
+        }
+ else {
+          path.push((ODocument)next);
+          next=nextToInspect;
+        }
+      }
+ else {
+        ORecordOperation toCommit=tx.getRecordEntry(next.getIdentity());
+        commitEntry(tx,toCommit);
+        next=path.pollFirst();
+      }
+    }
+ else {
+      ORecordOperation toCommit=tx.getRecordEntry(next.getIdentity());
+      commitEntry(tx,toCommit);
+      next=path.pollFirst();
+    }
+  }
+ while (next != null);
+  for (  ORecordOperation op : toResave) {
+    op.getRecord().setDirty();
+    commitEntry(tx,op);
+  }
+}

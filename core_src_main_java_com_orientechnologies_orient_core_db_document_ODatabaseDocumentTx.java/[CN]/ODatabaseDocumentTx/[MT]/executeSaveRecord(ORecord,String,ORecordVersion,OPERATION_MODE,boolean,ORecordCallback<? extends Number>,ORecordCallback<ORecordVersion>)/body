@@ -28,19 +28,17 @@
       if (rid.clusterId > -1 && clusterName == null)       clusterName=getClusterNameById(rid.clusterId);
       if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
       checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
-      final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.INSTANCE.checkIfPartial((ODocument)record);
+      final boolean partialMarshalling=record instanceof ODocument && OSerializationSetThreadLocal.checkIfPartial((ODocument)record);
       if (partialMarshalling && !isNew)       return (RET)record;
       if (stream != null && stream.length > 0 && !partialMarshalling) {
-        if (callTriggers) {
-          final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
-          final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
-          if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
-            if (record instanceof ODocument)             ((ODocument)record).validate();
-            stream=updateStream(record);
-          }
- else           if (hookResult == ORecordHook.RESULT.SKIP_IO)           return (RET)record;
- else           if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)           return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
+        final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
+        final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
+        if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
+          if (record instanceof ODocument)           ((ODocument)record).validate();
+          stream=updateStream(record);
         }
+ else         if (hookResult == ORecordHook.RESULT.SKIP_IO)         return (RET)record;
+ else         if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)         return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
       }
       if (wasNew && !isNew)       record.setDirty();
  else       if (!record.isDirty())       return (RET)record;
@@ -65,15 +63,15 @@
         }
         if (operationResult.getModifiedRecordContent() != null)         stream=operationResult.getModifiedRecordContent();
         ORecordInternal.fill(record,rid,version,stream,partialMarshalling);
-        callbackHookSuccess(record,callTriggers,wasNew,stream,operationResult);
+        callbackHookSuccess(record,wasNew,stream,operationResult);
       }
  catch (      Throwable t) {
-        callbackHookFailure(record,callTriggers,wasNew,stream);
+        callbackHookFailure(record,wasNew,stream);
         throw t;
       }
     }
   finally {
-      callbackHookFinalize(record,callTriggers,wasNew,stream);
+      callbackHookFinalize(record,wasNew,stream);
       ORecordSerializationContext.pullContext();
       getMetadata().clearThreadLocalSchemaSnapshot();
       ORecordSaveThreadLocal.removeLast();

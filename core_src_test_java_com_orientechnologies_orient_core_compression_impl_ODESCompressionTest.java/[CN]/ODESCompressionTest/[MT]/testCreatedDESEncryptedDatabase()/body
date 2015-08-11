@@ -1,0 +1,52 @@
+{
+  OFileUtils.deleteRecursively(new File("target/testCreatedDESEncryptedDatabase"));
+  final ODatabase db=new ODatabaseDocumentTx("plocal:target/testCreatedDESEncryptedDatabase");
+  db.setProperty(OGlobalConfiguration.STORAGE_COMPRESSION_OPTIONS.getKey(),"T1JJRU5UREI=");
+  db.create();
+  db.command(new OCommandSQL("create class TestEncryption")).execute();
+  db.command(new OCommandSQL("alter cluster TestEncryption compression des-encrypted")).execute();
+  db.command(new OCommandSQL("insert into TestEncryption set name = 'Jay'")).execute();
+  List result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+  Assert.assertEquals(result.size(),1);
+  db.close();
+  db.open("admin","admin");
+  db.close();
+  Orient.instance().getStorage("testCreatedDESEncryptedDatabase").close(true,false);
+  db.setProperty(OGlobalConfiguration.STORAGE_COMPRESSION_OPTIONS.getKey(),"T1JJRU5UREI=");
+  db.open("admin","admin");
+  result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+  Assert.assertEquals(result.size(),1);
+  db.close();
+  Orient.instance().getStorage("testCreatedDESEncryptedDatabase").close(true,false);
+  db.setProperty(OGlobalConfiguration.STORAGE_COMPRESSION_OPTIONS.getKey(),"invalidPassword");
+  try {
+    db.open("admin","admin");
+    db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    Assert.fail();
+  }
+ catch (  ODatabaseException e) {
+    Assert.assertTrue(e.getCause() instanceof OSecurityException);
+  }
+ finally {
+    db.close();
+    Orient.instance().getStorage("testCreatedDESEncryptedDatabase").close(true,false);
+  }
+  db.setProperty(OGlobalConfiguration.STORAGE_COMPRESSION_OPTIONS.getKey(),"T1JJRU5UREI-");
+  try {
+    db.open("admin","admin");
+    db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    Assert.fail();
+  }
+ catch (  OStorageException e) {
+    Assert.assertTrue(e.getCause() instanceof OSecurityException);
+  }
+ finally {
+    db.close();
+    Orient.instance().getStorage("testCreatedDESEncryptedDatabase").close(true,false);
+  }
+  db.setProperty(OGlobalConfiguration.STORAGE_COMPRESSION_OPTIONS.getKey(),"T1JJRU5UREI=");
+  db.open("admin","admin");
+  result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+  Assert.assertEquals(result.size(),1);
+  db.close();
+}

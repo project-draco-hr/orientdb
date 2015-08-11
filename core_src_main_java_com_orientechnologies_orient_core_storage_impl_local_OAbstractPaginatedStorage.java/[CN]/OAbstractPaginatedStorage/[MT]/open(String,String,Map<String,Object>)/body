@@ -10,7 +10,7 @@
   try {
     if (status == STATUS.OPEN)     return;
     if (!exists())     throw new OStorageException("Cannot open the storage '" + name + "' because it does not exist in path: "+ url);
-    configuration.load();
+    configuration.load(iProperties);
     componentsFactory=new OCurrentStorageComponentsFactory(configuration);
     preOpenSteps();
     initWalAndDiskCache();
@@ -52,6 +52,14 @@
     status=STATUS.OPEN;
   }
  catch (  Exception e) {
+    for (    OCluster c : clusters) {
+      try {
+        c.close(false);
+      }
+ catch (      IOException e1) {
+        OLogManager.instance().error(this,"Cannot close cluster after exception on open");
+      }
+    }
     status=STATUS.CLOSED;
     throw new OStorageException("Cannot open local storage '" + url + "' with mode="+ mode,e);
   }

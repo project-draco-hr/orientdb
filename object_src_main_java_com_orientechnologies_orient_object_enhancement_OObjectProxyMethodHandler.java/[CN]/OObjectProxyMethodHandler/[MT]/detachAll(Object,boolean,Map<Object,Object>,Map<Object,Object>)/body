@@ -1,0 +1,42 @@
+{
+  final Class<?> selfClass=self.getClass();
+  for (  String fieldName : doc.fieldNames()) {
+    final Field field=OObjectEntitySerializer.getField(fieldName,selfClass);
+    if (field != null) {
+      Object value=getValue(self,fieldName,false,null,true);
+      if (value instanceof OObjectLazyMultivalueElement) {
+        ((OObjectLazyMultivalueElement<?>)value).detachAll(nonProxiedInstance,alreadyDetached,lazyObjects);
+        if (nonProxiedInstance)         value=((OObjectLazyMultivalueElement<?>)value).getNonOrientInstance();
+      }
+ else       if (value instanceof Proxy) {
+        OObjectProxyMethodHandler handler=(OObjectProxyMethodHandler)((ProxyObject)value).getHandler();
+        if (nonProxiedInstance) {
+          value=OObjectEntitySerializer.getNonProxiedInstance(value);
+        }
+        if (OObjectEntitySerializer.isFetchLazyField(self.getClass(),fieldName)) {
+          Object lazyValue=lazyObjects.get(handler.doc.getIdentity());
+          if (lazyValue != null) {
+            value=lazyValue;
+          }
+ else {
+            OObjectEntitySerializer.setIdField(field.getType(),value,handler.doc.getIdentity());
+            lazyObjects.put(handler.doc.getIdentity(),value);
+          }
+        }
+ else {
+          Object detachedValue=alreadyDetached.get(handler.doc.getIdentity());
+          if (detachedValue != null) {
+            value=detachedValue;
+          }
+ else {
+            alreadyDetached.put(handler.doc.getIdentity(),value);
+            handler.detachAll(value,nonProxiedInstance,alreadyDetached,lazyObjects);
+          }
+        }
+      }
+      OObjectEntitySerializer.setFieldValue(field,self,value);
+    }
+  }
+  OObjectEntitySerializer.setIdField(selfClass,self,doc.getIdentity());
+  OObjectEntitySerializer.setVersionField(selfClass,self,doc.getRecordVersion().copy());
+}

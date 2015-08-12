@@ -1,0 +1,15 @@
+{
+  Shape shape=parseShape(query);
+  double distance=0;
+  Number n=(Number)query.get(MAX_DISTANCE);
+  if (n != null) {
+    distance=n.doubleValue();
+  }
+  Point p=(Point)shape;
+  SpatialArgs args=new SpatialArgs(SpatialOperation.Intersects,factory.SPATIAL_CONTEXT.makeCircle(p.getX(),p.getY(),DistanceUtils.dist2Degrees(distance,DistanceUtils.EARTH_MEAN_RADIUS_KM)));
+  Filter filter=manager.strategy().makeFilter(args);
+  ValueSource valueSource=manager.strategy().makeDistanceValueSource(p);
+  IndexSearcher searcher=manager.searcher();
+  Sort distSort=new Sort(valueSource.getSortField(false)).rewrite(searcher);
+  return new SpatialQueryContext(null,searcher,new MatchAllDocsQuery(),filter,distSort).setSpatialArgs(args);
+}

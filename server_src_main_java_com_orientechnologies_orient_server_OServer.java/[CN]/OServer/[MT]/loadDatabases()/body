@@ -1,0 +1,38 @@
+{
+  if (!OGlobalConfiguration.SERVER_OPEN_ALL_DATABASES_AT_STARTUP.getValueAsBoolean())   return;
+  final String dbPath=getDatabaseDirectory();
+  for (  Map.Entry<String,String> storageEntry : getAvailableStorageNames().entrySet()) {
+    final String databaseName=storageEntry.getKey();
+    OLogManager.instance().info(this,"Opening database '%s' at startup...",databaseName);
+    final ODatabaseDocumentTx db=new ODatabaseDocumentTx("plocal:" + dbPath + databaseName);
+    try {
+      try {
+        openDatabaseBypassingSecurity(db,null);
+      }
+ catch (      OStorageException e) {
+        if (e.getCause() instanceof OSecurityException) {
+          if (askForEncryptionKey(databaseName)) {
+            try {
+              openDatabaseBypassingSecurity(db,null);
+            }
+ catch (            Exception e2) {
+              Throwable nested=e2;
+              while (nested != null) {
+                if (nested instanceof OSecurityException) {
+                  OLogManager.instance().error(this,"Invalid key for database '%s'. Skip database opening",databaseName);
+                  return;
+                }
+                nested=nested.getCause();
+              }
+              OLogManager.instance().error(this,"Error on opening database '%s': %s",e,e.getMessage());
+            }
+          }
+        }
+      }
+    }
+  finally {
+      db.activateOnCurrentThread();
+      db.close();
+    }
+  }
+}

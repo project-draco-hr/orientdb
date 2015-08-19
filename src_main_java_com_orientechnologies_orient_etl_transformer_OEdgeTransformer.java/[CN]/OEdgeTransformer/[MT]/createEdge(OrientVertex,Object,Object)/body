@@ -44,6 +44,7 @@ edges=new ArrayList<OrientEdge>(size);
  else edges=new ArrayList<OrientEdge>(1);
 for (Object o : OMultiValue.getMultiValueIterable(result)) {
 final OrientVertex targetVertex=pipeline.getGraphDatabase().getVertex(o);
+try {
 final OrientEdge edge;
 if (directionOut) edge=(OrientEdge)vertex.addEdge(edgeClass,targetVertex);
  else edge=(OrientEdge)targetVertex.addEdge(edgeClass,vertex);
@@ -52,6 +53,17 @@ for (String f : edgeFields.fieldNames()) edge.setProperty(f,resolve(edgeFields.f
 }
 edges.add(edge);
 log(OETLProcessor.LOG_LEVELS.DEBUG,"created new edge=%s",edge);
+}
+ catch (ORecordDuplicatedException e) {
+if (skipDuplicates) {
+log(OETLProcessor.LOG_LEVELS.DEBUG,"skipped creation of new edge because already exists");
+continue;
+}
+ else {
+log(OETLProcessor.LOG_LEVELS.ERROR,"error on creation of new edge because it already exists (skipDuplicates=false)");
+throw e;
+}
+}
 }
 return edges;
 }

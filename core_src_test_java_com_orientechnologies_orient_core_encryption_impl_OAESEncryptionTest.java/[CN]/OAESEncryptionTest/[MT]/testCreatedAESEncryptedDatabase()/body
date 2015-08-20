@@ -1,6 +1,10 @@
 {
-  OFileUtils.deleteRecursively(new File("target/" + DBNAME_DATABASETEST));
-  final ODatabase db=new ODatabaseDocumentTx("plocal:target/" + DBNAME_DATABASETEST);
+  String buildDirectory=System.getProperty("buildDirectory",".");
+  final ODatabase db=new ODatabaseDocumentTx("plocal:" + buildDirectory + File.separator+ DBNAME_DATABASETEST);
+  if (db.exists()) {
+    db.open("admin","admin");
+    db.drop();
+  }
   db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD.getKey(),"aes");
   db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
   db.create();
@@ -11,17 +15,20 @@
     Assert.assertEquals(result.size(),1);
     db.close();
     db.open("admin","admin");
+    OStorage storage=((ODatabaseDocumentInternal)db).getStorage();
     db.close();
-    Orient.instance().getStorage(DBNAME_DATABASETEST).close(true,false);
+    storage.close(true,false);
     db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
     db.open("admin","admin");
     result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
     Assert.assertEquals(result.size(),1);
+    storage=((ODatabaseDocumentInternal)db).getStorage();
     db.close();
-    Orient.instance().getStorage(DBNAME_DATABASETEST).close(true,false);
+    storage.close(true,false);
     db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"invalidPassword");
     try {
       db.open("admin","admin");
+      storage=((ODatabaseDocumentInternal)db).getStorage();
       Assert.fail();
     }
  catch (    Exception e) {
@@ -30,11 +37,12 @@
  finally {
       db.activateOnCurrentThread();
       db.close();
-      Orient.instance().getStorage(DBNAME_DATABASETEST).close(true,false);
+      storage.close(true,false);
     }
     db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA=-");
     try {
       db.open("admin","admin");
+      storage=((ODatabaseDocumentInternal)db).getStorage();
       Assert.fail();
     }
  catch (    OStorageException e) {
@@ -43,7 +51,7 @@
  finally {
       db.activateOnCurrentThread();
       db.close();
-      Orient.instance().getStorage(DBNAME_DATABASETEST).close(true,false);
+      storage.close(true,false);
     }
     db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
     db.open("admin","admin");
@@ -52,6 +60,7 @@
   }
   finally {
     db.activateOnCurrentThread();
+    if (db.isClosed())     db.open("admin","admin");
     db.drop();
   }
 }

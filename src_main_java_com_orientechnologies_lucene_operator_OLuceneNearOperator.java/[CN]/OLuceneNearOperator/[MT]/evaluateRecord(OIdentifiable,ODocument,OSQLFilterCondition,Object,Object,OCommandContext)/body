@@ -1,8 +1,22 @@
 {
-  if (iContext.getVariable("$luceneIndex") != null) {
-    return true;
+  List<Object> left=(List<Object>)iLeft;
+  double lat=(double)left.get(0);
+  double lon=(double)left.get(1);
+  Shape shape=factory.SPATIAL_CONTEXT.makePoint(lon,lat);
+  List<Object> right=(List<Object>)iRight;
+  double lat1=(double)right.get(0);
+  double lon1=(double)right.get(1);
+  Shape shape1=factory.SPATIAL_CONTEXT.makePoint(lon1,lat1);
+  Map map=(Map)right.get(2);
+  double distance=0;
+  Number n=(Number)map.get("maxDistance");
+  if (n != null) {
+    distance=n.doubleValue();
   }
- else {
-    return false;
-  }
+  Point p=(Point)shape1;
+  Circle circle=factory.SPATIAL_CONTEXT.makeCircle(p.getX(),p.getY(),DistanceUtils.dist2Degrees(distance,DistanceUtils.EARTH_MEAN_RADIUS_KM));
+  double docDistDEG=factory.SPATIAL_CONTEXT.getDistCalc().distance((Point)shape,p);
+  final double docDistInKM=DistanceUtils.degrees2Dist(docDistDEG,DistanceUtils.EARTH_EQUATORIAL_RADIUS_KM);
+  iContext.setVariable("distance",docDistInKM);
+  return shape.relate(circle) == SpatialRelation.WITHIN;
 }

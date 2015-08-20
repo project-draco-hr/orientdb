@@ -7,6 +7,15 @@
   final String user=channel.readString();
   final String passwd=channel.readString();
   connection.database=(ODatabaseDocumentTx)server.openDatabase(dbURL,user,passwd,connection.data);
+  byte[] token=tokenHandler.getSignedBinaryToken(connection.database,connection.database.getUser(),connection.data);
+  if (Boolean.TRUE.equals(tokenBased)) {
+    try {
+      getServer().getClientConnectionManager().connect(this,connection,token,tokenHandler.parseBinaryToken(token));
+    }
+ catch (    Exception e) {
+      throw new OException(e);
+    }
+  }
   if (connection.database.getStorage() instanceof OStorageProxy && !loadUserFromSchema(user,passwd)) {
     sendErrorOrDropConnection(clientTxId,new OSecurityAccessException(connection.database.getName(),"User or password not valid for database: '" + connection.database.getName() + "'"));
   }
@@ -17,7 +26,6 @@
       channel.writeInt(connection.id);
       if (connection.data.protocolVersion > OChannelBinaryProtocol.PROTOCOL_VERSION_26) {
         if (Boolean.TRUE.equals(tokenBased)) {
-          byte[] token=tokenHandler.getSignedBinaryToken(connection.database,connection.database.getUser(),connection.data);
           channel.writeBytes(token);
         }
  else         channel.writeBytes(OCommonConst.EMPTY_BYTE_ARRAY);

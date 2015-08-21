@@ -1,0 +1,49 @@
+{
+  checkOpeness();
+  freeze(false);
+  try {
+    stateLock.acquireReadLock();
+    try {
+      checkOpeness();
+      final BufferedOutputStream bufferedOutputStream=new BufferedOutputStream(stream);
+      try {
+        final ZipOutputStream zipOutputStream=new ZipOutputStream(bufferedOutputStream,Charset.forName(configuration.getCharset()));
+        try {
+          final Date startedOn=new Date();
+          final OLogSequenceNumber lastLsn=((OWOWCache)writeCache).backupPagesWithChanges(logSequenceNumber,zipOutputStream);
+          final Date completedOn=new Date();
+          final ZipEntry backupJson=new ZipEntry("backup.json");
+          zipOutputStream.putNextEntry(backupJson);
+          final SimpleDateFormat dateFormat=new SimpleDateFormat("yyyy-MM-dd hh-mm-ss.SSS");
+          final OutputStreamWriter writer=new OutputStreamWriter(zipOutputStream,configuration.getCharset());
+          writer.append("{\r\n");
+          writer.append("\t\"lsn\":").append(lastLsn.toString()).append(",\r\n");
+          writer.append("\t\"startedOn\":").append(dateFormat.format(startedOn)).append(",\r\n");
+          writer.append("\t\"completedOn\":").append(dateFormat.format(completedOn)).append("\r\n");
+          writer.append("}\r\n");
+          writer.flush();
+          zipOutputStream.closeEntry();
+          final ZipEntry lastLsnEntry=new ZipEntry("last.lsn");
+          zipOutputStream.putNextEntry(lastLsnEntry);
+          final byte[] binaryLsn=new byte[2 * OLongSerializer.LONG_SIZE];
+          OLongSerializer.INSTANCE.serializeNative(lastLsn.getSegment(),binaryLsn,0);
+          OLongSerializer.INSTANCE.serializeNative(lastLsn.getPosition(),binaryLsn,OLongSerializer.LONG_SIZE);
+          zipOutputStream.write(binaryLsn);
+          zipOutputStream.closeEntry();
+        }
+  finally {
+          zipOutputStream.close();
+        }
+      }
+  finally {
+        bufferedOutputStream.close();
+      }
+    }
+  finally {
+      stateLock.releaseReadLock();
+    }
+  }
+  finally {
+    release();
+  }
+}

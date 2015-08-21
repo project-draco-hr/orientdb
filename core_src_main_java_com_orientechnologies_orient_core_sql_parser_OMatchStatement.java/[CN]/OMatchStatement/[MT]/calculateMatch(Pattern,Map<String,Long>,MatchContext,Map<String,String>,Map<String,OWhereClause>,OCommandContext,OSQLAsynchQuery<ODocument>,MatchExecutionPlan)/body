@@ -1,0 +1,43 @@
+{
+  boolean rootFound=false;
+  for (  Map.Entry<String,Long> entryPoint : estimatedRootEntries.entrySet()) {
+    if (entryPoint.getValue() < threshold) {
+      String nextAlias=entryPoint.getKey();
+      Iterable<OIdentifiable> matches=calculateMatches(nextAlias,aliasFilters,iCommandContext,aliasClasses);
+      Set<OIdentifiable> ids=new HashSet<OIdentifiable>();
+      if (!matches.iterator().hasNext()) {
+        return true;
+      }
+      matchContext.candidates.put(nextAlias,matches);
+      executionPlan.preFetchedAliases.put(nextAlias,entryPoint.getValue());
+      rootFound=true;
+    }
+  }
+  if (!rootFound) {
+    String nextAlias=getNextAlias(estimatedRootEntries,matchContext);
+    Iterable<OIdentifiable> matches=calculateMatches(nextAlias,aliasFilters,iCommandContext,aliasClasses);
+    if (!matches.iterator().hasNext()) {
+      return true;
+    }
+    matchContext.candidates.put(nextAlias,matches);
+    executionPlan.preFetchedAliases.put(nextAlias,estimatedRootEntries.get(nextAlias));
+  }
+  EdgeTraversal firstEdge=executionPlan.sortedEdges.size() == 0 ? null : executionPlan.sortedEdges.get(0);
+  String smallestAlias=null;
+  if (firstEdge != null) {
+    smallestAlias=firstEdge.out ? firstEdge.edge.out.alias : firstEdge.edge.in.alias;
+  }
+ else {
+    smallestAlias=pattern.aliasToNode.values().iterator().next().alias;
+  }
+  executionPlan.rootAlias=smallestAlias;
+  Iterable<OIdentifiable> allCandidates=matchContext.candidates.get(smallestAlias);
+  for (  OIdentifiable id : allCandidates) {
+    MatchContext childContext=matchContext.copy(smallestAlias,id);
+    childContext.currentEdgeNumber=0;
+    if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+      return false;
+    }
+  }
+  return true;
+}

@@ -1,47 +1,47 @@
 {
   System.out.println("Starting test against " + serverInstance.size() + " server nodes...");
-  for (  ServerRun server : serverInstance) {
-    System.out.println("\n******************************************************************************************");
-    System.out.println("STARTING SERVER -> " + server.getServerId() + "...");
-    System.out.println("******************************************************************************************\n");
-    server.startServer(getDistributedServerConfiguration(server));
-    try {
-      Thread.sleep(delayServerStartup * serverInstance.size());
+  try {
+    for (    ServerRun server : serverInstance) {
+      banner("STARTING SERVER -> " + server.getServerId() + "...");
+      server.startServer(getDistributedServerConfiguration(server));
+      if (delayServerStartup > 0)       try {
+        Thread.sleep(delayServerStartup * serverInstance.size());
+      }
+ catch (      InterruptedException e) {
+      }
+      onServerStarted(server);
+    }
+    if (delayServerAlign > 0)     try {
+      System.out.println("Server started, waiting for synchronization (" + (delayServerAlign * serverInstance.size() / 1000) + "secs)...");
+      Thread.sleep(delayServerAlign * serverInstance.size());
     }
  catch (    InterruptedException e) {
     }
-    onServerStarted(server);
-  }
-  try {
-    System.out.println("Server started, waiting for synchronization (" + (delayServerAlign * serverInstance.size() / 1000) + "secs)...");
-    Thread.sleep(delayServerAlign * serverInstance.size());
-  }
- catch (  InterruptedException e) {
-  }
-  for (  ServerRun server : serverInstance) {
-    final ODocument cfg=server.getServerInstance().getDistributedManager().getClusterConfiguration();
-    Assert.assertNotNull(cfg);
-  }
-  System.out.println("\n******************************************************************************************");
-  System.out.println("Executing test...");
-  System.out.println("******************************************************************************************\n");
-  try {
-    executeTest();
+    for (    ServerRun server : serverInstance) {
+      final ODocument cfg=server.getServerInstance().getDistributedManager().getClusterConfiguration();
+      Assert.assertNotNull(cfg);
+    }
+    OLogManager.instance().flush();
+    banner("Executing test...");
+    try {
+      executeTest();
+    }
+  finally {
+      onAfterExecution();
+    }
   }
   finally {
-    onAfterExecution();
-    System.out.println("\n******************************************************************************************");
-    System.out.println("Shutting down nodes...");
-    System.out.println("******************************************************************************************\n");
+    banner("Test finished");
+    OLogManager.instance().flush();
+    banner("Shutting down nodes...");
     for (    ServerRun server : serverInstance) {
       System.out.println("Shutting down node " + server.getServerId() + "...");
       server.shutdownServer();
     }
-    System.out.println("\n******************************************************************************************");
-    System.out.println("Test finished");
-    System.out.println("******************************************************************************************\n");
     onTestEnded();
+    banner("Shutdown HZ...");
     Hazelcast.shutdownAll();
+    banner("Clean server directories...");
     deleteServers();
   }
 }

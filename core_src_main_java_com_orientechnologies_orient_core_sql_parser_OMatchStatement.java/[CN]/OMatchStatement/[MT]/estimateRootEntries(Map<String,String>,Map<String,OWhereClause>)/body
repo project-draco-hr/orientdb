@@ -1,0 +1,27 @@
+{
+  Set<String> allAliases=new LinkedHashSet<String>();
+  allAliases.addAll(aliasClasses.keySet());
+  allAliases.addAll(aliasFilters.keySet());
+  OSchema schema=getDatabase().getMetadata().getSchema();
+  Map<String,Long> result=new LinkedHashMap<String,Long>();
+  for (  String alias : allAliases) {
+    String className=aliasClasses.get(alias);
+    if (className == null) {
+      continue;
+    }
+    if (!schema.existsClass(className)) {
+      throw new OCommandExecutionException("class not defined: " + className);
+    }
+    OClass oClass=schema.getClass(className);
+    long upperBound;
+    OWhereClause filter=aliasFilters.get(alias);
+    if (filter != null) {
+      upperBound=filter.estimate(oClass);
+    }
+ else {
+      upperBound=oClass.count();
+    }
+    result.put(alias,upperBound);
+  }
+  return result;
+}

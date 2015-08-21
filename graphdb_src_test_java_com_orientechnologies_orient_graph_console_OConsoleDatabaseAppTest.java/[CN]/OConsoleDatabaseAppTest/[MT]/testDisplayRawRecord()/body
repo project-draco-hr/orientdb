@@ -1,0 +1,51 @@
+{
+  String dbUrl="memory:OConsoleDatabaseAppTestDisplayRawRecord";
+  StringBuilder builder=new StringBuilder();
+  builder.append("create database " + dbUrl + ";\n");
+  builder.append("create class foo;\n");
+  builder.append("insert into foo set name = 'foo';\n");
+  OConsoleDatabaseApp console=new OConsoleDatabaseApp(null);
+  ByteArrayOutputStream out=new ByteArrayOutputStream();
+  PrintStream stream=new PrintStream(out);
+  console.setOutput(stream);
+  try {
+    console.createDatabase(dbUrl,null,null,null,null,null);
+    console.createClass("class foo");
+    console.insert("into foo set name = 'barbar'");
+    byte[] result=out.toByteArray();
+    out.close();
+    stream.close();
+    out=new ByteArrayOutputStream();
+    stream=new PrintStream(out);
+    console.setOutput(stream);
+    String resultString=new String(result);
+    String rid=resultString.substring(resultString.indexOf("#"),resultString.indexOf("#") + 5).trim();
+    console.set("maxBinaryDisplay","10000");
+    console.displayRawRecord(rid);
+    result=out.toByteArray();
+    resultString=new String(result);
+    Assert.assertTrue(resultString.contains("Raw record content."));
+    if ("ORecordSerializerBinary".equals(((ODatabaseDocumentTx)console.getCurrentDatabase()).getSerializer().toString())) {
+      Assert.assertTrue(resultString.contains("class name: foo"));
+      Assert.assertTrue(resultString.contains("property value: barbar"));
+    }
+  }
+ catch (  IOException e) {
+    Assert.fail();
+  }
+ finally {
+    try {
+      out.close();
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+    }
+    try {
+      stream.close();
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+    }
+    console.close();
+  }
+}

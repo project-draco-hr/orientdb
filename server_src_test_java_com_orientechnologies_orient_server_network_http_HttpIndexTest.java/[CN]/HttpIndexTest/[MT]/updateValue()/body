@@ -1,0 +1,24 @@
+{
+  put("index/" + getDatabaseName() + "/ManualIndex/Harry2").payload("{name:'Harry', surname:'Potter',age:18}",CONTENT.JSON).exec();
+  Assert.assertEquals(getResponse().getStatusLine().getStatusCode(),201);
+  get("index/" + getDatabaseName() + "/ManualIndex/Harry2").exec();
+  Assert.assertEquals(getResponse().getStatusLine().getStatusCode(),200);
+  String response=EntityUtils.toString(getResponse().getEntity());
+  Assert.assertEquals(response.charAt(0),'[');
+  Assert.assertEquals(response.charAt(response.length() - 1),']');
+  response=response.substring(1,response.length() - 1);
+  ODocument harry=new ODocument().fromJSON(response);
+  put("index/" + getDatabaseName() + "/ManualIndex/Harry2").payload("{name:'Harry3', surname:'Potter3',age:183,@rid:'" + harry.getIdentity() + "',@version:"+ harry.getVersion()+ "}",CONTENT.JSON).exec();
+  Assert.assertEquals(getResponse().getStatusLine().getStatusCode(),204);
+  get("index/" + getDatabaseName() + "/ManualIndex/Harry2").exec();
+  Assert.assertEquals(getResponse().getStatusLine().getStatusCode(),200);
+  response=EntityUtils.toString(getResponse().getEntity());
+  Assert.assertEquals(response.charAt(0),'[');
+  Assert.assertEquals(response.charAt(response.length() - 1),']');
+  response=response.substring(1,response.length() - 1);
+  harry=new ODocument().fromJSON(response);
+  Assert.assertEquals(harry.field("name"),"Harry3");
+  Assert.assertEquals(harry.field("surname"),"Potter3");
+  Assert.assertEquals(harry.field("age"),183);
+  Assert.assertEquals(harry.getVersion(),2);
+}

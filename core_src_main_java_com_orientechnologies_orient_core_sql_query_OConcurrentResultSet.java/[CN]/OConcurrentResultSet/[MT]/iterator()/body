@@ -1,0 +1,40 @@
+{
+  return new Iterator<T>(){
+    private int index=0;
+    @Override public boolean hasNext(){
+      int size;
+synchronized (wrapped) {
+        size=wrapped.size();
+      }
+      while (!completed) {
+        if (index < size)         return true;
+        waitForNewItemOrCompleted();
+synchronized (wrapped) {
+          size=wrapped.size();
+        }
+      }
+      return index < wrapped.size();
+    }
+    @Override public T next(){
+      int size;
+synchronized (wrapped) {
+        size=wrapped.size();
+      }
+      while (!completed) {
+        if (index < size)         break;
+        waitForNewItemOrCompleted();
+synchronized (wrapped) {
+          size=wrapped.size();
+        }
+      }
+      if (index > size || size == 0)       throw new NoSuchElementException("Error on browsing at element " + index + " while the resultset contains only "+ size+ " items");
+synchronized (wrapped) {
+        return wrapped.get(index++);
+      }
+    }
+    @Override public void remove(){
+      throw new UnsupportedOperationException("OResultSet.iterator.remove()");
+    }
+  }
+;
+}

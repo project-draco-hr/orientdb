@@ -1,4 +1,5 @@
 {
+  resetLastValidBackup();
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED) {
     wrapped.commit(iTx,callback);
     return;
@@ -44,7 +45,7 @@ case ORecordOperation.UPDATED:
 {
           if (record instanceof ODocument)           ((ODocument)record).validate();
           final OStorageOperationResult<ORawBuffer> previousContent=wrapped.readRecord(rid,null,false,null);
-          if (previousContent.getResult() == null)           throw new OTransactionException("Cannot update record '" + rid + "' because has been deleted");
+          if (previousContent.getResult() == null)           throw new ORecordNotFoundException("Cannot update record '" + rid + "' because has been deleted");
           final ORecordVersion v=executionModeSynch ? record.getRecordVersion() : record.getRecordVersion().copy();
           task=new OUpdateRecordTask(rid,previousContent.getResult().getBuffer(),previousContent.getResult().version,record.toStream(),v,ORecordInternal.getRecordType(record));
           break;
@@ -89,11 +90,7 @@ if (!nodes.isEmpty()) {
 if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE);
  else asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask,new OCallable(){
 @Override public Object call(Object iArgument){
-  try {
-    processCommitResult(localNodeName,txTask,involvedClusters,tmpEntries,nodes,0,iArgument);
-  }
- catch (  InterruptedException e) {
-  }
+  sendTxCompleted(localNodeName,involvedClusters,nodes,(OTxTaskResult)iArgument);
   return null;
 }
 }

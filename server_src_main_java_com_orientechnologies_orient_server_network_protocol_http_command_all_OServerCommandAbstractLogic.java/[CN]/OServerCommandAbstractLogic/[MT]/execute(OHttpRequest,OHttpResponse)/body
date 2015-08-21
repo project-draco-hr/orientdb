@@ -9,13 +9,24 @@
       iResponse.send(OHttpUtils.STATUS_BADREQ_CODE,OHttpUtils.STATUS_BADREQ_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,"GET method is not allowed to execute function '" + parts[2] + "' because has been declared as non idempotent. Use POST instead.",null);
       return false;
     }
-    final Object[] args=new String[parts.length - 3];
+    Object[] args=new String[parts.length - 3];
     for (int i=3; i < parts.length; ++i)     args[i - 3]=parts[i];
     final OBasicCommandContext context=new OBasicCommandContext();
     context.setVariable("session",OHttpSessionManager.getInstance().getSession(iRequest.sessionId));
     context.setVariable("request",new OHttpRequestWrapper(iRequest,(String[])args));
     context.setVariable("response",new OHttpResponseWrapper(iResponse));
-    handleResult(iRequest,iResponse,f.executeInContext(context,args));
+    final Object functionResult;
+    if (args.length == 0 && iRequest.content != null && !iRequest.content.isEmpty()) {
+      try {
+        final ODocument params=new ODocument().fromJSON(iRequest.content);
+        functionResult=f.executeInContext(context,params.toMap());
+      }
+ catch (      Exception e) {
+        throw new OCommandScriptException("Error on parsing parameters from request body",e);
+      }
+    }
+ else     functionResult=f.executeInContext(context,args);
+    handleResult(iRequest,iResponse,functionResult);
   }
  catch (  OCommandScriptException e) {
     final StringBuilder msg=new StringBuilder(256);
@@ -23,7 +34,12 @@
       if (msg.length() > 0)       msg.append("\n");
       msg.append(currentException.getMessage());
     }
-    iResponse.send(OHttpUtils.STATUS_BADREQ_CODE,OHttpUtils.STATUS_BADREQ_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,msg.toString(),null);
+    if (isJsonResponse(iResponse)) {
+      sendJsonError(iResponse,OHttpUtils.STATUS_BADREQ_CODE,OHttpUtils.STATUS_BADREQ_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,msg.toString(),null);
+    }
+ else {
+      iResponse.send(OHttpUtils.STATUS_BADREQ_CODE,OHttpUtils.STATUS_BADREQ_DESCRIPTION,OHttpUtils.CONTENT_TEXT_PLAIN,msg.toString(),null);
+    }
   }
  finally {
     if (db != null)     db.close();

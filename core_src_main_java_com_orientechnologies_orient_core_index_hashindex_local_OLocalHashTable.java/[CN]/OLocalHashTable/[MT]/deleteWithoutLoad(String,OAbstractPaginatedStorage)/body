@@ -4,34 +4,33 @@
     atomicOperation=startAtomicOperation();
   }
  catch (  IOException e) {
-    throw new OIndexException("Error during hash table deletion.",e);
+    throw new OIndexException("Error during hash table deletion",e);
   }
   acquireExclusiveLock();
   try {
-    final ODiskCache diskCache=storage.getDiskCache();
-    if (isFileExists(atomicOperation,name + metadataConfigurationFileExtension,diskCache)) {
-      fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension,diskCache);
-      deleteFile(atomicOperation,fileStateId,diskCache);
+    if (isFileExists(atomicOperation,name + metadataConfigurationFileExtension)) {
+      fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension);
+      deleteFile(atomicOperation,fileStateId);
     }
     directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
     directory.deleteWithoutOpen();
-    if (isFileExists(atomicOperation,name + nullBucketFileExtension,diskCache)) {
-      final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension,diskCache);
-      deleteFile(atomicOperation,nullBucketId,diskCache);
+    if (isFileExists(atomicOperation,name + nullBucketFileExtension)) {
+      final long nullBucketId=openFile(atomicOperation,name + nullBucketFileExtension);
+      deleteFile(atomicOperation,nullBucketId);
     }
-    if (isFileExists(atomicOperation,name + bucketFileExtension,diskCache)) {
-      final long fileId=openFile(atomicOperation,name + bucketFileExtension,diskCache);
-      deleteFile(atomicOperation,fileId,diskCache);
+    if (isFileExists(atomicOperation,getFullName())) {
+      final long fileId=openFile(atomicOperation,getFullName());
+      deleteFile(atomicOperation,fileId);
     }
-    endAtomicOperation(false);
+    endAtomicOperation(false,null);
   }
  catch (  IOException ioe) {
-    rollback();
-    throw new OIndexException("Can not delete hash table with name " + name,ioe);
+    rollback(ioe);
+    throw new OIndexException("Cannot delete hash table with name " + name,ioe);
   }
 catch (  Exception e) {
-    rollback();
-    throw new OIndexException("Can not delete hash table with name " + name,e);
+    rollback(e);
+    throw new OIndexException("Cannot delete hash table with name " + name,e);
   }
  finally {
     releaseExclusiveLock();

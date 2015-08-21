@@ -1,0 +1,43 @@
+{
+  int[] ports=null;
+  if (protocolClass.equals(ONetworkProtocolBinary.class)) {
+    String serverTestMode=System.getProperty("orient.server.testMode","false");
+    if (serverTestMode.equals("true")) {
+      String serverTestPort=System.getProperty("orient.server.port");
+      if (serverTestPort != null) {
+        try {
+          int serverPort=Integer.parseInt(serverTestPort);
+          ports=new int[]{serverPort};
+        }
+ catch (        NumberFormatException e) {
+          ports=null;
+        }
+      }
+    }
+  }
+  if (ports == null)   ports=getPorts(iHostPortRange);
+  for (  int port : ports) {
+    inboundAddr=new InetSocketAddress(iHostName,port);
+    try {
+      serverSocket=socketFactory.createServerSocket(port,0,InetAddress.getByName(iHostName));
+      if (serverSocket.isBound()) {
+        OLogManager.instance().info(this,"Listening " + iProtocolName + " connections on "+ inboundAddr.getAddress().getHostAddress()+ ":"+ inboundAddr.getPort()+ " (protocol v."+ protocolVersion+ ", socket="+ socketFactory.getName()+ ")");
+        return;
+      }
+    }
+ catch (    BindException be) {
+      OLogManager.instance().info(this,"Port %s:%d busy, trying the next available...",iHostName,port);
+    }
+catch (    SocketException se) {
+      OLogManager.instance().error(this,"Unable to create socket",se);
+      ShutdownHelper.shutdown(1);
+    }
+catch (    IOException ioe) {
+      OLogManager.instance().error(this,"Unable to read data from an open socket",ioe);
+      System.err.println("Unable to read data from an open socket.");
+      ShutdownHelper.shutdown(1);
+    }
+  }
+  OLogManager.instance().error(this,"Unable to listen for connections using the configured ports '%s' on host '%s'",iHostPortRange,iHostName);
+  ShutdownHelper.shutdown(1);
+}

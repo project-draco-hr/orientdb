@@ -1,10 +1,20 @@
 {
-  acquireReadLock();
-  try {
-    iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_LONG);
-    return readData(iOffset,OBinaryProtocol.SIZE_LONG).getLong();
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireReadLock();
+      try {
+        iOffset=checkRegions(iOffset,OBinaryProtocol.SIZE_LONG);
+        return readData(iOffset,OBinaryProtocol.SIZE_LONG).getLong();
+      }
   finally {
-    releaseReadLock();
+        releaseReadLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during read of long data for file " + getName() + " "+ attempts+ "-th attempt",e);
+      reopenFile(attempts,e);
+    }
   }
 }

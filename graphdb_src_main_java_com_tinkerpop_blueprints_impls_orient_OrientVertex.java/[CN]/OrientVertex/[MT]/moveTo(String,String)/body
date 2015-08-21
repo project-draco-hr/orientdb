@@ -1,6 +1,11 @@
 {
   final OrientBaseGraph graph=getGraph();
+  if (checkDeletedInTx())   throw new IllegalStateException("The vertex " + getIdentity() + " has been deleted");
   final ORID oldIdentity=getIdentity().copy();
+  final ORecord oldRecord=oldIdentity.getRecord();
+  if (oldRecord == null)   throw new IllegalStateException("The vertex " + getIdentity() + " has been deleted");
+  if (!graph.getRawGraph().getTransaction().isActive())   throw new IllegalStateException("Move vertex requires an active transaction to be executed in safe manner");
+  oldRecord.delete();
   final ODocument doc=((ODocument)rawElement.getRecord()).copy();
   final Iterable<Edge> outEdges=getEdges(Direction.OUT);
   final Iterable<Edge> inEdges=getEdges(Direction.IN);
@@ -37,7 +42,5 @@
     }
   }
   doc.save();
-  final ORecord oldRecord=oldIdentity.getRecord();
-  if (oldRecord != null)   oldRecord.delete();
   return newIdentity;
 }

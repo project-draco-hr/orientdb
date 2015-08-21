@@ -1,0 +1,36 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:testBooleanListNamedParameter");
+  try {
+    ODatabaseRecordThreadLocal.INSTANCE.set(db);
+    db.create();
+    db.getMetadata().getSchema().createClass("test");
+    ODocument doc=new ODocument("test");
+    doc.field("id",1);
+    doc.field("boolean",false);
+    doc.field("integerList",Collections.EMPTY_LIST);
+    doc.field("booleanList",Collections.EMPTY_LIST);
+    db.save(doc);
+    System.out.println(doc.toJSON());
+    OCommandSQL updateCommand=new OCommandSQL("UPDATE test SET boolean = :boolean, booleanList = :booleanList, integerList = :integerList WHERE id = 1");
+    Map<String,Object> params=new HashMap<String,Object>();
+    params.put("boolean",true);
+    List<Object> integerList=new ArrayList<Object>();
+    integerList.add(1);
+    params.put("integerList",integerList);
+    List<Object> booleanList=new ArrayList<Object>();
+    booleanList.add(true);
+    params.put("booleanList",booleanList);
+    db.command(updateCommand).execute(params);
+    OSQLSynchQuery<ODocument> query=new OSQLSynchQuery<ODocument>("SELECT * FROM test WHERE id = 1");
+    List<ODocument> queryResult=db.command(query).execute(params);
+    assertEquals(queryResult.size(),1);
+    ODocument docResult=queryResult.get(0);
+    List<?> resultBooleanList=docResult.field("booleanList");
+    assertNotNull(resultBooleanList);
+    assertEquals(resultBooleanList.size(),1);
+    assertEquals(resultBooleanList.iterator().next(),true);
+  }
+  finally {
+    db.close();
+  }
+}

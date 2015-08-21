@@ -1,0 +1,34 @@
+{
+  if (iCommand == null || iCommand.trim().isEmpty()) {
+    message("\nAVAILABLE COMMANDS:\n");
+    for (    Method m : getConsoleMethods().keySet()) {
+      ConsoleCommand annotation=m.getAnnotation(ConsoleCommand.class);
+      if (annotation == null)       continue;
+      message("* %-85s%s\n",getCorrectMethodName(m),annotation.description());
+    }
+    message("* %-85s%s\n",getClearName("exit"),"Close the console");
+    return;
+  }
+  final String[] commandWords=OStringParser.getWords(iCommand,wordSeparator);
+  boolean onlineMode=commandWords.length > 1 && commandWords[0].equalsIgnoreCase("-online");
+  if (onlineMode)   iCommand=iCommand.substring("-online".length() + 1);
+  final Method m=getMethod(iCommand);
+  if (m != null) {
+    final ConsoleCommand ann=m.getAnnotation(ConsoleCommand.class);
+    message("\nCOMMAND: " + iCommand + "\n\n");
+    if (ann != null) {
+      if (onlineMode && !ann.onlineHelp().isEmpty()) {
+        final String text=getOnlineHelp(ONLINE_HELP_URL + ann.onlineHelp() + ONLINE_HELP_EXT);
+        if (text != null && !text.isEmpty()) {
+          message(text);
+          return;
+        }
+        error("!CANNOT FETCH ONLINE DOCUMENTATION, CHECK IF COMPUTER IS CONNECTED TO THE INTERNET.");
+        return;
+      }
+      message(ann.description() + "." + "\r\n\r\nSYNTAX: ");
+      message(formatCommandSpecs(iCommand,m));
+    }
+ else     message("No description available");
+  }
+}

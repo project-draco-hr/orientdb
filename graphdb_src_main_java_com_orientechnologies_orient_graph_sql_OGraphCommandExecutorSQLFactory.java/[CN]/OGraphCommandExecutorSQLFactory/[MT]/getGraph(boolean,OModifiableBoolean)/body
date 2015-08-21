@@ -3,13 +3,18 @@
   final OrientBaseGraph result=OrientBaseGraph.getActiveGraph();
   if (result != null && (result instanceof OrientGraph)) {
     final ODatabaseDocumentTx graphDb=result.getRawGraph();
-    if (!graphDb.isClosed()) {
-      ODatabaseRecordThreadLocal.INSTANCE.set(graphDb);
-      shouldBeShutDown.setValue(false);
-      return (OrientGraph)result;
+    if (canReuseActiveGraph(graphDb,database)) {
+      if (!graphDb.isClosed()) {
+        ODatabaseRecordThreadLocal.INSTANCE.set(graphDb);
+        if (autoStartTx)         ((OrientGraph)result).begin();
+        shouldBeShutDown.setValue(false);
+        return (OrientGraph)result;
+      }
     }
   }
   ODatabaseRecordThreadLocal.INSTANCE.set((ODatabaseDocumentInternal)database);
   shouldBeShutDown.setValue(true);
-  return new OrientGraph((ODatabaseDocumentTx)database,autoStartTx);
+  final OrientGraph g=new OrientGraph((ODatabaseDocumentTx)database,false);
+  if (autoStartTx)   g.begin();
+  return g;
 }

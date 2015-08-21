@@ -1,8 +1,20 @@
 {
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"execute command=%s db=%s",text.toString(),database.getName());
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"execute command=%s db=%s",text.toString(),database.getName());
   final OCommandRequest cmd=database.command(new OCommandSQL(text));
+  OCommandExecutor executor=OCommandManager.instance().getExecutor((OCommandRequestInternal)cmd);
+  executor.parse(cmd);
+  final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
+  if (exec instanceof OCommandExecutorSQLSelect && clusters.size() > 0) {
+    final Iterator<? extends OIdentifiable> target=((OCommandExecutorSQLSelect)exec).getTarget();
+    final int[] clusterIds=new int[clusters.size()];
+    int i=0;
+    for (    String c : clusters)     clusterIds[i++]=database.getClusterIdByName(c);
+    final ORecordIteratorClusters<ORecord> filteredTarget=new ORecordIteratorClusters<ORecord>(database,database,clusterIds,true);
+    if (target instanceof ORecordIteratorClusters)     filteredTarget.setRange(((ORecordIteratorClusters)target).getBeginRange(),((ORecordIteratorClusters)target).getEndRange());
+    ((OCommandExecutorSQLSelect)exec).setTarget(filteredTarget);
+  }
   final Object res;
-  if (params != null)   res=cmd.execute(params);
- else   res=cmd.execute();
+  if (params != null)   res=executor.execute(params);
+ else   res=executor.execute(null);
   return res;
 }

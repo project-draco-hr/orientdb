@@ -1,0 +1,47 @@
+{
+  final File ibuFile=new File(backupDirectory,file);
+  final FileInputStream fileInputStream;
+  try {
+    fileInputStream=new FileInputStream(ibuFile);
+  }
+ catch (  FileNotFoundException e) {
+    throw new OStorageException("Backup file was not found",e);
+  }
+  try {
+    final ZipInputStream zipInputStream=new ZipInputStream(fileInputStream);
+    try {
+      ZipEntry zipEntry;
+      while ((zipEntry=zipInputStream.getNextEntry()) != null) {
+        if (zipEntry.getName().equals("last.lsn")) {
+          final byte[] data=new byte[2 * OLongSerializer.LONG_SIZE];
+          int bytesRead=0;
+          while (bytesRead < data.length) {
+            final int rb=zipInputStream.read(data,bytesRead,data.length - bytesRead);
+            if (rb >= 0)             bytesRead+=rb;
+ else {
+              throw new OStorageException("Can not read last backed up LSN during incremental backup");
+            }
+          }
+          final long segment=OLongSerializer.INSTANCE.deserializeNative(data,0);
+          final long position=OLongSerializer.INSTANCE.deserializeNative(data,OLongSerializer.LONG_SIZE);
+          return new OLogSequenceNumber(segment,position);
+        }
+      }
+    }
+  finally {
+      zipInputStream.close();
+    }
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error during read of backup file",e);
+  }
+ finally {
+    try {
+      fileInputStream.close();
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during read of backup file",e);
+    }
+  }
+  throw new OStorageException("Can not find latest backed up LSN in last IBU file");
+}

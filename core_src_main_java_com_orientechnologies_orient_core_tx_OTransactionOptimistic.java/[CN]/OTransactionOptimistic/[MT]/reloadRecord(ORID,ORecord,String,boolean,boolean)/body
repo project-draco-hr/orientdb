@@ -1,0 +1,33 @@
+{
+  checkTransaction();
+  final ORecord txRecord=getRecord(rid);
+  if (txRecord == OTransactionRealAbstract.DELETED_RECORD)   return null;
+  if (txRecord != null) {
+    if (passedRecord != null && txRecord != passedRecord)     OLogManager.instance().warn(this,"Found record in transaction with the same RID %s but different instance. " + "Probably the record has been loaded from another transaction and reused on the current one: reload it " + "from current transaction before to update or delete it",passedRecord.getIdentity());
+    return txRecord;
+  }
+  if (rid.isTemporary())   return null;
+  final ORecord record;
+  try {
+    final ODatabaseDocumentTx.RecordReader recordReader;
+    if (force) {
+      recordReader=new ODatabaseDocumentTx.SimpleRecordReader();
+    }
+ else {
+      recordReader=new ODatabaseDocumentTx.LatestVersionRecordReader();
+    }
+    ORecord loadedRecord=database.executeReadRecord((ORecordId)rid,passedRecord,null,fetchPlan,ignoreCache,!ignoreCache,false,OStorage.LOCKING_STRATEGY.NONE,recordReader);
+    if (force) {
+      record=loadedRecord;
+    }
+ else {
+      if (loadedRecord == null)       record=passedRecord;
+ else       record=loadedRecord;
+    }
+  }
+ catch (  ORecordNotFoundException e) {
+    return null;
+  }
+  if (record != null && isolationLevel == ISOLATION_LEVEL.REPEATABLE_READ)   addRecord(record,ORecordOperation.LOADED,null);
+  return record;
+}

@@ -1,13 +1,26 @@
 {
   final OIdentifiable id=(OIdentifiable)iRecord;
   if (compiledFilter != null) {
-    if (!(Boolean)compiledFilter.evaluate((ODocument)id.getRecord(),null,context))     return true;
+    if (!(Boolean)compiledFilter.evaluate(id.getRecord(),null,context))     return true;
   }
   if (id.getIdentity().isValid()) {
     final OrientEdge e=graph.getEdge(id);
-    if (e != null) {
-      e.remove();
-      removed++;
+    for (int retry=0; retry < 20; ++retry) {
+      try {
+        if (e != null) {
+          e.remove();
+          if (!txAlreadyBegun && batch > 0 && (removed + 1) % batch == 0) {
+            graph.commit();
+            graph.begin();
+          }
+          removed++;
+        }
+        break;
+      }
+ catch (      ONeedRetryException ex) {
+        getDatabase().getLocalCache().invalidate();
+        e.reload();
+      }
     }
   }
   return true;

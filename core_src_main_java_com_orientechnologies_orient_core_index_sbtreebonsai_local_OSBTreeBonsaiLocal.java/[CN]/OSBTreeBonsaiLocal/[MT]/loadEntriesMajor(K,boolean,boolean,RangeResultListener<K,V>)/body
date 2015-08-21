@@ -2,7 +2,7 @@
   if (!ascSortOrder)   throw new IllegalStateException("Descending sort order is not supported.");
   atomicOperationsManager.acquireReadLock(this);
   try {
-    acquireSharedLock();
+    final Lock lock=fileLockManager.acquireSharedLock(fileId);
     try {
       OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
       BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
@@ -15,7 +15,7 @@
         index=-bucketSearchResult.itemIndex - 1;
       }
       do {
-        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
         try {
           OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
           int bucketSize=bucket.size();
@@ -26,17 +26,17 @@
           index=0;
         }
   finally {
-          releasePage(atomicOperation,cacheEntry,diskCache);
+          releasePage(atomicOperation,cacheEntry);
         }
       }
  while (bucketPointer.getPageIndex() >= 0);
     }
   finally {
-      releaseSharedLock();
+      lock.unlock();
     }
   }
  catch (  IOException ioe) {
-    throw new OSBTreeException("Error during fetch of major values for key " + key + " in sbtree "+ name);
+    throw new OSBTreeException("Error during fetch of major values for key " + key + " in sbtree "+ getName(),ioe);
   }
  finally {
     atomicOperationsManager.releaseReadLock(this);

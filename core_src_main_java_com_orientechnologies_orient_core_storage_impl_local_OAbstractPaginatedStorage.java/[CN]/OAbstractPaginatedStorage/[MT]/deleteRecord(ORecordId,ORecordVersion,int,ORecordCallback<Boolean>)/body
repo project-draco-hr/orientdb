@@ -12,30 +12,37 @@
     }
   }
   final long timer=Orient.instance().getProfiler().startChrono();
-  cluster.getExternalModificationLock().requestModificationLock();
+  stateLock.acquireReadLock();
   try {
-    modificationLock.requestModificationLock();
+    cluster.getExternalModificationLock().requestModificationLock();
     try {
-      Lock recordLock=lockManager.acquireExclusiveLock(rid);
+      modificationLock.requestModificationLock();
       try {
-        lock.acquireSharedLock();
+        lockManager.acquireLock(rid,OLockManager.LOCK.EXCLUSIVE);
         try {
-          return doDeleteRecord(rid,version,cluster);
+          dataLock.acquireSharedLock();
+          try {
+            checkOpeness();
+            return doDeleteRecord(rid,version,cluster);
+          }
+  finally {
+            dataLock.releaseSharedLock();
+          }
         }
   finally {
-          lock.releaseSharedLock();
+          lockManager.releaseLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
         }
       }
   finally {
-        lockManager.releaseLock(recordLock);
+        modificationLock.releaseModificationLock();
       }
     }
   finally {
-      modificationLock.releaseModificationLock();
+      cluster.getExternalModificationLock().releaseModificationLock();
+      Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
     }
   }
   finally {
-    cluster.getExternalModificationLock().releaseModificationLock();
-    Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
+    stateLock.releaseReadLock();
   }
 }

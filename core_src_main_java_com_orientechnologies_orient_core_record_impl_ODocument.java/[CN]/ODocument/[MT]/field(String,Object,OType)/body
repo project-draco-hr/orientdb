@@ -1,30 +1,63 @@
 {
-  if ("@class".equals(iFieldName)) {
+  if (iFieldName == null)   throw new IllegalArgumentException("Field is null");
+  if (iFieldName.isEmpty())   throw new IllegalArgumentException("Field name is empty");
+  if (ODocumentHelper.ATTRIBUTE_CLASS.equals(iFieldName)) {
     setClassName(iPropertyValue.toString());
     return this;
   }
- else   if ("@rid".equals(iFieldName)) {
+ else   if (ODocumentHelper.ATTRIBUTE_RID.equals(iFieldName)) {
     _recordId.fromString(iPropertyValue.toString());
     return this;
   }
-  final int lastSep=_allowChainedAccess ? iFieldName.lastIndexOf('.') : -1;
+ else   if (ODocumentHelper.ATTRIBUTE_VERSION.equals(iFieldName)) {
+    if (iPropertyValue != null) {
+      int v=_recordVersion.getCounter();
+      if (iPropertyValue instanceof Number)       v=((Number)iPropertyValue).intValue();
+ else       Integer.parseInt(iPropertyValue.toString());
+      _recordVersion.setCounter(v);
+    }
+    return this;
+  }
+  final int lastDotSep=_allowChainedAccess ? iFieldName.lastIndexOf('.') : -1;
+  final int lastArraySep=_allowChainedAccess ? iFieldName.lastIndexOf('[') : -1;
+  final int lastSep=Math.max(lastArraySep,lastDotSep);
+  final boolean lastIsArray=lastArraySep > lastDotSep;
   if (lastSep > -1) {
     final Object subObject=field(iFieldName.substring(0,lastSep));
     if (subObject != null) {
-      final String subFieldName=iFieldName.substring(lastSep + 1);
+      final String subFieldName=lastIsArray ? iFieldName.substring(lastSep) : iFieldName.substring(lastSep + 1);
       if (subObject instanceof ODocument) {
         ((ODocument)subObject).field(subFieldName,iPropertyValue);
         return (ODocument)(((ODocument)subObject).isEmbedded() ? this : subObject);
       }
- else       if (subObject instanceof Map<?,?>)       ((Map<String,Object>)subObject).put(subFieldName,iPropertyValue);
+ else       if (subObject instanceof Map<?,?>) {
+        ((Map<String,Object>)subObject).put(subFieldName,iPropertyValue);
+      }
  else       if (OMultiValue.isMultiValue(subObject)) {
-        for (        Object subObjectItem : OMultiValue.getMultiValueIterable(subObject)) {
-          if (subObjectItem instanceof ODocument) {
-            if (!((ODocument)subObjectItem).isEmbedded())             throw new IllegalArgumentException("Property '" + iFieldName + "' points to linked collection of items. You can only change embedded documents in this way");
-            ((ODocument)subObjectItem).field(subFieldName,iPropertyValue);
+        if ((subObject instanceof List<?> || subObject.getClass().isArray()) && lastIsArray) {
+          final int subFieldNameLen=subFieldName.length();
+          if (subFieldName.charAt(subFieldNameLen - 1) != ']') {
+            throw new IllegalArgumentException("Missed closing ']'");
           }
- else           if (subObjectItem instanceof Map<?,?>) {
-            ((Map<String,Object>)subObjectItem).put(subFieldName,iPropertyValue);
+          final String indexPart=subFieldName.substring(1,subFieldNameLen - 1);
+          String indexAsString=ODocumentHelper.getIndexPart(null,indexPart).toString();
+          try {
+            final int index=Integer.parseInt(indexAsString);
+            OMultiValue.setValue(subObject,iPropertyValue,index);
+          }
+ catch (          NumberFormatException e) {
+            throw new IllegalArgumentException("List / array subscripts must resolve to integer values.");
+          }
+        }
+ else {
+          for (          Object subObjectItem : OMultiValue.getMultiValueIterable(subObject)) {
+            if (subObjectItem instanceof ODocument) {
+              if (!((ODocument)subObjectItem).isEmbedded())               throw new IllegalArgumentException("Property '" + iFieldName + "' points to linked collection of items. You can only change embedded documents in this way");
+              ((ODocument)subObjectItem).field(subFieldName,iPropertyValue);
+            }
+ else             if (subObjectItem instanceof Map<?,?>) {
+              ((Map<String,Object>)subObjectItem).put(subFieldName,iPropertyValue);
+            }
           }
         }
         return this;
@@ -55,7 +88,7 @@
   }
   OType fieldType=deriveFieldType(iFieldName,entry,iFieldType);
   if (iPropertyValue != null && fieldType != null) {
-    iPropertyValue=ODocumentHelper.convertField(this,iFieldName,fieldType.getDefaultJavaType(),iPropertyValue);
+    iPropertyValue=ODocumentHelper.convertField(this,iFieldName,fieldType,null,iPropertyValue);
   }
  else   if (iPropertyValue instanceof Enum)   iPropertyValue=iPropertyValue.toString();
   if (knownProperty)   if (iPropertyValue == null) {
@@ -64,7 +97,7 @@
  else {
     try {
       if (iPropertyValue.equals(oldValue)) {
-        if (iFieldType == null || iFieldType.length == 0 || iFieldType[0] == oldType) {
+        if (fieldType == oldType) {
           if (!(iPropertyValue instanceof ORecordElement))           setDirty();
           return this;
         }
@@ -79,12 +112,20 @@
     ridBag.setOwner(null);
   }
  else   if (oldValue instanceof ODocument) {
-    ODocumentInternal.removeOwner((ODocument)oldValue,this);
+    ((ODocument)oldValue).removeOwner(this);
+  }
+  if (oldValue instanceof OIdentifiable) {
+    unTrack((OIdentifiable)oldValue);
   }
   if (iPropertyValue != null) {
-    if (OType.EMBEDDED.equals(fieldType) && iPropertyValue instanceof ODocument) {
-      final ODocument embeddedDocument=(ODocument)iPropertyValue;
-      ODocumentInternal.addOwner(embeddedDocument,this);
+    if (iPropertyValue instanceof ODocument) {
+      if (OType.EMBEDDED.equals(fieldType)) {
+        final ODocument embeddedDocument=(ODocument)iPropertyValue;
+        ODocumentInternal.addOwner(embeddedDocument,this);
+      }
+    }
+    if (iPropertyValue instanceof OIdentifiable) {
+      track((OIdentifiable)iPropertyValue);
     }
     if (iPropertyValue instanceof ORidBag) {
       final ORidBag ridBag=(ORidBag)iPropertyValue;
@@ -96,13 +137,12 @@
     if (iPropertyValue == null || fieldType != null || oldType != OType.getTypeByValue(iPropertyValue))     entry.type=fieldType;
   }
   removeCollectionChangeListener(entry,oldValue);
-  removeCollectionTimeLine(entry);
   entry.value=iPropertyValue;
   if (!entry.exist()) {
     entry.setExist(true);
     _fieldSize++;
   }
-  addCollectionChangeListener(iFieldName,entry,iPropertyValue);
+  addCollectionChangeListener(entry);
   if (_status != STATUS.UNMARSHALLING) {
     setDirty();
     if (!entry.isChanged()) {

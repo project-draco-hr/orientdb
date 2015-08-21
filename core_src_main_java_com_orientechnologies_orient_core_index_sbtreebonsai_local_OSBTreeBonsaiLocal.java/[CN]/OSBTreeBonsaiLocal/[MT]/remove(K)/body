@@ -4,17 +4,17 @@
     atomicOperation=startAtomicOperation();
   }
  catch (  IOException e) {
-    throw new OSBTreeException("Error during sbtree entrie removal.",e);
+    throw new OSBTreeException("Error during sbtree entrie removal",e);
   }
-  acquireExclusiveLock();
+  Lock lock=fileLockManager.acquireExclusiveLock(fileId);
   try {
     BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
     if (bucketSearchResult.itemIndex < 0) {
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return null;
     }
     OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
-    OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
+    OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
     final V removed;
     keyBucketCacheEntry.acquireExclusiveLock();
     try {
@@ -24,17 +24,21 @@
     }
   finally {
       keyBucketCacheEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,keyBucketCacheEntry,diskCache);
+      releasePage(atomicOperation,keyBucketCacheEntry);
     }
     setSize(size() - 1,atomicOperation);
-    endAtomicOperation(false);
+    endAtomicOperation(false,null);
     return removed;
   }
- catch (  Throwable e) {
-    rollback();
-    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ name,e);
+ catch (  IOException e) {
+    rollback(e);
+    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),e);
+  }
+catch (  RuntimeException e) {
+    rollback(e);
+    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),e);
   }
  finally {
-    releaseExclusiveLock();
+    lock.unlock();
   }
 }

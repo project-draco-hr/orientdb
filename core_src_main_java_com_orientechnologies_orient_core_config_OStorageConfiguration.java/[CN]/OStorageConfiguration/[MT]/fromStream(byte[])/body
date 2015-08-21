@@ -35,12 +35,14 @@
       final float aa=Float.valueOf(read(values[index++]));
       final String clusterCompression=read(values[index++]);
       if (determineStorageCompression == null)       determineStorageCompression=clusterCompression;
+      String clusterEncryption=null;
+      if (version >= 15)       clusterEncryption=read(values[index++]);
       final String clusterConflictStrategy;
       if (version >= 12)       clusterConflictStrategy=read(values[index++]);
  else       clusterConflictStrategy=null;
       OStorageClusterConfiguration.STATUS status=OStorageClusterConfiguration.STATUS.ONLINE;
       if (version >= 13)       status=OStorageClusterConfiguration.STATUS.valueOf(read(values[index++]));
-      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,cc,bb,aa,clusterCompression,clusterConflictStrategy,status);
+      currentCluster=new OStoragePaginatedClusterConfiguration(this,clusterId,clusterName,null,cc,bb,aa,clusterCompression,clusterEncryption,configuration.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY),clusterConflictStrategy,status);
     }
  else     if (clusterType.equals("p"))     throw new IllegalArgumentException("Cluster of storage 'local' are not supported since 2.0");
  else     throw new IllegalArgumentException("Unsupported cluster type: " + clusterType);
@@ -64,10 +66,8 @@
     read(values[index++]);
   }
   size=Integer.parseInt(read(values[index++]));
-  properties.clear();
-  for (int i=0; i < size; ++i) {
-    properties.add(new OStorageEntryConfiguration(read(values[index++]),read(values[index++])));
-  }
+  clearProperties();
+  for (int i=0; i < size; ++i)   setProperty(read(values[index++]),read(values[index++]));
   if (version >= 7)   binaryFormatVersion=Integer.parseInt(read(values[index++]));
  else   if (version == 6)   binaryFormatVersion=9;
  else   binaryFormatVersion=8;
@@ -85,8 +85,10 @@
       final String key=read(values[index++]);
       final Object value=read(values[index++]);
       final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(key);
-      if (cfg != null)       configuration.setValue(key,OType.convert(value,cfg.getType()));
- else       OLogManager.instance().warn(this,"Ignored storage configuration because not supported: %s=%s.",key,value);
+      if (cfg != null) {
+        if (value != null)         configuration.setValue(key,OType.convert(value,cfg.getType()));
+      }
+ else       OLogManager.instance().warn(this,"Ignored storage configuration because not supported: %s=%s",key,value);
     }
   }
  else   configuration.setValue(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD,determineStorageCompression);

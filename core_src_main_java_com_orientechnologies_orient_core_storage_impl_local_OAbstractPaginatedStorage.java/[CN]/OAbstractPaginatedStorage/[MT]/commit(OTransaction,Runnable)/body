@@ -2,17 +2,19 @@
   checkOpeness();
   checkLowDiskSpaceAndFullCheckpointRequests();
   final ODatabaseDocumentInternal databaseRecord=ODatabaseRecordThreadLocal.INSTANCE.get();
-  if (databaseRecord != null)   ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  stateLock.acquireReadLock();
   try {
-    modificationLock.requestModificationLock();
     try {
-      lock.acquireExclusiveLock();
+      modificationLock.requestModificationLock();
       try {
-        if (writeAheadLog == null && clientTx.isUsingLog())         throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
-        makeStorageDirty();
-        startStorageTx(clientTx);
-        final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
-        while (clientTx.getCurrentRecordEntries().iterator().hasNext()) {
+        dataLock.acquireExclusiveLock();
+        try {
+          checkOpeness();
+          if (writeAheadLog == null && clientTx.isUsingLog())           throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
+          makeStorageDirty();
+          startStorageTx(clientTx);
+          final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
           for (          ORecordOperation txEntry : clientTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
           clientTx.clearRecordEntries();
           for (          ORecordOperation txEntry : tmpEntries) {
@@ -21,28 +23,38 @@
               if (record instanceof ODocument)               ((ODocument)record).validate();
             }
           }
-          for (          ORecordOperation txEntry : tmpEntries)           commitEntry(clientTx,txEntry);
+          for (          ORecordOperation txEntry : tmpEntries) {
+            if (txEntry.getRecord().isDirty()) {
+              if (txEntry.type == ORecordOperation.CREATED)               saveNew(txEntry,clientTx);
+            }
+          }
+          for (          ORecordOperation txEntry : tmpEntries) {
+            if (txEntry.type != ORecordOperation.CREATED)             commitEntry(clientTx,txEntry);
+          }
+          if (callback != null)           callback.run();
+          endStorageTx();
+          OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
         }
-        if (callback != null)         callback.run();
-        endStorageTx();
-        OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
-      }
- catch (      Exception e) {
-        OLogManager.instance().debug(this,"Error during transaction commit, transaction will be rolled back (tx-id=%d)",e,clientTx.getId());
-        rollback(clientTx);
-        if (e instanceof OException)         throw ((OException)e);
- else         throw new OStorageException("Error during transaction commit.",e);
-      }
+ catch (        IOException ioe) {
+          makeRollback(clientTx,ioe);
+        }
+catch (        RuntimeException e) {
+          makeRollback(clientTx,e);
+        }
  finally {
-        transaction.set(null);
-        lock.releaseExclusiveLock();
+          transaction.set(null);
+          dataLock.releaseExclusiveLock();
+        }
+      }
+  finally {
+        modificationLock.releaseModificationLock();
       }
     }
   finally {
-      modificationLock.releaseModificationLock();
+      ((OMetadataInternal)databaseRecord.getMetadata()).clearThreadLocalSchemaSnapshot();
     }
   }
   finally {
-    if (databaseRecord != null)     ((OMetadataInternal)databaseRecord.getMetadata()).clearThreadLocalSchemaSnapshot();
+    stateLock.releaseReadLock();
   }
 }

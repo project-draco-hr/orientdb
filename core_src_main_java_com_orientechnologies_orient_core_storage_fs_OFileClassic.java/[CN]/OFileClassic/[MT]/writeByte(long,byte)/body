@@ -1,13 +1,24 @@
 {
-  acquireWriteLock();
-  try {
-    iOffset+=HEADER_SIZE;
-    final ByteBuffer buffer=getWriteBuffer(OBinaryProtocol.SIZE_BYTE);
-    buffer.put(iValue);
-    writeBuffer(buffer,iOffset);
-    setDirty();
-  }
+  int attempts=0;
+  while (true) {
+    try {
+      acquireWriteLock();
+      try {
+        iOffset+=HEADER_SIZE;
+        final ByteBuffer buffer=getWriteBuffer(OBinaryProtocol.SIZE_BYTE);
+        buffer.put(iValue);
+        writeBuffer(buffer,iOffset);
+        setDirty();
+        break;
+      }
   finally {
-    releaseWriteLock();
+        releaseWriteLock();
+        attempts++;
+      }
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error during write of byte data for file " + getName() + " "+ attempts+ "-th attempt",e);
+      reopenFile(attempts,e);
+    }
   }
 }

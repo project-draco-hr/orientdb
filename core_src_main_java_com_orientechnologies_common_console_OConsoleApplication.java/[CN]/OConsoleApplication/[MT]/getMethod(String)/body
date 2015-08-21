@@ -1,0 +1,56 @@
+{
+  iCommand=iCommand.trim();
+  if (iCommand.length() == 0)   return null;
+  if (isComment(iCommand))   return null;
+  Method lastMethodInvoked=null;
+  final StringBuilder lastCommandInvoked=new StringBuilder(1024);
+  final String commandLowerCase=iCommand.toLowerCase();
+  final Map<Method,Object> methodMap=getConsoleMethods();
+  final StringBuilder commandSignature=new StringBuilder();
+  boolean separator=false;
+  for (int i=0; i < iCommand.length(); ++i) {
+    final char ch=iCommand.charAt(i);
+    if (ch == ' ')     separator=true;
+ else {
+      if (separator) {
+        separator=false;
+        commandSignature.append(Character.toUpperCase(ch));
+      }
+ else       commandSignature.append(ch);
+    }
+  }
+  final String commandSignatureToCheck=commandSignature.toString();
+  for (  Entry<Method,Object> entry : methodMap.entrySet()) {
+    final Method m=entry.getKey();
+    if (m.getName().equals(commandSignatureToCheck))     return m;
+  }
+  for (  Entry<Method,Object> entry : methodMap.entrySet()) {
+    final Method m=entry.getKey();
+    final String methodName=m.getName();
+    final ConsoleCommand ann=m.getAnnotation(ConsoleCommand.class);
+    final StringBuilder commandName=new StringBuilder();
+    char ch;
+    for (int i=0; i < methodName.length(); ++i) {
+      ch=methodName.charAt(i);
+      if (Character.isUpperCase(ch)) {
+        commandName.append(" ");
+        ch=Character.toLowerCase(ch);
+      }
+      commandName.append(ch);
+    }
+    if (!commandLowerCase.equals(commandName.toString()) && !commandLowerCase.startsWith(commandName.toString() + " ")) {
+      if (ann == null)       continue;
+      String[] aliases=ann.aliases();
+      if (aliases == null || aliases.length == 0)       continue;
+      for (      String alias : aliases) {
+        if (iCommand.startsWith(alias.split(" ")[0])) {
+          return m;
+        }
+      }
+    }
+ else     return m;
+  }
+  if (lastMethodInvoked != null)   syntaxError(lastCommandInvoked.toString(),lastMethodInvoked);
+  error("\n!Unrecognized command: '%s'",iCommand);
+  return null;
+}

@@ -1,7 +1,7 @@
 {
   atomicOperationsManager.acquireReadLock(this);
   try {
-    acquireSharedLock();
+    final Lock lock=fileLockManager.acquireSharedLock(fileId);
     try {
       OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
       BucketSearchResult bucketSearchResultFrom=findBucket(keyFrom,atomicOperation);
@@ -26,7 +26,7 @@
       int endIndex;
       OBonsaiBucketPointer bucketPointer=bucketPointerFrom;
       resultsLoop:       while (true) {
-        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false,diskCache);
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
         try {
           OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
           if (!bucketPointer.equals(bucketPointerTo))           endIndex=bucket.size() - 1;
@@ -39,17 +39,17 @@
           if (bucketPointer.getPageIndex() < 0)           break;
         }
   finally {
-          releasePage(atomicOperation,cacheEntry,diskCache);
+          releasePage(atomicOperation,cacheEntry);
         }
         startIndex=0;
       }
     }
   finally {
-      releaseSharedLock();
+      lock.unlock();
     }
   }
  catch (  IOException ioe) {
-    throw new OSBTreeException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ name);
+    throw new OSBTreeException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ getName(),ioe);
   }
  finally {
     atomicOperationsManager.releaseReadLock(this);

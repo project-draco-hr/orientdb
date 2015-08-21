@@ -1,0 +1,23 @@
+{
+  final int intId=extractFileId(fileId);
+  filesLock.acquireWriteLock();
+  try {
+    if (!files.containsKey(intId))     return;
+    final OFileClassic file=files.get(intId);
+    final String osFileName=file.getName();
+    if (osFileName.startsWith(oldFileName)) {
+      final File newFile=new File(storageLocal.getStoragePath() + File.separator + newFileName+ osFileName.substring(osFileName.lastIndexOf(oldFileName) + oldFileName.length()));
+      boolean renamed=file.renameTo(newFile);
+      while (!renamed) {
+        renamed=file.renameTo(newFile);
+      }
+    }
+    nameIdMap.remove(oldFileName);
+    nameIdMap.put(newFileName,intId);
+    writeNameIdEntry(new NameFileIdEntry(oldFileName,-1),false);
+    writeNameIdEntry(new NameFileIdEntry(newFileName,intId),true);
+  }
+  finally {
+    filesLock.releaseWriteLock();
+  }
+}

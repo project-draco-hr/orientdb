@@ -1,20 +1,33 @@
 {
-  final OIndexDefinition indexDefinition=idx.getDefinition();
-  if (indexDefinition == null || indexDefinition.getClassName() == null)   return;
-  final Map<OMultiKey,Set<OIndex<?>>> map=classPropertyIndex.get(indexDefinition.getClassName().toLowerCase());
-  if (map == null) {
-    return;
-  }
-  final int paramCount=indexDefinition.getParamCount();
-  for (int i=1; i <= paramCount; i++) {
-    final List<String> fields=normalizeFieldNames(indexDefinition.getFields().subList(0,i));
-    final OMultiKey multiKey=new OMultiKey(fields);
-    final Set<OIndex<?>> indexSet=map.get(multiKey);
-    if (indexSet == null)     continue;
-    indexSet.remove(idx);
-    if (indexSet.isEmpty()) {
-      map.remove(multiKey);
+  acquireExclusiveLock();
+  try {
+    final OIndexDefinition indexDefinition=idx.getDefinition();
+    if (indexDefinition == null || indexDefinition.getClassName() == null)     return;
+    final Locale locale=getServerLocale();
+    Map<OMultiKey,Set<OIndex<?>>> map=classPropertyIndex.get(indexDefinition.getClassName().toLowerCase(locale));
+    if (map == null) {
+      return;
     }
+    map=new HashMap<OMultiKey,Set<OIndex<?>>>(map);
+    final int paramCount=indexDefinition.getParamCount();
+    for (int i=1; i <= paramCount; i++) {
+      final List<String> fields=normalizeFieldNames(indexDefinition.getFields().subList(0,i));
+      final OMultiKey multiKey=new OMultiKey(fields);
+      Set<OIndex<?>> indexSet=map.get(multiKey);
+      if (indexSet == null)       continue;
+      indexSet=new HashSet<OIndex<?>>(indexSet);
+      indexSet.remove(idx);
+      if (indexSet.isEmpty()) {
+        map.remove(multiKey);
+      }
+ else {
+        map.put(multiKey,indexSet);
+      }
+    }
+    if (map.isEmpty())     classPropertyIndex.remove(indexDefinition.getClassName().toLowerCase(locale));
+ else     classPropertyIndex.put(indexDefinition.getClassName().toLowerCase(locale),copyPropertyMap(map));
   }
-  if (map.isEmpty())   classPropertyIndex.remove(indexDefinition.getClassName().toLowerCase());
+  finally {
+    releaseExclusiveLock();
+  }
 }

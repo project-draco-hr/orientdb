@@ -3,6 +3,22 @@
   if (attribute == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   final OClassImpl cls=(OClassImpl)database.getMetadata().getSchema().getClass(className);
   if (cls == null)   throw new OCommandExecutionException("Cannot alter class '" + className + "' because not found");
+  if (!unsafe && attribute == ATTRIBUTES.NAME && cls.isSubClassOf("E"))   throw new OCommandExecutionException("Cannot alter class '" + className + "' because is an Edge class and could break vertices. Use UNSAFE if you want to force it");
+  for (  int clId : cls.getPolymorphicClusterIds())   getDatabase().getMetadata().getCommandCache().invalidateResultsOfCluster(getDatabase().getClusterNameById(clId));
+  if (value != null && attribute == ATTRIBUTES.SUPERCLASS) {
+    checkClassExists(database,className,value);
+  }
+  if (value != null && attribute == ATTRIBUTES.SUPERCLASSES) {
+    List<String> classes=Arrays.asList(value.split(",\\s*"));
+    for (    String cName : classes) {
+      checkClassExists(database,className,cName);
+    }
+  }
+  if (!unsafe && value != null && attribute == ATTRIBUTES.NAME) {
+    if (!cls.getIndexes().isEmpty()) {
+      throw new OCommandExecutionException("Cannot rename class '" + className + "' because it has indexes defined on it. Drop indexes before or use UNSAFE (at your won risk)");
+    }
+  }
   cls.set(attribute,value);
   return null;
 }

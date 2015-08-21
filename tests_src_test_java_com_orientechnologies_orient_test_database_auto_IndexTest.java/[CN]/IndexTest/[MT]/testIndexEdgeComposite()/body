@@ -1,0 +1,38 @@
+{
+  OrientGraph graphNoTx=new OrientGraph((ODatabaseDocumentTx)database.getUnderlying());
+  OrientVertexType vertexType=null;
+  if (!graphNoTx.getRawGraph().existsCluster("CustomVertex")) {
+    vertexType=graphNoTx.createVertexType("CustomVertex");
+  }
+ else {
+    vertexType=graphNoTx.getVertexType("CustomVertex");
+  }
+  if (!graphNoTx.getRawGraph().existsCluster("CustomEdge")) {
+    OrientEdgeType edgeType=graphNoTx.createEdgeType("CustomEdge");
+    edgeType.createProperty("out",OType.LINK,vertexType);
+    edgeType.createProperty("in",OType.LINK,vertexType);
+    edgeType.createIndex("CustomEdge.in",OClass.INDEX_TYPE.UNIQUE,"in");
+    edgeType.createIndex("CustomEdge.out",OClass.INDEX_TYPE.UNIQUE,"out");
+    edgeType.createIndex("CustomEdge.compositeInOut",OClass.INDEX_TYPE.UNIQUE,"out","in");
+  }
+  OrientGraph graph=new OrientGraph((ODatabaseDocumentTx)database.getUnderlying());
+  Vertex inVert=null;
+  for (int i=0; i < 5; ++i) {
+    Vertex currentVert=graph.addVertex("class:CustomVertex");
+    if (inVert != null) {
+      graph.addEdge("class:CustomEdge",currentVert,inVert,"CustomEdge");
+    }
+    inVert=currentVert;
+  }
+  graph.commit();
+  Iterable<Vertex> verts=graph.getVertices();
+  StringBuilder vertIds=new StringBuilder();
+  for (  Vertex vert : verts) {
+    vertIds.append(vert.getId().toString()).append(" ");
+  }
+  System.out.println("Vertices: " + vertIds);
+  System.out.println();
+  checkIndexKeys(graph,"CustomEdge.in");
+  checkIndexKeys(graph,"CustomEdge.out");
+  checkIndexKeys(graph,"CustomEdge.compositeInOut");
+}

@@ -1,8 +1,35 @@
 {
   if (schemaClass == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   final long recs=schemaClass.count();
+  if (recs > 0 && !unsafe) {
+    if (schemaClass.isSubClassOf("V")) {
+      throw new OCommandExecutionException("'TRUNCATE CLASS' command cannot be used on not empty vertex classes. Apply the 'UNSAFE' keyword to force it (at your own risk)");
+    }
+ else     if (schemaClass.isSubClassOf("E")) {
+      throw new OCommandExecutionException("'TRUNCATE CLASS' command cannot be used on not empty edge classes. Apply the 'UNSAFE' keyword to force it (at your own risk)");
+    }
+  }
+  Collection<OClass> subclasses=schemaClass.getAllSubclasses();
+  if (deep && !unsafe) {
+    for (    OClass subclass : subclasses) {
+      long subclassRecs=schemaClass.count();
+      if (subclassRecs > 0) {
+        if (subclass.isSubClassOf("V")) {
+          throw new OCommandExecutionException("'TRUNCATE CLASS' command cannot be used on not empty vertex classes (" + subclass.getName() + "). Apply the 'UNSAFE' keyword to force it (at your own risk)");
+        }
+ else         if (subclass.isSubClassOf("E")) {
+          throw new OCommandExecutionException("'TRUNCATE CLASS' command cannot be used on not empty edge classes (" + subclass.getName() + "). Apply the 'UNSAFE' keyword to force it (at your own risk)");
+        }
+      }
+    }
+  }
   try {
     schemaClass.truncate();
+    if (deep) {
+      for (      OClass subclass : subclasses) {
+        subclass.truncate();
+      }
+    }
   }
  catch (  IOException e) {
     throw new OCommandExecutionException("Error on executing command",e);

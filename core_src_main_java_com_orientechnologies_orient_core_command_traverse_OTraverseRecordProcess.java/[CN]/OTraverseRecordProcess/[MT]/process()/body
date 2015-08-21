@@ -1,38 +1,43 @@
 {
-  if (target == null)   return drop();
-  if (command.getContext().isAlreadyTraversed(target))   return drop();
-  if (target.getInternalStatus() == ORecordElement.STATUS.NOT_LOADED)   try {
-    target.reload();
-  }
- catch (  final ORecordNotFoundException e) {
-    return drop();
-  }
+  if (target == null)   return pop();
+  final int depth=path.getDepth();
+  if (command.getContext().isAlreadyTraversed(target,depth))   return drop();
   if (command.getPredicate() != null) {
     final Object conditionResult=command.getPredicate().evaluate(target,null,command.getContext());
-    if (conditionResult != Boolean.TRUE)     return drop();
+    if (conditionResult != Boolean.TRUE)     return pop();
   }
-  command.getContext().addTraversed(target);
-  final List<Object> fields=new ArrayList<Object>();
-  for (  Object cfgFieldObject : command.getFields()) {
-    String cfgField=cfgFieldObject.toString();
-    if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equalsIgnoreCase(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equalsIgnoreCase(cfgField)) {
-      Collections.addAll(fields,target.fieldNames());
-      break;
-    }
+  command.getContext().addTraversed(target,depth);
+  final int maxDepth=command.getMaxDepth();
+  if (maxDepth > -1 && depth == maxDepth) {
+    pop();
+  }
  else {
-      final int pos=cfgField.indexOf('.');
-      if (pos > -1) {
-        final OClass cls=ODocumentInternal.getImmutableSchemaClass(target);
-        if (cls == null)         continue;
-        final String className=cfgField.substring(0,pos);
-        if (!cls.isSubClassOf(className))         continue;
-        cfgField=cfgField.substring(pos + 1);
-        fields.add(cfgField);
+    final ORecord targetRec=target.getRecord();
+    if (!(targetRec instanceof ODocument))     return pop();
+    final ODocument targetDoc=(ODocument)targetRec;
+    final List<Object> fields=new ArrayList<Object>();
+    for (    Object cfgFieldObject : command.getFields()) {
+      String cfgField=cfgFieldObject.toString();
+      if ("*".equals(cfgField) || OSQLFilterItemFieldAll.FULL_NAME.equalsIgnoreCase(cfgField) || OSQLFilterItemFieldAny.FULL_NAME.equalsIgnoreCase(cfgField)) {
+        Collections.addAll(fields,targetDoc.fieldNames());
+        break;
       }
- else       fields.add(cfgFieldObject);
+ else {
+        final int pos=cfgField.indexOf('.');
+        if (pos > -1) {
+          final OClass cls=ODocumentInternal.getImmutableSchemaClass(targetDoc);
+          if (cls == null)           continue;
+          final String className=cfgField.substring(0,pos);
+          if (!cls.isSubClassOf(className))           continue;
+          cfgField=cfgField.substring(pos + 1);
+          fields.add(cfgField);
+        }
+ else         fields.add(cfgFieldObject);
+      }
     }
+    if (command.getStrategy() == OTraverse.STRATEGY.DEPTH_FIRST)     Collections.reverse(fields);
+    processFields(fields.iterator());
+    if (targetDoc.isEmbedded())     return null;
   }
-  processFields(fields.iterator());
-  if (target.isEmbedded())   return null;
   return target;
 }

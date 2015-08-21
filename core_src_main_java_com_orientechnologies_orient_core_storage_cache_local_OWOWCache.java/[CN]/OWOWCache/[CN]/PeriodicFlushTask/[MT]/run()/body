@@ -1,0 +1,55 @@
+{
+  final long start=System.currentTimeMillis();
+  try {
+    if (writeCachePages.isEmpty()) {
+      lastAmountOfFlushedPages.lazySet(0);
+      return;
+    }
+    int writePagesToFlush=0;
+    final long wcs=exclusiveWriteCacheSize.get();
+    final long cs=writeCacheSize.get();
+    boolean iterateByWritePagesFirst=false;
+    boolean forceFlush=false;
+    double writeCacheThreshold=((double)wcs) / writeCacheMaxSize;
+    if (writeCacheThreshold > 0.3) {
+      writePagesToFlush=(int)Math.floor(((writeCacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
+      iterateByWritePagesFirst=true;
+      if (writeCacheThreshold > 0.7)       forceFlush=true;
+    }
+    double cacheThreshold=((double)cs) / cacheMaxSize;
+    if (cacheThreshold > 0.3) {
+      final int pagesToFlush=(int)Math.floor(((cacheThreshold - 0.3) / 0.4) * MAX_PAGES_PER_FLUSH);
+      writePagesToFlush=Math.max(pagesToFlush,writePagesToFlush);
+      if (cacheThreshold > 0.7)       forceFlush=true;
+    }
+    writePagesToFlush=Math.max(4,Math.min(MAX_PAGES_PER_FLUSH,writePagesToFlush));
+    int flushedPages=0;
+    flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    if (flushedPages < writePagesToFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
+    }
+    if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,false,false);
+    }
+    if (flushedPages < writePagesToFlush && forceFlush) {
+      flushedPages=flushRing(writePagesToFlush,flushedPages,true,iterateByWritePagesFirst);
+      if (flushedPages < writePagesToFlush && iterateByWritePagesFirst) {
+        flushedPages=flushRing(writePagesToFlush,flushedPages,true,false);
+        if (flushedPages < writePagesToFlush) {
+          flushedPages=flushRing(writePagesToFlush,flushedPages,true,false);
+        }
+      }
+    }
+    lastAmountOfFlushedPages.lazySet(flushedPages);
+  }
+ catch (  IOException e) {
+    OLogManager.instance().error(this,"Exception during data flush",e);
+  }
+catch (  RuntimeException e) {
+    OLogManager.instance().error(this,"Exception during data flush",e);
+  }
+ finally {
+    final long end=System.currentTimeMillis();
+    durationOfLastFlush.lazySet(end - start);
+  }
+}

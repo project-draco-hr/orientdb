@@ -1,0 +1,35 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + ODocumentValidationTest.class.getSimpleName());
+  db.create();
+  try {
+    OClass embeddedClazz=db.getMetadata().getSchema().createClass("EmbeddedValidation");
+    embeddedClazz.createProperty("int",OType.INTEGER).setMandatory(true);
+    embeddedClazz.createProperty("long",OType.LONG).setMandatory(true);
+    OClass clazz=db.getMetadata().getSchema().createClass("Validation");
+    clazz.createProperty("int",OType.INTEGER).setMandatory(true);
+    clazz.createProperty("long",OType.LONG).setMandatory(true);
+    clazz.createProperty("embeddedSet",OType.EMBEDDEDSET,embeddedClazz).setMandatory(true);
+    ODocument d=new ODocument(clazz);
+    d.field("int",30);
+    d.field("long",30);
+    final Set<ODocument> embeddedSet=new HashSet<ODocument>();
+    d.field("embeddedSet",embeddedSet);
+    ODocument embeddedInSet=new ODocument("EmbeddedValidation");
+    embeddedInSet.field("int",30);
+    embeddedInSet.field("long",30);
+    embeddedSet.add(embeddedInSet);
+    ODocument embeddedInSet2=new ODocument("EmbeddedValidation");
+    embeddedInSet2.field("int",30);
+    embeddedSet.add(embeddedInSet2);
+    try {
+      d.validate();
+      Assert.fail("Validation doesn't throw exception");
+    }
+ catch (    OValidationException e) {
+      Assert.assertTrue(e.toString().contains("EmbeddedValidation.long"));
+    }
+  }
+  finally {
+    db.drop();
+  }
+}

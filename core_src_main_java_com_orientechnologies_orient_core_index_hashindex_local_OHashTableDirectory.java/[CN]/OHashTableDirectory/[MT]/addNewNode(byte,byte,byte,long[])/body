@@ -3,7 +3,7 @@
   OAtomicOperation atomicOperation=startAtomicOperation();
   acquireExclusiveLock();
   try {
-    OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true,diskCache);
+    OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true);
     firstEntry.acquireExclusiveLock();
     try {
       ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
@@ -24,10 +24,10 @@
  else {
         final int pageIndex=nodeIndex / ODirectoryPage.NODES_PER_PAGE;
         final int localLevel=nodeIndex % ODirectoryPage.NODES_PER_PAGE;
-        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true,diskCache);
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true);
         while (cacheEntry == null || cacheEntry.getPageIndex() < pageIndex) {
-          if (cacheEntry != null)           releasePage(atomicOperation,cacheEntry,diskCache);
-          cacheEntry=addPage(atomicOperation,fileId,diskCache);
+          if (cacheEntry != null)           releasePage(atomicOperation,cacheEntry);
+          cacheEntry=addPage(atomicOperation,fileId);
         }
         cacheEntry.acquireExclusiveLock();
         try {
@@ -40,22 +40,22 @@
         }
   finally {
           cacheEntry.releaseExclusiveLock();
-          releasePage(atomicOperation,cacheEntry,diskCache);
+          releasePage(atomicOperation,cacheEntry);
         }
       }
     }
   finally {
       firstEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,firstEntry,diskCache);
+      releasePage(atomicOperation,firstEntry);
     }
-    endAtomicOperation(false);
+    endAtomicOperation(false,null);
   }
  catch (  IOException e) {
-    endAtomicOperation(true);
+    endAtomicOperation(true,e);
     throw e;
   }
-catch (  Throwable e) {
-    endAtomicOperation(true);
+catch (  RuntimeException e) {
+    endAtomicOperation(true,e);
     throw new OStorageException(null,e);
   }
  finally {

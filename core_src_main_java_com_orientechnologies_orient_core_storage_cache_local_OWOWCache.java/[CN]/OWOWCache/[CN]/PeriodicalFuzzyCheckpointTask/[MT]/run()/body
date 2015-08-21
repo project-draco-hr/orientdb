@@ -1,0 +1,19 @@
+{
+  OLogSequenceNumber minLsn=writeAheadLog.getFlushedLsn();
+  minLsn=findMinLsn(minLsn,writeCachePages);
+  OLogManager.instance().debug(this,"Start fuzzy checkpoint flushed LSN is %s",minLsn);
+  try {
+    writeAheadLog.logFuzzyCheckPointStart(minLsn);
+    for (    OFileClassic fileClassic : files.values()) {
+      fileClassic.synch();
+    }
+    writeAheadLog.logFuzzyCheckPointEnd();
+    writeAheadLog.flush();
+    if (minLsn.compareTo(new OLogSequenceNumber(-1,-1)) > 0)     writeAheadLog.cutTill(minLsn);
+  }
+ catch (  IOException ioe) {
+    OLogManager.instance().error(this,"Error during fuzzy checkpoint",ioe);
+  }
+  OLogManager.instance().debug(this,"End fuzzy checkpoint");
+  lastFuzzyCheckpointDate.lazySet(new Date());
+}

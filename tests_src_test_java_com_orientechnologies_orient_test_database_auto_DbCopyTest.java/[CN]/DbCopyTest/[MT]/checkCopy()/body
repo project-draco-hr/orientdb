@@ -1,0 +1,43 @@
+{
+  final String className="DbCopyTest";
+  database.getMetadata().getSchema().createClass(className);
+  final ODatabaseDocumentTx otherDB=database.copy();
+  Thread thread=new Thread(){
+    @Override public void run(){
+      otherDB.activateOnCurrentThread();
+      for (int i=0; i < 5; i++) {
+        ODocument doc=otherDB.newInstance(className);
+        doc.field("num",i);
+        doc.save();
+        try {
+          Thread.sleep(10);
+        }
+ catch (        InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      otherDB.close();
+    }
+  }
+;
+  thread.start();
+  for (int i=0; i < 20; i++) {
+    ODocument doc=database.newInstance(className);
+    doc.field("num",i);
+    doc.save();
+    try {
+      Thread.sleep(10);
+    }
+ catch (    InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+  try {
+    thread.join();
+  }
+ catch (  InterruptedException e) {
+    Assert.fail();
+  }
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("SELECT FROM " + className));
+  Assert.assertEquals(result.size(),25);
+}

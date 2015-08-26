@@ -1,10 +1,10 @@
 {
-  final String variable=lastCommand.substring("return ".length()).trim();
-  if (variable.equalsIgnoreCase("NULL"))   lastResult=null;
- else   if (variable.startsWith("$"))   lastResult=getContext().getVariable(variable);
- else   if (variable.startsWith("[") && variable.endsWith("]")) {
+  Object lastResult=null;
+  if (iValue.equalsIgnoreCase("NULL"))   lastResult=null;
+ else   if (iValue.startsWith("$"))   lastResult=getContext().getVariable(iValue);
+ else   if (iValue.startsWith("[") && iValue.endsWith("]")) {
     final List<String> items=new ArrayList<String>();
-    OStringSerializerHelper.getCollection(variable,0,items);
+    OStringSerializerHelper.getCollection(iValue,0,items);
     final List<Object> result=new ArrayList<Object>(items.size());
     for (int i=0; i < items.size(); ++i) {
       String item=items.get(i);
@@ -16,8 +16,8 @@
     }
     lastResult=result;
   }
- else   if (variable.startsWith("{") && variable.endsWith("}")) {
-    final Map<String,String> map=OStringSerializerHelper.getMap(variable);
+ else   if (iValue.startsWith("{") && iValue.endsWith("}")) {
+    final Map<String,String> map=OStringSerializerHelper.getMap(iValue);
     final Map<Object,Object> result=new HashMap<Object,Object>(map.size());
     for (    Map.Entry<String,String> entry : map.entrySet()) {
       String stringKey=entry.getKey();
@@ -37,6 +37,8 @@
     }
     lastResult=result;
   }
- else   lastResult=variable;
+ else   if (iValue.startsWith("\"") && iValue.endsWith("\"") || iValue.startsWith("'") && iValue.endsWith("'"))   lastResult=new OContextVariableResolver(context).parse(OIOUtils.getStringContent(iValue));
+ else   if (iValue.startsWith("(") && iValue.endsWith(")"))   lastResult=executeCommand(iValue,db);
+ else   lastResult=new OSQLPredicate(iValue).evaluate(context);
   return lastResult;
 }

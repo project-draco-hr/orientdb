@@ -1,11 +1,18 @@
 {
-  int fullPos=OVarIntSerializer.write(bytes,map.size());
-  for (  Entry<Object,OIdentifiable> entry : map.entrySet()) {
-    OType type=OType.STRING;
-    writeOType(bytes,bytes.alloc(1),type);
-    writeString(bytes,entry.getKey().toString());
-    if (entry.getValue() == null)     writeNullLink(bytes);
- else     writeOptimizedLink(bytes,entry.getValue());
+  final boolean disabledAutoConversion=map instanceof ORecordLazyMultiValue && ((ORecordLazyMultiValue)map).isAutoConvertToRecord();
+  if (disabledAutoConversion)   ((ORecordLazyMultiValue)map).setAutoConvertToRecord(false);
+  try {
+    int fullPos=OVarIntSerializer.write(bytes,map.size());
+    for (    Entry<Object,OIdentifiable> entry : map.entrySet()) {
+      OType type=OType.STRING;
+      writeOType(bytes,bytes.alloc(1),type);
+      writeString(bytes,entry.getKey().toString());
+      if (entry.getValue() == null)       writeNullLink(bytes);
+ else       writeOptimizedLink(bytes,entry.getValue());
+    }
+    return fullPos;
   }
-  return fullPos;
+  finally {
+    if (disabledAutoConversion)     ((ORecordLazyMultiValue)map).setAutoConvertToRecord(true);
+  }
 }

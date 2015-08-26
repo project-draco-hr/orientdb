@@ -1,0 +1,30 @@
+{
+  if (this.preParsedStatement == null) {
+    return null;
+  }
+  OWhereClause where=((OSelectStatement)this.preParsedStatement).getWhereClause();
+  if (where == null) {
+    return null;
+  }
+  List<OBinaryCondition> conditions=where.getIndexedFunctionConditions(iSchemaClass,getDatabase());
+  long lastEstimation=Long.MAX_VALUE;
+  OBinaryCondition bestCondition=null;
+  if (conditions == null) {
+    return null;
+  }
+  for (  OBinaryCondition condition : conditions) {
+    long estimation=condition.estimateIndexed(((OSelectStatement)this.preParsedStatement).getTarget(),getContext());
+    if (estimation > -1 && estimation < lastEstimation) {
+      lastEstimation=estimation;
+      bestCondition=condition;
+    }
+  }
+  if (bestCondition == null) {
+    return null;
+  }
+  Iterable<OIdentifiable> result=bestCondition.executeIndexedFunction(((OSelectStatement)this.preParsedStatement).getTarget(),getContext());
+  if (result == null) {
+    return null;
+  }
+  return result.iterator();
+}

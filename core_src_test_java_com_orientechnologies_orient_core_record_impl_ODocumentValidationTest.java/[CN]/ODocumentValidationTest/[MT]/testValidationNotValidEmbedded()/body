@@ -1,0 +1,26 @@
+{
+  ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + ODocumentValidationTest.class.getSimpleName());
+  db.create();
+  try {
+    OClass embeddedClazz=db.getMetadata().getSchema().createClass("EmbeddedValidation");
+    embeddedClazz.createProperty("int",OType.INTEGER).setMandatory(true);
+    OClass clazz=db.getMetadata().getSchema().createClass("Validation");
+    clazz.createProperty("int",OType.INTEGER).setMandatory(true);
+    clazz.createProperty("long",OType.LONG).setMandatory(true);
+    clazz.createProperty("embedded",OType.EMBEDDED,embeddedClazz).setMandatory(true);
+    ODocument d=new ODocument(clazz);
+    d.field("int",30);
+    d.field("long",30);
+    d.field("embedded",new ODocument("EmbeddedValidation").field("test","test"));
+    try {
+      d.validate();
+      Assert.fail("Validation doesn't throw exception");
+    }
+ catch (    OValidationException e) {
+      Assert.assertTrue(e.toString().contains("EmbeddedValidation.int"));
+    }
+  }
+  finally {
+    db.drop();
+  }
+}

@@ -1,0 +1,108 @@
+{
+  iCommandContext.setVariable("$matched",matchContext.matched);
+  if (pattern.getNumOfEdges() == matchContext.matchedEdges.size() && allNodesCalculated(matchContext,pattern)) {
+    addResult(matchContext,request,iCommandContext);
+    return true;
+  }
+  if (executionPlan.sortedEdges.size() == matchContext.currentEdgeNumber) {
+    expandCartesianProduct(pattern,matchContext,aliasClasses,aliasFilters,iCommandContext,request);
+    return true;
+  }
+  EdgeTraversal currentEdge=executionPlan.sortedEdges.get(matchContext.currentEdgeNumber);
+  PatternNode rootNode=currentEdge.out ? currentEdge.edge.out : currentEdge.edge.in;
+  if (currentEdge.out) {
+    PatternEdge outEdge=currentEdge.edge;
+    if (!matchContext.matchedEdges.containsKey(outEdge)) {
+      Object rightValues=outEdge.executeTraversal(matchContext,iCommandContext,matchContext.matched.get(outEdge.out.alias),0);
+      if (!(rightValues instanceof Iterable)) {
+        rightValues=Collections.singleton(rightValues);
+      }
+      for (      OIdentifiable rightValue : (Iterable<OIdentifiable>)rightValues) {
+        Iterable<OIdentifiable> prevMatchedRightValues=matchContext.candidates.get(outEdge.in.alias);
+        if (matchContext.matched.containsKey(outEdge.in.alias)) {
+          if (matchContext.matched.get(outEdge.in.alias).getIdentity().equals(rightValue.getIdentity())) {
+            MatchContext childContext=matchContext.copy(outEdge.in.alias,rightValue.getIdentity());
+            childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+            childContext.matchedEdges.put(outEdge,true);
+            if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+              return false;
+            }
+            break;
+          }
+        }
+ else         if (prevMatchedRightValues != null && prevMatchedRightValues.iterator().hasNext()) {
+          for (          OIdentifiable id : prevMatchedRightValues) {
+            if (id.getIdentity().equals(rightValue.getIdentity())) {
+              MatchContext childContext=matchContext.copy(outEdge.in.alias,id);
+              childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+              childContext.matchedEdges.put(outEdge,true);
+              if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+                return false;
+              }
+            }
+          }
+        }
+ else {
+          MatchContext childContext=matchContext.copy(outEdge.in.alias,rightValue.getIdentity());
+          childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+          childContext.matchedEdges.put(outEdge,true);
+          if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+            return false;
+          }
+        }
+      }
+    }
+  }
+ else {
+    PatternEdge inEdge=currentEdge.edge;
+    if (!matchContext.matchedEdges.containsKey(inEdge)) {
+      if (!inEdge.item.isBidirectional()) {
+        throw new RuntimeException("Invalid pattern to match!");
+      }
+      if (!matchContext.matchedEdges.containsKey(inEdge)) {
+        Object leftValues=inEdge.item.method.executeReverse(matchContext.matched.get(inEdge.in.alias),iCommandContext);
+        if (!(leftValues instanceof Iterable)) {
+          leftValues=Collections.singleton(leftValues);
+        }
+        for (        OIdentifiable leftValue : (Iterable<OIdentifiable>)leftValues) {
+          Iterable<OIdentifiable> prevMatchedRightValues=matchContext.candidates.get(inEdge.out.alias);
+          if (matchContext.matched.containsKey(inEdge.out.alias)) {
+            if (matchContext.matched.get(inEdge.out.alias).getIdentity().equals(leftValue.getIdentity())) {
+              MatchContext childContext=matchContext.copy(inEdge.out.alias,leftValue.getIdentity());
+              childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+              childContext.matchedEdges.put(inEdge,true);
+              if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+                return false;
+              }
+              break;
+            }
+          }
+ else           if (prevMatchedRightValues != null && prevMatchedRightValues.iterator().hasNext()) {
+            for (            OIdentifiable id : prevMatchedRightValues) {
+              if (id.getIdentity().equals(leftValue.getIdentity())) {
+                MatchContext childContext=matchContext.copy(inEdge.out.alias,id);
+                childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+                childContext.matchedEdges.put(inEdge,true);
+                if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+                  return false;
+                }
+              }
+            }
+          }
+ else {
+            OWhereClause where=aliasFilters.get(inEdge.out.alias);
+            if (where == null || where.matchesFilters(leftValue,iCommandContext)) {
+              MatchContext childContext=matchContext.copy(inEdge.out.alias,leftValue.getIdentity());
+              childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+              childContext.matchedEdges.put(inEdge,true);
+              if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return true;
+}

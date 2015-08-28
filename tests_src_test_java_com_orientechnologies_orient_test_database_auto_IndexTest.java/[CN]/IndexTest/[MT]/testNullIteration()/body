@@ -1,0 +1,20 @@
+{
+  ODatabaseDocumentTx database=(ODatabaseDocumentTx)this.database.getUnderlying();
+  OrientGraph graph=new OrientGraph(database,false);
+  OClass v=database.getMetadata().getSchema().getClass("V");
+  OClass testNullIteration=database.getMetadata().getSchema().createClass("NullIterationTest",v);
+  testNullIteration.createProperty("name",OType.STRING);
+  testNullIteration.createProperty("birth",OType.DATETIME);
+  database.command(new OCommandSQL("CREATE VERTEX NullIterationTest SET name = 'Andrew', birth = sysdate()")).execute();
+  database.command(new OCommandSQL("CREATE VERTEX NullIterationTest SET name = 'Marcel', birth = sysdate()")).execute();
+  database.command(new OCommandSQL("CREATE VERTEX NullIterationTest SET name = 'Olivier'")).execute();
+  ODocument metadata=new ODocument();
+  metadata.field("ignoreNullValues",false);
+  testNullIteration.createIndex("NullIterationTestIndex",INDEX_TYPE.NOTUNIQUE.name(),null,metadata,new String[]{"birth"});
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("SELECT FROM NullIterationTest ORDER BY birth ASC"));
+  Assert.assertEquals(result.size(),3);
+  result=database.query(new OSQLSynchQuery<ODocument>("SELECT FROM NullIterationTest ORDER BY birth DESC"));
+  Assert.assertEquals(result.size(),3);
+  result=database.query(new OSQLSynchQuery<ODocument>("SELECT FROM NullIterationTest"));
+  Assert.assertEquals(result.size(),3);
+}

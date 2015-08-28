@@ -6,16 +6,16 @@
     try {
       OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
       if (positionEntry == null) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return false;
       }
       long pageIndex=positionEntry.getPageIndex();
       int recordPosition=positionEntry.getRecordPosition();
       if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return false;
       }
-      long nextPagePointer=-1;
+      long nextPagePointer;
       int removedContentSize=0;
       do {
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
@@ -25,7 +25,10 @@
           OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
           initialFreePageIndex=calculateFreePageIndex(localPage);
           if (localPage.isDeleted(recordPosition)) {
-            if (removedContentSize == 0)             return false;
+            if (removedContentSize == 0) {
+              endAtomicOperation(false,null);
+              return false;
+            }
  else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
           }
  else           if (removedContentSize == 0) {
@@ -46,17 +49,21 @@
           releasePage(atomicOperation,cacheEntry);
         }
         updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
-        pageIndex=nextPagePointer >>> PAGE_INDEX_OFFSET;
-        recordPosition=(int)(nextPagePointer & RECORD_POSITION_MASK);
+        pageIndex=getPageIndex(nextPagePointer);
+        recordPosition=getRecordPosition(nextPagePointer);
       }
  while (nextPagePointer >= 0);
       updateClusterState(-1,-removedContentSize,atomicOperation);
       clusterPositionMap.remove(clusterPosition);
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return true;
     }
- catch (    Throwable e) {
-      endAtomicOperation(true);
+ catch (    IOException e) {
+      endAtomicOperation(true,e);
+      throw new OStorageException(null,e);
+    }
+catch (    RuntimeException e) {
+      endAtomicOperation(true,e);
       throw new OStorageException(null,e);
     }
  finally {

@@ -7,10 +7,76 @@
     if (rec != null)     rid=(ORecordId)rec.getIdentity();
  else     return;
   }
-  final ORawBuffer buffer=currentDatabase.getStorage().readRecord(rid,null,false,null).getResult();
-  if (buffer == null)   throw new OException("The record has been deleted");
-  String content;
-  if (Integer.parseInt(properties.get("maxBinaryDisplay")) < buffer.buffer.length)   content=new String(Arrays.copyOf(buffer.buffer,Integer.parseInt(properties.get("maxBinaryDisplay"))));
- else   content=new String(buffer.buffer);
-  out.println("\nRaw record content. The size is " + buffer.buffer.length + " bytes, while settings force to print first "+ content.length()+ " bytes:\n\n"+ content);
+  ORawBuffer record;
+  ORecordId id=new ORecordId(rid);
+  if (!(currentDatabase.getStorage() instanceof OLocalPaginatedStorage)) {
+    record=currentDatabase.getStorage().readRecord(rid,null,false,null).getResult();
+    if (record != null) {
+      String content;
+      if (Integer.parseInt(properties.get("maxBinaryDisplay")) < record.buffer.length)       content=new String(Arrays.copyOf(record.buffer,Integer.parseInt(properties.get("maxBinaryDisplay"))));
+ else       content=new String(record.buffer);
+      out.println("\nRaw record content. The size is " + record.buffer.length + " bytes, while settings force to print first "+ content.length()+ " bytes:\n\n"+ content);
+    }
+  }
+ else {
+    OLocalPaginatedStorage storage=(OLocalPaginatedStorage)currentDatabase.getStorage();
+    OPaginatedCluster cluster=(OPaginatedCluster)storage.getClusterById(id.getClusterId());
+    if (cluster == null) {
+      message("\n cluster with id %i does not exist",id.getClusterId());
+      return;
+    }
+    OPaginatedClusterDebug debugInfo=cluster.readDebug(id.clusterPosition);
+    message("\n\nLOW LEVEL CLUSTER INFO");
+    message("\n cluster fieldId: %d",debugInfo.fileId);
+    message("\n cluster name: %s",cluster.getName());
+    message("\n in cluster position: %d",debugInfo.clusterPosition);
+    message("\n empty: %b",debugInfo.empty);
+    message("\n contentSize: %d",debugInfo.contentSize);
+    message("\n n-pages: %d",debugInfo.pages.size());
+    message("\n\n +----------PAGE_ID---------------+------IN_PAGE_POSITION----------+---------IN_PAGE_SIZE-----------+----PAGE_CONTENT---->> ");
+    for (    OClusterPageDebug page : debugInfo.pages) {
+      message("\n |%30d ",page.pageIndex);
+      message(" |%30d ",page.inPagePosition);
+      message(" |%30d ",page.inPageSize);
+      message(" |%s",OBase64Utils.encodeBytes(page.content));
+    }
+    record=cluster.readRecord(id.clusterPosition);
+  }
+  if (record == null)   throw new OException("The record has been deleted");
+  if ("ORecordSerializerBinary".equals(currentDatabase.getSerializer().toString())) {
+    byte[] buff=record.getBuffer();
+    ORecordSerializerBinaryDebug debugger=new ORecordSerializerBinaryDebug();
+    ORecordSerializationDebug deserializeDebug=debugger.deserializeDebug(buff,currentDatabase);
+    message("\n\nRECORD CONTENT INFO");
+    message("\n class name: %s",deserializeDebug.className);
+    message("\n fail on Reading: %b",deserializeDebug.readingFailure);
+    message("\n fail position: %d",deserializeDebug.failPosition);
+    if (deserializeDebug.readingException != null) {
+      StringWriter writer=new StringWriter();
+      deserializeDebug.readingException.printStackTrace(new PrintWriter(writer));
+      message("\n Exception On Reading: %s",writer.getBuffer().toString());
+    }
+    message("\n number of properties : %d",deserializeDebug.properties.size());
+    message("\n\n PROPERTIES");
+    for (    ORecordSerializationDebugProperty prop : deserializeDebug.properties) {
+      message("\n  property name: %s",prop.name);
+      message("\n  property type: %s",prop.type.name());
+      message("\n  property globlaId: %d",prop.globalId);
+      message("\n  fail on reading: %b",prop.faildToRead);
+      if (prop.faildToRead) {
+        message("\n  failed on reading position: %b",prop.failPosition);
+        StringWriter writer=new StringWriter();
+        prop.readingException.printStackTrace(new PrintWriter(writer));
+        message("\n  Exception on reading: %s",writer.getBuffer().toString());
+      }
+ else {
+        if (prop.value instanceof ORidBag) {
+          message("\n  property value: ORidBug ");
+          ((ORidBag)prop.value).debugPrint(System.out);
+        }
+ else         message("\n  property value: %s",prop.value != null ? prop.value.toString() : "null");
+      }
+      message("\n");
+    }
+  }
 }

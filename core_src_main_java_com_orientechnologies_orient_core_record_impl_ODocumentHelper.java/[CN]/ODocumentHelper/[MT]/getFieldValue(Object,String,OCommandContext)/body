@@ -5,6 +5,7 @@
   OIdentifiable currentRecord=value instanceof OIdentifiable ? (OIdentifiable)value : null;
   int beginPos=iFieldName.charAt(0) == '.' ? 1 : 0;
   int nextSeparatorPos=iFieldName.charAt(0) == '.' ? 1 : 0;
+  boolean firstInChain=true;
   do {
     char nextSeparator=' ';
     for (; nextSeparatorPos < fieldNameLength; ++nextSeparatorPos) {
@@ -52,7 +53,7 @@
  else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            values[i]=((ODocument)record).field(OStringSerializerHelper.getStringContent(indexParts.get(i)));
+            values[i]=((ODocument)record).field(OIOUtils.getStringContent(indexParts.get(i)));
           }
           value=values;
         }
@@ -70,7 +71,7 @@
  else         if (!indexCondition.isEmpty()) {
           final String conditionFieldName=indexCondition.get(0);
           Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
-          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OIOUtils.getStringContent(conditionFieldValue);
           final Object fieldValue=getFieldValue(currentRecord,conditionFieldName);
           if (conditionFieldValue != null && fieldValue != null)           conditionFieldValue=OType.convert(conditionFieldValue,fieldValue.getClass());
           if (fieldValue == null && !conditionFieldValue.equals("null") || fieldValue != null && !fieldValue.equals(conditionFieldValue))           value=null;
@@ -87,7 +88,7 @@
  else         if (indexParts.size() > 1) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i) {
-            values[i]=map.get(OStringSerializerHelper.getStringContent(indexParts.get(i)));
+            values[i]=map.get(OIOUtils.getStringContent(indexParts.get(i)));
           }
           value=values;
         }
@@ -104,7 +105,7 @@
  else         if (!indexCondition.isEmpty()) {
           final String conditionFieldName=indexCondition.get(0);
           Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
-          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OIOUtils.getStringContent(conditionFieldValue);
           final Object fieldValue=map.get(conditionFieldName);
           if (conditionFieldValue != null && fieldValue != null)           conditionFieldValue=OType.convert(conditionFieldValue,fieldValue.getClass());
           if (fieldValue == null && !conditionFieldValue.equals("null") || fieldValue != null && !fieldValue.equals(conditionFieldValue))           value=null;
@@ -138,7 +139,7 @@
  else         if (!indexCondition.isEmpty()) {
           final String conditionFieldName=indexCondition.get(0);
           Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
-          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OIOUtils.getStringContent(conditionFieldValue);
           final HashSet<Object> values=new HashSet<Object>();
           for (          Object v : OMultiValue.getMultiValueIterable(value)) {
             Object filtered=filterItem(conditionFieldName,conditionFieldValue,v);
@@ -157,13 +158,25 @@
         continue;
       }
       if (fieldName.startsWith("$"))       value=iContext.getVariable(fieldName);
- else       if (fieldName.contains("("))       value=evaluateFunction(value,fieldName,iContext);
+ else       if (fieldName.contains("(")) {
+        boolean executedMethod=false;
+        if (!firstInChain && fieldName.endsWith("()")) {
+          OSQLMethod method=OSQLEngine.getInstance().getMethod(fieldName.substring(0,fieldName.length() - 2));
+          if (method != null) {
+            value=method.execute(value,currentRecord,iContext,value,new Object[]{});
+            executedMethod=true;
+          }
+        }
+        if (!executedMethod) {
+          value=evaluateFunction(value,fieldName,iContext);
+        }
+      }
  else {
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(fieldName,'=',' ');
         if (indexCondition.size() == 2) {
           final String conditionFieldName=indexCondition.get(0);
           Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
-          if (conditionFieldValue instanceof String)           conditionFieldValue=OStringSerializerHelper.getStringContent(conditionFieldValue);
+          if (conditionFieldValue instanceof String)           conditionFieldValue=OIOUtils.getStringContent(conditionFieldValue);
           value=filterItem(conditionFieldName,conditionFieldValue,value);
         }
  else         if (currentRecord != null) {
@@ -190,6 +203,7 @@
     if (value instanceof OIdentifiable)     currentRecord=(OIdentifiable)value;
  else     currentRecord=null;
     beginPos=++nextSeparatorPos;
+    firstInChain=false;
   }
  while (nextSeparatorPos < fieldNameLength && value != null);
   return (RET)value;

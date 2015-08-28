@@ -1,0 +1,58 @@
+{
+  if (!backupDirectory.exists()) {
+    if (!backupDirectory.mkdirs()) {
+      throw new OStorageException("Backup directory " + backupDirectory.getAbsolutePath() + " does not exist and can not be created");
+    }
+  }
+  final String[] files=backupDirectory.list(new FilenameFilter(){
+    @Override public boolean accept(    File dir,    String name){
+      return name.toLowerCase(configuration.getLocaleInstance()).endsWith(incrementalBackupExtension);
+    }
+  }
+);
+  if (files == null)   throw new OStorageException("Can not read list of backup files from directory " + backupDirectory.getAbsolutePath());
+  Arrays.sort(files,new Comparator<String>(){
+    @Override public int compare(    String firsFile,    String secondFile){
+      final long firstIndex=extractIndexFromIBUFile(firsFile);
+      final long secondIndex=extractIndexFromIBUFile(secondFile);
+      if (firstIndex > secondIndex)       return 1;
+      if (firstIndex < secondIndex)       return -1;
+      return 0;
+    }
+  }
+);
+  final OLogSequenceNumber lastLsn;
+  final long nextIndex;
+  if (files.length == 0) {
+    lastLsn=null;
+    nextIndex=0;
+  }
+ else {
+    lastLsn=extractIBULsn(backupDirectory,files[0]);
+    nextIndex=extractIndexFromIBUFile(files[0]) + 1;
+  }
+  final SimpleDateFormat dateFormat=new SimpleDateFormat("HH_mm_ss_dd_MM_yyyy");
+  final String fileName=nextIndex + "_" + dateFormat.format(new Date())+ incrementalBackupExtension;
+  final File ibuFile=new File(backupDirectory,fileName);
+  final FileOutputStream fileOutputStream;
+  try {
+    fileOutputStream=new FileOutputStream(ibuFile);
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error during incremental backup",e);
+  }
+  try {
+    incrementalBackup(fileOutputStream,lastLsn);
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error during incremental backup",e);
+  }
+ finally {
+    try {
+      fileOutputStream.close();
+    }
+ catch (    IOException e) {
+      throw new OStorageException("Error during incremental backup",e);
+    }
+  }
+}

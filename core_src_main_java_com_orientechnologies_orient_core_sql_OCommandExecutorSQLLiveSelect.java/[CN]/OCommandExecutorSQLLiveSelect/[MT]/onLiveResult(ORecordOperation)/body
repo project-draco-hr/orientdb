@@ -1,6 +1,5 @@
 {
-  ODocument doc=new ODocument();
-  OIdentifiable value=iOp.getRecord();
+  final OIdentifiable value=iOp.getRecord();
   if (!matchesTarget(value)) {
     return;
   }
@@ -10,16 +9,15 @@
   if (!checkSecurity(value)) {
     return;
   }
-  OCommandResultListener listener=request.getResultListener();
+  final OCommandResultListener listener=request.getResultListener();
   if (listener instanceof OLiveResultListener) {
-    ODatabaseDocumentInternal prevDb=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
-    ((ODatabaseDocumentTx)execDb).setCurrentDatabaseInThreadLocal();
-    ((OLiveResultListener)listener).onLiveResult(token,iOp);
-    if (prevDb != null) {
-      ODatabaseRecordThreadLocal.INSTANCE.set(prevDb);
+    execInSeparateDatabase(new OCallable(){
+      @Override public Object call(      Object iArgument){
+        execDb.activateOnCurrentThread();
+        ((OLiveResultListener)listener).onLiveResult(token,iOp);
+        return null;
+      }
     }
- else {
-      ODatabaseRecordThreadLocal.INSTANCE.remove();
-    }
+);
   }
 }

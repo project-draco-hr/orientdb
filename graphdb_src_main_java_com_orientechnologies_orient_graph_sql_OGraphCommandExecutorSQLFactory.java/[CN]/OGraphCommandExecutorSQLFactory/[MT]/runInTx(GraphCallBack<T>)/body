@@ -1,12 +1,16 @@
 {
   OModifiableBoolean shutdownFlag=new OModifiableBoolean();
   ODatabaseDocumentInternal curDb=ODatabaseRecordThreadLocal.INSTANCE.get();
-  OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(false,shutdownFlag);
+  final boolean txAlreadyBegun=curDb.getTransaction().isActive();
+  OrientGraph graph=OGraphCommandExecutorSQLFactory.getGraph(true,shutdownFlag);
   try {
     return runInTx(graph,callBack);
   }
   finally {
-    if (shutdownFlag.getValue())     graph.shutdown(false,false);
+    if (!txAlreadyBegun) {
+      graph.commit();
+      if (shutdownFlag.getValue())       graph.shutdown(false,false);
+    }
     ODatabaseRecordThreadLocal.INSTANCE.set(curDb);
   }
 }

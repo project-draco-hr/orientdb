@@ -11,7 +11,7 @@
   write(buffer,dateTimeFormat);
   write(buffer,timeZone.getID());
   write(buffer,charset);
-  if (version > 24)   write(buffer,conflictStrategy);
+  if (iNetworkVersion > 24)   write(buffer,conflictStrategy);
   phySegmentToStream(buffer,fileTemplate);
   write(buffer,clusters.size());
   for (  OStorageClusterConfiguration c : clusters) {
@@ -29,11 +29,12 @@
       write(buffer,paginatedClusterConfiguration.recordOverflowGrowFactor);
       write(buffer,paginatedClusterConfiguration.recordGrowFactor);
       write(buffer,paginatedClusterConfiguration.compression);
-      if (version > 24)       write(buffer,paginatedClusterConfiguration.conflictStrategy);
-      if (version > 25)       write(buffer,paginatedClusterConfiguration.getStatus().name().toString());
+      if (iNetworkVersion >= 31)       write(buffer,paginatedClusterConfiguration.encryption);
+      if (iNetworkVersion > 24)       write(buffer,paginatedClusterConfiguration.conflictStrategy);
+      if (iNetworkVersion > 25)       write(buffer,paginatedClusterConfiguration.getStatus().name().toString());
     }
   }
-  if (version <= 25) {
+  if (iNetworkVersion <= 25) {
     write(buffer,0);
     write(buffer,"");
     write(buffer,"");
@@ -46,13 +47,14 @@
   write(buffer,binaryFormatVersion);
   write(buffer,clusterSelection);
   write(buffer,minimumClusters);
-  if (version > 24) {
+  if (iNetworkVersion > 24) {
     write(buffer,recordSerializer);
     write(buffer,recordSerializerVersion);
     write(buffer,configuration.getContextSize());
     for (    String k : configuration.getContextKeys()) {
+      final OGlobalConfiguration cfg=OGlobalConfiguration.findByKey(k);
       write(buffer,k);
-      write(buffer,configuration.getValueAsString(OGlobalConfiguration.findByKey(k)));
+      write(buffer,cfg.isHidden() ? null : configuration.getValueAsString(cfg));
     }
   }
   buffer.append("|");

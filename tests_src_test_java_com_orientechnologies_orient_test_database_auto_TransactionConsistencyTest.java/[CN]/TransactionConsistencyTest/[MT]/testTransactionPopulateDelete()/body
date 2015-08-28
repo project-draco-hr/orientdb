@@ -1,4 +1,5 @@
 {
+  database=new ODatabaseDocumentTx(url).open("admin","admin");
   if (!database.getMetadata().getSchema().existsClass("MyFruit")) {
     OClass fruitClass=database.getMetadata().getSchema().createClass("MyFruit");
     fruitClass.createProperty("name",OType.STRING);
@@ -10,9 +11,10 @@
   }
   database.close();
   database.open("admin","admin");
-  int chunkSize=500;
+  int chunkSize=getEnvironment() == DatabaseAbstractTest.ENV.DEV ? 10 : 500;
   for (int initialValue=0; initialValue < 10; initialValue++) {
     Assert.assertEquals(database.countClusterElements("MyFruit"),0);
+    System.out.println("[testTransactionPopulateDelete] Populating chunk " + initialValue + "... (chunk="+ chunkSize+ ")");
     Vector<ODocument> v=new Vector<ODocument>();
     database.begin();
     for (int i=initialValue * chunkSize; i < (initialValue * chunkSize) + chunkSize; i++) {
@@ -20,13 +22,17 @@
       d.save();
       v.addElement(d);
     }
+    System.out.println("[testTransactionPopulateDelete] Committing chunk " + initialValue + "...");
     database.commit();
+    System.out.println("[testTransactionPopulateDelete] Committed chunk " + initialValue + ", starting to delete all the new entries ("+ v.size()+ ")...");
     database.begin();
     for (int i=0; i < v.size(); i++) {
       database.delete(v.elementAt(i));
     }
     database.commit();
+    System.out.println("[testTransactionPopulateDelete] Deleted executed successfully");
     Assert.assertEquals(database.countClusterElements("MyFruit"),0);
   }
+  System.out.println("[testTransactionPopulateDelete] End of the test");
   database.close();
 }

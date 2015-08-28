@@ -1,0 +1,26 @@
+{
+  OrientGraphFactory orientGraphFactory=new OrientGraphFactory("memory:testCustomPredicate");
+  final OrientGraphNoTx g=orientGraphFactory.getNoTx();
+  try {
+    g.addVertex(null).setProperty("test",true);
+    g.addVertex(null).setProperty("test",false);
+    g.addVertex(null).setProperty("no",true);
+    g.commit();
+    GraphQuery query=g.query();
+    query.has("test",new Predicate(){
+      @Override public boolean evaluate(      Object first,      Object second){
+        return first != null && first.equals(second);
+      }
+    }
+,true);
+    Iterable<Vertex> vertices=query.vertices();
+    final Iterator<Vertex> it=vertices.iterator();
+    Assert.assertTrue(it.hasNext());
+    Assert.assertTrue((Boolean)it.next().getProperty("test"));
+    Assert.assertFalse(it.hasNext());
+  }
+  finally {
+    g.shutdown();
+    orientGraphFactory.close();
+  }
+}

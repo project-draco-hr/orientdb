@@ -4,7 +4,7 @@
     atomicOperation=startAtomicOperation();
   }
  catch (  IOException e) {
-    throw new OIndexException("Error during hash table entry deletion.",e);
+    throw new OIndexException("Error during hash table entry deletion",e);
   }
   acquireExclusiveLock();
   try {
@@ -23,7 +23,7 @@
         final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
         final int positionIndex=bucket.getIndex(hashCode,key);
         if (positionIndex < 0) {
-          endAtomicOperation(false);
+          endAtomicOperation(false,null);
           return null;
         }
         removed=bucket.deleteEntry(positionIndex).value;
@@ -39,11 +39,14 @@
         if (allMapsContainSameBucket)         mergeNodeToParent(nodePath);
       }
       changeSize(sizeDiff,atomicOperation);
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return removed;
     }
  else {
-      if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0)       return null;
+      if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
+        endAtomicOperation(false,null);
+        return null;
+      }
       V removed=null;
       OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
       if (cacheEntry == null)       cacheEntry=addPage(atomicOperation,nullBucketFileId);
@@ -61,16 +64,16 @@
         releasePage(atomicOperation,cacheEntry);
       }
       changeSize(sizeDiff,atomicOperation);
-      endAtomicOperation(false);
+      endAtomicOperation(false,null);
       return removed;
     }
   }
  catch (  IOException e) {
-    rollback();
+    rollback(e);
     throw new OIndexException("Error during index removal",e);
   }
-catch (  Throwable e) {
-    rollback();
+catch (  Exception e) {
+    rollback(e);
     throw new OStorageException(null,e);
   }
  finally {

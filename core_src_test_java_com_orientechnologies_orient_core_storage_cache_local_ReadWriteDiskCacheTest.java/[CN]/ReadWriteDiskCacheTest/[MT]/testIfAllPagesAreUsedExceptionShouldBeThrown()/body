@@ -1,0 +1,26 @@
+{
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
+  OCacheEntry[] entries=new OCacheEntry[5];
+  try {
+    for (int i=0; i < 5; i++) {
+      entries[i]=readBuffer.load(fileId,i,false,writeBuffer);
+      if (entries[i] == null) {
+        entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer);
+        Assert.assertEquals(entries[i].getPageIndex(),i);
+      }
+      entries[i].getCachePointer().acquireExclusiveLock();
+      entries[i].markDirty();
+      entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,7},0,8);
+      if (i - 4 >= 0) {
+        readBuffer.load(fileId,i - 4,false,writeBuffer);
+        entries[i - 4].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)(i - 4),1,2,seed,4,5,6,7},0,8);
+      }
+    }
+  }
+  finally {
+    for (int i=0; i < 4; i++) {
+      entries[i].getCachePointer().releaseExclusiveLock();
+      readBuffer.release(entries[i],writeBuffer);
+    }
+  }
+}

@@ -1,27 +1,34 @@
 {
   checkOpeness();
-  final long timer=Orient.instance().getProfiler().startChrono();
-  modificationLock.prohibitModifications();
+  stateLock.acquireReadLock();
   try {
-    lock.acquireSharedLock();
+    final long timer=Orient.instance().getProfiler().startChrono();
+    modificationLock.prohibitModifications();
     try {
-      if (writeAheadLog != null) {
-        makeFullCheckpoint();
-        return;
+      dataLock.acquireSharedLock();
+      try {
+        checkOpeness();
+        if (writeAheadLog != null) {
+          makeFullCheckpoint();
+          return;
+        }
+        writeCache.flush();
+        if (configuration != null)         configuration.synch();
+        clearStorageDirty();
       }
-      writeCache.flush();
-      if (configuration != null)       configuration.synch();
-      clearStorageDirty();
-    }
- catch (    IOException e) {
-      throw new OStorageException("Error on synch storage '" + name + "'",e);
-    }
+ catch (      IOException e) {
+        throw new OStorageException("Error on synch storage '" + name + "'",e);
+      }
  finally {
-      lock.releaseSharedLock();
-      Orient.instance().getProfiler().stopChrono("db." + name + ".synch","Synch a database",timer,"db.*.synch");
+        dataLock.releaseSharedLock();
+        Orient.instance().getProfiler().stopChrono("db." + name + ".synch","Synch a database",timer,"db.*.synch");
+      }
+    }
+  finally {
+      modificationLock.allowModifications();
     }
   }
   finally {
-    modificationLock.allowModifications();
+    stateLock.releaseReadLock();
   }
 }

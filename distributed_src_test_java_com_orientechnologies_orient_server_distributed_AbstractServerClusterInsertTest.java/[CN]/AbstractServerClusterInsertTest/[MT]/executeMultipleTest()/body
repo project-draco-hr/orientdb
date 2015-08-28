@@ -1,0 +1,56 @@
+{
+  ODatabaseDocumentTx database=poolFactory.get(getDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+  try {
+    List<ODocument> result=database.query(new OSQLSynchQuery<OIdentifiable>("select count(*) from Person"));
+    baseCount=((Number)result.get(0).field("count")).intValue();
+  }
+  finally {
+    database.close();
+  }
+  System.out.println("Creating Writers and Readers threads...");
+  final ExecutorService writerExecutors=Executors.newCachedThreadPool();
+  final ExecutorService readerExecutors=Executors.newCachedThreadPool();
+  runningWriters=new CountDownLatch(serverInstance.size() * writerCount);
+  int serverId=0;
+  int threadId=0;
+  List<Callable<Void>> writerWorkers=new ArrayList<Callable<Void>>();
+  for (  ServerRun server : serverInstance) {
+    if (server.isActive()) {
+      for (int j=0; j < writerCount; j++) {
+        Callable writer=createWriter(serverId,threadId++,getDatabaseURL(server));
+        writerWorkers.add(writer);
+      }
+      serverId++;
+    }
+  }
+  expected=writerCount * count * serverId + baseCount;
+  List<Future<Void>> futures=writerExecutors.invokeAll(writerWorkers);
+  List<Callable<Void>> readerWorkers=new ArrayList<Callable<Void>>();
+  for (  ServerRun server : serverInstance) {
+    if (server.isActive()) {
+      Callable<Void> reader=createReader(getDatabaseURL(server));
+      readerWorkers.add(reader);
+    }
+  }
+  List<Future<Void>> rFutures=readerExecutors.invokeAll(readerWorkers);
+  System.out.println("Threads started, waiting for the end");
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  writerExecutors.shutdown();
+  Assert.assertTrue(writerExecutors.awaitTermination(1,TimeUnit.MINUTES));
+  System.out.println("All writer threads have finished, shutting down readers");
+  for (  Future<Void> future : rFutures) {
+    future.get();
+  }
+  readerExecutors.shutdown();
+  Assert.assertTrue(readerExecutors.awaitTermination(1,TimeUnit.MINUTES));
+  System.out.println("All threads have finished, shutting down server instances");
+  for (  ServerRun server : serverInstance) {
+    if (server.isActive()) {
+      printStats(getDatabaseURL(server));
+    }
+  }
+  checkInsertedEntries();
+  checkIndexedEntries();
+}

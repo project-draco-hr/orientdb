@@ -16,7 +16,7 @@
         for (; line < txBegunAtLine; ++line)         reader.readLine();
         for (; (lastLine=reader.readLine()) != null; ++line) {
           lastLine=lastLine.trim();
-          final List<String> lineParts=OStringSerializerHelper.smartSplit(lastLine,';');
+          final List<String> lineParts=OStringSerializerHelper.smartSplit(lastLine,';',true);
           if (line == txBegunAtLine)           linePart=txBegunAtPart;
  else           linePart=0;
           for (; linePart < lineParts.size(); ++linePart) {
@@ -63,8 +63,17 @@
  else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"sleep ")) {
               executeSleep(lastCommand);
             }
+ else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"console.log ")) {
+              executeConsoleLog(lastCommand,db);
+            }
+ else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"console.output ")) {
+              executeConsoleOutput(lastCommand,db);
+            }
+ else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"console.error ")) {
+              executeConsoleError(lastCommand,db);
+            }
  else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"return ")) {
-              lastResult=executeReturn(lastCommand,lastResult);
+              lastResult=getValue(lastCommand.substring("return ".length()),db);
               break;
             }
  else             if (lastCommand != null && lastCommand.length() > 0)             lastResult=executeCommand(lastCommand,db);
@@ -81,11 +90,13 @@
       context.setVariable("retries",retry);
       getDatabase().getLocalCache().clear();
       if (retry >= maxRetry)       throw e;
+      waitForNextRetry();
     }
 catch (    ORecordDuplicatedException e) {
       context.setVariable("retries",retry);
       getDatabase().getLocalCache().clear();
       if (retry >= maxRetry)       throw e;
+      waitForNextRetry();
     }
 catch (    ORecordNotFoundException e) {
       context.setVariable("retries",retry);
@@ -96,6 +107,7 @@ catch (    ONeedRetryException e) {
       context.setVariable("retries",retry);
       getDatabase().getLocalCache().clear();
       if (retry >= maxRetry)       throw e;
+      waitForNextRetry();
     }
   }
   return lastResult;

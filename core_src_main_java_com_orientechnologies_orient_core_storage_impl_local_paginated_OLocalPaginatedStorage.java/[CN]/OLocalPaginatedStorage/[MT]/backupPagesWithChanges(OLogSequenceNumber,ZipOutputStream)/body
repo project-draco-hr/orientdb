@@ -1,0 +1,41 @@
+{
+  OLogSequenceNumber lastLsn=changeLsn;
+  final Map<String,Long> files=writeCache.files();
+  final int pageSize=writeCache.pageSize();
+  for (  Map.Entry<String,Long> entry : files.entrySet()) {
+    final String fileName=entry.getKey();
+    final long fileId=entry.getValue();
+    final boolean closeFile;
+    if (writeCache.isOpen(fileId))     closeFile=false;
+ else {
+      readCache.openFile(fileId,writeCache);
+      closeFile=true;
+    }
+    final long filledUpTo=writeCache.getFilledUpTo(fileId);
+    final ZipEntry zipEntry=new ZipEntry(fileName);
+    stream.putNextEntry(zipEntry);
+    for (long pageIndex=0; pageIndex < filledUpTo; pageIndex++) {
+      final OCacheEntry cacheEntry=readCache.load(fileId,pageIndex,true,writeCache);
+      cacheEntry.acquireSharedLock();
+      try {
+        final OLogSequenceNumber pageLsn=ODurablePage.getLogSequenceNumberFromPage(cacheEntry.getCachePointer().getDataPointer());
+        if (changeLsn == null || pageLsn.compareTo(changeLsn) > 0) {
+          final byte[] data=new byte[pageSize + OLongSerializer.LONG_SIZE];
+          OLongSerializer.INSTANCE.serializeNative(pageIndex,data,0);
+          ODurablePage.getPageData(cacheEntry.getCachePointer().getDataPointer(),data,OLongSerializer.LONG_SIZE,pageSize);
+          stream.write(data);
+          if (lastLsn == null || pageLsn.compareTo(lastLsn) > 0) {
+            lastLsn=pageLsn;
+          }
+        }
+      }
+  finally {
+        cacheEntry.releaseSharedLock();
+        readCache.release(cacheEntry,writeCache);
+      }
+    }
+    if (closeFile)     readCache.closeFile(fileId,true,writeCache);
+    stream.closeEntry();
+  }
+  return lastLsn;
+}

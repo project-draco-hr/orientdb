@@ -1,18 +1,26 @@
 {
   checkForRebuild();
-  modificationLock.requestModificationLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (!txIsActive)   keyLockManager.lockAllExclusive();
   try {
-    acquireSharedLock();
+    modificationLock.requestModificationLock();
     try {
-      markStorageDirty();
-      indexEngine.clear();
-      return this;
+      acquireSharedLock();
+      try {
+        markStorageDirty();
+        indexEngine.clear();
+        return this;
+      }
+  finally {
+        releaseSharedLock();
+      }
     }
   finally {
-      releaseSharedLock();
+      modificationLock.releaseModificationLock();
     }
   }
   finally {
-    modificationLock.releaseModificationLock();
+    if (!txIsActive)     keyLockManager.unlockAllExclusive();
   }
 }

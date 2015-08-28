@@ -1,0 +1,46 @@
+{
+  if (returnsMatches()) {
+    ODocument doc=getDatabase().newInstance();
+    for (    Map.Entry<String,OIdentifiable> entry : matchContext.matched.entrySet()) {
+      if (isExplicitAlias(entry.getKey())) {
+        doc.field(entry.getKey(),entry.getValue());
+      }
+    }
+    Object result=getResult(request);
+    if (request.getResultListener() != null) {
+      request.getResultListener().result(doc);
+    }
+  }
+ else   if (returnsPaths()) {
+    ODocument doc=getDatabase().newInstance();
+    for (    Map.Entry<String,OIdentifiable> entry : matchContext.matched.entrySet()) {
+      doc.field(entry.getKey(),entry.getValue());
+    }
+    Object result=getResult(request);
+    if (request.getResultListener() != null) {
+      request.getResultListener().result(doc);
+    }
+  }
+ else {
+    ODocument doc=getDatabase().newInstance();
+    int i=0;
+    for (    OExpression item : returnItems) {
+      OIdentifier returnAliasIdentifier=returnAliases.get(i);
+      String returnAlias;
+      if (returnAliasIdentifier == null) {
+        returnAlias=item.getDefaultAlias();
+      }
+ else {
+        returnAlias=returnAliasIdentifier.getValue();
+      }
+      ODocument mapDoc=new ODocument();
+      mapDoc.fromMap((Map)matchContext.matched);
+      doc.field(returnAlias,item.execute(mapDoc,ctx));
+      i++;
+    }
+    Object result=getResult(request);
+    if (request.getResultListener() != null) {
+      request.getResultListener().result(doc);
+    }
+  }
+}

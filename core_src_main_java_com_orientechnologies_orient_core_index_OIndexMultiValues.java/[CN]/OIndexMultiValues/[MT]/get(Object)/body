@@ -1,13 +1,21 @@
 {
   checkForRebuild();
   key=getCollatingValue(key);
-  acquireSharedLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (!txIsActive)   keyLockManager.acquireSharedLock(key);
   try {
-    final Set<OIdentifiable> values=indexEngine.get(key);
-    if (values == null)     return Collections.emptySet();
-    return new HashSet<OIdentifiable>(values);
+    acquireSharedLock();
+    try {
+      final Set<OIdentifiable> values=indexEngine.get(key);
+      if (values == null)       return Collections.emptySet();
+      return new HashSet<OIdentifiable>(values);
+    }
+  finally {
+      releaseSharedLock();
+    }
   }
   finally {
-    releaseSharedLock();
+    if (!txIsActive)     keyLockManager.releaseSharedLock(key);
   }
 }

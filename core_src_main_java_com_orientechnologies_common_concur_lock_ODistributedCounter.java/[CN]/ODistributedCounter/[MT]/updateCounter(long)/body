@@ -1,0 +1,48 @@
+{
+  final int hashCode=threadHashCode.get();
+  while (true) {
+    final AtomicLong[] cts=counters;
+    final int index=(cts.length - 1) & hashCode;
+    AtomicLong counter=cts[index];
+    if (counter == null) {
+      if (!poolBusy.get() && poolBusy.compareAndSet(false,true)) {
+        if (cts == counters) {
+          counter=cts[index];
+          if (counter == null)           cts[index]=new AtomicLong();
+        }
+        poolBusy.set(false);
+      }
+      continue;
+    }
+ else {
+      long v=counter.get();
+      int retries=0;
+      if (cts.length < maxPartitions) {
+        while (retries < MAX_RETRIES) {
+          if (!counter.compareAndSet(v,v + delta)) {
+            retries++;
+            v=counter.get();
+          }
+ else {
+            return;
+          }
+        }
+      }
+ else {
+        counter.addAndGet(delta);
+        return;
+      }
+      if (!poolBusy.get() && poolBusy.compareAndSet(false,true)) {
+        if (cts == counters) {
+          if (cts.length < maxPartitions) {
+            final AtomicLong[] newCts=new AtomicLong[cts.length << 1];
+            System.arraycopy(cts,0,newCts,0,cts.length);
+            counters=newCts;
+          }
+        }
+        poolBusy.set(false);
+      }
+      continue;
+    }
+  }
+}

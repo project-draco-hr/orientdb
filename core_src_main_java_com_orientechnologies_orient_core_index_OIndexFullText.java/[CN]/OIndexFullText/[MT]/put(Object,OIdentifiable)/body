@@ -4,13 +4,13 @@
   key=getCollatingValue(key);
   final ODatabase database=getDatabase();
   final boolean txIsActive=database.getTransaction().isActive();
-  if (txIsActive)   keyLockManager.acquireSharedLock(key);
+  if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
     modificationLock.requestModificationLock();
     try {
       final Set<String> words=splitIntoWords(key.toString());
       for (      final String word : words) {
-        acquireExclusiveLock();
+        acquireSharedLock();
         startStorageAtomicOperation();
         try {
           Set<OIdentifiable> refs;
@@ -35,7 +35,7 @@
           throw new OIndexException("Error during put of key - value entry",e);
         }
  finally {
-          releaseExclusiveLock();
+          releaseSharedLock();
         }
       }
       return this;
@@ -45,6 +45,6 @@
     }
   }
   finally {
-    if (txIsActive)     keyLockManager.releaseSharedLock(key);
+    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
   }
 }

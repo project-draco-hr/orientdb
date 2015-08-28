@@ -1,0 +1,66 @@
+{
+  String buildDirectory=System.getProperty("buildDirectory",".");
+  final ODatabase db=new ODatabaseDocumentTx("plocal:" + buildDirectory + File.separator+ DBNAME_DATABASETEST);
+  if (db.exists()) {
+    db.open("admin","admin");
+    db.drop();
+  }
+  db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD.getKey(),"aes");
+  db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
+  db.create();
+  try {
+    db.command(new OCommandSQL("create class TestEncryption")).execute();
+    db.command(new OCommandSQL("insert into TestEncryption set name = 'Jay'")).execute();
+    List result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    Assert.assertEquals(result.size(),1);
+    db.close();
+    db.open("admin","admin");
+    OStorage storage=((ODatabaseDocumentInternal)db).getStorage();
+    db.close();
+    storage.close(true,false);
+    db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
+    db.open("admin","admin");
+    result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    Assert.assertEquals(result.size(),1);
+    storage=((ODatabaseDocumentInternal)db).getStorage();
+    db.close();
+    storage.close(true,false);
+    db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"invalidPassword");
+    try {
+      db.open("admin","admin");
+      storage=((ODatabaseDocumentInternal)db).getStorage();
+      Assert.fail();
+    }
+ catch (    Exception e) {
+      Assert.assertTrue(e.getCause() instanceof OSecurityException || e.getCause().getCause() instanceof OSecurityException);
+    }
+ finally {
+      db.activateOnCurrentThread();
+      db.close();
+      storage.close(true,false);
+    }
+    db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA=-");
+    try {
+      db.open("admin","admin");
+      storage=((ODatabaseDocumentInternal)db).getStorage();
+      Assert.fail();
+    }
+ catch (    OStorageException e) {
+      Assert.assertTrue(e.getCause() instanceof OSecurityException || e.getCause().getCause() instanceof OSecurityException);
+    }
+ finally {
+      db.activateOnCurrentThread();
+      db.close();
+      storage.close(true,false);
+    }
+    db.setProperty(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey(),"T1JJRU5UREJfSVNfQ09PTA==");
+    db.open("admin","admin");
+    result=db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    Assert.assertEquals(result.size(),1);
+  }
+  finally {
+    db.activateOnCurrentThread();
+    if (db.isClosed())     db.open("admin","admin");
+    db.drop();
+  }
+}

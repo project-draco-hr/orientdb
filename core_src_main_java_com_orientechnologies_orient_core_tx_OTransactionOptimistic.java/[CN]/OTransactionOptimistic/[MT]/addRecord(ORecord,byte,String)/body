@@ -1,5 +1,6 @@
 {
   checkTransaction();
+  if (iStatus != ORecordOperation.LOADED)   changedDocuments.remove(iRecord);
   try {
 switch (iStatus) {
 case ORecordOperation.CREATED:
@@ -25,30 +26,6 @@ break;
 }
 try {
 if (iRecord.getIdentity().isTemporary()) temp2persistent.put(iRecord.getIdentity().copy(),iRecord);
-if ((status == OTransaction.TXSTATUS.COMMITTING) && database.getStorage().getUnderlying() instanceof OAbstractPaginatedStorage) {
-switch (iStatus) {
-case ORecordOperation.CREATED:
-case ORecordOperation.UPDATED:
-final ORID oldRid=iRecord.getIdentity().copy();
-database.executeSaveRecord(iRecord,iClusterName,iRecord.getRecordVersion(),false,OPERATION_MODE.SYNCHRONOUS,false,null,null);
-updateIdentityAfterCommit(oldRid,iRecord.getIdentity());
-break;
-case ORecordOperation.DELETED:
-database.executeDeleteRecord(iRecord,iRecord.getRecordVersion(),false,false,OPERATION_MODE.SYNCHRONOUS,false);
-break;
-}
-final ORecordOperation txRecord=getRecordEntry(iRecord.getIdentity());
-if (txRecord == null) {
-allEntries.put(iRecord.getIdentity(),new ORecordOperation(iRecord,iStatus));
-}
- else if (txRecord.record != iRecord) {
-final String clusterName=getDatabase().getClusterNameById(iRecord.getIdentity().getClusterId());
-if (!clusterName.equals(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME) && !clusterName.equals(OMetadataDefault.CLUSTER_INDEX_NAME)) OLogManager.instance().warn(this,"Found record in transaction with the same RID %s but different instance. Probably the record has been loaded from another transaction and reused on the current one: reload it from current transaction before to update or delete it",iRecord.getIdentity());
-txRecord.record=iRecord;
-txRecord.type=iStatus;
-}
-}
- else {
 final ORecordId rid=(ORecordId)iRecord.getIdentity();
 if (!rid.isValid()) {
 ORecordInternal.onBeforeIdentityChanged(iRecord);
@@ -102,7 +79,6 @@ break;
 break;
 }
 }
-}
 switch (iStatus) {
 case ORecordOperation.CREATED:
 database.callbackHooks(TYPE.AFTER_CREATE,iRecord);
@@ -117,8 +93,7 @@ database.callbackHooks(TYPE.AFTER_DELETE,iRecord);
 break;
 }
 if (iRecord instanceof ODocument && ((ODocument)iRecord).isTrackingChanges()) {
-((ODocument)iRecord).setTrackingChanges(false);
-((ODocument)iRecord).setTrackingChanges(true);
+ODocumentInternal.clearTrackData(((ODocument)iRecord));
 }
 }
  catch (Throwable t) {

@@ -4,7 +4,7 @@
     atomicOperation=startAtomicOperation();
   }
  catch (  IOException e) {
-    throw new OIndexException("Error during sbtree entrie remove.",e);
+    throw new OIndexException("Error during sbtree entrie remove",e);
   }
   acquireExclusiveLock();
   try {
@@ -13,7 +13,7 @@
       key=keySerializer.preprocess(key,(Object[])keyTypes);
       BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
       if (bucketSearchResult.itemIndex < 0) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return null;
       }
       OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketSearchResult.getLastPathItem(),false);
@@ -34,7 +34,7 @@
     }
  else {
       if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
-        endAtomicOperation(false);
+        endAtomicOperation(false,null);
         return null;
       }
       OCacheEntry nullCacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
@@ -42,7 +42,10 @@
       try {
         ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getChangesTree(atomicOperation,nullCacheEntry),valueSerializer,false);
         OSBTreeValue<V> treeValue=nullBucket.getValue();
-        if (treeValue == null)         return null;
+        if (treeValue == null) {
+          endAtomicOperation(false,null);
+          return null;
+        }
         removedValue=readValue(treeValue,atomicOperation);
         nullBucket.removeValue();
       }
@@ -52,16 +55,16 @@
       }
       if (removedValue != null)       setSize(size() - 1,atomicOperation);
     }
-    endAtomicOperation(false);
+    endAtomicOperation(false,null);
     return removedValue;
   }
  catch (  IOException e) {
-    rollback();
-    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ name,e);
+    rollback(e);
+    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),e);
   }
-catch (  Exception e) {
-    rollback();
-    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ name,e);
+catch (  RuntimeException e) {
+    rollback(e);
+    throw new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),e);
   }
  finally {
     releaseExclusiveLock();

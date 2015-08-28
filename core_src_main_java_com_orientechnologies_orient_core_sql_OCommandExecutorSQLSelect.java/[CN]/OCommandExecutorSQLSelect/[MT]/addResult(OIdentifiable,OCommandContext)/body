@@ -1,0 +1,60 @@
+{
+  if (iRecord == null)   return true;
+  if (projections != null || groupByFields != null && !groupByFields.isEmpty()) {
+    if (groupedResult == null) {
+      iRecord=ORuntimeResult.getProjectionResult(getTemporaryRIDCounter(iContext),projections,iContext,iRecord);
+      if (iRecord == null)       return true;
+    }
+ else {
+      Object fieldValue=null;
+      if (groupByFields != null && !groupByFields.isEmpty()) {
+        if (groupByFields.size() > 1) {
+          final ODocument doc=iRecord.getRecord();
+          final Object[] fields=new Object[groupByFields.size()];
+          for (int i=0; i < groupByFields.size(); ++i) {
+            final String field=groupByFields.get(i);
+            if (field.startsWith("$"))             fields[i]=iContext.getVariable(field);
+ else             fields[i]=doc.field(field);
+          }
+          fieldValue=fields;
+        }
+ else {
+          final String field=groupByFields.get(0);
+          if (field != null) {
+            if (field.startsWith("$"))             fieldValue=iContext.getVariable(field);
+ else             fieldValue=((ODocument)iRecord.getRecord()).field(field);
+          }
+        }
+      }
+      getProjectionGroup(fieldValue,iContext).applyRecord(iRecord);
+      return true;
+    }
+  }
+  if (tipLimitThreshold > 0 && resultCount > tipLimitThreshold) {
+    reportTip(String.format("Query '%s' returned a result set with more than %d records. Reduce it to improve performance and reduce RAM used",parserText,tipLimitThreshold));
+    tipLimitThreshold=0;
+  }
+  List<OIdentifiable> allResults=new ArrayList<OIdentifiable>();
+  if (unwindFields != null) {
+    Collection<OIdentifiable> partial=unwind(iRecord,this.unwindFields,iContext);
+    for (    OIdentifiable item : partial) {
+      allResults.add(item);
+    }
+  }
+ else {
+    allResults.add(iRecord);
+  }
+  boolean result=true;
+  if ((fullySortedByIndex || orderedFields.isEmpty()) && expandTarget == null && unwindFields == null) {
+    if (request.getResultListener() != null)     for (    OIdentifiable iRes : allResults) {
+      result=pushResult(iRes);
+    }
+  }
+ else {
+    if (tempResult == null)     tempResult=new ArrayList<OIdentifiable>();
+    for (    OIdentifiable iRes : allResults) {
+      ((Collection<OIdentifiable>)tempResult).add(iRes);
+    }
+  }
+  return result;
+}

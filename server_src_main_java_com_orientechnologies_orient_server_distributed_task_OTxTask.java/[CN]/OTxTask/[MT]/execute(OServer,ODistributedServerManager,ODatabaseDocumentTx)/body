@@ -4,59 +4,76 @@
   try {
     database.begin();
     final OTransactionOptimistic tx=(OTransactionOptimistic)database.getTransaction();
-    final List<Object> results=new ArrayList<Object>();
-    for (    OAbstractRecordReplicatedTask task : tasks) {
-      if (task instanceof OCreateRecordTask) {
-        final OCreateRecordTask createRT=(OCreateRecordTask)task;
-        final int clId=createRT.clusterId > -1 ? createRT.clusterId : createRT.getRid().isValid() ? createRT.getRid().getClusterId() : -1;
-        final String clusterName=clId > -1 ? database.getClusterNameById(clId) : null;
-        tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
+    result=new OTxTaskResult();
+    final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+    try {
+      for (      OAbstractRecordReplicatedTask task : tasks) {
+        if (task instanceof OCreateRecordTask) {
+          final OCreateRecordTask createRT=(OCreateRecordTask)task;
+          final int clId=createRT.clusterId > -1 ? createRT.clusterId : createRT.getRid().isValid() ? createRT.getRid().getClusterId() : -1;
+          final String clusterName=clId > -1 ? database.getClusterNameById(clId) : null;
+          tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
+        }
+ else {
+          final ORID rid=task.getRid();
+          if (!ddb.lockRecord(rid,nodeSource))           throw new ODistributedRecordLockedException(rid);
+          result.locks.add(rid);
+        }
       }
-    }
-    for (    OAbstractRecordReplicatedTask task : tasks) {
-      if (task instanceof OAbstractRecordReplicatedTask) {
-        final ORecord record=((OAbstractRecordReplicatedTask)task).getRecord();
-        if (record != null)         for (        String f : ((ODocument)record).fieldNames()) {
-          final Object fValue=((ODocument)record).field(f);
-          if (fValue instanceof ORecordLazyMultiValue)           ((ORecordLazyMultiValue)fValue).convertLinks2Records();
- else           if (fValue instanceof ORecordId)           ((ODocument)record).field(f,((ORecordId)fValue).getRecord());
+      for (      OAbstractRecordReplicatedTask task : tasks) {
+        final ORecord record=task.getRecord();
+        if (record instanceof ODocument) {
+          for (          String f : ((ODocument)record).fieldNames()) {
+            final Object fValue=((ODocument)record).field(f);
+            if (fValue instanceof ORecordLazyMultiValue)             ((ORecordLazyMultiValue)fValue).convertLinks2Records();
+ else             if (fValue instanceof ORecordId)             ((ODocument)record).field(f,((ORecordId)fValue).getRecord());
+          }
+        }
+      }
+      for (      OAbstractRecordReplicatedTask task : tasks) {
+        final Object taskResult=task.execute(iServer,iManager,database);
+        result.results.add(taskResult);
+      }
+      database.commit();
+      for (int i=0; i < result.results.size(); ++i) {
+        final Object o=result.results.get(i);
+        final OAbstractRecordReplicatedTask task=tasks.get(i);
+        if (task instanceof OCreateRecordTask) {
+          final OCreateRecordTask t=(OCreateRecordTask)task;
+          result.results.set(i,new OPlaceholder(t.getRecord()));
+        }
+ else         if (task instanceof OUpdateRecordTask) {
+          if (((OSimpleVersion)o).getCounter() < 0) {
+            result.results.set(i,task.getRid().getRecord().reload().getRecordVersion());
+          }
+ else           result.results.set(i,o);
         }
       }
     }
-    for (    OAbstractRecordReplicatedTask task : tasks) {
-      final Object taskResult=task.execute(iServer,iManager,database);
-      results.add(taskResult);
+ catch (    Exception t) {
+      for (      ORID r : result.locks)       ddb.unlockRecord(r);
+      throw t;
     }
-    database.commit();
-    for (int i=0; i < results.size(); ++i) {
-      final Object o=results.get(i);
-      final OAbstractRecordReplicatedTask task=tasks.get(i);
-      if (task instanceof OCreateRecordTask) {
-        final OCreateRecordTask t=(OCreateRecordTask)task;
-        results.set(i,new OPlaceholder(t.getRecord()));
-      }
- else       if (task instanceof OUpdateRecordTask) {
-        if (((OSimpleVersion)o).getCounter() < 0) {
-          results.set(i,task.getRid().getRecord().reload().getRecordVersion());
-        }
- else         results.set(i,o);
-      }
-    }
-    return results;
+    return result;
   }
  catch (  ONeedRetryException e) {
+    database.rollback();
     return e;
   }
 catch (  OTransactionException e) {
+    database.rollback();
     return e;
   }
 catch (  ORecordDuplicatedException e) {
+    database.rollback();
     return e;
   }
 catch (  ORecordNotFoundException e) {
+    database.rollback();
     return e;
   }
 catch (  Exception e) {
+    database.rollback();
     OLogManager.instance().error(this,"Error on distributed transaction commit",e);
     return e;
   }

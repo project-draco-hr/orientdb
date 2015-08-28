@@ -1,0 +1,22 @@
+{
+  if (isInDevelopmentMode())   return;
+  final int max=OGlobalConfiguration.NETWORK_MAX_CONCURRENT_SESSIONS.getValueAsInteger();
+  int TOTAL=max * 3;
+  for (int i=0; i < TOTAL; ++i) {
+    final int response=get("connect/" + getDatabaseName()).setRetry(0).getResponse().getStatusLine().getStatusCode();
+    Assert.assertEquals(response,204);
+    if (i % 100 == 0)     System.out.printf("\nConnections " + i);
+  }
+  System.out.printf("\nTest completed");
+  Collection<ODocument> conns=null;
+  for (int i=0; i < 20; ++i) {
+    Assert.assertEquals(get("server").setKeepAlive(false).setUserName("root").setUserPassword("root").getResponse().getStatusLine().getStatusCode(),200);
+    final ODocument serverStatus=new ODocument().fromJSON(getResponse().getEntity().getContent());
+    conns=serverStatus.field("connections");
+    final int openConnections=conns.size();
+    System.out.printf("\nConnections still open: " + openConnections);
+    if (openConnections <= 1)     break;
+    Thread.sleep(1000);
+  }
+  Assert.assertTrue(conns.size() <= 1);
+}

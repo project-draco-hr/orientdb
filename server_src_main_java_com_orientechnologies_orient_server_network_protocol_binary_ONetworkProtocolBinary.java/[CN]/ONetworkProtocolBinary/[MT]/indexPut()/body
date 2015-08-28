@@ -1,0 +1,25 @@
+{
+  setDataCommandInfo("Put an entry in an index");
+  if (!isConnectionAlive())   return;
+  final String indexName=channel.readString();
+  Object key=new ODocument().fromStream(channel.readBytes()).field("key");
+  final ORecordId value=channel.readRID();
+  final OIndex<?> index=connection.database.getMetadata().getIndexManager().getIndex(indexName);
+  if (index == null)   throw new OException("index with name '" + indexName + "' was not found");
+  key=index.getDefinition().createValue(key);
+  if (!isConnectionAlive())   return;
+  beginResponse();
+  try {
+    try {
+      index.put(key,value);
+      sendOk(clientTxId);
+    }
+ catch (    ORecordDuplicatedException ex) {
+      sendError(clientTxId,ex);
+    }
+  }
+  finally {
+    connection.data.command=null;
+    endResponse();
+  }
+}

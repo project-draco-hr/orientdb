@@ -74,7 +74,20 @@
         }
  else         if (value.equals("\"super-class\"")) {
           final String classSuper=jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
-          superClasses.put(cls,classSuper);
+          final List<String> superClassNames=new ArrayList<String>();
+          superClassNames.add(classSuper);
+          superClasses.put(cls,superClassNames);
+        }
+ else         if (value.equals("\"super-classes\"")) {
+          jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
+          final List<String> superClassNames=new ArrayList<String>();
+          while (jsonReader.lastChar() != ']') {
+            jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
+            final String clsName=jsonReader.getValue();
+            superClassNames.add(OIOUtils.getStringContent(clsName));
+          }
+          jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
+          superClasses.put(cls,superClassNames);
         }
  else         if (value.equals("\"properties\"")) {
           jsonReader.readNext(OJSONReader.BEGIN_COLLECTION);
@@ -84,6 +97,12 @@
           }
           jsonReader.readNext(OJSONReader.END_OBJECT);
         }
+ else         if (value.equals("\"customFields\"")) {
+          Map<String,String> customFields=importCustomFields();
+          for (          Entry<String,String> entry : customFields.entrySet()) {
+            cls.setCustom(entry.getKey(),entry.getValue());
+          }
+        }
  else         if (value.equals("\"cluster-selection\"")) {
           cls.setClusterSelection(jsonReader.readString(OJSONReader.NEXT_IN_OBJECT));
         }
@@ -92,7 +111,9 @@
       jsonReader.readNext(OJSONReader.NEXT_IN_ARRAY);
     }
  while (jsonReader.lastChar() == ',');
-    for (    Map.Entry<OClass,String> entry : superClasses.entrySet())     entry.getKey().setSuperClass(database.getMetadata().getSchema().getClass(entry.getValue()));
+    for (    Map.Entry<OClass,List<String>> entry : superClasses.entrySet())     for (    String s : entry.getValue()) {
+      entry.getKey().addSuperClass(database.getMetadata().getSchema().getClass(s));
+    }
     for (    Map.Entry<OPropertyImpl,String> entry : linkedClasses.entrySet()) {
       entry.getKey().setLinkedClass(database.getMetadata().getSchema().getClass(entry.getValue()));
     }

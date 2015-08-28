@@ -26,9 +26,7 @@
     }
   }
 ),database);
-  final Boolean enableSecurity=(Boolean)database.getProperty(ODatabase.OPTIONS.SECURITY.toString());
-  if (enableSecurity != null && !enableSecurity)   security=new OSecurityNull();
- else   security=new OSecurityProxy(database.getStorage().getResource(OSecurity.class.getSimpleName(),new Callable<OSecurityShared>(){
+  security=new OSecurityProxy(database.getStorage().getResource(OSecurity.class.getSimpleName(),new Callable<OSecurityShared>(){
     public OSecurityShared call(){
       final OSecurityShared instance=new OSecurityShared();
       if (iLoad) {
@@ -39,10 +37,24 @@
     }
   }
 ),database);
+  commandCache=database.getStorage().getResource(OCommandCache.class.getSimpleName(),new Callable<OCommandCache>(){
+    public OCommandCache call(){
+      return new OCommandCacheSoftRefs(database.getName());
+    }
+  }
+);
+  final Class<? extends OSecurity> securityClass=(Class<? extends OSecurity>)database.getProperty(ODatabase.OPTIONS.SECURITY.toString());
+  if (securityClass != null)   try {
+    final OSecurity wrapped=security;
+    security=securityClass.getDeclaredConstructor(OSecurity.class,ODatabaseDocumentInternal.class).newInstance(wrapped,database);
+  }
+ catch (  Exception e) {
+    throw new OSecurityException("Cannot install custom security implementation (" + securityClass + ")",e);
+  }
   functionLibrary=new OFunctionLibraryProxy(database.getStorage().getResource(OFunctionLibrary.class.getSimpleName(),new Callable<OFunctionLibrary>(){
     public OFunctionLibrary call(){
       final OFunctionLibraryImpl instance=new OFunctionLibraryImpl();
-      if (iLoad)       instance.load();
+      if (iLoad && !(database.getStorage() instanceof OStorageProxy))       instance.load();
       return instance;
     }
   }
@@ -60,7 +72,7 @@
   scheduler=new OSchedulerListenerProxy(database.getStorage().getResource(OSchedulerListener.class.getSimpleName(),new Callable<OSchedulerListener>(){
     public OSchedulerListener call(){
       final OSchedulerListenerImpl instance=new OSchedulerListenerImpl();
-      if (iLoad)       instance.load();
+      if (iLoad && !(database.getStorage() instanceof OStorageProxy))       instance.load();
       return instance;
     }
   }

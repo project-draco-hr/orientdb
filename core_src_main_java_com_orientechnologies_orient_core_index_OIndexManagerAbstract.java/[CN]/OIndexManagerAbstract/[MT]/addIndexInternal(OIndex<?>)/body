@@ -1,13 +1,16 @@
 {
   acquireExclusiveLock();
   try {
-    indexes.put(index.getName().toLowerCase(),index);
+    final Locale locale=getServerLocale();
+    indexes.put(index.getName().toLowerCase(locale),index);
     final OIndexDefinition indexDefinition=index.getDefinition();
     if (indexDefinition == null || indexDefinition.getClassName() == null)     return;
-    Map<OMultiKey,Set<OIndex<?>>> propertyIndex=classPropertyIndex.get(indexDefinition.getClassName().toLowerCase());
+    Map<OMultiKey,Set<OIndex<?>>> propertyIndex=classPropertyIndex.get(indexDefinition.getClassName().toLowerCase(locale));
     if (propertyIndex == null) {
       propertyIndex=new HashMap<OMultiKey,Set<OIndex<?>>>();
-      classPropertyIndex.put(indexDefinition.getClassName().toLowerCase(),propertyIndex);
+    }
+ else {
+      propertyIndex=new HashMap<OMultiKey,Set<OIndex<?>>>(propertyIndex);
     }
     final int paramCount=indexDefinition.getParamCount();
     for (int i=1; i <= paramCount; i++) {
@@ -15,9 +18,11 @@
       final OMultiKey multiKey=new OMultiKey(normalizeFieldNames(fields));
       Set<OIndex<?>> indexSet=propertyIndex.get(multiKey);
       if (indexSet == null)       indexSet=new HashSet<OIndex<?>>();
+ else       indexSet=new HashSet<OIndex<?>>(indexSet);
       indexSet.add(index);
       propertyIndex.put(multiKey,indexSet);
     }
+    classPropertyIndex.put(indexDefinition.getClassName().toLowerCase(locale),copyPropertyMap(propertyIndex));
   }
   finally {
     releaseExclusiveLock();

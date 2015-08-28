@@ -7,7 +7,25 @@
     for (    ODatabaseListener oDatabaseListener : listeners) {
       oDatabaseListener.onBeforeCommand(iCommand,executor);
     }
-    Object result=executor.execute(iCommand.getParameters());
+    boolean foundInCache=false;
+    Object result=null;
+    if (iCommand.isCacheableResult() && executor.isCacheable() && iCommand.getParameters() == null) {
+      result=db.getMetadata().getCommandCache().get(db.getUser(),iCommand.getText(),iCommand.getLimit());
+      if (result != null) {
+        foundInCache=true;
+        if (iCommand.getResultListener() != null) {
+          if (result instanceof Collection) {
+            for (            Object o : (Collection)result)             iCommand.getResultListener().result(o);
+          }
+ else           iCommand.getResultListener().result(result);
+          result=null;
+        }
+      }
+    }
+    if (!foundInCache) {
+      result=executor.execute(iCommand.getParameters());
+      if (result != null && iCommand.isCacheableResult() && executor.isCacheable() && (iCommand.getParameters() == null || iCommand.getParameters().isEmpty()))       db.getMetadata().getCommandCache().put(db.getUser(),iCommand.getText(),result,iCommand.getLimit(),executor.getInvolvedClusters(),System.currentTimeMillis() - beginTime);
+    }
     for (    ODatabaseListener oDatabaseListener : listeners) {
       oDatabaseListener.onAfterCommand(iCommand,executor,result);
     }
@@ -21,9 +39,12 @@ catch (  Exception e) {
   }
  finally {
     if (Orient.instance().getProfiler().isRecording()) {
-      OSecurityUser user=ODatabaseRecordThreadLocal.INSTANCE.get().getUser();
-      String userString=user != null ? user.toString() : null;
-      Orient.instance().getProfiler().stopChrono("db." + ODatabaseRecordThreadLocal.INSTANCE.get().getName() + ".command."+ iCommand.toString(),"Command executed against the database",beginTime,"db.*.command.*",null,userString);
+      final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+      if (db != null) {
+        final OSecurityUser user=db.getUser();
+        final String userString=user != null ? user.toString() : null;
+        Orient.instance().getProfiler().stopChrono("db." + ODatabaseRecordThreadLocal.INSTANCE.get().getName() + ".command."+ iCommand.toString(),"Command executed against the database",beginTime,"db.*.command.*",null,userString);
+      }
     }
   }
 }

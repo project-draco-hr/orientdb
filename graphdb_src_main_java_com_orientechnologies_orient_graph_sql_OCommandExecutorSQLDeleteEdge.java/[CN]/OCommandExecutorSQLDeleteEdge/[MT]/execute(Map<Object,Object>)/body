@@ -2,25 +2,28 @@
   if (fromExpr == null && toExpr == null && rids == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
   for (int r=0; r < retry; ++r) {
     try {
+      txAlreadyBegun=getDatabase().getTransaction().isActive();
+      graph=OGraphCommandExecutorSQLFactory.getGraph(true,shutdownFlag);
       if (rids != null) {
-        OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+        OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
           @Override public Object call(          OrientBaseGraph graph){
             for (            ORecordId rid : rids) {
               final OrientEdge e=graph.getEdge(rid);
               if (e != null) {
                 e.remove();
-                removed=1;
+                removed++;
               }
             }
             return null;
           }
         }
 );
+        end();
       }
  else {
         final Set<OrientEdge> edges=new HashSet<OrientEdge>();
         if (query == null) {
-          OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+          OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
             @Override public Object call(            OrientBaseGraph graph){
               Set<OIdentifiable> fromIds=null;
               if (fromExpr != null)               fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr,context,iArgs);
@@ -62,7 +65,7 @@
               if (compiledFilter != null) {
                 for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
                   final OrientEdge edge=it.next();
-                  if (!(Boolean)compiledFilter.evaluate((ODocument)edge.getRecord(),null,context))                   it.remove();
+                  if (!(Boolean)compiledFilter.evaluate(edge.getRecord(),null,context))                   it.remove();
                 }
               }
               removed=edges.size();
@@ -71,15 +74,11 @@
             }
           }
 );
+          end();
         }
  else {
-          graph=OGraphCommandExecutorSQLFactory.getGraph(false,shutdownFlag);
-          OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
-            @Override public Object call(            OrientBaseGraph graph){
-              return query.execute(iArgs);
-            }
-          }
-);
+          query.setContext(getContext());
+          query.execute(iArgs);
         }
       }
       break;

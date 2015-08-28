@@ -1,0 +1,22 @@
+{
+  if (writeAheadLog == null)   return null;
+  OAtomicOperation operation=currentOperation.get();
+  if (operation != null) {
+    operation.incrementCounter();
+    if (fullName != null)     acquireExclusiveLockTillOperationComplete(fullName);
+    return operation;
+  }
+  final OOperationUnitId unitId=OOperationUnitId.generateId();
+  final OLogSequenceNumber lsn;
+  if (!rollbackOnlyMode)   lsn=writeAheadLog.logAtomicOperationStartRecord(true,unitId);
+ else   lsn=null;
+  operation=new OAtomicOperation(lsn,unitId,readCache,writeCache,storage.getId(),rollbackOnlyMode);
+  currentOperation.set(operation);
+  if (trackAtomicOperations) {
+    final Thread thread=Thread.currentThread();
+    activeAtomicOperations.put(unitId,new OPair<String,StackTraceElement[]>(thread.getName(),thread.getStackTrace()));
+  }
+  if (storage.getStorageTransaction() == null)   writeAheadLog.log(new ONonTxOperationPerformedWALRecord());
+  if (fullName != null)   acquireExclusiveLockTillOperationComplete(fullName);
+  return operation;
+}

@@ -6,12 +6,14 @@
       String indexType=OClass.INDEX_TYPE.NOTUNIQUE.name();
       OType keyType=OType.STRING;
       String className=null;
+      String collate=null;
       ODocument metadata=null;
       final String ancestorClassName=getClassName(elementClass);
       for (      Parameter<?,?> p : indexParameters) {
         if (p.getKey().equals("type"))         indexType=p.getValue().toString().toUpperCase();
  else         if (p.getKey().equals("keytype"))         keyType=OType.valueOf(p.getValue().toString().toUpperCase());
  else         if (p.getKey().equals("class"))         className=p.getValue().toString();
+ else         if (p.getKey().equals("collate"))         collate=p.getValue().toString();
  else         if (p.getKey().toString().startsWith("metadata.")) {
           if (metadata == null)           metadata=new ODocument();
           metadata.field(p.getKey().toString().substring("metadata.".length()),p.getValue());
@@ -23,8 +25,9 @@
       final OClass cls=schema.getOrCreateClass(className,schema.getClass(ancestorClassName));
       final OProperty property=cls.getProperty(key);
       if (property != null)       keyType=property.getType();
-      OIndexFactory factory=OIndexes.getFactory(indexType,null);
-      db.getMetadata().getIndexManager().createIndex(className + "." + key,indexType,new OPropertyIndexDefinition(className,key,keyType,factory.getLastVersion()),cls.getPolymorphicClusterIds(),null,metadata);
+      OPropertyIndexDefinition indexDefinition=new OPropertyIndexDefinition(className,key,keyType);
+      if (collate != null)       indexDefinition.setCollate(collate);
+      db.getMetadata().getIndexManager().createIndex(className + "." + key,indexType,indexDefinition,cls.getPolymorphicClusterIds(),null,metadata);
       return null;
     }
   }

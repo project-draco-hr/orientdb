@@ -1,0 +1,21 @@
+{
+  if (!backupDirectory.exists()) {
+    throw new OStorageException("Directory which should contain incremental backup files (files with extension " + incrementalBackupExtension + " ) is absent. It should be located at "+ backupDirectory.getAbsolutePath());
+  }
+  final String[] files=fetchIBUFiles(backupDirectory);
+  if (files.length == 0) {
+    throw new OStorageException("Can not find incremental backup files (files with extension " + incrementalBackupExtension + " ) in directory "+ backupDirectory.getAbsolutePath());
+  }
+  stateLock.acquireWriteLock();
+  try {
+    for (    String file : files) {
+      final boolean fullBackup=file.endsWith("_full" + incrementalBackupExtension);
+      final File ibuFile=new File(storagePath,file);
+      final FileInputStream inputStream=new FileInputStream(ibuFile);
+      restoreFromIncrementalBackup(inputStream,fullBackup);
+    }
+  }
+  finally {
+    stateLock.releaseWriteLock();
+  }
+}

@@ -1,0 +1,34 @@
+{
+  final int pageSize=writeCache.pageSize();
+  final Map<String,Object> loadProperties=configuration.getLoadProperties();
+  final String configurationFileName=((OStorageConfigurationSegment)configuration).getFileName();
+  close(true,true);
+  final BufferedInputStream bufferedInputStream=new BufferedInputStream(inputStream);
+  final ZipInputStream zipInputStream=new ZipInputStream(bufferedInputStream,Charset.forName(configuration.getCharset()));
+  ZipEntry zipEntry;
+  while ((zipEntry=zipInputStream.getNextEntry()) != null) {
+    if (zipEntry.getName().equals("last.lsn"))     continue;
+    if (zipEntry.getName().equals(configurationFileName)) {
+      replaceConfigurationFile(configurationFileName,zipInputStream);
+      continue;
+    }
+    final File outputFile=new File(storagePath,zipEntry.getName());
+    final FileOutputStream fileOutputStream=new FileOutputStream(outputFile);
+    try {
+      final BufferedOutputStream bufferedOutputStream=new BufferedOutputStream(fileOutputStream);
+      try {
+        while (zipInputStream.available() > 0) {
+          byte[] page=new byte[pageSize + OLongSerializer.LONG_SIZE];
+          bufferedOutputStream.write(page,OLongSerializer.LONG_SIZE,pageSize);
+        }
+      }
+  finally {
+        bufferedOutputStream.close();
+      }
+    }
+  finally {
+      fileOutputStream.close();
+    }
+  }
+  open("","",loadProperties);
+}

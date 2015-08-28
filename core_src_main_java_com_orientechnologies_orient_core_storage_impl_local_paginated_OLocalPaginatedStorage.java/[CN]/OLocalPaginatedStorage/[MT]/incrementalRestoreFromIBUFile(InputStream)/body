@@ -1,0 +1,80 @@
+{
+  closeClusters(false);
+  final Map<String,Object> loadProperties=configuration.getLoadProperties();
+  final String configurationFileName=((OStorageConfigurationSegment)configuration).getFileName();
+  configuration.close();
+  final BufferedInputStream bufferedInputStream=new BufferedInputStream(inputStream);
+  final ZipInputStream zipInputStream=new ZipInputStream(bufferedInputStream,Charset.forName(configuration.getCharset()));
+  final int pageSize=writeCache.pageSize();
+  ZipEntry zipEntry;
+  OLogSequenceNumber maxLsn=null;
+  List<String> processedFiles=new ArrayList<String>();
+  while ((zipEntry=zipInputStream.getNextEntry()) != null) {
+    if (zipEntry.getName().equals("last.lsn"))     continue;
+    if (zipEntry.getName().equals(configurationFileName)) {
+      replaceConfigurationFile(configurationFileName,zipInputStream);
+      continue;
+    }
+    Long fileId;
+    final boolean isClosed;
+    if (!writeCache.exists(zipEntry.getName())) {
+      fileId=readCache.addFile(zipEntry.getName(),writeCache);
+      isClosed=true;
+    }
+ else {
+      fileId=writeCache.isOpen(zipEntry.getName());
+      if (fileId == null) {
+        isClosed=true;
+        fileId=readCache.openFile(zipEntry.getName(),writeCache);
+      }
+ else       isClosed=false;
+    }
+    while (zipInputStream.available() > 0) {
+      final byte[] data=new byte[pageSize + OLongSerializer.LONG_SIZE];
+      int rb=0;
+      while (rb < data.length) {
+        final int b=zipInputStream.read(data,rb,data.length - rb);
+        if (b == -1)         throw new OStorageException("Can not read data from file " + zipEntry.getName());
+        rb+=b;
+      }
+      final long pageIndex=OLongSerializer.INSTANCE.deserializeNative(data,0);
+      OCacheEntry cacheEntry=readCache.load(fileId,pageIndex,true,writeCache);
+      if (cacheEntry == null) {
+        do {
+          readCache.release(cacheEntry,writeCache);
+          cacheEntry=readCache.allocateNewPage(fileId,writeCache);
+        }
+ while (cacheEntry.getPageIndex() != pageIndex);
+      }
+      cacheEntry.acquireSharedLock();
+      try {
+        final ODirectMemoryPointer pointer=cacheEntry.getCachePointer().getDataPointer();
+        final OLogSequenceNumber currentPageLsn=ODurablePage.getLogSequenceNumberFromPage(pointer);
+        final OLogSequenceNumber backedUpPageLsn=ODurablePage.getLogSequenceNumber(OLongSerializer.LONG_SIZE,data);
+        if (backedUpPageLsn.compareTo(currentPageLsn) > 0) {
+          pointer.set(OWOWCache.PAGE_PADDING,data,OLongSerializer.LONG_SIZE,data.length - OLongSerializer.LONG_SIZE);
+          if (maxLsn == null || maxLsn.compareTo(backedUpPageLsn) > 0) {
+            maxLsn=backedUpPageLsn;
+          }
+        }
+      }
+  finally {
+        cacheEntry.releaseSharedLock();
+        readCache.release(cacheEntry,writeCache);
+      }
+    }
+    if (isClosed)     readCache.closeFile(fileId,true,writeCache);
+    processedFiles.add(zipEntry.getName());
+  }
+  final List<String> currentFiles=new ArrayList<String>(writeCache.files().keySet());
+  currentFiles.removeAll(processedFiles);
+  for (  String file : currentFiles) {
+    final long fileId=readCache.openFile(file,writeCache);
+    readCache.deleteFile(fileId,writeCache);
+  }
+  if (maxLsn != null && writeAheadLog != null) {
+    writeAheadLog.moveLsnAfter(maxLsn);
+  }
+  configuration.load(new HashMap<String,Object>(loadProperties));
+  openClusters();
+}

@@ -1,4 +1,5 @@
 {
+  final OLogSequenceNumber lastLsn;
   checkOpeness();
   freeze(false);
   try {
@@ -10,7 +11,7 @@
         final ZipOutputStream zipOutputStream=new ZipOutputStream(bufferedOutputStream,Charset.forName(configuration.getCharset()));
         try {
           final Date startedOn=new Date();
-          final OLogSequenceNumber lastLsn=backupPagesWithChanges(fromLsn,zipOutputStream);
+          lastLsn=backupPagesWithChanges(fromLsn,zipOutputStream);
           final Date completedOn=new Date();
           final ZipEntry backupJson=new ZipEntry("backup.json");
           zipOutputStream.putNextEntry(backupJson);
@@ -22,13 +23,6 @@
           writer.append("\t\"completedOn\":").append(dateFormat.format(completedOn)).append("\r\n");
           writer.append("}\r\n");
           writer.flush();
-          zipOutputStream.closeEntry();
-          final ZipEntry lastLsnEntry=new ZipEntry("last.lsn");
-          zipOutputStream.putNextEntry(lastLsnEntry);
-          final byte[] binaryLsn=new byte[2 * OLongSerializer.LONG_SIZE];
-          OLongSerializer.INSTANCE.serializeNative(lastLsn.getSegment(),binaryLsn,0);
-          OLongSerializer.INSTANCE.serializeNative(lastLsn.getPosition(),binaryLsn,OLongSerializer.LONG_SIZE);
-          zipOutputStream.write(binaryLsn);
           zipOutputStream.closeEntry();
           final ZipEntry configurationEntry=new ZipEntry(((OStorageConfigurationSegment)configuration).getFileName());
           zipOutputStream.putNextEntry(configurationEntry);
@@ -51,4 +45,5 @@
   finally {
     release();
   }
+  return lastLsn;
 }

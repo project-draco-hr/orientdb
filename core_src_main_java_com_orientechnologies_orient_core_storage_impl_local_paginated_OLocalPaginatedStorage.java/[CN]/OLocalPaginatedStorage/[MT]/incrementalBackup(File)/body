@@ -4,38 +4,44 @@
       throw new OStorageException("Backup directory " + backupDirectory.getAbsolutePath() + " does not exist and can not be created");
     }
   }
-  final String[] files=fetchIBUFiles(backupDirectory);
-  final OLogSequenceNumber lastLsn;
-  final long nextIndex;
-  if (files.length == 0) {
-    lastLsn=null;
-    nextIndex=0;
-  }
+  RandomAccessFile rndIBUFile=null;
+  try {
+    final String[] files=fetchIBUFiles(backupDirectory);
+    final OLogSequenceNumber lastLsn;
+    final long nextIndex;
+    if (files.length == 0) {
+      lastLsn=null;
+      nextIndex=0;
+    }
  else {
-    lastLsn=extractIBULsn(backupDirectory,files[files.length - 1]);
-    nextIndex=extractIndexFromIBUFile(files[files.length - 1]) + 1;
-  }
-  final SimpleDateFormat dateFormat=new SimpleDateFormat("HH_mm_ss_dd_MM_yyyy");
-  final String fileName;
-  if (lastLsn != null)   fileName=nextIndex + "_" + dateFormat.format(new Date())+ incrementalBackupExtension;
- else   fileName=nextIndex + "_" + dateFormat.format(new Date())+ "_full"+ incrementalBackupExtension;
-  final File ibuFile=new File(backupDirectory,fileName);
-  final FileOutputStream fileOutputStream;
-  try {
-    fileOutputStream=new FileOutputStream(ibuFile);
-  }
- catch (  IOException e) {
-    throw new OStorageException("Error during incremental backup",e);
-  }
-  try {
-    incrementalBackup(fileOutputStream,lastLsn);
+      lastLsn=extractIBULsn(backupDirectory,files[files.length - 1]);
+      nextIndex=extractIndexFromIBUFile(files[files.length - 1]) + 1;
+    }
+    final SimpleDateFormat dateFormat=new SimpleDateFormat("HH_mm_ss_dd_MM_yyyy");
+    final String fileName;
+    if (lastLsn != null)     fileName=nextIndex + "_" + dateFormat.format(new Date())+ incrementalBackupExtension;
+ else     fileName=nextIndex + "_" + dateFormat.format(new Date())+ "_full"+ incrementalBackupExtension;
+    final File ibuFile=new File(backupDirectory,fileName);
+    rndIBUFile=new RandomAccessFile(ibuFile,"w");
+    final FileChannel ibuChannel=rndIBUFile.getChannel();
+    ibuChannel.position(3 * OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE);
+    final OLogSequenceNumber maxLsn=incrementalBackup(Channels.newOutputStream(ibuChannel),lastLsn);
+    final ByteBuffer dataBuffer=ByteBuffer.allocate(3 * OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE);
+    dataBuffer.putLong(nextIndex);
+    dataBuffer.putLong(maxLsn.getSegment());
+    dataBuffer.putLong(maxLsn.getPosition());
+    if (lastLsn == null)     dataBuffer.put((byte)1);
+ else     dataBuffer.put((byte)0);
+    dataBuffer.rewind();
+    ibuChannel.position(0);
+    ibuChannel.write(dataBuffer);
   }
  catch (  IOException e) {
     throw new OStorageException("Error during incremental backup",e);
   }
  finally {
     try {
-      fileOutputStream.close();
+      if (rndIBUFile != null)       rndIBUFile.close();
     }
  catch (    IOException e) {
       throw new OStorageException("Error during incremental backup",e);

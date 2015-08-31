@@ -1,35 +1,23 @@
 {
   final File ibuFile=new File(backupDirectory,file);
-  final FileInputStream fileInputStream;
+  final RandomAccessFile rndIBUFile;
   try {
-    fileInputStream=new FileInputStream(ibuFile);
+    rndIBUFile=new RandomAccessFile(ibuFile,"r");
   }
  catch (  FileNotFoundException e) {
     throw new OStorageException("Backup file was not found",e);
   }
   try {
-    final ZipInputStream zipInputStream=new ZipInputStream(fileInputStream);
     try {
-      ZipEntry zipEntry;
-      while ((zipEntry=zipInputStream.getNextEntry()) != null) {
-        if (zipEntry.getName().equals("last.lsn")) {
-          final byte[] data=new byte[2 * OLongSerializer.LONG_SIZE];
-          int bytesRead=0;
-          while (bytesRead < data.length) {
-            final int rb=zipInputStream.read(data,bytesRead,data.length - bytesRead);
-            if (rb >= 0)             bytesRead+=rb;
- else {
-              throw new OStorageException("Can not read last backed up LSN during incremental backup");
-            }
-          }
-          final long segment=OLongSerializer.INSTANCE.deserializeNative(data,0);
-          final long position=OLongSerializer.INSTANCE.deserializeNative(data,OLongSerializer.LONG_SIZE);
-          return new OLogSequenceNumber(segment,position);
-        }
-      }
+      final FileChannel ibuChannel=rndIBUFile.getChannel();
+      ibuChannel.position(OLongSerializer.LONG_SIZE);
+      ByteBuffer lsnData=ByteBuffer.allocate(2 * OLongSerializer.LONG_SIZE);
+      final long segment=lsnData.getLong();
+      final long position=lsnData.getLong();
+      return new OLogSequenceNumber(segment,position);
     }
   finally {
-      zipInputStream.close();
+      rndIBUFile.close();
     }
   }
  catch (  IOException e) {
@@ -37,11 +25,10 @@
   }
  finally {
     try {
-      fileInputStream.close();
+      rndIBUFile.close();
     }
  catch (    IOException e) {
       OLogManager.instance().error(this,"Error during read of backup file",e);
     }
   }
-  throw new OStorageException("Can not find latest backed up LSN in last IBU file");
 }

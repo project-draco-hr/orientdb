@@ -1,8 +1,24 @@
 {
-  if (iContext.getVariable("$luceneIndex") != null) {
-    return true;
+  OLuceneFullTextIndex index=involvedIndex(iRecord,iCurrentResult,iCondition,iLeft,iRight);
+  if (index == null) {
+    throw new OCommandExecutionException("Cannot evaluate lucene condition without index configuration.");
   }
- else {
-    return false;
+  MemoryIndex memoryIndex=(MemoryIndex)iContext.getVariable("_memoryIndex");
+  if (memoryIndex == null) {
+    memoryIndex=new MemoryIndex();
+    iContext.setVariable("_memoryIndex",memoryIndex);
   }
+  memoryIndex.reset();
+  Document doc=index.buildDocument(iLeft);
+  for (  IndexableField field : doc.getFields()) {
+    memoryIndex.addField(field.name(),field.stringValue(),index.analyzer(field.name()));
+  }
+  Query query=null;
+  try {
+    query=index.buildQuery(iRight);
+  }
+ catch (  ParseException e) {
+    e.printStackTrace();
+  }
+  return memoryIndex.search(query) > 0.0f;
 }

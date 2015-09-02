@@ -5,40 +5,39 @@
   final boolean txIsActive=database.getTransaction().isActive();
   if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    modificationLock.requestModificationLock();
+    checkForKeyType(key);
+    acquireSharedLock();
     try {
-      checkForKeyType(key);
-      acquireSharedLock();
-      startStorageAtomicOperation();
-      try {
-        Set<OIdentifiable> values=indexEngine.get(key);
-        if (values == null) {
-          if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-            boolean durable=false;
-            if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))             durable=true;
-            values=new OIndexRIDContainer(getName(),durable);
-          }
+      if (!singleValue.getIdentity().isValid())       (singleValue.getRecord()).save();
+      final ORID identity=singleValue.getIdentity();
+      final boolean durable;
+      if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))       durable=true;
+ else       durable=false;
+      final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
+      final Callable<Object> creator=new Callable<Object>(){
+        @Override public Object call() throws Exception {
+          Set<OIdentifiable> result=values;
+          if (result == null) {
+            if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
+              result=new OIndexRIDContainer(getName(),durable);
+            }
  else {
-            values=new OMVRBTreeRIDSet(OGlobalConfiguration.MVRBTREE_RID_BINARY_THRESHOLD.getValueAsInteger());
-            ((OMVRBTreeRIDSet)values).setAutoConvertToRecord(false);
+              throw new IllegalStateException("MVRBTree is not supported any more");
+            }
           }
+          result.add(identity);
+          return result;
         }
-        if (!iSingleValue.getIdentity().isValid())         (iSingleValue.getRecord()).save();
-        values.add(iSingleValue.getIdentity());
-        indexEngine.put(key,values);
-        commitStorageAtomicOperation();
-        return this;
       }
- catch (      RuntimeException e) {
-        rollbackStorageAtomicOperation();
-        throw new OIndexException("Error during insertion of key in index",e);
-      }
- finally {
-        releaseSharedLock();
-      }
+;
+      storage.updateIndexEntry(indexId,key,creator);
+      return this;
     }
-  finally {
-      modificationLock.releaseModificationLock();
+ catch (    RuntimeException e) {
+      throw new OIndexException("Error during insertion of key in index",e);
+    }
+ finally {
+      releaseSharedLock();
     }
   }
   finally {

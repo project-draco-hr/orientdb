@@ -5,38 +5,22 @@
   final boolean txIsActive=database.getTransaction().isActive();
   if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    modificationLock.requestModificationLock();
+    acquireSharedLock();
     try {
-      acquireSharedLock();
-      startStorageAtomicOperation();
-      try {
-        Set<OIdentifiable> values=indexEngine.get(key);
-        if (values == null) {
-          commitStorageAtomicOperation();
-          return false;
-        }
-        if (value == null) {
-          indexEngine.remove(key);
-        }
- else         if (values.remove(value)) {
-          if (values.isEmpty())           indexEngine.remove(key);
- else           indexEngine.put(key,values);
-          commitStorageAtomicOperation();
-          return true;
-        }
-        commitStorageAtomicOperation();
+      final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
+      if (values == null) {
         return false;
       }
- catch (      RuntimeException e) {
-        rollbackStorageAtomicOperation();
-        throw new OIndexException("Error during removal of entry by key",e);
-      }
- finally {
-        releaseSharedLock();
-      }
+      final OModifiableBoolean removed=new OModifiableBoolean(false);
+      final Callable<Object> creator=new EntityRemover(value,removed,values);
+      storage.updateIndexEntry(indexId,key,creator);
+      return removed.getValue();
     }
-  finally {
-      modificationLock.releaseModificationLock();
+ catch (    RuntimeException e) {
+      throw new OIndexException("Error during removal of entry by key",e);
+    }
+ finally {
+      releaseSharedLock();
     }
   }
   finally {

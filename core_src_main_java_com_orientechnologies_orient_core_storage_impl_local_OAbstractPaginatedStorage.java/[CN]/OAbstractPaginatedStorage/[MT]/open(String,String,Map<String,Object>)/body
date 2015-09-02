@@ -10,7 +10,6 @@
   try {
     if (status == STATUS.OPEN)     return;
     if (!exists())     throw new OStorageException("Cannot open the storage '" + name + "' because it does not exist in path: "+ url);
-    status=STATUS.OPEN;
     configuration.load(iProperties);
     componentsFactory=new OCurrentStorageComponentsFactory(configuration);
     preOpenSteps();
@@ -24,8 +23,10 @@
     }
     restoreIfNeeded();
     openClusters();
+    openIndexes(componentsFactory.binarySerializerFactory);
     if (OGlobalConfiguration.STORAGE_MAKE_FULL_CHECKPOINT_AFTER_OPEN.getValueAsBoolean())     makeFullCheckpoint();
     writeCache.startFuzzyCheckpoints();
+    status=STATUS.OPEN;
   }
  catch (  Exception e) {
     for (    OCluster c : clusters) {
@@ -37,6 +38,7 @@
       }
     }
     try {
+      status=STATUS.OPEN;
       doClose(true,false);
     }
  catch (    RuntimeException re) {

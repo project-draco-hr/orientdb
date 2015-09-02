@@ -5,31 +5,24 @@
   final boolean txIsActive=database.getTransaction().isActive();
   if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    modificationLock.requestModificationLock();
+    checkForKeyType(key);
+    acquireSharedLock();
     try {
-      checkForKeyType(key);
-      acquireSharedLock();
-      try {
-        final OIdentifiable value=indexEngine.get(key);
-        if (value != null) {
-          if (!value.equals(iSingleValue)) {
-            final Boolean mergeSameKey=metadata != null ? (Boolean)metadata.field(OIndex.MERGE_KEYS) : Boolean.FALSE;
-            if (mergeSameKey != null && mergeSameKey)             ;
- else             throw new ORecordDuplicatedException(String.format("Cannot index record %s: found duplicated key '%s' in index '%s' previously assigned to the record %s",iSingleValue.getIdentity(),key,getName(),value.getIdentity()),value.getIdentity());
-          }
- else           return this;
+      final OIdentifiable value=(OIdentifiable)storage.getIndexValue(indexId,key);
+      if (value != null) {
+        if (!value.equals(iSingleValue)) {
+          final Boolean mergeSameKey=metadata != null ? (Boolean)metadata.field(OIndex.MERGE_KEYS) : Boolean.FALSE;
+          if (mergeSameKey != null && mergeSameKey)           ;
+ else           throw new ORecordDuplicatedException(String.format("Cannot index record %s: found duplicated key '%s' in index '%s' previously assigned to the record %s",iSingleValue.getIdentity(),key,getName(),value.getIdentity()),value.getIdentity());
         }
-        if (!iSingleValue.getIdentity().isPersistent())         ((ORecord)iSingleValue.getRecord()).save();
-        markStorageDirty();
-        indexEngine.put(key,iSingleValue.getIdentity());
-        return this;
+ else         return this;
       }
-  finally {
-        releaseSharedLock();
-      }
+      if (!iSingleValue.getIdentity().isPersistent())       ((ORecord)iSingleValue.getRecord()).save();
+      storage.putIndexValue(indexId,key,iSingleValue.getIdentity());
+      return this;
     }
   finally {
-      modificationLock.releaseModificationLock();
+      releaseSharedLock();
     }
   }
   finally {

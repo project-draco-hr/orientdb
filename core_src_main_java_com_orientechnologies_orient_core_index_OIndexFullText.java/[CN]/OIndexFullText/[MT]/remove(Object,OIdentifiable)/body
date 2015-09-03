@@ -5,37 +5,24 @@
   final boolean txIsActive=database.getTransaction().isActive();
   if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    modificationLock.requestModificationLock();
-    try {
-      final Set<String> words=splitIntoWords(key.toString());
-      boolean removed=false;
-      for (      final String word : words) {
-        acquireSharedLock();
-        startStorageAtomicOperation();
-        try {
-          final Set<OIdentifiable> recs=indexEngine.get(word);
-          if (recs != null && !recs.isEmpty()) {
-            if (recs.remove(value)) {
-              if (recs.isEmpty())               indexEngine.remove(word);
- else               indexEngine.put(word,recs);
-              removed=true;
-            }
-          }
-          commitStorageAtomicOperation();
-        }
- catch (        RuntimeException e) {
-          rollbackStorageAtomicOperation();
-          throw new OIndexException("Error during removal of entry by key and value",e);
-        }
- finally {
-          releaseSharedLock();
+    final Set<String> words=splitIntoWords(key.toString());
+    final OModifiableBoolean removed=new OModifiableBoolean(false);
+    for (    final String word : words) {
+      acquireSharedLock();
+      try {
+        final Set<OIdentifiable> recs=(Set<OIdentifiable>)storage.getIndexValue(indexId,word);
+        if (recs != null && !recs.isEmpty()) {
+          storage.updateIndexEntry(indexId,word,new EntityRemover(recs,value,removed));
         }
       }
-      return removed;
+ catch (      RuntimeException e) {
+        throw new OIndexException("Error during removal of entry by key and value",e);
+      }
+ finally {
+        releaseSharedLock();
+      }
     }
-  finally {
-      modificationLock.releaseModificationLock();
-    }
+    return removed.getValue();
   }
   finally {
     if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);

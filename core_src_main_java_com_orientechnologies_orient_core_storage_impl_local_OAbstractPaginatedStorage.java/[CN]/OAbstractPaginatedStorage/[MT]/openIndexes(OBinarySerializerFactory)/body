@@ -1,0 +1,16 @@
+{
+  final Set<String> indexNames=configuration.indexEngines();
+  for (  String indexName : indexNames) {
+    final OStorageConfiguration.IndexEngineData engineData=configuration.getIndexEngine(indexName);
+    final OIndexEngine engine=OIndexes.createIndexEngine(engineData.getName(),engineData.getAlgorithm(),engineData.getDurableInNonTxMode(),this,engineData.getVersion());
+    try {
+      engine.load(engineData.getName(),binarySerializerFactory.getObjectSerializer(engineData.getValueSerializerId()),engineData.isAutomatic(),binarySerializerFactory.getObjectSerializer(engineData.getKeySerializedId()),engineData.getKeyTypes(),engineData.isNullValuesSupport(),engineData.getKeySize());
+      indexEngineNameMap.put(engineData.getName().toLowerCase(configuration.getLocaleInstance()),engine);
+      indexEngines.add(engine);
+    }
+ catch (    RuntimeException e) {
+      OLogManager.instance().error(this,"Index " + engineData.getName() + " can not be created and will be removed from configuration");
+      engine.deleteWithoutLoad(engineData.getName());
+    }
+  }
+}

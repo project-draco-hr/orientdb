@@ -1,0 +1,23 @@
+{
+  checkOpeness();
+  stateLock.acquireWriteLock();
+  try {
+    checkOpeness();
+    checkLowDiskSpaceAndFullCheckpointRequests();
+    checkIndexId(indexId);
+    makeStorageDirty();
+    final OIndexEngine engine=indexEngines.get(indexId);
+    indexEngines.set(indexId,null);
+    engine.delete();
+    final String engineName=engine.getName().toLowerCase(configuration.getLocaleInstance());
+    indexEngineNameMap.remove(engineName);
+    configuration.deleteIndexEngine(engineName);
+    if (OGlobalConfiguration.DB_MAKE_FULL_CHECKPOINT_ON_INDEX_CHANGE.getValueAsBoolean())     makeFullCheckpoint();
+  }
+ catch (  IOException e) {
+    throw new OStorageException("Error on index deletion",e);
+  }
+ finally {
+    stateLock.releaseWriteLock();
+  }
+}

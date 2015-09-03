@@ -4,21 +4,14 @@
   final boolean txIsActive=database.getTransaction().isActive();
   if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    modificationLock.requestModificationLock();
+    checkForKeyType(key);
+    acquireSharedLock();
     try {
-      checkForKeyType(key);
-      acquireSharedLock();
-      try {
-        markStorageDirty();
-        indexEngine.put(key,value);
-        return this;
-      }
-  finally {
-        releaseSharedLock();
-      }
+      storage.putIndexValue(indexId,key,value);
+      return this;
     }
   finally {
-      modificationLock.releaseModificationLock();
+      releaseSharedLock();
     }
   }
   finally {

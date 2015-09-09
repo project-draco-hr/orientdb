@@ -2,28 +2,31 @@
   Object value=iParams[0];
   if (value instanceof OSQLFilterItemVariable)   value=((OSQLFilterItemVariable)value).getValue(iCurrentRecord,iCurrentResult,iContext);
   if (value == null)   return Collections.emptySet();
-  if (!(value instanceof Collection<?>))   value=Arrays.asList(value);
-  final Collection<?> coll=(Collection<?>)value;
   if (iParams.length == 1) {
     if (context == null) {
-      context=new HashSet<Object>(coll);
+      if (value instanceof Collection) {
+        context=((Collection)value).iterator();
+      }
+ else       if (value instanceof Iterator) {
+        context=(Iterator)value;
+      }
+ else {
+        context=Arrays.asList(value).iterator();
+      }
     }
  else {
-      context.retainAll(coll);
+      context=intersectWith((Iterator)context,value);
     }
     return null;
   }
- else {
-    final HashSet<Object> result=new HashSet<Object>(coll);
-    for (int i=1; i < iParams.length; ++i) {
-      value=iParams[i];
-      if (value instanceof OSQLFilterItemVariable)       value=((OSQLFilterItemVariable)value).getValue(iCurrentRecord,iCurrentResult,iContext);
-      if (value != null) {
-        if (!(value instanceof Collection<?>))         value=Arrays.asList(value);
-        result.retainAll((Collection<?>)value);
-      }
- else       result.clear();
+  Iterator result=OMultiValue.getMultiValueIterator(value);
+  for (int i=1; i < iParams.length; ++i) {
+    value=iParams[i];
+    if (value instanceof OSQLFilterItemVariable)     value=((OSQLFilterItemVariable)value).getValue(iCurrentRecord,iCurrentResult,iContext);
+    if (value != null) {
+      intersectWith(result,value);
     }
-    return result;
+ else     result=new ArrayList().iterator();
   }
+  return result;
 }

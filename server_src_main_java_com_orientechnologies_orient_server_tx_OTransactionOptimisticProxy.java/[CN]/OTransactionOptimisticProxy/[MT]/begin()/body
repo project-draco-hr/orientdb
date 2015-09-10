@@ -1,5 +1,6 @@
 {
   super.begin();
+  OException toThrow=null;
   try {
     setUsingLog(channel.readByte() == 1);
     byte lastTxStatus;
@@ -22,7 +23,9 @@ if (protocolVersion >= 23) ORecordInternal.setContentChanged(entry.getRecord(),c
 break;
 case ORecordOperation.DELETED:
 final ORecord rec=rid.getRecord();
-ORecordInternal.setVersion(rec,channel.readVersion().getCounter());
+ORecordVersion deleteVersion=channel.readVersion();
+if (rec == null) toThrow=new OConcurrentModificationException(rid.getIdentity(),new OSimpleVersion(-1),deleteVersion,ORecordOperation.DELETED);
+ORecordInternal.setVersion(rec,deleteVersion.getCounter());
 entry.setRecord(rec);
 break;
 default :
@@ -30,6 +33,7 @@ throw new OTransactionException("Unrecognized tx command: " + recordStatus);
 }
 tempEntries.put(entry.getRecord().getIdentity(),entry);
 }
+if (toThrow != null) throw toThrow;
 if (lastTxStatus == -1) throw new OTransactionAbortedException("Transaction aborted by the client");
 final ODocument remoteIndexEntries=new ODocument(channel.readBytes());
 fillIndexOperations(remoteIndexEntries);

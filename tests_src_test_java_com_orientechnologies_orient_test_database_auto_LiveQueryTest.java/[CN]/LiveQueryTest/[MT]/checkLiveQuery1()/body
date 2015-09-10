@@ -1,0 +1,34 @@
+{
+  final String className1="LiveQueryTest1_1";
+  final String className2="LiveQueryTest1_2";
+  database.getMetadata().getSchema().createClass(className1);
+  database.getMetadata().getSchema().createClass(className2);
+  MyLiveQueryListener listener=new MyLiveQueryListener();
+  OResultSet<ODocument> tokens=database.query(new OLiveQuery<ODocument>("live select from " + className1,listener));
+  Assert.assertEquals(tokens.size(),1);
+  ODocument tokenDoc=tokens.get(0);
+  Integer token=tokenDoc.field("token");
+  Assert.assertNotNull(token);
+  database.command(new OCommandSQL("insert into " + className1 + " set name = 'foo', surname = 'bar'")).execute();
+  database.command(new OCommandSQL("insert into  " + className1 + " set name = 'foo', surname = 'baz'")).execute();
+  database.command(new OCommandSQL("insert into " + className2 + " set name = 'foo'"));
+  try {
+    latch.await();
+  }
+ catch (  InterruptedException e) {
+    e.printStackTrace();
+  }
+  database.command(new OCommandSQL("live unsubscribe " + token)).execute();
+  database.command(new OCommandSQL("insert into " + className1 + " set name = 'foo', surname = 'bax'")).execute();
+  try {
+    Thread.sleep(3000);
+  }
+ catch (  InterruptedException e) {
+    e.printStackTrace();
+  }
+  Assert.assertEquals(listener.ops.size(),2);
+  for (  ORecordOperation doc : listener.ops) {
+    Assert.assertEquals(doc.type,ORecordOperation.CREATED);
+    Assert.assertEquals(((ODocument)doc.record).field("name"),"foo");
+  }
+}

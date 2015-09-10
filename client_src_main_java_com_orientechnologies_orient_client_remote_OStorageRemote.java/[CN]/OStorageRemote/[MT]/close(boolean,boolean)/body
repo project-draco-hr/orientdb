@@ -4,19 +4,25 @@
   stateLock.acquireWriteLock();
   try {
     if (status == STATUS.CLOSED)     return;
-    network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
-    try {
-      setSessionId(null,-1,null);
-    }
+    if (getSessionToken() != null && getSessionId() != -1) {
+      network=beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE);
+      try {
+        setSessionId(null,-1,null);
+      }
   finally {
-      endRequest(network);
-      engine.getConnectionManager().release(network);
+        endRequest(network);
+        engine.getConnectionManager().release(network);
+      }
+      if (!checkForClose(iForce))       return;
     }
-    if (!checkForClose(iForce))     return;
+ else {
+      return;
+    }
     status=STATUS.CLOSING;
     engine.getConnectionManager().closePool(getCurrentServerURL());
     sbTreeCollectionManager.close();
     super.close(iForce,onDelete);
+    this.token=null;
     status=STATUS.CLOSED;
     Orient.instance().unregisterStorage(this);
   }

@@ -1,0 +1,59 @@
+{
+  OChannelBinaryAsynchClient network=null;
+  String currentURL=getCurrentServerURL();
+  do {
+    do {
+      try {
+        network=getAvailableNetwork(currentURL);
+        try {
+          network.writeByte(OChannelBinaryProtocol.REQUEST_DB_REOPEN);
+          network.writeInt(getSessionId());
+          network.writeBytes(getSessionToken());
+        }
+  finally {
+          endRequest(network);
+        }
+        final int sessionId;
+        try {
+          beginResponse(network);
+          sessionId=network.readInt();
+          setSessionId(network.getServerURL(),sessionId,getSessionToken());
+          OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
+          return currentURL;
+        }
+  finally {
+          endResponse(network);
+        }
+      }
+ catch (      OIOException e) {
+        if (network != null) {
+          engine.getConnectionManager().remove(network);
+          network=null;
+        }
+        OLogManager.instance().error(this,"Can not open database with url " + currentURL,e);
+      }
+catch (      OException e) {
+        throw e;
+      }
+catch (      Exception e) {
+        if (network != null) {
+          try {
+            engine.getConnectionManager().remove(network);
+          }
+ catch (          Exception ex) {
+            OLogManager.instance().debug(this,"Can not remove connection or database url=" + currentURL,e);
+          }
+          network=null;
+        }
+        OLogManager.instance().error(this,"Can not open database url=" + currentURL,e);
+      }
+    }
+ while (engine.getConnectionManager().getAvailableConnections(currentURL) > 0);
+    currentURL=useNewServerURL(currentURL);
+  }
+ while (currentURL != null);
+  parseServerURLs();
+synchronized (serverURLs) {
+    throw new OStorageException("Cannot create a connection to remote server address(es): " + serverURLs);
+  }
+}

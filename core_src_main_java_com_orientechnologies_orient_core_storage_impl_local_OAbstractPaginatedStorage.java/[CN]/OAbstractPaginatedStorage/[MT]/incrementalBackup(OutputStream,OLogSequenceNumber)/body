@@ -1,11 +1,11 @@
 {
   final OLogSequenceNumber lastLsn;
   checkOpeness();
-  freeze(false);
+  stateLock.acquireReadLock();
   try {
-    stateLock.acquireReadLock();
+    checkOpeness();
+    modificationLock.prohibitModifications();
     try {
-      checkOpeness();
       final BufferedOutputStream bufferedOutputStream=new BufferedOutputStream(stream);
       try {
         final ZipOutputStream zipOutputStream=new ZipOutputStream(bufferedOutputStream,Charset.forName(configuration.getCharset()));
@@ -39,11 +39,11 @@
       }
     }
   finally {
-      stateLock.releaseReadLock();
+      modificationLock.allowModifications();
     }
   }
   finally {
-    release();
+    stateLock.releaseReadLock();
   }
   return lastLsn;
 }

@@ -5,20 +5,15 @@
   storageType=channel.readString();
   if (storageType == null)   storageType="plocal";
   checkServerAccess("database.exists");
-  if (storageType != null)   connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,storageType);
- else {
-    for (    String engine : Orient.instance().getEngines()) {
-      if (!engine.equalsIgnoreCase(OEngineRemote.NAME)) {
-        connection.database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,engine);
-        if (connection.database.exists())         break;
-        Orient.instance().unregisterStorage(connection.database.getStorage());
-      }
-    }
-  }
+  boolean result=false;
+  ODatabaseDocumentInternal database;
+  database=getDatabaseInstance(dbName,ODatabaseDocument.TYPE,storageType);
+  if (database.exists())   result=true;
+ else   Orient.instance().unregisterStorage(database.getStorage());
   beginResponse();
   try {
     sendOk(clientTxId);
-    channel.writeByte((byte)(connection.database.exists() ? 1 : 0));
+    channel.writeByte((byte)(result ? 1 : 0));
   }
   finally {
     endResponse();

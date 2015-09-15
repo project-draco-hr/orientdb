@@ -3,7 +3,9 @@
   stateLock.acquireReadLock();
   try {
     checkOpeness();
-    modificationLock.prohibitModifications(throwException);
+    final long freezeId;
+    if (throwException)     freezeId=atomicOperationsManager.freezeAtomicOperations(OModificationOperationProhibitedException.class,"Modification requests are prohibited");
+ else     freezeId=atomicOperationsManager.freezeAtomicOperations(null,null);
     synch();
     try {
       unlock();
@@ -11,7 +13,7 @@
       if (configuration != null)       configuration.setSoftlyClosed(true);
     }
  catch (    IOException e) {
-      modificationLock.allowModifications();
+      atomicOperationsManager.releaseAtomicOperations(freezeId);
       try {
         lock();
       }

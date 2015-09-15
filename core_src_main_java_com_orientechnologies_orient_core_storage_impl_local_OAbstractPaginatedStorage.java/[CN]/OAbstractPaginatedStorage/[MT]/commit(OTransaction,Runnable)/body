@@ -6,48 +6,42 @@
   stateLock.acquireReadLock();
   try {
     try {
-      modificationLock.requestModificationLock();
+      dataLock.acquireExclusiveLock();
       try {
-        dataLock.acquireExclusiveLock();
-        try {
-          checkOpeness();
-          if (writeAheadLog == null && clientTx.isUsingLog())           throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
-          makeStorageDirty();
-          startStorageTx(clientTx);
-          final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
-          for (          ORecordOperation txEntry : clientTx.getCurrentRecordEntries())           tmpEntries.add(txEntry);
-          clientTx.clearRecordEntries();
-          for (          ORecordOperation txEntry : tmpEntries) {
-            if (txEntry.type == ORecordOperation.CREATED || txEntry.type == ORecordOperation.UPDATED) {
-              final ORecord record=txEntry.getRecord();
-              if (record instanceof ODocument)               ((ODocument)record).validate();
-            }
+        checkOpeness();
+        if (writeAheadLog == null && clientTx.isUsingLog())         throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
+        makeStorageDirty();
+        startStorageTx(clientTx);
+        final List<ORecordOperation> tmpEntries=new ArrayList<ORecordOperation>();
+        for (        ORecordOperation txEntry : clientTx.getCurrentRecordEntries())         tmpEntries.add(txEntry);
+        clientTx.clearRecordEntries();
+        for (        ORecordOperation txEntry : tmpEntries) {
+          if (txEntry.type == ORecordOperation.CREATED || txEntry.type == ORecordOperation.UPDATED) {
+            final ORecord record=txEntry.getRecord();
+            if (record instanceof ODocument)             ((ODocument)record).validate();
           }
-          for (          ORecordOperation txEntry : tmpEntries) {
-            if (txEntry.getRecord().isDirty()) {
-              if (txEntry.type == ORecordOperation.CREATED)               saveNew(txEntry,clientTx);
-            }
+        }
+        for (        ORecordOperation txEntry : tmpEntries) {
+          if (txEntry.getRecord().isDirty()) {
+            if (txEntry.type == ORecordOperation.CREATED)             saveNew(txEntry,clientTx);
           }
-          for (          ORecordOperation txEntry : tmpEntries) {
-            if (txEntry.type != ORecordOperation.CREATED)             commitEntry(clientTx,txEntry);
-          }
-          if (callback != null)           callback.run();
-          endStorageTx();
-          OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
         }
- catch (        IOException ioe) {
-          makeRollback(clientTx,ioe);
+        for (        ORecordOperation txEntry : tmpEntries) {
+          if (txEntry.type != ORecordOperation.CREATED)           commitEntry(clientTx,txEntry);
         }
-catch (        RuntimeException e) {
-          makeRollback(clientTx,e);
-        }
- finally {
-          transaction.set(null);
-          dataLock.releaseExclusiveLock();
-        }
+        if (callback != null)         callback.run();
+        endStorageTx();
+        OTransactionAbstract.updateCacheFromEntries(clientTx,clientTx.getAllRecordEntries(),true);
       }
-  finally {
-        modificationLock.releaseModificationLock();
+ catch (      IOException ioe) {
+        makeRollback(clientTx,ioe);
+      }
+catch (      RuntimeException e) {
+        makeRollback(clientTx,e);
+      }
+ finally {
+        transaction.set(null);
+        dataLock.releaseExclusiveLock();
       }
     }
   finally {

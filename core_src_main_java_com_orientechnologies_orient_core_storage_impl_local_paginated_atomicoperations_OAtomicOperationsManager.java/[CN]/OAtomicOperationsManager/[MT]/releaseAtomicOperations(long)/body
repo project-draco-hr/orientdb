@@ -1,0 +1,18 @@
+{
+  if (id >= 0) {
+    final FreezeParameters freezeParameters=freezeParametersIdMap.remove(id);
+    if (freezeParameters == null)     throw new IllegalStateException("Invalid value for freeze id " + id);
+  }
+  final Map<Long,FreezeParameters> freezeParametersMap=new HashMap<Long,FreezeParameters>(freezeParametersIdMap);
+  final long requests=freezeRequests.decrementAndGet();
+  if (requests == 0) {
+    for (    Long freezeId : freezeParametersMap.keySet()) {
+      freezeParametersIdMap.remove(freezeId);
+    }
+    WaitingListNode node=cutWaitingList();
+    while (node != null) {
+      LockSupport.unpark(node.item);
+      node=node.next;
+    }
+  }
+}

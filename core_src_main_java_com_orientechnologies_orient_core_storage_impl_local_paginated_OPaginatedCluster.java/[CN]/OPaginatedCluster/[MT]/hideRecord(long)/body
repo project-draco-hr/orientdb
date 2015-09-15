@@ -1,35 +1,29 @@
 {
-  externalModificationLock.requestModificationLock();
+  OAtomicOperation atomicOperation=startAtomicOperation();
+  acquireExclusiveLock();
   try {
-    OAtomicOperation atomicOperation=startAtomicOperation();
-    acquireExclusiveLock();
-    try {
-      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(position);
-      if (positionEntry == null) {
-        endAtomicOperation(false,null);
-        return false;
-      }
-      long pageIndex=positionEntry.getPageIndex();
-      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-        endAtomicOperation(false,null);
-        return false;
-      }
-      try {
-        updateClusterState(-1,0,atomicOperation);
-        clusterPositionMap.remove(position);
-        endAtomicOperation(false,null);
-        return true;
-      }
- catch (      Exception e) {
-        endAtomicOperation(true,e);
-        throw new OStorageException(null,e);
-      }
+    OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(position);
+    if (positionEntry == null) {
+      endAtomicOperation(false,null);
+      return false;
     }
-  finally {
-      releaseExclusiveLock();
+    long pageIndex=positionEntry.getPageIndex();
+    if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
+      endAtomicOperation(false,null);
+      return false;
+    }
+    try {
+      updateClusterState(-1,0,atomicOperation);
+      clusterPositionMap.remove(position);
+      endAtomicOperation(false,null);
+      return true;
+    }
+ catch (    Exception e) {
+      endAtomicOperation(true,e);
+      throw new OStorageException(null,e);
     }
   }
   finally {
-    externalModificationLock.releaseModificationLock();
+    releaseExclusiveLock();
   }
 }

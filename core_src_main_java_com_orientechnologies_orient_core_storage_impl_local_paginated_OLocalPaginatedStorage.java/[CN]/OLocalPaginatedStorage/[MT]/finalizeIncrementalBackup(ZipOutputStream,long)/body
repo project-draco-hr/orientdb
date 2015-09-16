@@ -6,7 +6,7 @@
   long freezeId=-1;
   try {
     while (true) {
-      for (; i < WAL_BACKUP_ITERATION_STEP * (n + 1) || i < nonActiveSegments.length; i++) {
+      for (; i < WAL_BACKUP_ITERATION_STEP * (n + 1) && i < nonActiveSegments.length; i++) {
         final File nonActiveSegment=nonActiveSegments[i];
         final FileInputStream fileInputStream=new FileInputStream(nonActiveSegment);
         try {
@@ -14,10 +14,15 @@
           try {
             final ZipEntry entry=new ZipEntry(nonActiveSegment.getName());
             zipOutputStream.putNextEntry(entry);
-            final byte[] buffer=new byte[4096];
-            int br=0;
-            while ((br=bufferedInputStream.read(buffer)) >= 0) {
-              zipOutputStream.write(buffer,0,br);
+            try {
+              final byte[] buffer=new byte[4096];
+              int br=0;
+              while ((br=bufferedInputStream.read(buffer)) >= 0) {
+                zipOutputStream.write(buffer,0,br);
+              }
+            }
+  finally {
+              zipOutputStream.closeEntry();
             }
           }
   finally {
@@ -40,6 +45,7 @@
           freezeId=getAtomicOperationsManager().freezeAtomicOperations(OModificationOperationProhibitedException.class,"Incremental backup in progress");
         }
         writeAheadLog.newSegment();
+        newSegment=true;
         nonActiveSegments=writeAheadLog.nonActiveSegments(startSegment);
       }
       n++;

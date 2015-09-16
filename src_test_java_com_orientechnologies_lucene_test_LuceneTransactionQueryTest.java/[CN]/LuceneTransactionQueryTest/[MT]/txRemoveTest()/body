@@ -1,0 +1,27 @@
+{
+  databaseDocumentTx.begin();
+  ODocument doc=new ODocument("c1");
+  doc.field("p1","abc");
+  OIndex<?> index=databaseDocumentTx.getMetadata().getIndexManager().getIndex("C1.p1");
+  databaseDocumentTx.save(doc);
+  String query="select from C1 where p1 lucene \"abc\" limit 1";
+  List<ODocument> vertices=ODatabaseRecordThreadLocal.INSTANCE.get().command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Assert.assertEquals(vertices.size(),1);
+  Assert.assertEquals(index.getSize(),1);
+  databaseDocumentTx.commit();
+  query="select from C1 where p1 lucene \"abc\" limit 1";
+  vertices=databaseDocumentTx.command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Assert.assertEquals(vertices.size(),1);
+  Assert.assertEquals(index.getSize(),1);
+  databaseDocumentTx.begin();
+  databaseDocumentTx.delete(vertices.get(0));
+  query="select from C1 where p1 lucene \"abc\" limit 1";
+  vertices=databaseDocumentTx.command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Assert.assertEquals(vertices.size(),0);
+  Assert.assertEquals(index.getSize(),0);
+  databaseDocumentTx.rollback();
+  query="select from C1 where p1 lucene \"abc\" limit 1";
+  vertices=databaseDocumentTx.command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Assert.assertEquals(vertices.size(),1);
+  Assert.assertEquals(index.getSize(),1);
+}

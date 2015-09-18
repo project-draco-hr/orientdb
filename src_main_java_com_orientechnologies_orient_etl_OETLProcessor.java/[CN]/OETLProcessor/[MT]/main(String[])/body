@@ -1,33 +1,10 @@
 {
-  ODocument cfgGlobal=null;
   System.out.println("OrientDB etl v." + OConstants.getVersion() + " "+ OConstants.ORIENT_URL);
   if (args.length == 0) {
     System.out.println("Syntax error, missing configuration file.");
     System.out.println("Use: oetl.sh <json-file>");
     System.exit(1);
   }
-  final OBasicCommandContext context=createDefaultContext();
-  ODocument configuration=null;
-  for (  final String arg : args) {
-    if (arg.charAt(0) == '-') {
-      final String[] parts=arg.substring(1).split("=");
-      context.setVariable(parts[0].toUpperCase(),parts[1]);
-    }
- else {
-      try {
-        final String config=OIOUtils.readFileAsString(new File(arg));
-        configuration=new ODocument().fromJSON(config,"noMap");
-        cfgGlobal=configuration.field("config");
-      }
- catch (      IOException e) {
-        throw new OConfigurationException("Error on loading config file: " + arg);
-      }
-    }
-  }
-  if (cfgGlobal != null) {
-    for (    String f : cfgGlobal.fieldNames()) {
-      context.setVariable(f,cfgGlobal.field(f));
-    }
-  }
-  new OETLProcessor().parse(configuration,context).execute();
+  final OETLProcessor processor=parseConfigAndParameters(args);
+  processor.execute();
 }

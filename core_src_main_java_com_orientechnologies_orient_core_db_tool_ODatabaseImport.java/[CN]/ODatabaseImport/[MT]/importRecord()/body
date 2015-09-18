@@ -5,7 +5,23 @@
   }
   record=null;
   try {
-    record=ORecordSerializerJSON.INSTANCE.fromString(value,record,null);
+    try {
+      record=ORecordSerializerJSON.INSTANCE.fromString(value,record,null);
+    }
+ catch (    OSerializationException e) {
+      if (e.getCause() instanceof OSchemaException) {
+        final int pos=value.indexOf("\"@class\":\"");
+        if (pos > -1) {
+          final int end=value.indexOf("\"",pos + "\"@class\":\"".length() + 1);
+          final String value1=value.substring(0,pos + "\"@class\":\"".length());
+          final String clsName=value.substring(pos + "\"@class\":\"".length(),end);
+          final String value2=value.substring(end);
+          final String newClassName=convertedClassNames.get(clsName);
+          value=value1 + newClassName + value2;
+          record=ORecordSerializerJSON.INSTANCE.fromString(value,record,null);
+        }
+      }
+    }
     if (schemaImported && record.getIdentity().equals(schemaRecordId)) {
       return null;
     }

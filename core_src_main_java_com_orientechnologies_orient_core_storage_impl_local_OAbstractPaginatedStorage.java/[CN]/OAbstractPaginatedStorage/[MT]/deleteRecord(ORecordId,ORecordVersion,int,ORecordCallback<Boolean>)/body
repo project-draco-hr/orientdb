@@ -14,35 +14,23 @@
   final long timer=Orient.instance().getProfiler().startChrono();
   stateLock.acquireReadLock();
   try {
-    cluster.getExternalModificationLock().requestModificationLock();
+    lockManager.acquireLock(rid,OLockManager.LOCK.EXCLUSIVE);
     try {
-      modificationLock.requestModificationLock();
+      dataLock.acquireSharedLock();
       try {
-        lockManager.acquireLock(rid,OLockManager.LOCK.EXCLUSIVE);
-        try {
-          dataLock.acquireSharedLock();
-          try {
-            checkOpeness();
-            return doDeleteRecord(rid,version,cluster);
-          }
-  finally {
-            dataLock.releaseSharedLock();
-          }
-        }
-  finally {
-          lockManager.releaseLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
-        }
+        checkOpeness();
+        return doDeleteRecord(rid,version,cluster);
       }
   finally {
-        modificationLock.releaseModificationLock();
+        dataLock.releaseSharedLock();
       }
     }
   finally {
-      cluster.getExternalModificationLock().releaseModificationLock();
-      Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
+      lockManager.releaseLock(this,rid,OLockManager.LOCK.EXCLUSIVE);
     }
   }
   finally {
     stateLock.releaseReadLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
   }
 }

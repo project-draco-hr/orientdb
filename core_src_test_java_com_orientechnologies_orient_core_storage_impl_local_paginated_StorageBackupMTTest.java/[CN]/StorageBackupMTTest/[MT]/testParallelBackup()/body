@@ -1,0 +1,52 @@
+{
+  String buildDirectory=System.getProperty("buildDirectory",".");
+  String dbDirectory=buildDirectory + File.separator + StorageBackupMTTest.class.getSimpleName();
+  OFileUtils.deleteRecursively(new File(dbDirectory));
+  dbURL="plocal:" + dbDirectory;
+  databaseDocumentTx=new ODatabaseDocumentTx(dbURL);
+  databaseDocumentTx.create();
+  final OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  final OClass backupClass=schema.createClass("BackupClass");
+  backupClass.createProperty("num",OType.INTEGER);
+  backupClass.createProperty("data",OType.BINARY);
+  backupClass.createIndex("backupIndex",OClass.INDEX_TYPE.NOTUNIQUE,"num");
+  File backupDir=new File(buildDirectory,"backupDir");
+  OFileUtils.deleteRecursively(backupDir);
+  if (!backupDir.exists())   Assert.assertTrue(backupDir.mkdirs());
+  final ExecutorService executor=Executors.newCachedThreadPool();
+  final List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  for (int i=0; i < 4; i++) {
+    futures.add(executor.submit(new DataWriterCallable()));
+  }
+  futures.add(executor.submit(new DBBackupCallable(backupDir.getAbsolutePath())));
+  latch.countDown();
+  Thread.sleep(15 * 1000 * 60);
+  stop=true;
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  databaseDocumentTx.incrementalBackup(backupDir.getAbsolutePath());
+  final OStorage storage=databaseDocumentTx.getStorage();
+  databaseDocumentTx.close();
+  storage.close(true,false);
+  final String backedUpDbDirectory=buildDirectory + File.separator + StorageBackupMTTest.class.getSimpleName()+ "BackUp";
+  OFileUtils.deleteRecursively(new File(backedUpDbDirectory));
+  final ODatabaseDocumentTx backedUpDb=new ODatabaseDocumentTx("plocal:" + backedUpDbDirectory);
+  backedUpDb.create();
+  backedUpDb.incrementalRestore(backupDir.getAbsolutePath());
+  final OStorage backupStorage=backedUpDb.getStorage();
+  backedUpDb.close();
+  backupStorage.close(true,false);
+  final ODatabaseCompare compare=new ODatabaseCompare("plocal:" + dbDirectory,"plocal:" + backedUpDbDirectory,"admin","admin",new OCommandOutputListener(){
+    @Override public void onMessage(    String iText){
+      System.out.println(iText);
+    }
+  }
+);
+  Assert.assertTrue(compare.compare());
+  databaseDocumentTx.open("admin","admin");
+  databaseDocumentTx.drop();
+  backedUpDb.open("admin","admin");
+  backedUpDb.drop();
+  OFileUtils.deleteRecursively(backupDir);
+}

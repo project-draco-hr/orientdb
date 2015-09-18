@@ -1,0 +1,57 @@
+{
+  File[] nonActiveSegments=writeAheadLog.nonActiveSegments(startSegment);
+  int n=0;
+  int i=0;
+  boolean newSegment=false;
+  long freezeId=-1;
+  try {
+    while (true) {
+      for (; i < WAL_BACKUP_ITERATION_STEP * (n + 1) && i < nonActiveSegments.length; i++) {
+        final File nonActiveSegment=nonActiveSegments[i];
+        final FileInputStream fileInputStream=new FileInputStream(nonActiveSegment);
+        try {
+          final BufferedInputStream bufferedInputStream=new BufferedInputStream(fileInputStream);
+          try {
+            final ZipEntry entry=new ZipEntry(nonActiveSegment.getName());
+            zipOutputStream.putNextEntry(entry);
+            try {
+              final byte[] buffer=new byte[4096];
+              int br=0;
+              while ((br=bufferedInputStream.read(buffer)) >= 0) {
+                zipOutputStream.write(buffer,0,br);
+              }
+            }
+  finally {
+              zipOutputStream.closeEntry();
+            }
+          }
+  finally {
+            bufferedInputStream.close();
+          }
+        }
+  finally {
+          fileInputStream.close();
+        }
+      }
+      final File[] updatedNonActiveSegments=writeAheadLog.nonActiveSegments(startSegment);
+      if (freezeId < 0 && updatedNonActiveSegments.length > nonActiveSegments.length + WAL_BACKUP_ITERATION_STEP) {
+        OLogManager.instance().warn(this,"Incremental backup can not keep up with grow of write ahead log , write operations will be blocked");
+        freezeId=getAtomicOperationsManager().freezeAtomicOperations(OModificationOperationProhibitedException.class,"Incremental backup can not keep up with grow of write ahead log , write operations are blocked");
+      }
+      nonActiveSegments=updatedNonActiveSegments;
+      if (i >= nonActiveSegments.length) {
+        if (newSegment)         break;
+        if (freezeId < 0) {
+          freezeId=getAtomicOperationsManager().freezeAtomicOperations(OModificationOperationProhibitedException.class,"Incremental backup in progress");
+        }
+        writeAheadLog.newSegment();
+        newSegment=true;
+        nonActiveSegments=writeAheadLog.nonActiveSegments(startSegment);
+      }
+      n++;
+    }
+  }
+  finally {
+    if (freezeId >= 0)     getAtomicOperationsManager().releaseAtomicOperations(freezeId);
+  }
+}

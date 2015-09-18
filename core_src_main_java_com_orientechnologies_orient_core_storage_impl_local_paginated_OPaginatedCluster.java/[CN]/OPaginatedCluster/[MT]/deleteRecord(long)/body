@@ -1,76 +1,70 @@
 {
-  externalModificationLock.requestModificationLock();
+  OAtomicOperation atomicOperation=startAtomicOperation();
+  acquireExclusiveLock();
   try {
-    OAtomicOperation atomicOperation=startAtomicOperation();
-    acquireExclusiveLock();
-    try {
-      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
-      if (positionEntry == null) {
-        endAtomicOperation(false,null);
-        return false;
-      }
-      long pageIndex=positionEntry.getPageIndex();
-      int recordPosition=positionEntry.getRecordPosition();
-      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-        endAtomicOperation(false,null);
-        return false;
-      }
-      long nextPagePointer;
-      int removedContentSize=0;
-      do {
-        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-        cacheEntry.acquireExclusiveLock();
-        int initialFreePageIndex;
-        try {
-          OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-          initialFreePageIndex=calculateFreePageIndex(localPage);
-          if (localPage.isDeleted(recordPosition)) {
-            if (removedContentSize == 0) {
-              endAtomicOperation(false,null);
-              return false;
-            }
- else             throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
+    OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+    if (positionEntry == null) {
+      endAtomicOperation(false,null);
+      return false;
+    }
+    long pageIndex=positionEntry.getPageIndex();
+    int recordPosition=positionEntry.getRecordPosition();
+    if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
+      endAtomicOperation(false,null);
+      return false;
+    }
+    long nextPagePointer;
+    int removedContentSize=0;
+    do {
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+      cacheEntry.acquireExclusiveLock();
+      int initialFreePageIndex;
+      try {
+        OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+        initialFreePageIndex=calculateFreePageIndex(localPage);
+        if (localPage.isDeleted(recordPosition)) {
+          if (removedContentSize == 0) {
+            endAtomicOperation(false,null);
+            return false;
           }
- else           if (removedContentSize == 0) {
-            cacheEntry.releaseExclusiveLock();
-            releasePage(atomicOperation,cacheEntry);
-            cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-            cacheEntry.acquireExclusiveLock();
-            localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-          }
-          byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
-          int initialFreeSpace=localPage.getFreeSpace();
-          localPage.deleteRecord(recordPosition);
-          removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
-          nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+ else           throw new OStorageException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.");
         }
-  finally {
+ else         if (removedContentSize == 0) {
           cacheEntry.releaseExclusiveLock();
           releasePage(atomicOperation,cacheEntry);
+          cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+          cacheEntry.acquireExclusiveLock();
+          localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
         }
-        updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
-        pageIndex=getPageIndex(nextPagePointer);
-        recordPosition=getRecordPosition(nextPagePointer);
+        byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
+        int initialFreeSpace=localPage.getFreeSpace();
+        localPage.deleteRecord(recordPosition);
+        removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
+        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
       }
- while (nextPagePointer >= 0);
-      updateClusterState(-1,-removedContentSize,atomicOperation);
-      clusterPositionMap.remove(clusterPosition);
-      endAtomicOperation(false,null);
-      return true;
-    }
- catch (    IOException e) {
-      endAtomicOperation(true,e);
-      throw new OStorageException(null,e);
-    }
-catch (    RuntimeException e) {
-      endAtomicOperation(true,e);
-      throw new OStorageException(null,e);
-    }
- finally {
-      releaseExclusiveLock();
-    }
-  }
   finally {
-    externalModificationLock.releaseModificationLock();
+        cacheEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,cacheEntry);
+      }
+      updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
+      pageIndex=getPageIndex(nextPagePointer);
+      recordPosition=getRecordPosition(nextPagePointer);
+    }
+ while (nextPagePointer >= 0);
+    updateClusterState(-1,-removedContentSize,atomicOperation);
+    clusterPositionMap.remove(clusterPosition);
+    endAtomicOperation(false,null);
+    return true;
+  }
+ catch (  IOException e) {
+    endAtomicOperation(true,e);
+    throw new OStorageException(null,e);
+  }
+catch (  RuntimeException e) {
+    endAtomicOperation(true,e);
+    throw new OStorageException(null,e);
+  }
+ finally {
+    releaseExclusiveLock();
   }
 }

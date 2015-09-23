@@ -1,0 +1,41 @@
+{
+  OrientGraph mainTx=graphFactory.getTx();
+  mainTx.begin();
+  OrientVertex vertex=mainTx.addVertex(null,PROPERTY_NAME,"init");
+  mainTx.commit();
+  mainTx.shutdown();
+  int threadCount=200;
+  final Object recordId=vertex.getId();
+  final CyclicBarrier barrier=new CyclicBarrier(threadCount);
+  List<Thread> threads=new ArrayList<Thread>();
+  final AtomicReference<Throwable> t=new AtomicReference<Throwable>(null);
+  for (int i=0; i < threadCount; i++) {
+    final int threadNo=i;
+    Thread thread=run(new Runnable(){
+      @Override public void run(){
+        OrientGraph tx=graphFactory.getTx();
+        try {
+          tx.begin();
+          OrientVertex secondVertexHandle=tx.getVertex(recordId);
+          secondVertexHandle.setProperty(PROPERTY_NAME,threadNo);
+          waitFor(barrier);
+          tx.commit();
+        }
+ catch (        Exception e) {
+          t.set(e);
+        }
+ finally {
+          tx.shutdown();
+        }
+      }
+    }
+);
+    threads.add(thread);
+  }
+  for (  Thread thread : threads) {
+    thread.join();
+  }
+  if (t.get() != null) {
+    throw t.get();
+  }
+}

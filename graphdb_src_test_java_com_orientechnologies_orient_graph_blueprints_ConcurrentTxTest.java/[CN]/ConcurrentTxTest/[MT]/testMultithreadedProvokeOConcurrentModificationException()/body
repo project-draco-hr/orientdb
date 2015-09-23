@@ -1,0 +1,40 @@
+{
+  final int firstValue=0;
+  final int secondValue=1;
+  OrientGraph mainTx=graphFactory.getTx();
+  mainTx.begin();
+  OrientVertex firstVertexHandle=mainTx.addVertex(null,PROPERTY_NAME,firstValue);
+  mainTx.commit();
+  final Object recordId=firstVertexHandle.getId();
+  final CyclicBarrier barrier=new CyclicBarrier(2);
+  List<Thread> threads=new ArrayList<Thread>();
+  final AtomicReference<Throwable> t=new AtomicReference<Throwable>(null);
+  for (int i=0; i < 2; i++) {
+    Thread thread=run(new Runnable(){
+      @Override public void run(){
+        OrientGraph tx=graphFactory.getTx();
+        try {
+          tx.begin();
+          Vertex secondVertexHandle=tx.getVertex(recordId);
+          secondVertexHandle.setProperty(PROPERTY_NAME,secondValue);
+          waitFor(barrier);
+          tx.commit();
+        }
+ catch (        Exception e) {
+          t.set(e);
+        }
+ finally {
+          tx.shutdown();
+        }
+      }
+    }
+);
+    threads.add(thread);
+  }
+  for (  Thread thread : threads) {
+    thread.join();
+  }
+  if (t.get() != null) {
+    throw t.get();
+  }
+}

@@ -4,25 +4,34 @@
   do {
     do {
       try {
-        network=getAvailableNetwork(currentURL);
-        try {
-          network.writeByte(OChannelBinaryProtocol.REQUEST_DB_REOPEN);
-          network.writeInt(getSessionId());
-          network.writeBytes(getSessionToken());
+        final byte[] curToken=tokens.get(currentURL);
+        if (curToken == null || curToken.length == 0) {
+          return openRemoteDatabase();
         }
+ else {
+          network=getAvailableNetwork(currentURL);
+          try {
+            network.writeByte(OChannelBinaryProtocol.REQUEST_DB_REOPEN);
+            network.writeInt(getSessionId());
+            network.writeBytes(curToken);
+          }
   finally {
-          endRequest(network);
-        }
-        final int sessionId;
-        try {
-          beginResponse(network);
-          sessionId=network.readInt();
-          setSessionId(network.getServerURL(),sessionId,getSessionToken());
-          OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
-          return currentURL;
-        }
+            endRequest(network);
+          }
+          final int sessionId;
+          try {
+            byte[] newToken=network.beginResponse(getSessionId(),true);
+            if (newToken != null && newToken.length > 0) {
+              setSessionId(getServerURL(),getSessionId(),newToken);
+            }
+            sessionId=network.readInt();
+            setSessionId(currentURL,sessionId,curToken);
+            OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
+            return currentURL;
+          }
   finally {
-          endResponse(network);
+            endResponse(network);
+          }
         }
       }
  catch (      OIOException e) {
@@ -31,6 +40,18 @@
           network=null;
         }
         OLogManager.instance().error(this,"Can not open database with url " + currentURL,e);
+      }
+catch (      OSecurityException ex) {
+        if (network != null) {
+          try {
+            engine.getConnectionManager().remove(network);
+          }
+ catch (          Exception e) {
+            OLogManager.instance().debug(this,"Can not remove connection or database url=" + currentURL,e);
+          }
+          network=null;
+        }
+        return openRemoteDatabase();
       }
 catch (      OException e) {
         throw e;

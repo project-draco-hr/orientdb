@@ -1,0 +1,19 @@
+{
+  OrientGraphNoTx graph=new OrientGraphNoTx("memory:doubleLucene");
+  try {
+    ODatabaseDocumentTx db=graph.getRawGraph();
+    db.command(new OCommandSQL("create class Person extends V")).execute();
+    db.command(new OCommandSQL("create property Person.name string")).execute();
+    db.command(new OCommandSQL("create index Person.name on Person (name) fulltext engine lucene")).execute();
+    db.command(new OCommandSQL("insert into Person set name='Enrico', age=18")).execute();
+    OSQLSynchQuery query=new OSQLSynchQuery("select  from (select from Person where age = 18) where name lucene 'Enrico'");
+    List results=db.command(query).execute();
+    Assert.assertEquals(results.size(),1);
+    query=new OSQLSynchQuery("select  from (select name  from Person where age = 18) where name lucene 'Enrico'");
+    results=db.command(query).execute();
+    Assert.assertEquals(results.size(),0);
+  }
+  finally {
+    graph.drop();
+  }
+}

@@ -1,0 +1,18 @@
+{
+  OrientGraphNoTx graph=new OrientGraphNoTx("memory:doubleLucene");
+  try {
+    ODatabaseDocumentTx db=graph.getRawGraph();
+    db.command(new OCommandSQL("create class Test extends V")).execute();
+    db.command(new OCommandSQL("create property Test.attr1 string")).execute();
+    db.command(new OCommandSQL("create index Test.attr1 on Test (attr1) fulltext engine lucene")).execute();
+    db.command(new OCommandSQL("insert into Test set attr1='foo', attr2='bar'")).execute();
+    OSQLSynchQuery query=new OSQLSynchQuery("select from Test where attr1 lucene :name");
+    Map params=new HashMap();
+    params.put("name","FOO or");
+    List results=db.command(query).execute(params);
+    Assert.assertEquals(results.size(),1);
+  }
+  finally {
+    graph.drop();
+  }
+}

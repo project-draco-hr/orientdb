@@ -1,0 +1,25 @@
+{
+  final OModifiableBoolean shutdownFlag=new OModifiableBoolean();
+  ODatabaseDocumentInternal curDb=ODatabaseRecordThreadLocal.INSTANCE.get();
+  final OrientBaseGraph graph=OGraphCommandExecutorSQLFactory.getAnyGraph(shutdownFlag);
+  try {
+    final String[] labels;
+    if (iParameters != null && iParameters.length > 0 && iParameters[0] != null)     labels=OMultiValue.array(iParameters,String.class,new OCallable<Object,Object>(){
+      @Override public Object call(      final Object iArgument){
+        return OIOUtils.getStringContent(iArgument);
+      }
+    }
+);
+ else     labels=null;
+    return OSQLEngine.foreachRecord(new OCallable<Object,OIdentifiable>(){
+      @Override public Object call(      final OIdentifiable iArgument){
+        return move(graph,iArgument,labels,iPossibleResults);
+      }
+    }
+,iThis,iContext);
+  }
+  finally {
+    if (shutdownFlag.getValue())     graph.shutdown(false);
+    ODatabaseRecordThreadLocal.INSTANCE.set(curDb);
+  }
+}

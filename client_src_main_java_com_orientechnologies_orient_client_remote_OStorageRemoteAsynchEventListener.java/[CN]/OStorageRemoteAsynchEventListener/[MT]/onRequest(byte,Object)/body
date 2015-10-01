@@ -10,18 +10,30 @@ synchronized (storage.getClusterConfiguration()) {
  else   if (iRequestCode == OChannelBinaryProtocol.REQUEST_PUSH_LIVE_QUERY) {
     byte[] bytes=(byte[])obj;
     DataInputStream dis=new DataInputStream(new ByteArrayInputStream(bytes));
+    Integer id=null;
     try {
       byte op=dis.readByte();
-      Integer id=dis.readInt();
+      id=dis.readInt();
       final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(dis.readByte());
       final ORecordId rid=readRID(dis);
       final ORecordVersion version=readVersion(dis);
       final byte[] content=readBytes(dis);
       ORecordInternal.fill(record,rid,version,content,false);
       OLiveResultListener listener=liveQueryListeners.get(id);
-      listener.onLiveResult(id,new ORecordOperation(record,op));
+      if (listener != null) {
+        listener.onLiveResult(id,new ORecordOperation(record,op));
+      }
+ else {
+        OLogManager.instance().warn(this,"Receiving invalid LiveQuery token: " + id);
+      }
     }
  catch (    IOException e) {
+      if (id != null) {
+        OLiveResultListener listener=liveQueryListeners.get(id);
+        if (listener != null) {
+          listener.onError(id);
+        }
+      }
       e.printStackTrace();
     }
   }

@@ -1,0 +1,35 @@
+{
+  String edgeClassName=null;
+  if (iEdgeTypes == null) {
+    edgeClassName="E";
+  }
+ else   if (iEdgeTypes.length == 1) {
+    edgeClassName=iEdgeTypes[0];
+  }
+ else {
+    return null;
+  }
+  OClass edgeClass=graph.getRawGraph().getMetadata().getSchema().getClass(edgeClassName);
+  if (edgeClass == null) {
+    return null;
+  }
+  Set<OIndex<?>> indexes=edgeClass.getInvolvedIndexes("out","in");
+  if (indexes == null || indexes.size() == 0) {
+    return null;
+  }
+  OIndex index=indexes.iterator().next();
+  OMultiCollectionIterator<OrientVertex> result=new OMultiCollectionIterator<OrientVertex>();
+  for (  OIdentifiable to : iTo) {
+    OCompositeKey key=new OCompositeKey(iFrom,to);
+    Object indexResult=index.get(key);
+    if (indexResult instanceof OIdentifiable) {
+      indexResult=Collections.singleton(indexResult);
+    }
+    Set<OIdentifiable> identities=new HashSet<OIdentifiable>();
+    for (    OIdentifiable edge : ((Iterable<OrientEdge>)indexResult)) {
+      identities.add((OIdentifiable)((ODocument)edge.getRecord()).rawField("in"));
+    }
+    result.add(identities);
+  }
+  return result;
+}

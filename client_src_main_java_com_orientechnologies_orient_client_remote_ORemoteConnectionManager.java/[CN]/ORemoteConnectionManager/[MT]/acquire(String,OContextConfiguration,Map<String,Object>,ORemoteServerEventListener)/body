@@ -1,27 +1,20 @@
 {
-  OResourcePool<String,OChannelBinaryAsynchClient> pool=connections.get(iServerURL);
+  ORemoteConnectionPool pool=connections.get(iServerURL);
   if (pool == null) {
     int maxPool=OGlobalConfiguration.CLIENT_CHANNEL_MAX_POOL.getValueAsInteger();
     if (iConfiguration != null && iConfiguration.size() > 0) {
       if (iConfiguration.containsKey(PARAM_MAX_POOL))       maxPool=Integer.parseInt(iConfiguration.get(PARAM_MAX_POOL).toString());
     }
-    pool=new OResourcePool<String,OChannelBinaryAsynchClient>(maxPool,new OResourcePoolListener<String,OChannelBinaryAsynchClient>(){
-      @Override public OChannelBinaryAsynchClient createNewResource(      final String iKey,      final Object... iAdditionalArgs){
-        return createNetworkConnection(iKey,(OContextConfiguration)iAdditionalArgs[0],(Map<String,Object>)iAdditionalArgs[1],(ORemoteServerEventListener)iAdditionalArgs[2]);
-      }
-      @Override public boolean reuseResource(      final String iKey,      final Object[] iAdditionalArgs,      final OChannelBinaryAsynchClient iValue){
-        return iValue.isConnected();
-      }
-    }
-);
-    final OResourcePool<String,OChannelBinaryAsynchClient> prev=connections.putIfAbsent(iServerURL,pool);
+    pool=new ORemoteConnectionPool(maxPool);
+    final ORemoteConnectionPool prev=connections.putIfAbsent(iServerURL,pool);
     if (prev != null) {
-      pool.close();
+      pool.getPool().close();
       pool=prev;
     }
   }
+  pool.addListener(iListener);
   try {
-    OChannelBinaryAsynchClient ret=pool.getResource(iServerURL,timeout,clientConfiguration,iConfiguration,iListener);
+    OChannelBinaryAsynchClient ret=pool.getPool().getResource(iServerURL,timeout,clientConfiguration,iConfiguration);
     return ret;
   }
  catch (  RuntimeException e) {

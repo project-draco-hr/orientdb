@@ -6,49 +6,12 @@
     if (!backupDatabase)     return false;
   }
   final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
-  try {
-    Thread.sleep(2000 * activeNodes.size());
-  }
- catch (  InterruptedException e) {
-    e.printStackTrace();
-  }
   String queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName);
   messageService.getQueue(queueName);
   queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName + OCreateRecordTask.SUFFIX_QUEUE_NAME);
   messageService.getQueue(queueName);
-  final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
-  final Collection<String> nodes=cfg.getServers(null,getLocalNodeName());
-  final List<String> firstNode=new ArrayList<String>();
-  final Iterator<String> it=nodes.iterator();
-  while (it.hasNext()) {
-    final String f=it.next();
-    if (isNodeAvailable(f,databaseName)) {
-      firstNode.add(f);
-      break;
-    }
+  for (int retry=0; retry < DEPLOY_DB_MAX_RETRIES; ++retry) {
+    if (requestDatabase(distrDatabase,backupDatabase,databaseName,retry > 0))     return true;
   }
-  if (firstNode.isEmpty())   firstNode.addAll(nodes);
-  ODistributedServerLog.warn(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"requesting deploy of database '%s' on local server...",databaseName);
-  final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,firstNode,new OSyncDatabaseTask(OSyncDatabaseTask.MODE.FULL_REPLACE),EXECUTION_MODE.RESPONSE);
-  ODistributedServerLog.debug(this,getLocalNodeName(),firstNode.toString(),DIRECTION.OUT,"deploy returned: %s",results);
-  final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
-  for (  Entry<String,Object> r : results.entrySet()) {
-    final Object value=r.getValue();
-    if (value instanceof Boolean) {
-      continue;
-    }
- else     if (value instanceof Throwable) {
-      ODistributedServerLog.error(this,getLocalNodeName(),r.getKey(),DIRECTION.IN,"error on installing database %s in %s",(Exception)value,databaseName,dbPath);
-    }
- else     if (value instanceof ODistributedDatabaseChunk) {
-      if (backupDatabase)       backupCurrentDatabase(databaseName);
-      final Set<String> toSyncClusters=installDatabaseFromNetwork(dbPath,databaseName,distrDatabase,cfg,r.getKey(),(ODistributedDatabaseChunk)value);
-      for (      String cl : toSyncClusters) {
-        OCommandExecutorSQLSyncCluster.replaceCluster(this,serverInstance,databaseName,cl);
-      }
-      return true;
-    }
- else     throw new IllegalArgumentException("Type " + value + " not supported");
-  }
-  throw new ODistributedException("No response received from remote nodes for auto-deploy of database");
+  return false;
 }

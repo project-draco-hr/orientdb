@@ -9,9 +9,10 @@
   for (  ODatabaseListener listener : browseListeners())   try {
     listener.onBeforeTxCommit(this);
   }
- catch (  Throwable t) {
+ catch (  Exception e) {
     rollback(force);
-    OLogManager.instance().debug(this,"Cannot commit the transaction: caught exception on execution of %s.onBeforeTxCommit()",t,OTransactionBlockedException.class,listener.getClass());
+    OLogManager.instance().error(this,"Cannot commit the transaction: caught exception on execution of %s.onBeforeTxCommit()",listener.getClass().getName(),e);
+    throw OException.wrapException(new OTransactionException("Cannot commit the transaction: caught exception on execution of " + listener.getClass().getName() + "#onBeforeTxCommit()"),e);
   }
   try {
     currentTx.commit(force);
@@ -37,8 +38,10 @@
   for (  ODatabaseListener listener : browseListeners())   try {
     listener.onAfterTxCommit(this);
   }
- catch (  Throwable t) {
-    OLogManager.instance().debug(this,"Error after the transaction has been committed. The transaction remains valid. The exception caught was on execution of %s.onAfterTxCommit()",t,OTransactionBlockedException.class,listener.getClass());
+ catch (  Exception e) {
+    final String message="Error after the transaction has been committed. The transaction remains valid. The exception caught was on execution of " + listener.getClass() + ".onAfterTxCommit()";
+    OLogManager.instance().error(this,message,e);
+    throw OException.wrapException(new OTransactionBlockedException(message),e);
   }
   return this;
 }

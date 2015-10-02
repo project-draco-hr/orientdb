@@ -5,11 +5,11 @@
   super.startup();
   status=NODE_STATUS.STARTING;
   final String localNodeName=getLocalNodeName();
-  OLogManager.instance().info(this,"Starting distributed server '%s'...",localNodeName);
   activeNodes.clear();
   try {
     hazelcastInstance=configureHazelcast();
     nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
+    OLogManager.instance().info(this,"Starting distributed server '%s' (hzID=%s)...",localNodeName,nodeId);
     timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
     activeNodes.put(localNodeName,hazelcastInstance.getCluster().getLocalMember());
     membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
@@ -25,13 +25,18 @@
     }
     ODocument cfg=getLocalNodeConfiguration();
     ORecordInternal.setRecordSerializer(cfg,ODatabaseDocumentTx.getDefaultSerializer());
-    configurationMap.put(CONFIG_NODE_PREFIX + getLocalNodeId(),cfg);
+    configurationMap.put(CONFIG_NODE_PREFIX + nodeId,cfg);
+    if (!configurationMap.containsKey(CONFIG_NODE_PREFIX + nodeId)) {
+      ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on registering local node on cluster");
+      System.exit(1);
+    }
     messageService=new OHazelcastDistributedMessageService(this);
     installNewDatabases(true);
     loadDistributedDatabases();
     setNodeStatus(NODE_STATUS.ONLINE);
   }
- catch (  FileNotFoundException e) {
-    throw OException.wrapException(new OConfigurationException("Error on creating Hazelcast instance"),e);
+ catch (  Exception e) {
+    ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on starting distributed plugin",e);
+    System.exit(1);
   }
 }

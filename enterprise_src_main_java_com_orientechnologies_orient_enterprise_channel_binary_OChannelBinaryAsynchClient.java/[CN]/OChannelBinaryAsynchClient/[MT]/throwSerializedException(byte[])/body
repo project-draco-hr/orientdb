@@ -6,10 +6,32 @@
     throwable=objectInputStream.readObject();
   }
  catch (  ClassNotFoundException e) {
-    OLogManager.instance().error(this,"Error during exception serialization",e);
+    OLogManager.instance().error(this,"Error during exception deserialization",e);
   }
   objectInputStream.close();
-  if (throwable instanceof OException)   throw (OException)throwable;
- else   if (throwable instanceof Throwable)   throw new OResponseProcessingException("Exception during response processing");
+  if (throwable instanceof OException) {
+    try {
+      final Class<? extends OException> cls=(Class<? extends OException>)throwable.getClass();
+      final Constructor<? extends OException> constructor;
+      constructor=cls.getConstructor(cls);
+      final OException proxyInstance=constructor.newInstance(throwable);
+      throw proxyInstance;
+    }
+ catch (    NoSuchMethodException e) {
+      OLogManager.instance().error(this,"Error during exception deserialization",e);
+    }
+catch (    InvocationTargetException e) {
+      OLogManager.instance().error(this,"Error during exception deserialization",e);
+    }
+catch (    InstantiationException e) {
+      OLogManager.instance().error(this,"Error during exception deserialization",e);
+    }
+catch (    IllegalAccessException e) {
+      OLogManager.instance().error(this,"Error during exception deserialization",e);
+    }
+  }
+  if (throwable instanceof Throwable) {
+    throw new OResponseProcessingException("Exception during response processing");
+  }
  else   OLogManager.instance().error(this,"Error during exception serialization, serialized exception is not Throwable, exception type is " + (throwable != null ? throwable.getClass().getName() : "null"));
 }

@@ -4,7 +4,7 @@
     atomicOperation=startAtomicOperation();
   }
  catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during sbtree entrie clear"),e);
+    throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during sbtree entrie clear",this),e);
   }
   final Lock lock=fileLockManager.acquireExclusiveLock(fileId);
   try {
@@ -12,10 +12,10 @@
     OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,rootBucketPointer.getPageIndex(),false);
     cacheEntry.acquireExclusiveLock();
     try {
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry),this);
       addChildrenToQueue(subTreesToDelete,rootBucket);
       rootBucket.shrink(0);
-      rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+      rootBucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,rootBucketPointer.getPageOffset(),true,keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry),this);
       rootBucket.setTreeSize(0);
     }
   finally {
@@ -27,7 +27,7 @@
   }
  catch (  IOException e) {
     rollback(e);
-    throw OException.wrapException(new OSBTreeException("Error during clear of sbtree with name " + getName()),e);
+    throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during clear of sbtree with name " + getName(),this),e);
   }
 catch (  RuntimeException e) {
     rollback(e);

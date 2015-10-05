@@ -1,0 +1,39 @@
+{
+  long count=oClass.count();
+  if (count > 1) {
+    count=count / 2;
+  }
+  if (count < threshold) {
+    return count;
+  }
+  long indexesCount=0l;
+  List<OAndBlock> flattenedConditions=flatten();
+  Set<OIndex<?>> indexes=oClass.getIndexes();
+  for (  OAndBlock condition : flattenedConditions) {
+    Map<String,Object> conditions=getEqualityOperations(condition,ctx);
+    long conditionEstimation=Long.MAX_VALUE;
+    for (    OIndex index : indexes) {
+      List<String> indexedFields=index.getDefinition().getFields();
+      int nMatchingKeys=0;
+      for (      String indexedField : indexedFields) {
+        if (conditions.containsKey(indexedField)) {
+          nMatchingKeys++;
+        }
+ else {
+          break;
+        }
+      }
+      if (nMatchingKeys > 0) {
+        long newCount=estimateFromIndex(index,conditions,nMatchingKeys);
+        if (newCount < conditionEstimation) {
+          conditionEstimation=newCount;
+        }
+      }
+    }
+    if (conditionEstimation > count) {
+      return count;
+    }
+    indexesCount+=conditionEstimation;
+  }
+  return Math.min(indexesCount,count);
+}

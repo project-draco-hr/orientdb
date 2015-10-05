@@ -1,0 +1,59 @@
+{
+  final String className=readString(bytes);
+  if (className.length() != 0)   ODocumentInternal.fillClassNameIfNeeded(document,className);
+  final byte[][] fields=new byte[iFields.length][];
+  for (int i=0; i < iFields.length; ++i)   fields[i]=iFields[i].getBytes();
+  String fieldName=null;
+  int valuePos;
+  OType type;
+  int unmarshalledFields=0;
+  while (true) {
+    final int len=OVarIntSerializer.readAsInteger(bytes);
+    if (len == 0) {
+      break;
+    }
+ else     if (len > 0) {
+      boolean match=false;
+      for (int i=0; i < iFields.length; ++i) {
+        if (iFields[i].length() == len) {
+          boolean matchField=true;
+          for (int j=0; j < len; ++j) {
+            if (bytes.bytes[bytes.offset + j] != fields[i][j]) {
+              matchField=false;
+              break;
+            }
+          }
+          if (matchField) {
+            fieldName=iFields[i];
+            unmarshalledFields++;
+            bytes.skip(len);
+            match=true;
+            break;
+          }
+        }
+      }
+      if (!match) {
+        bytes.skip(len + OIntegerSerializer.INT_SIZE + 1);
+        continue;
+      }
+      valuePos=readInteger(bytes);
+      type=readOType(bytes);
+    }
+ else {
+      OGlobalProperty prop=getGlobalProperty(document,len);
+      fieldName=prop.getName();
+      valuePos=readInteger(bytes);
+      if (prop.getType() != OType.ANY)       type=prop.getType();
+ else       type=readOType(bytes);
+    }
+    if (valuePos != 0) {
+      int headerCursor=bytes.offset;
+      bytes.offset=valuePos;
+      final Object value=readSingleValue(bytes,type,document);
+      bytes.offset=headerCursor;
+      ODocumentInternal.rawField(document,fieldName,value,type);
+    }
+ else     ODocumentInternal.rawField(document,fieldName,null,null);
+    if (unmarshalledFields == iFields.length)     break;
+  }
+}

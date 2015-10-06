@@ -98,6 +98,33 @@ catch (          Exception e) {
       filterOptimizer.optimize(compiledFilter,lastSearchResult);
     }
     uniqueResult=new ConcurrentHashMap<ORID,ORID>();
+    if (cursors.size() == 1 && compiledFilter == null && groupByFields == null && projections != null && projections.size() == 1) {
+      final Entry<String,Object> entry=projections.entrySet().iterator().next();
+      if (entry.getValue() instanceof OSQLFunctionRuntime) {
+        final OSQLFunctionRuntime rf=(OSQLFunctionRuntime)entry.getValue();
+        if (rf.function instanceof OSQLFunctionCount && rf.configuredParameters.length == 1 && "*".equals(rf.configuredParameters[0])) {
+          final boolean restrictedClasses=isUsingRestrictedClasses();
+          if (!restrictedClasses) {
+            final OIndexCursor cursor=cursors.get(0);
+            long count=0;
+            if (cursor instanceof OSizeable)             count=((OSizeable)cursor).size();
+ else {
+              while (cursor.hasNext()) {
+                cursor.next();
+                count++;
+              }
+            }
+            final OProfiler profiler=Orient.instance().getProfiler();
+            if (profiler.isRecording()) {
+              profiler.updateCounter(profiler.getDatabaseMetric(database.getName(),"query.indexUsed"),"Used index in query",+1);
+            }
+            if (tempResult == null)             tempResult=new ArrayList<OIdentifiable>();
+            ((Collection<OIdentifiable>)tempResult).add(new ODocument().field(entry.getKey(),count));
+            return true;
+          }
+        }
+      }
+    }
     for (    OIndexCursor cursor : cursors) {
       if (!fetchValuesFromIndexCursor(cursor)) {
         break;

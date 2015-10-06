@@ -4,6 +4,7 @@
   int i=0;
   boolean newSegment=false;
   long freezeId=-1;
+  OLogSequenceNumber lastLSN=null;
   try {
     while (true) {
       for (; i < WAL_BACKUP_ITERATION_STEP * (n + 1) && i < nonActiveSegments.length; i++) {
@@ -44,6 +45,7 @@
         if (freezeId < 0) {
           freezeId=getAtomicOperationsManager().freezeAtomicOperations(OModificationOperationProhibitedException.class,"Incremental backup in progress");
         }
+        lastLSN=writeAheadLog.end();
         writeAheadLog.newSegment();
         newSegment=true;
         nonActiveSegments=writeAheadLog.nonActiveSegments(startSegment);
@@ -54,4 +56,5 @@
   finally {
     if (freezeId >= 0)     getAtomicOperationsManager().releaseAtomicOperations(freezeId);
   }
+  return lastLSN;
 }

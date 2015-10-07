@@ -1,0 +1,47 @@
+{
+  List<OAndBlock> flattenedConditions=flatten();
+  if (flattenedConditions == null || flattenedConditions.size() == 0) {
+    return null;
+  }
+  Set<OIndex<?>> indexes=oClass.getIndexes();
+  List<OIndex> bestIndexes=new ArrayList<OIndex>();
+  List<Map<String,Object>> indexConditions=new ArrayList<Map<String,Object>>();
+  for (  OAndBlock condition : flattenedConditions) {
+    Map<String,Object> conditions=getEqualityOperations(condition,ctx);
+    long conditionEstimation=Long.MAX_VALUE;
+    OIndex bestIndex=null;
+    Map<String,Object> bestCondition=null;
+    for (    OIndex index : indexes) {
+      List<String> indexedFields=index.getDefinition().getFields();
+      int nMatchingKeys=0;
+      for (      String indexedField : indexedFields) {
+        if (conditions.containsKey(indexedField)) {
+          nMatchingKeys++;
+        }
+ else {
+          break;
+        }
+      }
+      if (nMatchingKeys > 0) {
+        long newCount=estimateFromIndex(index,conditions,nMatchingKeys);
+        if (newCount >= 0 && newCount <= conditionEstimation) {
+          conditionEstimation=newCount;
+          bestIndex=index;
+          bestCondition=conditions;
+        }
+      }
+    }
+    if (bestIndex == null) {
+      return null;
+    }
+    bestIndexes.add(bestIndex);
+    indexConditions.add(bestCondition);
+  }
+  OMultiCollectionIterator result=new OMultiCollectionIterator();
+  for (int i=0; i < bestIndexes.size(); i++) {
+    OIndex index=bestIndexes.get(i);
+    Map<String,Object> condition=indexConditions.get(i);
+    result.add(fetchFromIndex(index,indexConditions.get(i)));
+  }
+  return result;
+}

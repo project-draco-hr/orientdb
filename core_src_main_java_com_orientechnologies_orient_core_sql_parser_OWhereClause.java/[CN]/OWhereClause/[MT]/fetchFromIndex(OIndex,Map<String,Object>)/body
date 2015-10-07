@@ -1,0 +1,38 @@
+{
+  OIndexDefinition definition=index.getDefinition();
+  List<String> definitionFields=definition.getFields();
+  Object key=null;
+  if (definition instanceof OPropertyIndexDefinition) {
+    key=convert(conditions.get(definitionFields.get(0)),definition.getTypes()[0]);
+  }
+ else   if (definition instanceof OCompositeIndexDefinition) {
+    key=new OCompositeKey();
+    for (int i=0; i < definitionFields.size(); i++) {
+      String keyName=definitionFields.get(i);
+      if (!conditions.containsKey(keyName)) {
+        break;
+      }
+      Object keyValue=convert(conditions.get(keyName),definition.getTypes()[i]);
+      ((OCompositeKey)key).addKey(conditions.get(keyName));
+    }
+  }
+  if (key != null) {
+    final Object result=index.get(key);
+    if (result == null) {
+      return Collections.EMPTY_LIST;
+    }
+    if (result instanceof Iterable) {
+      return (Iterable)result;
+    }
+    if (result instanceof Iterator) {
+      return new Iterable(){
+        @Override public Iterator iterator(){
+          return (Iterator)result;
+        }
+      }
+;
+    }
+    return Collections.singleton(result);
+  }
+  return null;
+}

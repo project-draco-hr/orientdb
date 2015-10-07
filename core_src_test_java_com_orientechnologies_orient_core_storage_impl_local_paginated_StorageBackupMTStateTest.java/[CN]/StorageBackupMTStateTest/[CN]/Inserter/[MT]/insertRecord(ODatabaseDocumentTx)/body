@@ -1,0 +1,29 @@
+{
+  final int classes=classCounter.get();
+  String className;
+  AtomicInteger classCounter;
+  do {
+    className=CLASS_PREFIX + random.nextInt(classes);
+    classCounter=classInstancesCounters.get(className);
+  }
+ while (classCounter == null);
+  final ODocument doc=new ODocument(className);
+  doc.field("id",classCounter.getAndIncrement());
+  doc.field("stringValue","value");
+  doc.field("intValue",random.nextInt(1024));
+  String linkedClassName;
+  AtomicInteger linkedClassCounter=null;
+  do {
+    linkedClassName=CLASS_PREFIX + random.nextInt(classes);
+    if (linkedClassName.equalsIgnoreCase(className))     continue;
+    linkedClassCounter=classInstancesCounters.get(linkedClassName);
+  }
+ while (linkedClassCounter == null);
+  ORidBag linkedDocuments=new ORidBag();
+  while (linkedDocuments.size() < 5 && linkedDocuments.size() < linkedClassCounter.get()) {
+    List<ODocument> docs=db.query(new OSQLSynchQuery<ODocument>("select * from " + linkedClassName + " where id="+ random.nextInt(linkedClassCounter.get())));
+    if (docs.size() > 0)     linkedDocuments.add(docs.get(0));
+  }
+  doc.field("linkedDocuments",linkedDocuments);
+  doc.save();
+}

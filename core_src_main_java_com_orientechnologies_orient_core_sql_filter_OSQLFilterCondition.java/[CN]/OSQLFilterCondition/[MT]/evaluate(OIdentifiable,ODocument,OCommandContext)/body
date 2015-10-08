@@ -10,24 +10,52 @@
     right=((OSQLQuery<?>)right).setContext(iContext).execute();
   }
   Object r=evaluate(iCurrentRecord,iCurrentResult,right,iContext);
-  final OCollate collate=getCollate();
-  final Object[] convertedValues=checkForConversion(iCurrentRecord,l,r,collate);
-  if (convertedValues != null) {
-    l=convertedValues[0];
-    r=convertedValues[1];
-  }
-  if (operator == null) {
-    if (l == null) {
-      return Boolean.FALSE;
+  if (l instanceof OBinaryField) {
+    if (r != null && !(r instanceof OBinaryField)) {
+      final BytesContainer bytes=new BytesContainer();
+      final OType type=OType.getTypeByValue(r);
+      ORecordSerializerBinary.INSTANCE.getCurrentSerializer().serializeValue(bytes,r,type,null);
+      bytes.offset=0;
+      r=new OBinaryField(null,type,bytes);
+      right=r;
     }
-    return l;
+ else     r=((OBinaryField)r).copy();
   }
-  Object result;
+  if (r instanceof OBinaryField) {
+    if (l != null && !(l instanceof OBinaryField)) {
+      final BytesContainer bytes=new BytesContainer();
+      final OType type=OType.getTypeByValue(l);
+      ORecordSerializerBinary.INSTANCE.getCurrentSerializer().serializeValue(bytes,l,type,null);
+      bytes.offset=0;
+      l=new OBinaryField(null,type,bytes);
+      left=l;
+    }
+  }
+ else   l=((OBinaryField)l).copy();
   try {
-    result=operator.evaluateRecord(iCurrentRecord,iCurrentResult,this,l,r,iContext);
+    final OCollate collate=getCollate();
+    final Object[] convertedValues=checkForConversion(iCurrentRecord,l,r,collate);
+    if (convertedValues != null) {
+      l=convertedValues[0];
+      r=convertedValues[1];
+    }
+    if (operator == null) {
+      if (l == null) {
+        return Boolean.FALSE;
+      }
+      return l;
+    }
+    Object result;
+    try {
+      result=operator.evaluateRecord(iCurrentRecord,iCurrentResult,this,l,r,iContext);
+    }
+ catch (    Exception e) {
+      result=Boolean.FALSE;
+    }
+    return result;
   }
- catch (  Exception e) {
-    result=Boolean.FALSE;
+  finally {
+    if (left instanceof OBinaryField)     ((OBinaryField)left).bytes.offset=0;
+    if (right instanceof OBinaryField)     ((OBinaryField)right).bytes.offset=0;
   }
-  return result;
 }

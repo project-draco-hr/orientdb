@@ -5,17 +5,17 @@
     final OCluster cluster=db.getStorage().getClusterById(clusterIds[i]);
     if (cluster.getEntries() > 0)     clusterList.add(cluster.getName());
   }
-  final int threadNumber=clusterList.size();
-  OLogManager.instance().debug(this,"Executing parallel query with strategy one thread per cluster. clusterIds=%d, threads=%d",clusterIds.length,threadNumber);
-  final Thread[] threads=new Thread[threadNumber];
-  final boolean[] results=new boolean[threadNumber];
-  final OCommandContext[] contexts=new OCommandContext[threadNumber];
-  final RuntimeException[] exceptions=new RuntimeException[threadNumber];
+  final int jobNumbers=clusterList.size();
+  final List<Future<?>> jobs=new ArrayList<Future<?>>();
+  OLogManager.instance().debug(this,"Executing parallel query with strategy executors. clusterIds=%d, jobs=%d",clusterIds.length,jobNumbers);
+  final boolean[] results=new boolean[jobNumbers];
+  final OCommandContext[] contexts=new OCommandContext[jobNumbers];
+  final RuntimeException[] exceptions=new RuntimeException[jobNumbers];
   parallelRunning=true;
-  final AtomicInteger runningThreads=new AtomicInteger(threadNumber);
-  for (int i=0; i < threadNumber; ++i) {
+  final AtomicInteger runningJobs=new AtomicInteger(jobNumbers);
+  for (int i=0; i < jobNumbers; ++i) {
     final int current=i;
-    threads[i]=new Thread(new Runnable(){
+    final Runnable job=new Runnable(){
       @Override public void run(){
         try {
           ODatabaseDocumentTx localDatabase=null;
@@ -33,7 +33,7 @@
             exceptions[current]=t;
           }
  finally {
-            runningThreads.decrementAndGet();
+            runningJobs.decrementAndGet();
             resultQueue.offer(PARALLEL_END_EXECUTION_THREAD);
             if (localDatabase != null)             localDatabase.close();
           }
@@ -43,10 +43,10 @@
         }
       }
     }
-,"OrientDB SELECT " + getDatabase().getName() + "-"+ i);
-    threads[i].start();
+;
+    jobs.add(Orient.instance().submit(job));
   }
-  while (runningThreads.get() > 0 || !resultQueue.isEmpty()) {
+  while (runningJobs.get() > 0 || !resultQueue.isEmpty()) {
     try {
       final AsyncResult result=resultQueue.take();
       if (OExecutionThreadLocal.isInterruptCurrentOperation())       throw new InterruptedException("Operation has been interrupted");
@@ -63,17 +63,20 @@
     }
   }
   parallelRunning=false;
-  for (int i=0; i < threadNumber; ++i) {
+  for (int i=0; i < jobs.size(); ++i) {
     try {
-      threads[i].join();
+      jobs.get(i).get();
       context.merge(contexts[i]);
     }
  catch (    InterruptedException e) {
       break;
     }
+catch (    ExecutionException e) {
+      e.printStackTrace();
+    }
   }
-  for (int i=0; i < threadNumber; ++i)   if (exceptions[i] != null)   throw exceptions[i];
-  for (int i=0; i < threadNumber; ++i) {
+  for (int i=0; i < jobNumbers; ++i)   if (exceptions[i] != null)   throw exceptions[i];
+  for (int i=0; i < jobNumbers; ++i) {
     if (!results[i])     return false;
   }
   return true;

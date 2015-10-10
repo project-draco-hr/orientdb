@@ -1,0 +1,46 @@
+{
+  atomicOperationsManager.acquireReadLock(this);
+  try {
+    acquireSharedLock();
+    try {
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      final long firstPos=iFrom > -1 ? iFrom : getFirstPosition();
+      final long lastPos=iTo > -1 ? iTo : getLastPosition();
+      for (long clusterPosition=iAscendingOrder ? firstPos : lastPos; iAscendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(iAscendingOrder ? 1 : -1)) {
+        OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+        if (positionEntry == null)         continue;
+        int recordPosition=positionEntry.getRecordPosition();
+        long pageIndex=positionEntry.getPageIndex();
+        if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)         continue;
+        ORecordVersion recordVersion=null;
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        try {
+          final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+          if (localPage.isDeleted(recordPosition))           continue;
+          recordVersion=localPage.getRecordVersion(recordPosition);
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry);
+        }
+        byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
+        if (fullContent == null)         continue;
+        int fullContentPosition=0;
+        byte recordType=fullContent[fullContentPosition];
+        fullContentPosition++;
+        int readContentSize=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,fullContentPosition);
+        fullContentPosition+=OIntegerSerializer.INT_SIZE;
+        byte[] recordContent=compression.uncompress(fullContent,fullContentPosition,readContentSize);
+        recordContent=encryption.decrypt(recordContent);
+        final ORecord rec=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+        ORecordInternal.fill(rec,new ORecordId(id,clusterPosition),recordVersion,recordContent,false);
+        if (iCallback.call(rec).equals(Boolean.FALSE))         break;
+      }
+    }
+  finally {
+      releaseSharedLock();
+    }
+  }
+  finally {
+    atomicOperationsManager.releaseReadLock(this);
+  }
+}

@@ -1,0 +1,31 @@
+{
+  checkOpeness();
+  final OCluster cluster=getClusterByName(iClusterName);
+  if (cluster instanceof OOfflineCluster)   return;
+  if (!(cluster instanceof OPaginatedCluster))   throw new IllegalArgumentException("Cluster '" + iClusterName + "' is not valid for scan");
+  if (transaction.get() != null) {
+    final long timer=Orient.instance().getProfiler().startChrono();
+    try {
+      ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,iCallback);
+    }
+  finally {
+      Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+    }
+  }
+  final long timer=Orient.instance().getProfiler().startChrono();
+  stateLock.acquireReadLock();
+  try {
+    dataLock.acquireSharedLock();
+    try {
+      checkOpeness();
+      ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,iCallback);
+    }
+  finally {
+      dataLock.releaseSharedLock();
+    }
+  }
+  finally {
+    stateLock.releaseReadLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+  }
+}

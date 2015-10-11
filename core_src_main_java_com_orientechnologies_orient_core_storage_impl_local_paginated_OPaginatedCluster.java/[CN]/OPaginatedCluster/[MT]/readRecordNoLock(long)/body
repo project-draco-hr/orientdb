@@ -1,0 +1,28 @@
+{
+  final OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
+  if (positionEntry == null)   return null;
+  final int recordPosition=positionEntry.getRecordPosition();
+  final long pageIndex=positionEntry.getPageIndex();
+  final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+  if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)   return null;
+  ORecordVersion recordVersion=null;
+  final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+  try {
+    final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+    if (localPage.isDeleted(recordPosition))     return null;
+    recordVersion=localPage.getRecordVersion(recordPosition);
+  }
+  finally {
+    releasePage(atomicOperation,cacheEntry);
+  }
+  final byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
+  if (fullContent == null)   return null;
+  int fullContentPosition=0;
+  final byte recordType=fullContent[fullContentPosition];
+  fullContentPosition++;
+  final int readContentSize=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,fullContentPosition);
+  fullContentPosition+=OIntegerSerializer.INT_SIZE;
+  byte[] recordContent=compression.uncompress(fullContent,fullContentPosition,readContentSize);
+  recordContent=encryption.decrypt(recordContent);
+  return new ORawBuffer(recordContent,recordVersion,recordType);
+}

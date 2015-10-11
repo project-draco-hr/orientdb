@@ -10,7 +10,8 @@
     parserRequiredKeyword("CREATE");
     parserRequiredKeyword("EDGE");
     String className=null;
-    String temp=parseOptionalWord(true);
+    String tempLower=parseOptionalWord(false);
+    String temp=tempLower == null ? null : tempLower.toUpperCase();
     while (temp != null) {
       if (temp.equals("CLUSTER")) {
         clusterName=parserRequiredWord(false);
@@ -36,8 +37,14 @@
         if (temp != null)         batch=Integer.parseInt(temp);
       }
  else       if (className == null && temp.length() > 0) {
-        className=temp;
-        clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
+        className=tempLower;
+        OrientBaseGraph graph=OrientBaseGraph.getActiveGraph();
+        if (graph != null && graph.isUseClassForEdgeLabel()) {
+          clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(temp);
+        }
+ else {
+          clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass("E");
+        }
       }
       temp=parseOptionalWord(true);
       if (parserIsEnded())       break;
@@ -47,6 +54,7 @@
       clazz=((OMetadataInternal)database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
     }
     if (clazz == null)     throw new OCommandSQLParsingException("Class '" + className + "' was not found");
+    edgeLabel=className;
   }
   finally {
     textRequest.setText(originalQuery);

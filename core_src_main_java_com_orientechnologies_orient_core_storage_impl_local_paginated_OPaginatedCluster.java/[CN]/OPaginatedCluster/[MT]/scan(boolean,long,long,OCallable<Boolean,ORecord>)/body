@@ -1,0 +1,34 @@
+{
+  atomicOperationsManager.acquireReadLock(this);
+  try {
+    acquireSharedLock();
+    try {
+      final long firstPos=iFrom > -1 ? iFrom : getFirstPosition();
+      final long lastPos=iTo > -1 ? iTo : getLastPosition();
+      final long recordsToScan=lastPos - firstPos;
+      final long progressDump=recordsToScan / 10;
+      for (long clusterPosition=iAscendingOrder ? firstPos : lastPos; iAscendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(iAscendingOrder ? 1 : -1)) {
+        final ORawBuffer buffer=readRecordNoLock(clusterPosition);
+        if (buffer == null)         continue;
+        if (progressDump > 1 && OLogManager.instance().isDebugEnabled()) {
+          final long recordsScanned=clusterPosition - firstPos;
+          if ((recordsScanned + 1) % progressDump == 0) {
+            OLogManager.instance().debug(this,"Scan cluster id=%d read %d/%d %.2f%%",id,recordsScanned,recordsToScan,((float)recordsScanned * 100 / recordsToScan));
+          }
+        }
+        final ORecord rec=Orient.instance().getRecordFactoryManager().newInstance(buffer.recordType);
+        ORecordInternal.fill(rec,new ORecordId(id,clusterPosition),buffer.version,buffer.buffer,false);
+        if (iCallback.call(rec).equals(Boolean.FALSE))         break;
+      }
+    }
+  finally {
+      releaseSharedLock();
+    }
+  }
+  finally {
+    atomicOperationsManager.releaseReadLock(this);
+    if (OLogManager.instance().isDebugEnabled()) {
+      OLogManager.instance().debug(this,"Scan cluster id=%d completed",id);
+    }
+  }
+}

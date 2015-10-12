@@ -3,32 +3,7 @@
   try {
     acquireSharedLock();
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition);
-      if (positionEntry == null)       return null;
-      int recordPosition=positionEntry.getRecordPosition();
-      long pageIndex=positionEntry.getPageIndex();
-      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)       return null;
-      ORecordVersion recordVersion=null;
-      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-      try {
-        final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-        if (localPage.isDeleted(recordPosition))         return null;
-        recordVersion=localPage.getRecordVersion(recordPosition);
-      }
-  finally {
-        releasePage(atomicOperation,cacheEntry);
-      }
-      byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation);
-      if (fullContent == null)       return null;
-      int fullContentPosition=0;
-      byte recordType=fullContent[fullContentPosition];
-      fullContentPosition++;
-      int readContentSize=OIntegerSerializer.INSTANCE.deserializeNative(fullContent,fullContentPosition);
-      fullContentPosition+=OIntegerSerializer.INT_SIZE;
-      byte[] recordContent=compression.uncompress(fullContent,fullContentPosition,readContentSize);
-      recordContent=encryption.decrypt(recordContent);
-      return new ORawBuffer(recordContent,recordVersion,recordType);
+      return readRecordNoLock(clusterPosition);
     }
   finally {
       releaseSharedLock();

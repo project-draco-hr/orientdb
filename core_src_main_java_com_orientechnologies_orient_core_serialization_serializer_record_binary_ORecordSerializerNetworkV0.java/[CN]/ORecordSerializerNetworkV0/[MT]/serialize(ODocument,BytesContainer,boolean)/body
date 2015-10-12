@@ -1,0 +1,34 @@
+{
+  final OClass clazz=serializeClass(document,bytes);
+  if (iClassOnly) {
+    writeEmptyString(bytes);
+    return;
+  }
+  final Set<Entry<String,ODocumentEntry>> fields=ODocumentInternal.rawEntries(document);
+  final int[] pos=new int[fields.size()];
+  int i=0;
+  final Entry<String,ODocumentEntry> values[]=new Entry[fields.size()];
+  for (  Entry<String,ODocumentEntry> entry : fields) {
+    ODocumentEntry docEntry=entry.getValue();
+    if (!docEntry.exist())     continue;
+    writeString(bytes,entry.getKey());
+    pos[i]=bytes.alloc(OIntegerSerializer.INT_SIZE + 1);
+    values[i]=entry;
+    i++;
+  }
+  writeEmptyString(bytes);
+  int size=i;
+  for (i=0; i < size; i++) {
+    int pointer=0;
+    final Object value=values[i].getValue().value;
+    if (value != null) {
+      final OType type=getFieldType(values[i].getValue());
+      if (type == null) {
+        throw new OSerializationException("Impossible serialize value of type " + value.getClass() + " with the ODocument binary serializer");
+      }
+      pointer=serializeValue(bytes,value,type,getLinkedType(document,type,values[i].getKey()));
+      OIntegerSerializer.INSTANCE.serializeLiteral(pointer,bytes.bytes,pos[i]);
+      writeOType(bytes,(pos[i] + OIntegerSerializer.INT_SIZE),type);
+    }
+  }
+}

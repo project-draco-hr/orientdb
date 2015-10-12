@@ -1,0 +1,37 @@
+{
+  final String className=readString(bytes);
+  if (className.length() != 0)   ODocumentInternal.fillClassNameIfNeeded(document,className);
+  int last=0;
+  String fieldName;
+  int valuePos;
+  OType type;
+  while (true) {
+    final int len=OVarIntSerializer.readAsInteger(bytes);
+    if (len == 0) {
+      break;
+    }
+ else     if (len > 0) {
+      fieldName=stringFromBytes(bytes.bytes,bytes.offset,len).intern();
+      bytes.skip(len);
+      valuePos=readInteger(bytes);
+      type=readOType(bytes);
+    }
+ else {
+      throw new OStorageException("property id not supported in network serialization");
+    }
+    if (ODocumentInternal.rawContainsField(document,fieldName)) {
+      continue;
+    }
+    if (valuePos != 0) {
+      int headerCursor=bytes.offset;
+      bytes.offset=valuePos;
+      final Object value=deserializeValue(bytes,type,document);
+      if (bytes.offset > last)       last=bytes.offset;
+      bytes.offset=headerCursor;
+      ODocumentInternal.rawField(document,fieldName,value,type);
+    }
+ else     ODocumentInternal.rawField(document,fieldName,null,null);
+  }
+  ORecordInternal.clearSource(document);
+  if (last > bytes.offset)   bytes.offset=last;
+}

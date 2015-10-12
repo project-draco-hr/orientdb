@@ -1,20 +1,46 @@
 {
-  if (left instanceof OSQLQuery<?>) {
-    left=((OSQLQuery<?>)left).setContext(iContext).execute();
+  boolean binaryEvaluation=operator != null && operator.isSupportingBinaryEvaluate();
+  if (left instanceof OSQLQuery<?>)   left=((OSQLQuery<?>)left).setContext(iContext).execute();
+  Object l=evaluate(iCurrentRecord,iCurrentResult,left,iContext,binaryEvaluation);
+  if (operator != null && operator.canShortCircuit(l))   return l;
+  if (right instanceof OSQLQuery<?>)   right=((OSQLQuery<?>)right).setContext(iContext).execute();
+  Object r=evaluate(iCurrentRecord,iCurrentResult,right,iContext,binaryEvaluation);
+  if (binaryEvaluation && l instanceof OBinaryField) {
+    if (r != null && !(r instanceof OBinaryField)) {
+      final OType type=OType.getTypeByValue(r);
+      if (ORecordSerializerBinary.INSTANCE.getCurrentSerializer().getComparator().isBinaryComparable(type)) {
+        final BytesContainer bytes=new BytesContainer();
+        ORecordSerializerBinary.INSTANCE.getCurrentSerializer().serializeValue(bytes,r,type,null);
+        bytes.offset=0;
+        final OCollate collate=r instanceof OSQLFilterItemField ? ((OSQLFilterItemField)r).getCollate() : null;
+        r=new OBinaryField(null,type,bytes,collate);
+        if (!(right instanceof OSQLFilterItem || right instanceof OSQLFilterCondition))         right=r;
+      }
+    }
+ else     if (r instanceof OBinaryField)     r=((OBinaryField)r).copy();
   }
-  Object l=evaluate(iCurrentRecord,iCurrentResult,left,iContext);
-  if (operator != null && operator.canShortCircuit(l)) {
-    return l;
+  if (binaryEvaluation && r instanceof OBinaryField) {
+    if (l != null && !(l instanceof OBinaryField)) {
+      final OType type=OType.getTypeByValue(l);
+      if (ORecordSerializerBinary.INSTANCE.getCurrentSerializer().getComparator().isBinaryComparable(type)) {
+        final BytesContainer bytes=new BytesContainer();
+        ORecordSerializerBinary.INSTANCE.getCurrentSerializer().serializeValue(bytes,l,type,null);
+        bytes.offset=0;
+        final OCollate collate=l instanceof OSQLFilterItemField ? ((OSQLFilterItemField)l).getCollate() : null;
+        l=new OBinaryField(null,type,bytes,collate);
+        if (!(left instanceof OSQLFilterItem || left instanceof OSQLFilterCondition))         left=l;
+      }
+    }
+ else     if (l instanceof OBinaryField)     l=((OBinaryField)l).copy();
   }
-  if (right instanceof OSQLQuery<?>) {
-    right=((OSQLQuery<?>)right).setContext(iContext).execute();
-  }
-  Object r=evaluate(iCurrentRecord,iCurrentResult,right,iContext);
-  final OCollate collate=getCollate();
-  final Object[] convertedValues=checkForConversion(iCurrentRecord,l,r,collate);
-  if (convertedValues != null) {
-    l=convertedValues[0];
-    r=convertedValues[1];
+  if (binaryEvaluation)   binaryEvaluation=l instanceof OBinaryField && r instanceof OBinaryField;
+  if (!binaryEvaluation) {
+    final OCollate collate=getCollate();
+    final Object[] convertedValues=checkForConversion(iCurrentRecord,l,r,collate);
+    if (convertedValues != null) {
+      l=convertedValues[0];
+      r=convertedValues[1];
+    }
   }
   if (operator == null) {
     if (l == null) {
@@ -27,6 +53,7 @@
     result=operator.evaluateRecord(iCurrentRecord,iCurrentResult,this,l,r,iContext);
   }
  catch (  Exception e) {
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Error on evaluating expression (%s)",e,toString());
     result=Boolean.FALSE;
   }
   return result;

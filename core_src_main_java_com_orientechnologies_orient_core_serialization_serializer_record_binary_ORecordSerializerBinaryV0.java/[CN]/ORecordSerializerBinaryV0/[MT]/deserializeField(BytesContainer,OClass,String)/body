@@ -1,0 +1,46 @@
+{
+  final int classNameLen=OVarIntSerializer.readAsInteger(bytes);
+  bytes.skip(classNameLen);
+  final byte[] field=iFieldName.getBytes();
+  final OMetadataInternal metadata=(OMetadataInternal)ODatabaseRecordThreadLocal.INSTANCE.get().getMetadata();
+  final OImmutableSchema _schema=metadata.getImmutableSchemaSnapshot();
+  while (true) {
+    final int len=OVarIntSerializer.readAsInteger(bytes);
+    if (len == 0) {
+      return null;
+    }
+ else     if (len > 0) {
+      if (iFieldName.length() == len) {
+        boolean match=true;
+        for (int j=0; j < len; ++j)         if (bytes.bytes[bytes.offset + j] != field[j]) {
+          match=false;
+          break;
+        }
+        bytes.skip(len);
+        final int valuePos=readInteger(bytes);
+        final OType type=readOType(bytes);
+        if (!match)         continue;
+        if (!ORecordSerializerBinary.INSTANCE.getCurrentSerializer().getComparator().isBinaryComparable(type))         return null;
+        bytes.offset=valuePos;
+        return new OBinaryField(iFieldName,type,bytes,null);
+      }
+      bytes.skip(len + OIntegerSerializer.INT_SIZE + 1);
+      continue;
+    }
+ else {
+      final int id=(len * -1) - 1;
+      final OGlobalProperty prop=_schema.getGlobalPropertyById(id);
+      if (iFieldName.equals(prop.getName())) {
+        final int valuePos=readInteger(bytes);
+        final OType type;
+        if (prop.getType() != OType.ANY)         type=prop.getType();
+ else         type=readOType(bytes);
+        if (!ORecordSerializerBinary.INSTANCE.getCurrentSerializer().getComparator().isBinaryComparable(type))         return null;
+        bytes.offset=valuePos;
+        final OProperty classProp=iClass.getProperty(iFieldName);
+        return new OBinaryField(iFieldName,type,bytes,classProp != null ? classProp.getCollate() : null);
+      }
+      bytes.skip(OIntegerSerializer.INT_SIZE + (prop.getType() != OType.ANY ? 0 : 1));
+    }
+  }
+}

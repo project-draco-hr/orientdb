@@ -1,0 +1,98 @@
+{
+  int pointer=0;
+switch (type) {
+case INTEGER:
+case LONG:
+case SHORT:
+    pointer=OVarIntSerializer.write(bytes,((Number)value).longValue());
+  break;
+case STRING:
+pointer=writeString(bytes,value.toString());
+break;
+case DOUBLE:
+long dg=Double.doubleToLongBits(((Number)value).doubleValue());
+pointer=bytes.alloc(OLongSerializer.LONG_SIZE);
+OLongSerializer.INSTANCE.serializeLiteral(dg,bytes.bytes,pointer);
+break;
+case FLOAT:
+int fg=Float.floatToIntBits(((Number)value).floatValue());
+pointer=bytes.alloc(OIntegerSerializer.INT_SIZE);
+OIntegerSerializer.INSTANCE.serializeLiteral(fg,bytes.bytes,pointer);
+break;
+case BYTE:
+pointer=bytes.alloc(1);
+bytes.bytes[pointer]=((Number)value).byteValue();
+break;
+case BOOLEAN:
+pointer=bytes.alloc(1);
+bytes.bytes[pointer]=((Boolean)value) ? (byte)1 : (byte)0;
+break;
+case DATETIME:
+if (value instanceof Number) {
+pointer=OVarIntSerializer.write(bytes,((Number)value).longValue());
+}
+ else pointer=OVarIntSerializer.write(bytes,((Date)value).getTime());
+break;
+case DATE:
+long dateValue;
+if (value instanceof Number) {
+dateValue=((Number)value).longValue();
+}
+ else dateValue=((Date)value).getTime();
+int offset=ODateHelper.getDatabaseTimeZone().getOffset(dateValue);
+pointer=OVarIntSerializer.write(bytes,(dateValue + offset) / MILLISEC_PER_DAY);
+break;
+case EMBEDDED:
+pointer=bytes.offset;
+if (value instanceof ODocumentSerializable) {
+ODocument cur=((ODocumentSerializable)value).toDocument();
+cur.field(ODocumentSerializable.CLASS_NAME,value.getClass().getName());
+serialize(cur,bytes,false);
+}
+ else {
+serialize((ODocument)value,bytes,false);
+}
+break;
+case EMBEDDEDSET:
+case EMBEDDEDLIST:
+if (value.getClass().isArray()) pointer=writeEmbeddedCollection(bytes,Arrays.asList(OMultiValue.array(value)),linkedType);
+ else pointer=writeEmbeddedCollection(bytes,(Collection<?>)value,linkedType);
+break;
+case DECIMAL:
+BigDecimal decimalValue=(BigDecimal)value;
+pointer=bytes.alloc(ODecimalSerializer.INSTANCE.getObjectSize(decimalValue));
+ODecimalSerializer.INSTANCE.serialize(decimalValue,bytes.bytes,pointer);
+break;
+case BINARY:
+pointer=writeBinary(bytes,(byte[])(value));
+break;
+case LINKSET:
+case LINKLIST:
+Collection<OIdentifiable> ridCollection=(Collection<OIdentifiable>)value;
+pointer=writeLinkCollection(bytes,ridCollection);
+break;
+case LINK:
+if (!(value instanceof OIdentifiable)) throw new OValidationException("Value '" + value + "' is not a OIdentifiable");
+pointer=writeOptimizedLink(bytes,(OIdentifiable)value);
+break;
+case LINKMAP:
+pointer=writeLinkMap(bytes,(Map<Object,OIdentifiable>)value);
+break;
+case EMBEDDEDMAP:
+pointer=writeEmbeddedMap(bytes,(Map<Object,Object>)value);
+break;
+case LINKBAG:
+pointer=((ORidBag)value).toStream(bytes);
+break;
+case CUSTOM:
+if (!(value instanceof OSerializableStream)) value=new OSerializableWrapper((Serializable)value);
+pointer=writeString(bytes,value.getClass().getName());
+writeBinary(bytes,((OSerializableStream)value).toStream());
+break;
+case TRANSIENT:
+break;
+case ANY:
+break;
+}
+return pointer;
+}

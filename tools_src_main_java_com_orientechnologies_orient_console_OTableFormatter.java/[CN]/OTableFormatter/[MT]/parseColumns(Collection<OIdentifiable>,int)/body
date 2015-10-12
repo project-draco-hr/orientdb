@@ -2,16 +2,18 @@
   final Map<String,Integer> columns=new LinkedHashMap<String,Integer>();
   for (  String c : prefixedColumns)   columns.put(c,minColumnSize);
   boolean tempRids=false;
+  boolean hasClass=false;
   int fetched=0;
   for (  OIdentifiable id : resultSet) {
     ORecord rec=id.getRecord();
     for (    String c : prefixedColumns)     columns.put(c,getColumnSize(fetched,rec,c,columns.get(c)));
     if (rec instanceof ODocument) {
       ((ODocument)rec).setLazyLoad(false);
-      ODocument doc=(ODocument)rec;
+      final ODocument doc=(ODocument)rec;
       for (      String fieldName : doc.fieldNames()) {
         columns.put(fieldName,getColumnSize(fetched,doc,fieldName,columns.get(fieldName)));
       }
+      if (!hasClass && doc.getClassName() != null)       hasClass=true;
     }
  else     if (rec instanceof ORecordBytes) {
       columns.put("value",maxWidthSize - 15);
@@ -20,6 +22,7 @@
     if (limit > -1 && fetched++ >= limit)     break;
   }
   if (tempRids)   columns.remove("@RID");
+  if (!hasClass)   columns.remove("@CLASS");
   int width=0;
   for (  Entry<String,Integer> col : columns.entrySet())   width+=col.getValue();
   if (width > maxWidthSize) {

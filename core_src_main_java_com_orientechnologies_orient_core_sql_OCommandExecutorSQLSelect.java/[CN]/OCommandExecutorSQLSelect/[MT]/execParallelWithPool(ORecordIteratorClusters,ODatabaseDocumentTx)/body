@@ -46,6 +46,7 @@
 ;
     jobs.add(Orient.instance().submit(job));
   }
+  boolean cancelQuery=false;
   boolean tipProvided=false;
   while (runningJobs.get() > 0 || !resultQueue.isEmpty()) {
     try {
@@ -65,20 +66,29 @@
     }
  catch (    InterruptedException e) {
       Thread.interrupted();
+      cancelQuery=true;
       break;
     }
   }
   parallelRunning=false;
-  for (int i=0; i < jobs.size(); ++i) {
-    try {
-      jobs.get(i).get();
-      context.merge(contexts[i]);
+  if (cancelQuery) {
+    for (int i=0; i < jobs.size(); ++i) {
+      jobs.get(i).cancel(true);
     }
- catch (    InterruptedException e) {
-      break;
-    }
-catch (    ExecutionException e) {
-      e.printStackTrace();
+  }
+ else {
+    for (int i=0; i < jobs.size(); ++i) {
+      try {
+        jobs.get(i).get();
+        context.merge(contexts[i]);
+      }
+ catch (      InterruptedException e) {
+        break;
+      }
+catch (      final ExecutionException e) {
+        OLogManager.instance().error(this,"Error on executing parallel query",e);
+        throw OException.wrapException(new OCommandExecutionException("Error on executing parallel query"),e);
+      }
     }
   }
   for (int i=0; i < jobNumbers; ++i)   if (exceptions[i] != null)   throw exceptions[i];

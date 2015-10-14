@@ -46,14 +46,15 @@
 ;
     jobs.add(Orient.instance().submit(job));
   }
+  final int maxQueueSize=OGlobalConfiguration.QUERY_PARALLEL_RESULT_QUEUE_SIZE.getValueAsInteger() - 1;
   boolean cancelQuery=false;
   boolean tipProvided=false;
   while (runningJobs.get() > 0 || !resultQueue.isEmpty()) {
     try {
       final AsyncResult result=resultQueue.take();
       final int qSize=resultQueue.size();
-      if (!tipProvided && qSize >= OGlobalConfiguration.QUERY_PARALLEL_RESULT_QUEUE_SIZE.getValueAsInteger() - 1) {
-        OLogManager.instance().debug(this,"Parallel query '%s' has result queue full (size=%d), this could reduce concurrency level. Consider increasing queue size with setting: %s=<size>",parserText,OGlobalConfiguration.QUERY_PARALLEL_RESULT_QUEUE_SIZE.getValueAsInteger(),OGlobalConfiguration.QUERY_PARALLEL_RESULT_QUEUE_SIZE.getKey());
+      if (!tipProvided && qSize >= maxQueueSize) {
+        OLogManager.instance().debug(this,"Parallel query '%s' has result queue full (size=%d), this could reduce concurrency level. Consider increasing queue size with setting: %s=<size>",parserText,maxQueueSize + 1,OGlobalConfiguration.QUERY_PARALLEL_RESULT_QUEUE_SIZE.getKey());
         tipProvided=true;
       }
       if (OExecutionThreadLocal.isInterruptCurrentOperation())       throw new InterruptedException("Operation has been interrupted");

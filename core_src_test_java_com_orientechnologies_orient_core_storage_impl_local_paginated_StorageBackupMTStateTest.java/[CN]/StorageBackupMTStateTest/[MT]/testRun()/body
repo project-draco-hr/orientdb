@@ -19,27 +19,40 @@
   }
   databaseDocumentTx.close();
   pool=new OPartitionedDatabasePool(dbURL,"admin","admin");
-  System.out.println("Start insertion");
-  final ExecutorService executor=Executors.newSingleThreadExecutor();
+  System.out.println("Start data modification");
+  final ExecutorService executor=Executors.newFixedThreadPool(5);
   final ScheduledExecutorService backupExecutor=Executors.newSingleThreadScheduledExecutor();
-  backupExecutor.scheduleWithFixedDelay(new IncrementalBackupThread(),1,1,TimeUnit.MINUTES);
+  final ScheduledExecutorService classCreatorExecutor=Executors.newSingleThreadScheduledExecutor();
+  final ScheduledExecutorService classDeleterExecutor=Executors.newSingleThreadScheduledExecutor();
+  classDeleterExecutor.scheduleWithFixedDelay(new ClassDeleter(),10,10,TimeUnit.MINUTES);
+  backupExecutor.scheduleWithFixedDelay(new IncrementalBackupThread(),5,5,TimeUnit.MINUTES);
+  classCreatorExecutor.scheduleWithFixedDelay(new ClassAdder(),7,5,TimeUnit.MINUTES);
   List<Future<Void>> futures=new ArrayList<Future<Void>>();
   futures.add(executor.submit(new NonTxInserter()));
   futures.add(executor.submit(new NonTxInserter()));
   futures.add(executor.submit(new TxInserter()));
   futures.add(executor.submit(new TxInserter()));
+  futures.add(executor.submit(new RecordsDeleter()));
   int k=0;
-  while (k < 10) {
+  while (k < 60) {
     Thread.sleep(30 * 1000);
     k++;
     System.out.println(k * 0.5 + " minutes...");
   }
   stop=true;
-  for (  Future<Void> future : futures)   future.get();
+  System.out.println("Stop backup");
   backupExecutor.shutdown();
+  System.out.println("Stop class creation/deletion");
+  classCreatorExecutor.shutdown();
+  classDeleterExecutor.shutdown();
   backupExecutor.awaitTermination(15,TimeUnit.MINUTES);
-  System.out.println("Stop insertion ");
+  classCreatorExecutor.awaitTermination(15,TimeUnit.MINUTES);
+  classDeleterExecutor.awaitTermination(15,TimeUnit.MINUTES);
+  System.out.println("Stop data threads");
+  for (  Future<Void> future : futures)   future.get();
+  System.out.println("All threads are stopped");
   pool.close();
+  System.out.println("Final incremental  backup");
   databaseDocumentTx=new ODatabaseDocumentTx(dbURL);
   databaseDocumentTx.open("admin","admin");
   databaseDocumentTx.incrementalBackup(backupDir.getAbsolutePath());

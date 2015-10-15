@@ -1,4 +1,5 @@
 {
+  final int docId;
   final int classes=classCounter.get();
   String className;
   AtomicInteger classCounter;
@@ -8,7 +9,8 @@
   }
  while (classCounter == null);
   final ODocument doc=new ODocument(className);
-  doc.field("id",classCounter.getAndIncrement());
+  docId=classCounter.getAndIncrement();
+  doc.field("id",docId);
   doc.field("stringValue","value");
   doc.field("intValue",random.nextInt(1024));
   String linkedClassName;
@@ -20,10 +22,17 @@
   }
  while (linkedClassCounter == null);
   ORidBag linkedDocuments=new ORidBag();
-  while (linkedDocuments.size() < 5 && linkedDocuments.size() < linkedClassCounter.get()) {
+  long linkedClassCount=db.countClass(linkedClassName);
+  long tCount=0;
+  while (linkedDocuments.size() < 5 && linkedDocuments.size() < linkedClassCount) {
     List<ODocument> docs=db.query(new OSQLSynchQuery<ODocument>("select * from " + linkedClassName + " where id="+ random.nextInt(linkedClassCounter.get())));
     if (docs.size() > 0)     linkedDocuments.add(docs.get(0));
+    tCount++;
+    if (tCount % 10 == 0)     linkedClassCount=db.countClass(linkedClassName);
   }
   doc.field("linkedDocuments",linkedDocuments);
   doc.save();
+  if (docId % 10000 == 0) {
+    System.out.println(docId + " documents of class " + className+ " were inserted");
+  }
 }

@@ -1,0 +1,30 @@
+{
+  ODatabaseDocumentTx db=pool.acquire();
+  try {
+    flowLock.acquireWriteLock();
+    try {
+      final OSchema schema=db.getMetadata().getSchema();
+      final int classes=classCounter.get();
+      String className;
+      AtomicInteger classCounter;
+      do {
+        className=CLASS_PREFIX + random.nextInt(classes);
+        classCounter=classInstancesCounters.get(className);
+      }
+ while (classCounter == null);
+      schema.dropClass(className);
+      classInstancesCounters.remove(className);
+      System.out.println("Class " + className + " was deleted");
+    }
+ catch (    RuntimeException e) {
+      e.printStackTrace();
+      throw e;
+    }
+ finally {
+      flowLock.releaseWriteLock();
+    }
+  }
+  finally {
+    db.close();
+  }
+}

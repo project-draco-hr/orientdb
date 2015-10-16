@@ -1,0 +1,60 @@
+{
+  int counter=0;
+  while (!stop) {
+    while (true) {
+      ODatabaseDocumentTx databaseDocumentTx=pool.acquire();
+      try {
+        flowLock.acquireReadLock();
+        try {
+          final int classes=classCounter.get();
+          String className;
+          AtomicInteger classCounter;
+          long countClasses;
+          do {
+            className=CLASS_PREFIX + random.nextInt(classes);
+            classCounter=classInstancesCounters.get(className);
+            if (classCounter != null)             countClasses=databaseDocumentTx.countClass(className);
+ else             countClasses=0;
+          }
+ while (classCounter == null || countClasses == 0);
+          boolean deleted=false;
+          do {
+            List<ODocument> docs=databaseDocumentTx.query(new OSQLSynchQuery<ODocument>("select * from " + className + " where id="+ random.nextInt(classCounter.get())));
+            if (docs.size() > 0) {
+              final ODocument document=docs.get(0);
+              document.delete();
+              deleted=true;
+            }
+          }
+ while (!deleted);
+          counter++;
+          if (counter % 1000 == 0) {
+            System.out.println(counter + " documents are deleted");
+            System.out.println("Pause for 3 seconds...");
+            Thread.sleep(3000);
+          }
+          break;
+        }
+  finally {
+          flowLock.releaseReadLock();
+        }
+      }
+ catch (      OModificationOperationProhibitedException mope) {
+        System.out.println("Modification was prohibited ... wait 5s.");
+        Thread.sleep(5 * 1000);
+      }
+catch (      ORecordNotFoundException rnfe) {
+      }
+catch (      OConcurrentModificationException cme) {
+      }
+catch (      RuntimeException e) {
+        e.printStackTrace();
+        throw e;
+      }
+ finally {
+        databaseDocumentTx.close();
+      }
+    }
+  }
+  return null;
+}

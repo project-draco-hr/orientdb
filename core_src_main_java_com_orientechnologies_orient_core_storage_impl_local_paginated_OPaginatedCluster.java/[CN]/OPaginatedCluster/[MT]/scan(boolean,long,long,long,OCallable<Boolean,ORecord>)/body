@@ -8,7 +8,9 @@
       final long recordsToScan=lastPos - firstPos;
       final long progressDump=recordsToScan / 10;
       final int prefetchPages=OGlobalConfiguration.QUERY_SCAN_PREFETCH_PAGES.getValueAsInteger();
-      for (long clusterPosition=iAscendingOrder ? firstPos : lastPos; iAscendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(iAscendingOrder ? 1 : -1)) {
+      long clusterPosition=iAscendingOrder ? firstPos : lastPos;
+      long browsed=0;
+      for (; iAscendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(iAscendingOrder ? 1 : -1)) {
         final ORawBuffer buffer=readRecordNoLock(clusterPosition,prefetchPages);
         if (buffer == null)         continue;
         if (progressDump > 1 && OLogManager.instance().isDebugEnabled()) {
@@ -24,7 +26,9 @@
           Thread.currentThread().interrupt();
           break;
         }
+        if (iLimit > 0 && browsed++ > iLimit)         return clusterPosition;
       }
+      return -1;
     }
   finally {
       releaseSharedLock();

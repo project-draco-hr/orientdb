@@ -1,0 +1,24 @@
+{
+  RecursivePrefixTreeStrategy strategy=new RecursivePrefixTreeStrategy(new GeohashPrefixTree(JtsSpatialContext.GEO,11),"location");
+  strategy.setDistErrPct(0);
+  IndexWriterConfig conf=new IndexWriterConfig(new StandardAnalyzer());
+  final RAMDirectory directory=new RAMDirectory();
+  final IndexWriter writer=new IndexWriter(directory,conf);
+  Shape point=JtsSpatialContext.GEO.getWktShapeParser().parse("POINT (9.4714708 47.6819432)");
+  Shape polygon=JtsSpatialContext.GEO.getWktShapeParser().parse("POLYGON((9.481201171875 47.64885294675266,9.471416473388672 47.65128140482982,9.462661743164062 47.64781214443791,9.449443817138672 47.656947367880335,9.445838928222656 47.66110972448931,9.455795288085938 47.667352637215,9.469013214111328 47.67255449415724,9.477081298828125 47.679142768657066,9.490299224853516 47.678680460743834,9.506263732910156 47.679258344995326,9.51364517211914 47.68191653011071,9.518795013427734 47.677177931734406,9.526691436767578 47.679489496903706,9.53390121459961 47.67139857075435,9.50918197631836 47.66180341832901,9.50815200805664 47.6529003141482,9.51192855834961 47.64654002455372,9.504375457763672 47.64237650648966,9.49270248413086 47.649662445325035,9.48617935180664 47.65151268066222,9.481201171875 47.64885294675266))");
+  Document doc=new Document();
+  Assert.assertNotEquals(point.relate(polygon),SpatialRelation.INTERSECTS);
+  for (  IndexableField f : strategy.createIndexableFields(point)) {
+    doc.add(f);
+  }
+  writer.addDocument(doc);
+  writer.commit();
+  SpatialArgs args=new SpatialArgs(SpatialOperation.Intersects,polygon.getBoundingBox());
+  Filter filter=strategy.makeFilter(args);
+  IndexReader reader=DirectoryReader.open(directory);
+  IndexSearcher searcher=new IndexSearcher(reader);
+  TopDocs search=searcher.search(new MatchAllDocsQuery(),filter,1000);
+  Assert.assertEquals(search.totalHits,0);
+  reader.close();
+  writer.close();
+}

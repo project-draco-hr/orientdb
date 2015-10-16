@@ -1,0 +1,29 @@
+{
+  databaseDocumentTx.begin();
+  ODocument doc=new ODocument("Foo");
+  doc.field("name","Test");
+  doc.field("bar","abc");
+  OIndex<?> index=databaseDocumentTx.getMetadata().getIndexManager().getIndex("Foo.bar");
+  databaseDocumentTx.save(doc);
+  databaseDocumentTx.commit();
+  databaseDocumentTx.begin();
+  databaseDocumentTx.delete(doc);
+  String query="select from Foo where name = 'Test' and bar lucene \"abc\" ";
+  List<ODocument> vertices=databaseDocumentTx.command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Collection coll=(Collection)index.get("abc");
+  Assert.assertEquals(vertices.size(),0);
+  Assert.assertEquals(coll.size(),0);
+  Iterator iterator=coll.iterator();
+  int i=0;
+  while (iterator.hasNext()) {
+    iterator.next();
+    i++;
+  }
+  Assert.assertEquals(i,0);
+  Assert.assertEquals(index.getSize(),0);
+  databaseDocumentTx.rollback();
+  query="select from Foo where name = 'Test' and bar lucene \"abc\" ";
+  vertices=databaseDocumentTx.command(new OSQLSynchQuery<ODocument>(query)).execute();
+  Assert.assertEquals(vertices.size(),1);
+  Assert.assertEquals(index.getSize(),1);
+}

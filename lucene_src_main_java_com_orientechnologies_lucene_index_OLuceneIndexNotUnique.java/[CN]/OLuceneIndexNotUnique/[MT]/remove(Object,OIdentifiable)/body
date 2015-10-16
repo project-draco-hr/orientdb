@@ -1,0 +1,23 @@
+{
+  OTransaction transaction=getDatabase().getTransaction();
+  if (transaction.isActive()) {
+    transaction.addIndexEntry(this,super.getName(),OTransactionIndexChanges.OPERATION.REMOVE,encodeKey(key),value);
+    OLuceneTxChanges transactionChanges=getTransactionChanges(transaction);
+    try {
+      transactionChanges.remove(key,value);
+    }
+ catch (    IOException e) {
+      OLogManager.instance().error(this,"Error while removing",e);
+    }
+    return true;
+  }
+ else {
+    return storage.callIndexEngine(false,false,indexId,new OIndexEngineCallback<Boolean>(){
+      @Override public Boolean callEngine(      OIndexEngine engine){
+        OLuceneIndexEngine indexEngine=(OLuceneIndexEngine)engine;
+        return indexEngine.remove(key,value);
+      }
+    }
+);
+  }
+}

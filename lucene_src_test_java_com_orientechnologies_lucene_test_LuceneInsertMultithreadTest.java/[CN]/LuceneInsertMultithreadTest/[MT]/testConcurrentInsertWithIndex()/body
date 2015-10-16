@@ -1,0 +1,25 @@
+{
+  databaseDocumentTx=new ODatabaseDocumentTx(url);
+  if (!url.contains("remote:") && databaseDocumentTx.exists()) {
+    databaseDocumentTx.open("admin","admin");
+    databaseDocumentTx.drop();
+    databaseDocumentTx.create();
+  }
+ else {
+    databaseDocumentTx.create();
+  }
+  OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  if (schema.getClass("City") == null) {
+    OClass oClass=schema.createClass("City");
+    oClass.createProperty("name",OType.STRING);
+    oClass.createIndex("City.name","FULLTEXT",null,null,"LUCENE",new String[]{"name"});
+  }
+  Thread[] threads=new Thread[THREADS + RTHREADS];
+  for (int i=0; i < THREADS; ++i)   threads[i]=new Thread(new LuceneInsertThread(CYCLE),"ConcurrentWriteTest" + i);
+  for (int i=THREADS; i < THREADS + RTHREADS; ++i)   threads[i]=new Thread(new LuceneReadThread(CYCLE),"ConcurrentReadTest" + i);
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].start();
+  for (int i=0; i < THREADS + RTHREADS; ++i)   threads[i].join();
+  OIndex idx=schema.getClass("City").getClassIndex("City.name");
+  Assert.assertEquals(idx.getSize(),THREADS * CYCLE);
+  databaseDocumentTx.drop();
+}

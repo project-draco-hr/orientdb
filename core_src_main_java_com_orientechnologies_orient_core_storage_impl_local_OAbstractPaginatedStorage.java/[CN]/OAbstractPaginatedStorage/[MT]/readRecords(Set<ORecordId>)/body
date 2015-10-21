@@ -1,0 +1,39 @@
+{
+  checkOpeness();
+  final List<OPair<ORecordId,ORawBuffer>> records=new ArrayList<OPair<ORecordId,ORawBuffer>>();
+  if (iRids == null || iRids.isEmpty())   return records;
+  if (transaction.get() != null) {
+    for (    ORecordId rid : iRids) {
+      if (!rid.isPersistent())       throw new IllegalArgumentException("Cannot read record " + rid + " since the position is invalid in database '"+ name+ '\'');
+      records.add(new OPair<ORecordId,ORawBuffer>(rid,doReadRecord(getClusterById(rid.clusterId),rid)));
+    }
+    return records;
+  }
+  final Map<Integer,List<ORecordId>> ridsPerCluster=getRidsGroupedByCluster(iRids);
+  stateLock.acquireReadLock();
+  try {
+    dataLock.acquireSharedLock();
+    try {
+      for (      Map.Entry<Integer,List<ORecordId>> entry : ridsPerCluster.entrySet()) {
+        final int clusterId=entry.getKey();
+        final OCluster clusterSegment=getClusterById(clusterId);
+        for (        ORecordId rid : entry.getValue()) {
+          lockManager.acquireLock(rid,OLockManager.LOCK.SHARED);
+          try {
+            records.add(new OPair<ORecordId,ORawBuffer>(rid,doReadRecord(clusterSegment,rid)));
+          }
+  finally {
+            lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
+          }
+        }
+      }
+    }
+  finally {
+      dataLock.releaseSharedLock();
+    }
+  }
+  finally {
+    stateLock.releaseReadLock();
+  }
+  return records;
+}

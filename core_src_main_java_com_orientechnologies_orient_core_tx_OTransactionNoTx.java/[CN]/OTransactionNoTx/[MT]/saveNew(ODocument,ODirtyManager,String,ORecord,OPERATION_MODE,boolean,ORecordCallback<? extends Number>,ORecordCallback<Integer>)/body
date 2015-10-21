@@ -1,0 +1,41 @@
+{
+  ORecord toRet=null;
+  LinkedList<ODocument> path=new LinkedList<ODocument>();
+  ORecord next=document;
+  do {
+    if (next instanceof ODocument) {
+      ORecord nextToInspect=null;
+      List<OIdentifiable> toSave=manager.getPointed(next);
+      if (toSave != null) {
+        for (        OIdentifiable oIdentifiable : toSave) {
+          if (oIdentifiable.getIdentity().isNew()) {
+            if (oIdentifiable instanceof ORecord)             nextToInspect=(ORecord)oIdentifiable;
+ else             nextToInspect=oIdentifiable.getRecord();
+            break;
+          }
+        }
+      }
+      if (nextToInspect != null) {
+        if (path.contains(nextToInspect)) {
+          if (nextToInspect == original)           database.executeSaveEmptyRecord(nextToInspect,iClusterName);
+ else           database.executeSaveEmptyRecord(nextToInspect,getClusterName(nextToInspect));
+        }
+ else {
+          path.push((ODocument)next);
+          next=nextToInspect;
+        }
+      }
+ else {
+        if (next == original)         toRet=database.executeSaveRecord(next,iClusterName,next.getVersion(),iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+ else         database.executeSaveRecord(next,getClusterName(next),next.getVersion(),OPERATION_MODE.SYNCHRONOUS,false,null,null);
+        next=path.pollFirst();
+      }
+    }
+ else {
+      database.executeSaveRecord(next,null,next.getVersion(),iMode,false,null,null);
+      next=path.pollFirst();
+    }
+  }
+ while (next != null);
+  return toRet;
+}

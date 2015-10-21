@@ -2,7 +2,7 @@
   setDataCommandInfo("Load record if version is not latest");
   if (!isConnectionAlive())   return;
   final ORecordId rid=channel.readRID();
-  final ORecordVersion recordVersion=channel.readVersion();
+  final int recordVersion=channel.readVersion();
   final String fetchPlanString=channel.readString();
   boolean ignoreCache=channel.readByte() == 1;
   if (rid.clusterId == 0 && rid.clusterPosition == 0) {
@@ -13,12 +13,12 @@
       channel.writeByte((byte)1);
       if (connection.data.protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_27) {
         channel.writeBytes(connection.database.getStorage().getConfiguration().toStream(connection.data.protocolVersion));
-        channel.writeVersion(OVersionFactory.instance().createVersion());
+        channel.writeVersion(0);
         channel.writeByte(ORecordBytes.RECORD_TYPE);
       }
  else {
         channel.writeByte(ORecordBytes.RECORD_TYPE);
-        channel.writeVersion(OVersionFactory.instance().createVersion());
+        channel.writeVersion(0);
         channel.writeBytes(connection.database.getStorage().getConfiguration().toStream(connection.data.protocolVersion));
       }
       channel.writeByte((byte)0);
@@ -37,7 +37,7 @@
         byte[] bytes=getRecordBytes(record);
         int length=trimCsvSerializedContent(bytes);
         channel.writeByte(ORecordInternal.getRecordType(record));
-        channel.writeVersion(record.getRecordVersion());
+        channel.writeVersion(record.getVersion());
         channel.writeBytes(bytes,length);
         if (fetchPlanString.length() > 0) {
           if (record instanceof ODocument) {

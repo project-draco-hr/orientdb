@@ -1,0 +1,32 @@
+{
+  try {
+    ORecord toRet=null;
+    ODirtyManager dirtyManager=ORecordInternal.getDirtyManager(iRecord);
+    Set<ORecord> newRecord=dirtyManager.getNewRecord();
+    Set<ORecord> updatedRecord=dirtyManager.getUpdateRecords();
+    dirtyManager.cleanForSave();
+    if (newRecord != null) {
+      for (      ORecord rec : newRecord) {
+        if (rec.getIdentity().isNew() && rec instanceof ODocument) {
+          ORecord ret=saveNew((ODocument)rec,dirtyManager,iClusterName,iRecord,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+          if (ret != null)           toRet=ret;
+        }
+      }
+    }
+    if (updatedRecord != null) {
+      for (      ORecord rec : updatedRecord) {
+        if (rec == iRecord) {
+          toRet=database.executeSaveRecord(rec,iClusterName,rec.getVersion(),iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+        }
+ else         database.executeSaveRecord(rec,getClusterName(rec),rec.getVersion(),OPERATION_MODE.SYNCHRONOUS,false,null,null);
+      }
+    }
+    if (toRet != null)     return toRet;
+ else     return database.executeSaveRecord(iRecord,iClusterName,iRecord.getVersion(),iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  }
+ catch (  Exception e) {
+    final ORecordId rid=(ORecordId)iRecord.getIdentity();
+    if (rid.isValid())     database.getLocalCache().freeRecord(rid);
+    throw OException.wrapException(new ODatabaseException("Error during saving of record" + iRecord != null ? " with rid " + iRecord.getIdentity() : ""),e);
+  }
+}

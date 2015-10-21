@@ -14,12 +14,12 @@
 switch (recordStatus) {
 case ORecordOperation.CREATED:
         byte[] content=channel.readBytes();
-      ORecordInternal.fill(entry.getRecord(),rid,OVersionFactory.instance().createVersion(),null,true);
+      ORecordInternal.fill(entry.getRecord(),rid,0,null,true);
     lazyDeserialize.put(entry.getRecord(),content);
   createdRecords.put(rid.copy(),entry.getRecord());
 break;
 case ORecordOperation.UPDATED:
-ORecordVersion version=channel.readVersion();
+int version=channel.readVersion();
 byte[] bytes=channel.readBytes();
 ORecordInternal.fill(entry.getRecord(),rid,version,null,true);
 lazyDeserialize.put(entry.getRecord(),bytes);
@@ -27,9 +27,9 @@ if (protocolVersion >= 23) ORecordInternal.setContentChanged(entry.getRecord(),c
 break;
 case ORecordOperation.DELETED:
 final ORecord rec=rid.getRecord();
-ORecordVersion deleteVersion=channel.readVersion();
-if (rec == null) toThrow=new OConcurrentModificationException(rid.getIdentity(),new OSimpleVersion(-1),deleteVersion,ORecordOperation.DELETED);
-ORecordInternal.setVersion(rec,deleteVersion.getCounter());
+int deleteVersion=channel.readVersion();
+if (rec == null) toThrow=new OConcurrentModificationException(rid.getIdentity(),-1,deleteVersion,ORecordOperation.DELETED);
+ORecordInternal.setVersion(rec,deleteVersion);
 entry.setRecord(rec);
 break;
 default :
@@ -70,7 +70,7 @@ if (loadedRecord == null) throw new ORecordNotFoundException(record.getIdentity(
 if (ORecordInternal.getRecordType(loadedRecord) == ODocument.RECORD_TYPE && ORecordInternal.getRecordType(loadedRecord) == ORecordInternal.getRecordType(record)) {
 ((ODocument)loadedRecord).merge((ODocument)record,false,false);
 ((ODocument)loadedRecord).setDirty();
-loadedRecord.getRecordVersion().copyFrom(record.getRecordVersion());
+ORecordInternal.setVersion(loadedRecord,record.getVersion());
 entry.getValue().record=loadedRecord;
 updatedRecords.put((ORecordId)entry.getKey(),entry.getValue().getRecord());
 }

@@ -1,22 +1,28 @@
 {
   int size=OVarIntSerializer.readAsInteger(bytes);
-  final Map<Object,Object> result=new OTrackedMap<Object>(document);
-  int last=0;
-  while ((size--) > 0) {
-    OType keyType=readOType(bytes);
-    Object key=deserializeValue(bytes,keyType,document);
-    final int valuePos=readInteger(bytes);
-    final OType type=readOType(bytes);
-    if (valuePos != 0) {
-      int headerCursor=bytes.offset;
-      bytes.offset=valuePos;
-      Object value=deserializeValue(bytes,type,document);
-      if (bytes.offset > last)       last=bytes.offset;
-      bytes.offset=headerCursor;
-      result.put(key,value);
+  final OTrackedMap<Object> result=new OTrackedMap<Object>(document);
+  result.setInternalStatus(ORecordElement.STATUS.UNMARSHALLING);
+  try {
+    int last=0;
+    while ((size--) > 0) {
+      OType keyType=readOType(bytes);
+      Object key=deserializeValue(bytes,keyType,document);
+      final int valuePos=readInteger(bytes);
+      final OType type=readOType(bytes);
+      if (valuePos != 0) {
+        int headerCursor=bytes.offset;
+        bytes.offset=valuePos;
+        Object value=deserializeValue(bytes,type,document);
+        if (bytes.offset > last)         last=bytes.offset;
+        bytes.offset=headerCursor;
+        result.put(key,value);
+      }
+ else       result.put(key,null);
     }
- else     result.put(key,null);
+    if (last > bytes.offset)     bytes.offset=last;
+    return result;
   }
-  if (last > bytes.offset)   bytes.offset=last;
-  return result;
+  finally {
+    result.setInternalStatus(ORecordElement.STATUS.LOADED);
+  }
 }

@@ -1,5 +1,5 @@
 {
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"updating record %s/%s v.%s",database.getName(),rid.toString(),version.toString());
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"updating record %s/%s v.%d",database.getName(),rid.toString(),version);
   final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
   if (!inTx) {
     if (lockRecord && !ddb.lockRecord(rid,nodeSource))     throw new ODistributedRecordLockedException(rid);
@@ -10,16 +10,16 @@
     if (loadedRecord instanceof ODocument) {
       final ODocument newDocument=(ODocument)getRecord();
       ODocument loadedDocument=(ODocument)loadedRecord;
-      ORecordVersion loadedRecordVersion=loadedDocument.merge(newDocument,false,false).getRecordVersion();
-      if (loadedRecordVersion.getCounter() != version.getCounter()) {
+      int loadedRecordVersion=loadedDocument.merge(newDocument,false,false).getVersion();
+      if (loadedRecordVersion != version) {
         loadedDocument.setDirty();
       }
-      loadedRecordVersion.copyFrom(version);
+      ORecordInternal.setVersion(loadedDocument,version);
     }
  else     ORecordInternal.fill(loadedRecord,rid,version,content,true);
     loadedRecord=database.save(loadedRecord);
-    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> updated record %s/%s v.%s",database.getName(),rid.toString(),loadedRecord.getRecordVersion().toString());
-    return loadedRecord.getRecordVersion();
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> updated record %s/%s v.%d",database.getName(),rid.toString(),loadedRecord.getVersion());
+    return loadedRecord.getVersion();
   }
   finally {
     if (!inTx)     ddb.unlockRecord(rid);

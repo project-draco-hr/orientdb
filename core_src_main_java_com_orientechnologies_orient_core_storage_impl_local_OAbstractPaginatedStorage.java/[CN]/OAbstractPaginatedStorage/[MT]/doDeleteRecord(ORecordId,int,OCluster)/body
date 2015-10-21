@@ -1,0 +1,27 @@
+{
+  try {
+    final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+    if (ppos == null)     return new OStorageOperationResult<Boolean>(false);
+    if (version > -1 && ppos.recordVersion != version)     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
+ else     throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
+    makeStorageDirty();
+    atomicOperationsManager.startAtomicOperation((String)null);
+    try {
+      cluster.deleteRecord(ppos.clusterPosition);
+      final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+      if (context != null)       context.executeOperations(this);
+      atomicOperationsManager.endAtomicOperation(false,null);
+    }
+ catch (    Exception e) {
+      atomicOperationsManager.endAtomicOperation(true,e);
+      OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",e);
+      return new OStorageOperationResult<Boolean>(false);
+    }
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Deleted record %s v.%s",rid,version);
+    return new OStorageOperationResult<Boolean>(true);
+  }
+ catch (  IOException ioe) {
+    OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",ioe);
+    throw OException.wrapException(new OStorageException("Error on deleting record " + rid + "( cluster: "+ cluster+ ")"),ioe);
+  }
+}

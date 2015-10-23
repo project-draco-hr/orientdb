@@ -1,0 +1,23 @@
+{
+  this.listeners.add(listener);
+  Set<OChannelBinaryAsynchClient> ans=conns.get(listener);
+  if (ans == null) {
+    ans=Collections.synchronizedSet(new HashSet<OChannelBinaryAsynchClient>());
+    Set<OChannelBinaryAsynchClient> putRet=conns.putIfAbsent(listener,ans);
+    if (putRet != null)     ans=putRet;
+  }
+  if (!ans.contains(connection)) {
+    ans.add(connection);
+    connection.registerListener(new OChannelListener(){
+      @Override public void onChannelClose(      OChannel iChannel){
+        Set<OChannelBinaryAsynchClient> all=conns.get(listener);
+        all.remove(iChannel);
+        if (all.isEmpty()) {
+          listener.onEndUsedConnections(pool);
+        }
+        connection.unregisterListener(this);
+      }
+    }
+);
+  }
+}

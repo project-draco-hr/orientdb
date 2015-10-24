@@ -1,0 +1,25 @@
+{
+  ODatabaseDocumentInternal database=ODatabaseRecordThreadLocal.INSTANCE.get();
+  final OAbstractPaginatedStorage storageLocalAbstract=(OAbstractPaginatedStorage)database.getStorage().getUnderlying();
+  Directory dir=null;
+  if (storageLocalAbstract instanceof OLocalPaginatedStorage) {
+    String pathname=getIndexPath((OLocalPaginatedStorage)storageLocalAbstract);
+    OLogManager.instance().info(this,"Opening NIOFS Lucene db=%s, path=%s",database.getName(),pathname);
+    dir=NIOFSDirectory.open(new File(pathname).toPath());
+  }
+ else {
+    OLogManager.instance().info(this,"Opening RAM Lucene index db=%s",database.getName());
+    dir=new RAMDirectory();
+  }
+  final IndexWriter indexWriter=createIndexWriter(dir);
+  mgrWriter=new TrackingIndexWriter(indexWriter);
+  searcherManager=new SearcherManager(indexWriter,true,null);
+  if (nrt != null) {
+    nrt.close();
+  }
+  nrt=new ControlledRealTimeReopenThread(mgrWriter,searcherManager,60.00,0.1);
+  nrt.setDaemon(true);
+  nrt.start();
+  flush();
+  OLogManager.instance().info(this,"REOPEN DONE");
+}

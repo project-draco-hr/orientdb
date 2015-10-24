@@ -1,0 +1,15 @@
+{
+  OLogManager.instance().installCustomFormatter();
+  OLogManager.instance().setConsoleLevel(Level.INFO.getName());
+  initDB();
+  OSchema schema=databaseDocumentTx.getMetadata().getSchema();
+  OClass v=schema.getClass("V");
+  OClass song=schema.createClass("Song");
+  song.setSuperClass(v);
+  song.createProperty("title",OType.STRING);
+  song.createProperty("author",OType.STRING);
+  song.createProperty("lyrics",OType.STRING);
+  databaseDocumentTx.command(new OCommandSQL("create index Song.all on Song (title,author,lyrics) FULLTEXTEXP ENGINE LUCENE METADATA {" + "\"title_index_analyzer\":\"" + StandardAnalyzer.class.getName() + "\" , "+ "\"author_index_analyzer\":\""+ StandardAnalyzer.class.getName()+ "\" , "+ "\"lyrics_index_analyzer\":\""+ EnglishAnalyzer.class.getName()+ "\"}")).execute();
+  String fromStream=OIOUtils.readFileAsString(new File("./src/test/resources/testLuceneIndex.sql"),StandardCharsets.UTF_8);
+  databaseDocumentTx.command(new OCommandScript("sql",fromStream)).execute();
+}

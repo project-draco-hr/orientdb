@@ -8,12 +8,12 @@
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
   final OPair<String,IQueue<ODistributedRequest>>[] reqQueues=getRequestQueues(databaseName,iNodes,iRequest.getTask());
   iRequest.setSenderNodeName(getLocalNodeName());
-  int availableNodes;
+  int onlineNodes;
   if (iRequest.getTask().isRequireNodeOnline()) {
-    availableNodes=0;
+    onlineNodes=0;
     int i=0;
     for (    String node : iNodes) {
-      if (reqQueues[i].getValue() != null && manager.isNodeAvailable(node,databaseName))       availableNodes++;
+      if (reqQueues[i].getValue() != null && manager.isNodeOnline(node,databaseName))       onlineNodes++;
  else {
         if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"skip expected response from node '%s' for request %s because it's not online (queue=%s)",node,iRequest,reqQueues[i].getValue() != null);
       }
@@ -21,15 +21,15 @@
     }
   }
  else {
-    availableNodes=0;
-    for (    OPair<String,IQueue<ODistributedRequest>> q : reqQueues)     if (q.getValue() != null)     availableNodes++;
+    onlineNodes=0;
+    for (    OPair<String,IQueue<ODistributedRequest>> q : reqQueues)     if (q.getValue() != null)     onlineNodes++;
   }
-  final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,availableNodes,iExecutionMode);
+  final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,onlineNodes,iExecutionMode);
   final int queueSize=iNodes.size();
-  int expectedSynchronousResponses=availableNodes;
+  int expectedSynchronousResponses=onlineNodes;
   final boolean groupByResponse;
   if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
-    expectedSynchronousResponses=availableNodes;
+    expectedSynchronousResponses=onlineNodes;
     groupByResponse=false;
   }
  else {

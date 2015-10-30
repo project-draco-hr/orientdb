@@ -1,0 +1,34 @@
+{
+  message("\n\nCONFIGURED SERVERS");
+  final List<OIdentifiable> servers=new ArrayList<OIdentifiable>();
+  final ODocument distribCfg=getDistributedConfiguration();
+  final Collection<ODocument> members=distribCfg.field("members");
+  if (members != null)   for (  ODocument m : members) {
+    final ODocument server=new ODocument();
+    server.field("Name",m.field("name"));
+    server.field("Status",m.field("status"));
+    server.field("Connections",m.field("connections"));
+    server.field("StartedOn",m.field("startedOn"));
+    final Collection<Map> listeners=m.field("listeners");
+    if (listeners != null) {
+      for (      Map l : listeners) {
+        final String protocol=(String)l.get("protocol");
+        if (protocol.equals("ONetworkProtocolBinary")) {
+          server.field("Binary",l.get("listen"));
+        }
+ else         if (protocol.equals("ONetworkProtocolHttpDb")) {
+          server.field("HTTP",l.get("listen"));
+        }
+      }
+    }
+    final long usedMem=m.field("usedMemory");
+    final long freeMem=m.field("freeMemory");
+    final long maxMem=m.field("maxMemory");
+    server.field("UsedMemory",String.format("%s (%.2f%%)",OFileUtils.getSizeAsString(usedMem),((float)usedMem / (float)maxMem) * 100));
+    server.field("FreeMemory",String.format("%s (%.2f%%)",OFileUtils.getSizeAsString(freeMem),((float)freeMem / (float)maxMem) * 100));
+    server.field("MaxMemory",OFileUtils.getSizeAsString(maxMem));
+    servers.add(server);
+  }
+  currentResultSet=servers;
+  new OTableFormatter(this).setMaxWidthSize(getWindowSize()).writeRecords(servers,-1);
+}

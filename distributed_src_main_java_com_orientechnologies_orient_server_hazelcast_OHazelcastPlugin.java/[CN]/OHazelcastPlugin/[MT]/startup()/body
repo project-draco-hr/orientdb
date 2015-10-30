@@ -23,9 +23,7 @@
  else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
       }
     }
-    ODocument cfg=getLocalNodeConfiguration();
-    ORecordInternal.setRecordSerializer(cfg,ODatabaseDocumentTx.getDefaultSerializer());
-    configurationMap.put(CONFIG_NODE_PREFIX + nodeId,cfg);
+    publishLocalNodeConfiguration();
     if (!configurationMap.containsKey(CONFIG_NODE_PREFIX + nodeId)) {
       ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on registering local node on cluster");
       System.exit(1);
@@ -34,6 +32,14 @@
     installNewDatabases(true);
     loadDistributedDatabases();
     setNodeStatus(NODE_STATUS.ONLINE);
+    publishLocalNodeConfiguration();
+    final long delay=OGlobalConfiguration.DISTRIBUTED_PUBLISH_NODE_STATUS_EVERY.getValueAsLong();
+    if (delay > 0)     Orient.instance().scheduleTask(new TimerTask(){
+      @Override public void run(){
+        publishLocalNodeConfiguration();
+      }
+    }
+,delay,delay);
   }
  catch (  Exception e) {
     ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on starting distributed plugin",e);

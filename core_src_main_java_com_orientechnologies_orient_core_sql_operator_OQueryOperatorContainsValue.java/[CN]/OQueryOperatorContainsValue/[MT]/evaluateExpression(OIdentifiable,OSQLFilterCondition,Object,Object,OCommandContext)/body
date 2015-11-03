@@ -3,6 +3,23 @@
   if (iCondition.getLeft() instanceof OSQLFilterCondition)   condition=(OSQLFilterCondition)iCondition.getLeft();
  else   if (iCondition.getRight() instanceof OSQLFilterCondition)   condition=(OSQLFilterCondition)iCondition.getRight();
  else   condition=null;
+  OType type=null;
+  if (iCondition.getLeft() instanceof OSQLFilterItemField && ((OSQLFilterItemField)iCondition.getLeft()).isFieldChain() && ((OSQLFilterItemField)iCondition.getLeft()).getFieldChain().getItemCount() == 1) {
+    String fieldName=((OSQLFilterItemField)iCondition.getLeft()).getFieldChain().getItemName(0);
+    if (fieldName != null) {
+      Object record=iRecord.getRecord();
+      if (record instanceof ODocument) {
+        OProperty property=((ODocument)record).getSchemaClass().getProperty(fieldName);
+        if (property != null && property.getType().isMultiValue()) {
+          type=property.getLinkedType();
+        }
+      }
+    }
+  }
+  Object right=iRight;
+  if (type != null) {
+    right=OType.convert(iRight,type.getDefaultJavaType());
+  }
   if (iLeft instanceof Map<?,?>) {
     final Map<String,?> map=(Map<String,?>)iLeft;
     if (condition != null) {
@@ -11,7 +28,7 @@
         if ((Boolean)condition.evaluate((ODocument)o,null,iContext))         return true;
       }
     }
- else     return map.containsValue(iRight);
+ else     return map.containsValue(right);
   }
  else   if (iRight instanceof Map<?,?>) {
     final Map<String,?> map=(Map<String,?>)iRight;

@@ -1,0 +1,42 @@
+{
+  OObjectDatabaseTx db=OObjectDatabasePool.global().acquire(url,"admin","admin");
+  try {
+    OSchemaProxyObject schema=db.getMetadata().getSchema();
+    db.getEntityManager().registerEntityClass(RefParent.class);
+    db.getEntityManager().registerEntityClass(RefChild.class);
+    db.getEntityManager().registerEntityClass(OtherThing.class);
+    schema.generateSchema(RefParent.class);
+    schema.generateSchema(RefChild.class);
+    schema.generateSchema(OtherThing.class);
+    RefParent parent1=new RefParent();
+    parent1=db.save(parent1);
+    RefParent parent2=new RefParent();
+    parent2=db.save(parent2);
+    RefChild child1=new RefChild();
+    parent1.getChildren().add(child1);
+    parent1=db.save(parent1);
+    RefChild child2=new RefChild();
+    parent2.getChildren().add(child2);
+    parent2=db.save(parent2);
+    parent1=db.detachAll(parent1,true);
+    parent2=db.detachAll(parent2,true);
+    db.close();
+    db=OObjectDatabasePool.global().acquire(url,"admin","admin");
+    db.begin();
+    parent1=db.load((ORID)parent1.getId());
+    parent2=db.load((ORID)parent2.getId());
+    RefChild child3=new RefChild();
+    OtherThing otherThing=new OtherThing();
+    child3.setOtherThing(otherThing);
+    otherThing.setRelationToParent1(parent1);
+    otherThing.setRelationToParent2(parent2);
+    parent1.getChildren().add(child3);
+    parent2.getChildren().add(child3);
+    db.save(parent1);
+    db.save(parent2);
+    db.commit();
+  }
+  finally {
+    db.close();
+  }
+}

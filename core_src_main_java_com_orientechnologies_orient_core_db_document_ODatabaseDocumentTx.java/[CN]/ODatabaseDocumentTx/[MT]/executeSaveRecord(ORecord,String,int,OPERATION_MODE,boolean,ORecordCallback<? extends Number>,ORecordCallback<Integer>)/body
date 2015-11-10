@@ -22,23 +22,18 @@
       stream=record.toStream();
       final boolean isNew=forceCreate || rid.isNew();
       if (isNew)       ORecordInternal.onBeforeIdentityChanged(record);
- else       if (stream == null || stream.length == 0)       return (RET)record;
       if (isNew && rid.clusterId < 0 && storage.isAssigningClusterIds())       rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
       if (rid.clusterId > -1 && clusterName == null)       clusterName=getClusterNameById(rid.clusterId);
       if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
       checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
-      if (stream != null && stream.length > 0) {
-        final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
-        final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
-        if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
-          if (record instanceof ODocument)           ((ODocument)record).validate();
-          stream=updateStream(record);
-        }
- else         if (hookResult == ORecordHook.RESULT.SKIP_IO)         return (RET)record;
- else         if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)         return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
+      final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
+      final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
+      if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
+        if (record instanceof ODocument)         ((ODocument)record).validate();
+        stream=updateStream(record);
       }
-      if (wasNew && !isNew)       record.setDirty();
- else       if (!record.isDirty())       return (RET)record;
+ else       if (hookResult == ORecordHook.RESULT.SKIP_IO)       return (RET)record;
+ else       if (hookResult == ORecordHook.RESULT.RECORD_REPLACED)       return (RET)OHookReplacedRecordThreadLocal.INSTANCE.get();
       ORecordSaveThreadLocal.setLast(record);
       try {
         boolean updateContent=ORecordInternal.isContentChanged(record);

@@ -1,21 +1,12 @@
 {
-  Exception originalException=exception;
-  if (exception instanceof OIOException) {
-    exception=(Exception)exception.getCause();
-  }
- else   if (exception instanceof OException) {
-    if (iNetwork != null)     engine.getConnectionManager().release(iNetwork);
-    if (exception instanceof OTokenSecurityException)     clearToken();
-    throw (OException)exception;
-  }
- else   if (!(exception instanceof IOException)) {
-    if (iNetwork != null)     engine.getConnectionManager().release(iNetwork);
+  final Throwable firstCause=OException.getFirstCause(exception);
+  if (!(firstCause instanceof IOException)) {
+    if (exception instanceof OException)     throw (OException)exception;
     throw OException.wrapException(new OStorageException(message),exception);
   }
-  if (status != STATUS.OPEN)   return;
   if (iNetwork != null) {
-    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),exception == null ? originalException : exception);
-    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
+    OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),firstCause);
+    OLogManager.instance().debug(this,"I/O error stack: ",firstCause);
     try {
       engine.getConnectionManager().remove(iNetwork);
     }
@@ -24,8 +15,8 @@
     }
   }
  else {
-    OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",exception == null ? originalException.toString() : exception.toString());
-    OLogManager.instance().debug(this,"I/O error stack: ",exception == null ? originalException : exception);
+    OLogManager.instance().warn(this,"Caught I/O errors, trying to reconnect (error: %s)",firstCause.toString());
+    OLogManager.instance().debug(this,"I/O error stack: ",firstCause);
   }
   final long lostConnectionTime=System.currentTimeMillis();
   final int currentMaxRetry;

@@ -1,10 +1,11 @@
 {
   final Throwable firstCause=OException.getFirstCause(exception);
+  final boolean tokenException=firstCause instanceof OTokenException;
   if (!(firstCause instanceof IOException)) {
     if (exception instanceof OException)     throw (OException)exception;
     throw OException.wrapException(new OStorageException(message),exception);
   }
-  if (iNetwork != null) {
+  if (!tokenException)   if (iNetwork != null) {
     OLogManager.instance().warn(this,"Caught I/O errors from %s (local socket=%s), trying to reconnect (error: %s)",iNetwork,iNetwork.getLocalSocketAddress(),firstCause);
     OLogManager.instance().debug(this,"I/O error stack: ",firstCause);
     try {
@@ -45,7 +46,7 @@ synchronized (serverURLs) {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + (retry + 1) + "/"+ currentMaxRetry+ "...");
       setSessionId(null,-1,null);
       final String currentURL=reopenRemoteDatabase();
-      OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries to server '%s': no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1,currentURL);
+      if (!tokenException)       OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries to server '%s': no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1,currentURL);
       return;
     }
  catch (    Throwable t) {

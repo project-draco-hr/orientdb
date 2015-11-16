@@ -1,0 +1,72 @@
+{
+  do {
+    do {
+      OChannelBinaryAsynchClient network=null;
+      try {
+        network=getAvailableNetwork(currentURL);
+        try {
+          network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
+          network.writeInt(getSessionId());
+          sendClientInfo(network);
+          network.writeString(name);
+          network.writeString(connectionUserName);
+          network.writeString(connectionUserPassword);
+        }
+  finally {
+          endRequest(network);
+        }
+        final int sessionId;
+        try {
+          network.beginResponse(getSessionId(),false);
+          sessionId=network.readInt();
+          byte[] token=network.readBytes();
+          if (token.length == 0) {
+            token=null;
+          }
+ else {
+            network.getServiceThread().setTokenBased(true);
+          }
+          setSessionId(currentURL,sessionId,token);
+          OLogManager.instance().debug(this,"Client connected to %s with session id=%d",currentURL,sessionId);
+          readDatabaseInformation(network);
+          updateClusterConfiguration(currentURL,network.readBytes());
+          if (network.getSrvProtocolVersion() >= 14)           network.readString();
+          status=STATUS.OPEN;
+          return currentURL;
+        }
+  finally {
+          endResponse(network);
+        }
+      }
+ catch (      OIOException e) {
+        if (network != null) {
+          engine.getConnectionManager().remove(network);
+          network=null;
+        }
+        OLogManager.instance().error(this,"Cannot open database with url " + currentURL,e);
+      }
+catch (      OException e) {
+        throw e;
+      }
+catch (      Exception e) {
+        if (network != null) {
+          try {
+            engine.getConnectionManager().remove(network);
+          }
+ catch (          Exception ex) {
+            OLogManager.instance().debug(this,"Cannot remove connection or database url=" + currentURL,e);
+          }
+          network=null;
+        }
+        OLogManager.instance().error(this,"Cannot open database url=" + currentURL,e);
+      }
+    }
+ while (engine.getConnectionManager().getReusableConnections(currentURL) > 0);
+    currentURL=useNewServerURL(currentURL);
+  }
+ while (currentURL != null);
+  parseServerURLs();
+synchronized (serverURLs) {
+    throw new OStorageException("Cannot create a connection to remote server address(es): " + serverURLs);
+  }
+}

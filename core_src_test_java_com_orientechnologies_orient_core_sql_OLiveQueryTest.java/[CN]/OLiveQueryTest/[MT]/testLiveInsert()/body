@@ -1,8 +1,6 @@
 {
-  OLiveCommandExecutorSQLFactory.init();
   ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:OLiveQueryTest");
   db.activateOnCurrentThread();
-  db.registerHook(new OLiveQueryHook(db));
   db.create();
   try {
     db.getMetadata().getSchema().createClass("test");
@@ -18,12 +16,9 @@
     db.command(new OCommandSQL("insert into test2 set name = 'foo'")).execute();
     db.command(new OCommandSQL("live unsubscribe " + token)).execute();
     db.command(new OCommandSQL("insert into test set name = 'foo', surname = 'bax'")).execute();
-    try {
-      Thread.sleep(3000);
-    }
- catch (    InterruptedException e) {
-      e.printStackTrace();
-    }
+    db.command(new OCommandSQL("insert into test2 set name = 'foo'"));
+    db.command(new OCommandSQL("insert into test set name = 'foo', surname = 'baz'")).execute();
+    latch.await(1,TimeUnit.MINUTES);
     Assert.assertEquals(listener.ops.size(),2);
     for (    ORecordOperation doc : listener.ops) {
       Assert.assertEquals(doc.type,ORecordOperation.CREATED);

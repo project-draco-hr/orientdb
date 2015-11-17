@@ -1,0 +1,36 @@
+{
+  ODocument document=new ODocument();
+  final ORidBag ridBag=new ORidBag();
+  document.field("ridBag",ridBag);
+  document.save();
+  ridBag.add(new ORecordId("#77:10"));
+  Assert.assertTrue(document.isDirty());
+  boolean expectCME=false;
+  if (ORecordInternal.isContentChanged(document)) {
+    assertEmbedded(true);
+    expectCME=true;
+  }
+ else {
+    assertEmbedded(false);
+  }
+  document.save();
+  ODocument copy=new ODocument();
+  copy.fromStream(document.toStream());
+  ORecordInternal.setIdentity(copy,new ORecordId(document.getIdentity()));
+  ORecordInternal.setVersion(copy,document.getVersion());
+  ORidBag copyRidBag=copy.field("ridBag");
+  Assert.assertNotSame(copyRidBag,ridBag);
+  copyRidBag.add(new ORecordId("#77:11"));
+  Assert.assertTrue(copy.isDirty());
+  Assert.assertTrue(!document.isDirty());
+  ridBag.add(new ORecordId("#77:12"));
+  Assert.assertTrue(document.isDirty());
+  document.save();
+  try {
+    copy.save();
+    Assert.assertTrue(!expectCME);
+  }
+ catch (  OConcurrentModificationException cme) {
+    Assert.assertTrue(expectCME);
+  }
+}

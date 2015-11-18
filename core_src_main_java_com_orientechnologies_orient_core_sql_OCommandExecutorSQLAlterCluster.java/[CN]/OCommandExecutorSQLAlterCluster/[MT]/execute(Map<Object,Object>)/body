@@ -1,23 +1,25 @@
 {
   if (attribute == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final OCluster cluster=getCluster();
-  if (cluster == null)   throw new OCommandExecutionException("Cluster '" + clusterName + "' not found");
-  if (clusterId > -1 && clusterName.equals(String.valueOf(clusterId))) {
-    clusterName=cluster.getName();
-  }
+  final List<OCluster> clusters=getClusters();
+  if (clusters.isEmpty())   throw new OCommandExecutionException("Cluster '" + clusterName + "' not found");
+  Object result=null;
+  for (  OCluster cluster : getClusters()) {
+    if (clusterId > -1 && clusterName.equals(String.valueOf(clusterId))) {
+      clusterName=cluster.getName();
+    }
  else {
-    clusterId=cluster.getId();
-  }
-  Object result;
-  try {
-    if (attribute == ATTRIBUTES.STATUS && OStorageClusterConfiguration.STATUS.OFFLINE.toString().equalsIgnoreCase(value))     getDatabase().getMetadata().getCommandCache().invalidateResultsOfCluster(clusterName);
-    if (attribute == ATTRIBUTES.NAME)     getDatabase().getMetadata().getCommandCache().invalidateResultsOfCluster(clusterName);
-    result=cluster.set(attribute,value);
-    final OStorage storage=getDatabase().getStorage();
-    if (storage instanceof OLocalPaginatedStorage)     storage.synch();
-  }
- catch (  IOException ioe) {
-    throw OException.wrapException(new OCommandExecutionException("Error altering cluster '" + clusterName + "'"),ioe);
+      clusterId=cluster.getId();
+    }
+    try {
+      if (attribute == ATTRIBUTES.STATUS && OStorageClusterConfiguration.STATUS.OFFLINE.toString().equalsIgnoreCase(value))       getDatabase().getMetadata().getCommandCache().invalidateResultsOfCluster(clusterName);
+      if (attribute == ATTRIBUTES.NAME)       getDatabase().getMetadata().getCommandCache().invalidateResultsOfCluster(clusterName);
+      result=cluster.set(attribute,value);
+      final OStorage storage=getDatabase().getStorage();
+      if (storage instanceof OLocalPaginatedStorage)       storage.synch();
+    }
+ catch (    IOException ioe) {
+      throw OException.wrapException(new OCommandExecutionException("Error altering cluster '" + clusterName + "'"),ioe);
+    }
   }
   return result;
 }

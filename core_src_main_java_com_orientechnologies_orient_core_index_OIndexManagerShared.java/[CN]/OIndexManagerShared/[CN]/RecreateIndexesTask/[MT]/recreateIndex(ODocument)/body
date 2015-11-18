@@ -1,5 +1,20 @@
 {
   final OIndexInternal<?> index=createIndex(idx);
+  try {
+    index.delete();
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Error on removing index '%s' on rebuilding. Trying removing index files (Cause: %s)",index.getName(),e);
+    for (Iterator<OIndexFactory> it=OIndexes.getAllFactories(); it.hasNext(); ) {
+      try {
+        final OIndexFactory indexFactory=it.next();
+        final OIndexEngine engine=indexFactory.createIndexEngine(null,index.getName(),false,getDatabase().getStorage(),0,null);
+        engine.deleteWithoutLoad(index.getName());
+      }
+ catch (      Exception e2) {
+      }
+    }
+  }
   OIndexInternal.IndexMetadata indexMetadata=index.loadMetadata(idx);
   OIndexDefinition indexDefinition=indexMetadata.getIndexDefinition();
   if (indexDefinition != null && indexDefinition.isAutomatic()) {

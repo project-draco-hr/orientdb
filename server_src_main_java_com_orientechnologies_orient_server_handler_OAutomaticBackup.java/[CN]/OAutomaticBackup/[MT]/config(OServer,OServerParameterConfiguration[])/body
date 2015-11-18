@@ -1,33 +1,30 @@
 {
   serverInstance=iServer;
+  configuration=new ODocument();
   for (  OServerParameterConfiguration param : iParams) {
-    if (param.name.equalsIgnoreCase("enabled")) {
-      if (!Boolean.parseBoolean(param.value))       return;
+    if (param.name.equalsIgnoreCase("config") && param.value.trim().length() > 0) {
+      configFile=param.value.trim();
+      final File f=new File(OSystemVariableResolver.resolveSystemVariables(configFile));
+      if (!f.exists())       throw new OConfigurationException("Automatic backup configuration file '" + configFile + "' not found. Automatic Backup will be disabled");
+      break;
     }
- else     if (param.name.equalsIgnoreCase("delay"))     delay=OIOUtils.getTimeAsMillisecs(param.value);
+ else     if (param.name.equalsIgnoreCase("enabled")) {
+      configuration.field("enabled",Boolean.parseBoolean(param.value));
+    }
+ else     if (param.name.equalsIgnoreCase("delay"))     configuration.field("delay",param.value);
  else     if (param.name.equalsIgnoreCase("firstTime")) {
-      try {
-        firstTime=OIOUtils.getTodayWithTime(param.value);
-        if (firstTime.before(new Date())) {
-          Calendar cal=Calendar.getInstance();
-          cal.setTime(firstTime);
-          cal.add(Calendar.DAY_OF_MONTH,1);
-          firstTime=cal.getTime();
-        }
-      }
- catch (      ParseException e) {
-        throw OException.wrapException(new OConfigurationException("Parameter 'firstTime' has invalid format, expected: HH:mm:ss"),e);
-      }
+      configuration.field("firstTime",param.value);
     }
- else     if (param.name.equalsIgnoreCase("target.directory"))     targetDirectory=param.value;
- else     if (param.name.equalsIgnoreCase("db.include") && param.value.trim().length() > 0)     for (    String db : param.value.split(","))     includeDatabases.add(db);
- else     if (param.name.equalsIgnoreCase("db.exclude") && param.value.trim().length() > 0)     for (    String db : param.value.split(","))     excludeDatabases.add(db);
- else     if (param.name.equalsIgnoreCase("target.fileName"))     targetFileName=param.value;
- else     if (param.name.equalsIgnoreCase("bufferSize"))     bufferSize=Integer.parseInt(param.value);
- else     if (param.name.equalsIgnoreCase("compressionLevel"))     compressionLevel=Integer.parseInt(param.value);
- else     if (param.name.equalsIgnoreCase("mode"))     mode=MODE.valueOf(param.value.toUpperCase());
- else     if (param.name.equalsIgnoreCase("exportOptions"))     exportOptions=param.value;
+ else     if (param.name.equalsIgnoreCase("target.directory"))     configuration.field("targetDirectory",param.value);
+ else     if (param.name.equalsIgnoreCase("db.include") && param.value.trim().length() > 0)     configuration.field("dbInclude",param.value);
+ else     if (param.name.equalsIgnoreCase("db.exclude") && param.value.trim().length() > 0)     configuration.field("dbExclude",param.value);
+ else     if (param.name.equalsIgnoreCase("target.fileName"))     configuration.field("targetFileName",param.value);
+ else     if (param.name.equalsIgnoreCase("bufferSize"))     configuration.field("bufferSize",param.value);
+ else     if (param.name.equalsIgnoreCase("compressionLevel"))     configuration.field("compressionLevel",Integer.parseInt(param.value));
+ else     if (param.name.equalsIgnoreCase("mode"))     configuration.field("mode",param.value);
+ else     if (param.name.equalsIgnoreCase("exportOptions"))     configuration.field("exportOptions",param.value);
   }
+  configure();
   if (delay <= 0)   throw new OConfigurationException("Cannot find mandatory parameter 'delay'");
   if (!targetDirectory.endsWith("/"))   targetDirectory+="/";
   final File filePath=new File(targetDirectory);

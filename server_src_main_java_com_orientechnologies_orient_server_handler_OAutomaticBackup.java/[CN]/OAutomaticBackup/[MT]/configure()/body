@@ -1,0 +1,52 @@
+{
+  final File f=new File(OSystemVariableResolver.resolveSystemVariables(configFile));
+  if (f.exists()) {
+    try {
+      final String configurationContent=OIOUtils.readFileAsString(f);
+      configuration=new ODocument().fromJSON(configurationContent);
+    }
+ catch (    IOException e) {
+      OException.wrapException(new OConfigurationException("Cannot load Automatic backup configuration file '" + configFile + "'. Automatic Backup will be disabled"),e);
+    }
+  }
+ else {
+    try {
+      f.getParentFile().mkdirs();
+      f.createNewFile();
+      OIOUtils.writeFile(f,configuration.toJSON());
+    }
+ catch (    IOException e) {
+      OException.wrapException(new OConfigurationException("Cannot create Automatic backup configuration file '" + configFile + "'. Automatic Backup will be disabled"),e);
+    }
+  }
+  for (  String settingName : configuration.fieldNames()) {
+    final Object settingValue=configuration.field(settingName);
+    final String settingValueAsString=settingValue != null ? settingValue.toString() : null;
+    if (settingName.equalsIgnoreCase("enabled")) {
+      if (!(Boolean)settingValue)       return;
+    }
+ else     if (settingName.equalsIgnoreCase("delay"))     delay=OIOUtils.getTimeAsMillisecs(settingValue);
+ else     if (settingName.equalsIgnoreCase("firstTime")) {
+      try {
+        firstTime=OIOUtils.getTodayWithTime(settingValueAsString);
+        if (firstTime.before(new Date())) {
+          Calendar cal=Calendar.getInstance();
+          cal.setTime(firstTime);
+          cal.add(Calendar.DAY_OF_MONTH,1);
+          firstTime=cal.getTime();
+        }
+      }
+ catch (      ParseException e) {
+        throw OException.wrapException(new OConfigurationException("Parameter 'firstTime' has invalid format, expected: HH:mm:ss"),e);
+      }
+    }
+ else     if (settingName.equalsIgnoreCase("targetDirectory"))     targetDirectory=settingValueAsString;
+ else     if (settingName.equalsIgnoreCase("dbInclude") && settingValueAsString.trim().length() > 0)     for (    String db : settingValueAsString.split(","))     includeDatabases.add(db);
+ else     if (settingName.equalsIgnoreCase("dbExclude") && settingValueAsString.trim().length() > 0)     for (    String db : settingValueAsString.split(","))     excludeDatabases.add(db);
+ else     if (settingName.equalsIgnoreCase("targetFileName"))     targetFileName=settingValueAsString;
+ else     if (settingName.equalsIgnoreCase("bufferSize"))     bufferSize=(Integer)settingValue;
+ else     if (settingName.equalsIgnoreCase("compressionLevel"))     compressionLevel=(Integer)settingValue;
+ else     if (settingName.equalsIgnoreCase("mode"))     mode=MODE.valueOf(settingValueAsString.toUpperCase());
+ else     if (settingName.equalsIgnoreCase("exportOptions"))     exportOptions=settingValueAsString;
+  }
+}

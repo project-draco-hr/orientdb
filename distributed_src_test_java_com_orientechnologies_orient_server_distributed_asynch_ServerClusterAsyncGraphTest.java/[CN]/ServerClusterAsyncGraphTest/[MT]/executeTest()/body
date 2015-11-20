@@ -1,0 +1,70 @@
+{
+{
+    OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
+    OrientGraphNoTx g=factory.getNoTx();
+    try {
+      g.createVertexType("Post");
+      g.createVertexType("User");
+      g.createEdgeType("Own");
+      g.addVertex("class:User");
+      g.command(new OCommandSQL("insert into Post (content, timestamp) values('test', 1)")).execute();
+    }
+  finally {
+      g.shutdown();
+    }
+  }
+  for (int s=0; s < SERVERS; ++s) {
+    OrientGraphFactory factory2=new OrientGraphFactory("plocal:target/server" + s + "/databases/"+ getDatabaseName());
+    OrientGraphNoTx g2=factory2.getNoTx();
+    try {
+      Iterable<OrientVertex> result=g2.command(new OCommandSQL("select from Post")).execute();
+      Assert.assertTrue(result.iterator().hasNext());
+      Assert.assertNotNull(result.iterator().next());
+    }
+  finally {
+      g2.shutdown();
+    }
+  }
+{
+    OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
+    OrientGraphNoTx g=factory.getNoTx();
+    try {
+      g.command(new OCommandSQL("create edge Own from (select from User) to (select from Post)").onAsyncReplicationError(new OAsyncReplicationError(){
+        @Override public ACTION onAsyncReplicationError(        Throwable iException,        int iRetry){
+          return iException instanceof ONeedRetryException && iRetry <= 3 ? ACTION.RETRY : ACTION.IGNORE;
+        }
+      }
+)).execute();
+    }
+  finally {
+      g.shutdown();
+    }
+  }
+  Thread.sleep(2000);
+  for (int s=0; s < SERVERS; ++s) {
+    OrientGraphFactory factory2=new OrientGraphFactory("plocal:target/server" + s + "/databases/"+ getDatabaseName());
+    OrientGraphNoTx g2=factory2.getNoTx();
+    try {
+      Iterable<OrientVertex> result=g2.command(new OCommandSQL("select from Own")).execute();
+      Assert.assertTrue(result.iterator().hasNext());
+      Assert.assertNotNull(result.iterator().next());
+      result=g2.command(new OCommandSQL("select from Post")).execute();
+      Assert.assertTrue(result.iterator().hasNext());
+      final OrientVertex v=result.iterator().next();
+      Assert.assertNotNull(v);
+      final Iterable<Edge> inEdges=v.getEdges(Direction.IN);
+      Assert.assertTrue(inEdges.iterator().hasNext());
+      Assert.assertNotNull(inEdges.iterator().next());
+      result=g2.command(new OCommandSQL("select from User")).execute();
+      Assert.assertTrue(result.iterator().hasNext());
+      final OrientVertex v2=result.iterator().next();
+      Assert.assertNotNull(v2);
+      final Iterable<Edge> outEdges=v2.getEdges(Direction.OUT);
+      Assert.assertTrue(outEdges.iterator().hasNext());
+      Assert.assertNotNull(outEdges.iterator().next());
+    }
+  finally {
+      g2.shutdown();
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  final ODocument doc=new ODocument();
+  Object result=doc;
+  final NamedNodeMap attrs=xmlDocument.getAttributes();
+  if (attrs != null)   for (int i=0; i < attrs.getLength(); ++i) {
+    final Node item=attrs.item(i);
+switch (item.getNodeType()) {
+case Node.ATTRIBUTE_NODE:
+{
+        final Attr attr=(Attr)item;
+        doc.field(attr.getName(),attr.getValue());
+        break;
+      }
+  }
+}
+final NodeList children=xmlDocument.getChildNodes();
+if (children != null) {
+  for (int i=0; i < children.getLength(); ++i) {
+    final Node child=children.item(i);
+switch (child.getNodeType()) {
+case Node.ELEMENT_NODE:
+{
+        final Element element=(Element)child;
+        final String path=iPath.isEmpty() ? element.getNodeName() : iPath + "." + element.getNodeName();
+        if (tagsAsAttribute.contains(iPath)) {
+          final NodeList subChildren=element.getChildNodes();
+          if (subChildren.getLength() > 0) {
+            final Node fieldContent=subChildren.item(0);
+            doc.field(element.getNodeName(),fieldContent.getTextContent());
+          }
+        }
+ else {
+          final Object sub=xml2doc(element,path,iLevel + 1);
+          final Object previous=doc.field(element.getNodeName());
+          if (previous != null) {
+            List list;
+            if (previous instanceof List) {
+              list=(List)previous;
+            }
+ else {
+              list=new ArrayList();
+              list.add(previous);
+              doc.field(element.getNodeName(),list,OType.EMBEDDEDLIST);
+            }
+            list.add(sub);
+          }
+ else           doc.field(element.getNodeName(),sub,OType.EMBEDDED);
+          if (rootNode != null && rootNode.startsWith(path))           result=doc.field(element.getNodeName());
+        }
+        break;
+      }
+  }
+}
+}
+return result;
+}

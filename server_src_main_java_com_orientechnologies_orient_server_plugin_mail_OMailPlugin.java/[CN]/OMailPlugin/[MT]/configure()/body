@@ -1,0 +1,38 @@
+{
+  final File f=new File(OSystemVariableResolver.resolveSystemVariables(configFile));
+  if (f.exists()) {
+    try {
+      final String configurationContent=OIOUtils.readFileAsString(f);
+      configuration=new ODocument().fromJSON(configurationContent);
+    }
+ catch (    IOException e) {
+      OException.wrapException(new OConfigurationException("Cannot load Mail configuration file '" + configFile + "'. Mail Plugin will be disabled"),e);
+    }
+  }
+ else {
+    try {
+      f.getParentFile().mkdirs();
+      f.createNewFile();
+      OIOUtils.writeFile(f,configuration.toJSON("prettyPrint"));
+      OLogManager.instance().info(this,"Mail plugin: migrated configuration to file '%s'",f);
+    }
+ catch (    IOException e) {
+      OException.wrapException(new OConfigurationException("Cannot create Mail plugin configuration file '" + configFile + "'. Mail Plugin will be disabled"),e);
+    }
+  }
+  profiles.clear();
+  Collection<Map<String,Object>> profilesInDocs=configuration.field("profiles");
+  for (  Map<String,Object> profile : profilesInDocs) {
+    String name=(String)profile.get("name");
+    OMailProfile p=profiles.get(name);
+    if (p == null) {
+      p=new OMailProfile();
+      profiles.put(name,p);
+    }
+    for (    String s : profile.keySet()) {
+      if (!s.equalsIgnoreCase("name")) {
+        p.put(s,profile.get(s));
+      }
+    }
+  }
+}

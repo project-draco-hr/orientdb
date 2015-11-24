@@ -6,7 +6,7 @@
     throw new ODistributedException("No nodes configured for partition '" + databaseName + "' request: "+ iRequest);
   }
   final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-  final OPair<String,IQueue<ODistributedRequest>>[] reqQueues=getRequestQueues(databaseName,iNodes,iRequest.getTask());
+  final OPair<String,IQueue>[] reqQueues=getRequestQueues(databaseName,iNodes,iRequest.getTask());
   iRequest.setSenderNodeName(getLocalNodeName());
   int onlineNodes;
   if (iRequest.getTask().isRequireNodeOnline()) {
@@ -22,7 +22,7 @@
   }
  else {
     onlineNodes=0;
-    for (    OPair<String,IQueue<ODistributedRequest>> q : reqQueues)     if (q.getValue() != null)     onlineNodes++;
+    for (    OPair<String,IQueue> q : reqQueues)     if (q.getValue() != null)     onlineNodes++;
   }
   final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,onlineNodes,iExecutionMode);
   final int queueSize=iNodes.size();
@@ -45,13 +45,13 @@
       iRequest.setId(msgService.getMessageIdCounter().getAndIncrement());
       if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"sending request %s",iRequest);
       msgService.registerRequest(iRequest.getId(),currentResponseMgr);
-      for (      OPair<String,IQueue<ODistributedRequest>> entry : reqQueues) {
+      for (      OPair<String,IQueue> entry : reqQueues) {
         final IQueue queue=entry.getValue();
         if (queue != null) {
           if (queueMaxSize > 0 && queue.size() > queueMaxSize) {
             ODistributedServerLog.warn(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"queue has too many messages (%d), treating the node as in stall: trying to restart it...",queue.size());
             queue.clear();
-            manager.unjoinNode(entry.getKey());
+            manager.disconnectNode(entry.getKey());
           }
  else {
             queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);

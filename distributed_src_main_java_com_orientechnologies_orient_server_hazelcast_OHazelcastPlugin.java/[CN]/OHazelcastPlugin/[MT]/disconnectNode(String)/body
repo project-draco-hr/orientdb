@@ -1,0 +1,19 @@
+{
+  final Set<String> databases=new HashSet<String>();
+  for (  Map.Entry<String,Object> entry : getConfigurationMap().entrySet()) {
+    if (entry.getKey().toString().startsWith(CONFIG_DBSTATUS_PREFIX)) {
+      final String nodeDb=entry.getKey().toString().substring(CONFIG_DBSTATUS_PREFIX.length());
+      if (nodeDb.startsWith(iNode))       databases.add(entry.getKey());
+    }
+  }
+  for (  String k : databases)   getConfigurationMap().put(k,DB_STATUS.OFFLINE);
+  final IQueue queue=messageService.getQueue(OHazelcastDistributedMessageService.getResponseQueueName(iNode));
+  ODistributedServerLog.warn(this,nodeName,null,DIRECTION.NONE,"sending request of restarting node '%s'...",iNode);
+  final OHazelcastDistributedResponse response=new OHazelcastDistributedResponse(-1,nodeName,iNode,new ORestartNodeTask());
+  try {
+    if (!queue.offer(response,OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong(),TimeUnit.MILLISECONDS))     throw new ODistributedException("Timeout on dispatching restart node request to node '" + iNode + "'");
+  }
+ catch (  InterruptedException e) {
+    ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Interrupted request to restart node '%s'",iNode);
+  }
+}

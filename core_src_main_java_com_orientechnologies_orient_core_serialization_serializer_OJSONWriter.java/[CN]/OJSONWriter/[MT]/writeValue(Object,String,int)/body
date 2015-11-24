@@ -1,0 +1,80 @@
+{
+  if (iValue == null)   return "null";
+  final StringBuilder buffer=new StringBuilder(64);
+  final boolean oldAutoConvertSettings;
+  if (iValue instanceof ORecordLazyMultiValue) {
+    oldAutoConvertSettings=((ORecordLazyMultiValue)iValue).isAutoConvertToRecord();
+    ((ORecordLazyMultiValue)iValue).setAutoConvertToRecord(false);
+  }
+ else   oldAutoConvertSettings=false;
+  if (iValue instanceof Boolean || iValue instanceof Number)   buffer.append(iValue.toString());
+ else   if (iValue instanceof OIdentifiable) {
+    final OIdentifiable linked=(OIdentifiable)iValue;
+    if (linked.getIdentity().isValid()) {
+      buffer.append('\"');
+      linked.getIdentity().toString(buffer);
+      buffer.append('\"');
+    }
+ else {
+      if (iFormat != null && iFormat.contains("shallow"))       buffer.append("{}");
+ else {
+        final ORecord rec=linked.getRecord();
+        if (rec != null) {
+          final String embeddedFormat=iFormat != null && iFormat.isEmpty() ? "indent:" + iIndentLevel : iFormat + ",indent:" + iIndentLevel;
+          buffer.append(rec.toJSON(embeddedFormat));
+        }
+ else         buffer.append("null");
+      }
+    }
+  }
+ else   if (iValue.getClass().isArray()) {
+    if (iValue instanceof byte[]) {
+      buffer.append('\"');
+      final byte[] source=(byte[])iValue;
+      if (iFormat != null && iFormat.contains("shallow"))       buffer.append(source.length);
+ else       buffer.append(OBase64Utils.encodeBytes(source));
+      buffer.append('\"');
+    }
+ else {
+      buffer.append('[');
+      int size=Array.getLength(iValue);
+      if (iFormat != null && iFormat.contains("shallow"))       buffer.append(size);
+ else       for (int i=0; i < size; ++i) {
+        if (i > 0)         buffer.append(",");
+        buffer.append(writeValue(Array.get(iValue,i),iFormat));
+      }
+      buffer.append(']');
+    }
+  }
+ else   if (iValue instanceof Iterator<?>)   iteratorToJSON((Iterator<?>)iValue,iFormat,buffer);
+ else   if (iValue instanceof Iterable<?>)   iteratorToJSON(((Iterable<?>)iValue).iterator(),iFormat,buffer);
+ else   if (iValue instanceof Map<?,?>)   mapToJSON((Map<Object,Object>)iValue,iFormat,buffer);
+ else   if (iValue instanceof Map.Entry<?,?>) {
+    final Map.Entry<?,?> entry=(Entry<?,?>)iValue;
+    buffer.append('{');
+    buffer.append(writeValue(entry.getKey(),iFormat));
+    buffer.append(":");
+    if (iFormat.contains("prettyPrint"))     buffer.append(' ');
+    buffer.append(writeValue(entry.getValue(),iFormat));
+    buffer.append('}');
+  }
+ else   if (iValue instanceof Date) {
+    if (iFormat.indexOf("dateAsLong") > -1)     buffer.append(((Date)iValue).getTime());
+ else {
+      buffer.append('"');
+      buffer.append(ODateHelper.getDateTimeFormatInstance().format(iValue));
+      buffer.append('"');
+    }
+  }
+ else   if (iValue instanceof BigDecimal)   buffer.append(((BigDecimal)iValue).toPlainString());
+ else   if (iValue instanceof ORecordLazyMultiValue)   iteratorToJSON(((ORecordLazyMultiValue)iValue).rawIterator(),iFormat,buffer);
+ else   if (iValue instanceof Iterable<?>)   iteratorToJSON(((Iterable<?>)iValue).iterator(),iFormat,buffer);
+ else {
+    final String v=iValue.toString();
+    buffer.append('"');
+    buffer.append(encode(v));
+    buffer.append('"');
+  }
+  if (iValue instanceof ORecordLazyMultiValue)   ((ORecordLazyMultiValue)iValue).setAutoConvertToRecord(oldAutoConvertSettings);
+  return buffer.toString();
+}

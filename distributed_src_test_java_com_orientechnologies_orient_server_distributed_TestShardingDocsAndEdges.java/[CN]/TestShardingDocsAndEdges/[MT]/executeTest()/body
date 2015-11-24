@@ -1,0 +1,38 @@
+{
+  EUR=new ODatabaseDocumentTx("plocal:target/server0/databases/" + getDatabaseName());
+  USA=new ODatabaseDocumentTx("plocal:target/server1/databases/" + getDatabaseName());
+  Set<String> queryResult;
+  execute(USA,"insert into cluster:" + clusterNodeUSA + " set name = 'mike'");
+  Thread.sleep(1000);
+  queryResult=execute(USA,"select from cluster:" + clusterNodeUSA);
+  compare(queryResult,new String[]{"mike"});
+  queryResult=execute(USA,"select from cluster:" + clusterNodeEUR);
+  compare(queryResult,new String[]{});
+  queryResult=execute(USA,"select from User");
+  compare(queryResult,new String[]{"mike"});
+  queryResult=execute(EUR,"select from cluster:" + clusterNodeUSA);
+  compare(queryResult,new String[]{"mike"});
+  queryResult=execute(EUR,"select from cluster:" + clusterNodeEUR);
+  compare(queryResult,new String[]{});
+  queryResult=execute(EUR,"select from User");
+  compare(queryResult,new String[]{"mike"});
+  execute(EUR,"insert into cluster:" + clusterNodeEUR + " set name = 'phoebe'");
+  Thread.sleep(1000);
+  queryResult=execute(USA,"select from cluster:" + clusterNodeUSA);
+  compare(queryResult,new String[]{"mike"});
+  queryResult=execute(USA,"select from cluster:" + clusterNodeEUR);
+  compare(queryResult,new String[]{"phoebe"});
+  queryResult=execute(USA,"select from User");
+  compare(queryResult,new String[]{"mike","phoebe"});
+  queryResult=execute(EUR,"select from cluster:" + clusterNodeUSA);
+  compare(queryResult,new String[]{"mike"});
+  queryResult=execute(EUR,"select from cluster:" + clusterNodeEUR);
+  compare(queryResult,new String[]{"phoebe"});
+  queryResult=execute(EUR,"select from User");
+  compare(queryResult,new String[]{"mike","phoebe"});
+  queryResult=execute(USA,"select from V");
+  compare(queryResult,new String[]{"mike","phoebe"});
+  queryResult=execute(EUR,"select from V");
+  compare(queryResult,new String[]{"mike","phoebe"});
+  execute(USA,"create edge Follows " + "from (select from User where name = 'mike') " + "to (select from User where name = 'phoebe')");
+}

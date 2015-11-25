@@ -1,7 +1,8 @@
 {
+  configuration=new ODocument();
   for (  OServerParameterConfiguration param : iParams) {
     if (param.name.equalsIgnoreCase("enabled")) {
-      if (!Boolean.parseBoolean(param.value))       return;
+      configuration.field("enabled",Boolean.parseBoolean(param.value));
     }
  else     if (param.name.startsWith(CONFIG_PROFILE_PREFIX)) {
       final String parts=param.name.substring(CONFIG_PROFILE_PREFIX.length());
@@ -19,5 +20,19 @@
       }
     }
   }
+  List<ODocument> profilesDocuments=new ArrayList<ODocument>();
+  for (  String p : profiles.keySet()) {
+    OMailProfile oMailProfile=profiles.get(p);
+    ODocument doc=new ODocument();
+    doc.setAllowChainedAccess(false);
+    Set<String> strings=oMailProfile.stringPropertyNames();
+    for (    String string : strings) {
+      doc.field(string,oMailProfile.getProperty(string));
+    }
+    doc.field("name",p);
+    profilesDocuments.add(doc);
+  }
+  configuration.field("profiles",profilesDocuments);
+  configure();
   OLogManager.instance().info(this,"Installing Mail plugin, loaded %d profile(s): %s",profiles.size(),profiles.keySet());
 }

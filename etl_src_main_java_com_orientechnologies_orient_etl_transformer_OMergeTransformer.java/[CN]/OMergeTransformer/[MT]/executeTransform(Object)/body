@@ -2,7 +2,24 @@
   Object joinValue=((ODocument)((OIdentifiable)input).getRecord()).field(joinFieldName);
   final Object result=lookup(joinValue,false);
   log(OETLProcessor.LOG_LEVELS.DEBUG,"joinValue=%s, lookupResult=%s",joinValue,result);
-  if (result == null || OMultiValue.getSize(result) == 0) {
+  if (result != null) {
+    if (result instanceof OIdentifiable) {
+      ((ODocument)result).merge((ODocument)input,true,false);
+      log(OETLProcessor.LOG_LEVELS.DEBUG,"merged record %s with found record=%s",result,input);
+      return result;
+    }
+ else     if (OMultiValue.isMultiValue(result) && OMultiValue.getSize(result) == 1) {
+      final Object firstValue=OMultiValue.getFirstValue(result);
+      ((ODocument)firstValue).merge((ODocument)((OIdentifiable)input).getRecord(),true,false);
+      log(OETLProcessor.LOG_LEVELS.DEBUG,"merged record %s with found record=%s",firstValue,input);
+      return firstValue;
+    }
+ else     if (OMultiValue.isMultiValue(result) && OMultiValue.getSize(result) > 1) {
+      throw new OETLProcessHaltedException("[Merge transformer] Multiple results returned from join for value '" + joinValue + "'");
+    }
+  }
+ else {
+    log(OETLProcessor.LOG_LEVELS.DEBUG,"unresolved link!!! %s",OMultiValue.getSize(result));
 switch (unresolvedLinkAction) {
 case NOTHING:
       break;
@@ -19,13 +36,6 @@ return null;
 case HALT:
 throw new OETLProcessHaltedException("[Merge transformer] Cannot resolve join for value '" + joinValue + "'");
 }
-}
- else if (OMultiValue.getSize(result) > 1) throw new OETLProcessHaltedException("[Merge transformer] Multiple results returned from join for value '" + joinValue + "'");
- else {
-final Object o=OMultiValue.getFirstValue(result);
-((ODocument)o).merge((ODocument)((OIdentifiable)input).getRecord(),true,false);
-log(OETLProcessor.LOG_LEVELS.DEBUG,"merged record %s with found record=%s",result,input);
-return o;
 }
 return input;
 }

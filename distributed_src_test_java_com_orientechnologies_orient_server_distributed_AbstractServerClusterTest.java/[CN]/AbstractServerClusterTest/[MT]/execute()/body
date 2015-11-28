@@ -1,16 +1,35 @@
 {
   System.out.println("Starting test against " + serverInstance.size() + " server nodes...");
   try {
-    for (    final ServerRun server : serverInstance) {
-      banner("STARTING SERVER -> " + server.getServerId() + "...");
-      server.startServer(getDistributedServerConfiguration(server));
-      onServerStarting(server);
-      if (delayServerStartup > 0)       try {
-        Thread.sleep(delayServerStartup * serverInstance.size());
+    if (startupNodesInSequence) {
+      for (      ServerRun server : serverInstance) {
+        banner("STARTING SERVER -> " + server.getServerId() + "...");
+        server.startServer(getDistributedServerConfiguration(server));
+        if (delayServerStartup > 0)         try {
+          Thread.sleep(delayServerStartup * serverInstance.size());
+        }
+ catch (        InterruptedException e) {
+        }
+        onServerStarted(server);
       }
- catch (      InterruptedException e) {
+    }
+ else {
+      for (      final ServerRun server : serverInstance) {
+        final Thread thread=new Thread(new Runnable(){
+          @Override public void run(){
+            banner("STARTING SERVER -> " + server.getServerId() + "...");
+            try {
+              server.startServer(getDistributedServerConfiguration(server));
+              onServerStarted(server);
+            }
+ catch (            Exception e) {
+              e.printStackTrace();
+            }
+          }
+        }
+);
+        thread.start();
       }
-      onServerStarted(server);
     }
     if (delayServerAlign > 0)     try {
       System.out.println("Server started, waiting for synchronization (" + (delayServerAlign * serverInstance.size() / 1000) + "secs)...");

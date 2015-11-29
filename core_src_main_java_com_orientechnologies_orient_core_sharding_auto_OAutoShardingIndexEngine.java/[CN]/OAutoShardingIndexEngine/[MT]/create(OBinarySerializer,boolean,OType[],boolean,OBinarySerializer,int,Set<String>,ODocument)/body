@@ -1,0 +1,21 @@
+{
+  this.strategy=new OAutoShardingMurmurStrategy(keySerializer);
+  this.hashFunction.setValueSerializer(keySerializer);
+  this.partitionSize=clustersToIndex.size();
+  final OStorage storage=getDatabase().getStorage().getUnderlying();
+  if (storage instanceof OLocalPaginatedStorage) {
+    final String path=((OLocalPaginatedStorage)storage).getStoragePath();
+    final File fileMetadata=new File(path + "/" + name+ METADATA_FILE_EXTENSION);
+    if (fileMetadata.exists())     fileMetadata.delete();
+    try {
+      if (metadata == null)       metadata=new ODocument();
+      metadata.field("partitions",partitionSize);
+      OIOUtils.writeFile(fileMetadata,metadata.toJSON());
+    }
+ catch (    IOException e1) {
+      throw new OConfigurationException("Cannot create sharded index metadata file '" + fileMetadata + "'");
+    }
+  }
+  init();
+  for (  OHashTable<Object,Object> p : partitions)   p.create(keySerializer,valueSerializer,keyTypes,nullPointerSupport);
+}

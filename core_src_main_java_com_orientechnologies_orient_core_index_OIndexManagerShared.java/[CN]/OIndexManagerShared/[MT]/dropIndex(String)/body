@@ -1,14 +1,25 @@
 {
   if (getDatabase().getTransaction().isActive())   throw new IllegalStateException("Cannot drop an index inside a transaction");
+  int[] clusterIdsToIndex=null;
   acquireExclusiveLock();
   try {
     final Locale locale=getServerLocale();
     final OIndex<?> idx=indexes.remove(iIndexName.toLowerCase(locale));
     if (idx != null) {
+      final Set<String> clusters=idx.getClusters();
+      if (clusters != null && !clusters.isEmpty()) {
+        final ODatabaseDocumentInternal db=getDatabase();
+        clusterIdsToIndex=new int[clusters.size()];
+        int i=0;
+        for (        String cl : clusters) {
+          clusterIdsToIndex[i++]=db.getClusterIdByName(cl);
+        }
+      }
       removeClassPropertyIndex(idx);
       idx.delete();
       setDirty();
       save();
+      notifyInvolvedClasses(clusterIdsToIndex);
     }
   }
   finally {

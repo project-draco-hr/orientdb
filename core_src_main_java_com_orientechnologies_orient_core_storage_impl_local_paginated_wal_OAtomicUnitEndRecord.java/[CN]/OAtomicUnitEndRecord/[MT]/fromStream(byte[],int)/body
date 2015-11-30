@@ -1,5 +1,27 @@
 {
   offset=super.fromStream(content,offset);
   rollback=content[offset] > 0;
+  final int len=OIntegerSerializer.INSTANCE.deserializeNative(content,offset);
+  offset+=OIntegerSerializer.INT_SIZE;
+  if (len > 0) {
+    atomicOperationsMetadataBinary=new byte[len];
+    System.arraycopy(content,offset,atomicOperationsMetadataBinary,0,len);
+    final OByteArrayInputStream byteArrayInputStream=new OByteArrayInputStream(atomicOperationsMetadataBinary);
+    try {
+      final ObjectInputStream objectInputStream=new ObjectInputStream(byteArrayInputStream);
+      atomicOperationMetadataMap=(Map<String,OAtomicOperationMetadata<?>>)objectInputStream.readObject();
+      objectInputStream.close();
+    }
+ catch (    ClassNotFoundException cnfe) {
+      throw new IllegalStateException("Error during atomic operation metadata deserialization",cnfe);
+    }
+catch (    IOException ioe) {
+      throw new IllegalStateException("Error during atomic operation metadata deserialization",ioe);
+    }
+  }
+ else {
+    atomicOperationsMetadataBinary=new byte[0];
+    atomicOperationMetadataMap=new HashMap<String,OAtomicOperationMetadata<?>>();
+  }
   return offset;
 }

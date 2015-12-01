@@ -3,9 +3,8 @@
   for (int r=0; r < retry; ++r) {
     try {
       txAlreadyBegun=getDatabase().getTransaction().isActive();
-      graph=OGraphCommandExecutorSQLFactory.getGraph(true,shutdownFlag);
       if (rids != null) {
-        OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+        OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
           @Override public Object call(          OrientBaseGraph graph){
             for (            ORecordId rid : rids) {
               final OrientEdge e=graph.getEdge(rid);
@@ -23,7 +22,7 @@
  else {
         final Set<OrientEdge> edges=new HashSet<OrientEdge>();
         if (query == null) {
-          OGraphCommandExecutorSQLFactory.runInTx(graph,new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+          OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
             @Override public Object call(            OrientBaseGraph graph){
               Set<OIdentifiable> fromIds=null;
               if (fromExpr != null)               fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr,context,iArgs);
@@ -77,8 +76,15 @@
           end();
         }
  else {
-          query.setContext(getContext());
-          query.execute(iArgs);
+          OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<OrientGraph>(){
+            @Override public OrientGraph call(            final OrientBaseGraph iGraph){
+              currentGraph.set(iGraph);
+              query.setContext(getContext());
+              query.execute(iArgs);
+              return null;
+            }
+          }
+);
         }
       }
       break;

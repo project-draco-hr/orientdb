@@ -1,6 +1,6 @@
 {
   if (clazz == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  return OGraphCommandExecutorSQLFactory.runInTx(new OGraphCommandExecutorSQLFactory.GraphCallBack<List<Object>>(){
+  return OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<List<Object>>(){
     @Override public List<Object> call(    OrientBaseGraph graph){
       final Set<OIdentifiable> fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),from,context,iArgs);
       final Set<OIdentifiable> toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),to,context,iArgs);
@@ -16,7 +16,6 @@
  else {
             toVertex=graph.getVertex(to);
           }
-          final String clsName=clazz.getName();
           if (fields != null)           for (          final OPair<String,Object> f : fields) {
             if (f.getValue() instanceof OSQLFunctionRuntime)             f.setValue(((OSQLFunctionRuntime)f.getValue()).getValue(to,null,context));
           }
@@ -49,8 +48,10 @@
           }
           edges.add(edge);
           if (batch > 0 && edges.size() % batch == 0) {
-            graph.commit();
-            ((OrientGraph)graph).begin();
+            if (graph instanceof OrientGraph) {
+              graph.commit();
+              ((OrientGraph)graph).begin();
+            }
           }
         }
       }

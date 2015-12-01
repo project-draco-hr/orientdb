@@ -1,0 +1,50 @@
+{
+  long fixedLinks=0l;
+  long modifiedDocuments=0l;
+  long errors=0l;
+  message("\n- Removing broken links...");
+  for (  String clusterName : database.getClusterNames()) {
+    for (    ORecord rec : database.browseCluster(clusterName)) {
+      try {
+        if (rec instanceof ODocument) {
+          boolean changed=false;
+          final ODocument doc=(ODocument)rec;
+          for (          String fieldName : doc.fieldNames()) {
+            final Object fieldValue=doc.rawField(fieldName);
+            if (fieldValue instanceof OIdentifiable) {
+              if (fixLink(fieldValue)) {
+                doc.field(fieldName,(OIdentifiable)null);
+                fixedLinks++;
+                changed=true;
+                if (verbose)                 message("\n--- reset link " + ((OIdentifiable)fieldValue).getIdentity() + " in field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
+              }
+            }
+ else             if (fieldValue instanceof Iterable<?>) {
+              if (fieldValue instanceof ORecordLazyMultiValue)               ((ORecordLazyMultiValue)fieldValue).setAutoConvertToRecord(false);
+              final Iterator<Object> it=((Iterable)fieldValue).iterator();
+              for (int i=0; it.hasNext(); ++i) {
+                final Object v=it.next();
+                if (fixLink(v)) {
+                  it.remove();
+                  fixedLinks++;
+                  changed=true;
+                  if (verbose)                   message("\n--- reset link " + ((OIdentifiable)v).getIdentity() + " as item "+ i+ " in collection of field '"+ fieldName+ "' (rid="+ doc.getIdentity()+ ")");
+                }
+              }
+            }
+          }
+          if (changed) {
+            modifiedDocuments++;
+            doc.save();
+            if (verbose)             message("\n-- updated document " + doc.getIdentity());
+          }
+        }
+      }
+ catch (      Exception e) {
+        errors++;
+      }
+    }
+  }
+  message("\n-- Done! Fixed links: " + fixedLinks + ", modified documents: "+ modifiedDocuments);
+  return errors;
+}

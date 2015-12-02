@@ -1,0 +1,92 @@
+{
+  OrientEdge edge=null;
+  ODocument outDocument=null;
+  ODocument inDocument=null;
+  boolean outDocumentModified=false;
+  for (int retry=0; retry < graph.getMaxRetries(); ++retry) {
+    try {
+      if (outDocument == null) {
+        outDocument=currentVertex.getRecord();
+        if (outDocument == null)         throw new IllegalArgumentException("source vertex is invalid (rid=" + currentVertex.getIdentity() + ")");
+      }
+      if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())       throw new IllegalArgumentException("source record is not a vertex");
+      if (inDocument == null) {
+        inDocument=inVertex.getRecord();
+        if (inDocument == null)         throw new IllegalArgumentException("destination vertex is invalid (rid=" + inVertex.getIdentity() + ")");
+      }
+      if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())       throw new IllegalArgumentException("destination record is not a vertex");
+      OIdentifiable to;
+      OIdentifiable from;
+      label=OrientBaseGraph.encodeClassName(label);
+      if (label == null && iClassName != null)       label=OrientBaseGraph.encodeClassName(iClassName);
+      if (graph != null && graph.isUseClassForEdgeLabel()) {
+        final OrientEdgeType edgeType=graph.getEdgeType(label);
+        if (edgeType == null)         graph.createEdgeType(label);
+ else         label=edgeType.getName();
+      }
+      final String outFieldName=currentVertex.getConnectionFieldName(Direction.OUT,label,graph.settings.isUseVertexFieldsForEdgeLabels());
+      final String inFieldName=currentVertex.getConnectionFieldName(Direction.IN,label,graph.settings.isUseVertexFieldsForEdgeLabels());
+      if (label == null)       throw ExceptionFactory.edgeLabelCanNotBeNull();
+      final ODocument edgeRecord;
+      final boolean lightWeightEdge;
+      if (currentVertex.canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
+        lightWeightEdge=true;
+        from=currentVertex.rawElement;
+        to=inDocument;
+        if (edge == null) {
+          if (graph.settings.isKeepInMemoryReferences())           edge=new OrientEdge(graph,from.getIdentity(),to.getIdentity(),label);
+ else           edge=new OrientEdge(graph,from,to,label);
+        }
+        edgeRecord=null;
+      }
+ else {
+        lightWeightEdge=false;
+        if (edge == null) {
+          edge=new OrientEdge(graph,label,fields);
+          edgeRecord=edge.getRecord();
+          if (graph.settings.isKeepInMemoryReferences())           edgeRecord.fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
+ else           edgeRecord.fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
+        }
+ else         edgeRecord=edge.getRecord();
+        from=edgeRecord;
+        to=edgeRecord;
+      }
+      if (graph.settings.isKeepInMemoryReferences()) {
+        from=from.getIdentity();
+        to=to.getIdentity();
+      }
+      if (graph != null && edgeRecord != null)       edgeRecord.save(iClusterName);
+      if (!outDocumentModified) {
+        currentVertex.createLink(graph,outDocument,to,outFieldName);
+        if (graph != null) {
+          outDocument.save();
+          outDocumentModified=true;
+        }
+      }
+      currentVertex.createLink(graph,inDocument,from,inFieldName);
+      if (graph != null)       inDocument.save();
+      break;
+    }
+ catch (    ONeedRetryException e) {
+      if (!outDocumentModified)       outDocument.reload();
+ else       if (inDocument != null)       inDocument.reload();
+    }
+catch (    RuntimeException e) {
+      try {
+        edge.remove();
+      }
+ catch (      Exception ex) {
+      }
+      throw e;
+    }
+catch (    Throwable e) {
+      try {
+        edge.remove();
+      }
+ catch (      Exception ex) {
+      }
+      throw OException.wrapException(new OrientGraphModificationException("Error on addEdge in non tx environment"),e);
+    }
+  }
+  return edge;
+}

@@ -1,0 +1,25 @@
+{
+  final OModifiableBoolean shutdownFlag=new OModifiableBoolean();
+  final ODatabaseDocumentInternal curDb=ODatabaseRecordThreadLocal.INSTANCE.get();
+  final boolean txAlreadyBegun=curDb.getTransaction().isActive();
+  OrientBaseGraph graph=null;
+  try {
+    if (isTxRequiredForSQLGraphOperations()) {
+      graph=OGraphCommandExecutorSQLFactory.getGraph(true,shutdownFlag);
+      return runInTx((OrientGraph)graph,callBack);
+    }
+ else {
+      graph=OGraphCommandExecutorSQLFactory.getAnyGraph(shutdownFlag);
+      return callBack.call(graph);
+    }
+  }
+  finally {
+    if (graph != null) {
+      if (!txAlreadyBegun) {
+        graph.commit();
+        if (shutdownFlag.getValue())         graph.shutdown(false,false);
+      }
+    }
+    ODatabaseRecordThreadLocal.INSTANCE.set(curDb);
+  }
+}

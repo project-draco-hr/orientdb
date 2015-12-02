@@ -8,6 +8,8 @@
         int txBegunAtLine=-1;
         int txBegunAtPart=-1;
         lastResult=null;
+        int nestedLevel=0;
+        int skippingScriptsAtNestedLevel=-1;
         final BufferedReader reader=new BufferedReader(new StringReader(iText));
         int line=0;
         int linePart=0;
@@ -16,12 +18,34 @@
         for (; line < txBegunAtLine; ++line)         reader.readLine();
         for (; (lastLine=reader.readLine()) != null; ++line) {
           lastLine=lastLine.trim();
+          if (isIfCondition(lastLine)) {
+            nestedLevel++;
+            if (skippingScriptsAtNestedLevel >= 0) {
+              continue;
+            }
+            boolean ifResult=evaluateIfCondition(lastLine);
+            if (!ifResult) {
+              skippingScriptsAtNestedLevel=nestedLevel;
+            }
+            continue;
+          }
+ else           if (lastLine.equals("}")) {
+            nestedLevel--;
+            if (skippingScriptsAtNestedLevel > nestedLevel) {
+              skippingScriptsAtNestedLevel=-1;
+            }
+            continue;
+          }
           final List<String> lineParts=OStringSerializerHelper.smartSplit(lastLine,';',true);
           if (line == txBegunAtLine)           linePart=txBegunAtPart;
  else           linePart=0;
+          boolean breakReturn=false;
           for (; linePart < lineParts.size(); ++linePart) {
             final String lastCommand=lineParts.get(linePart);
-            if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"let ")) {
+            if (skippingScriptsAtNestedLevel >= 0) {
+              continue;
+            }
+ else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"let ")) {
               lastResult=executeLet(lastCommand,db);
             }
  else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"begin")) {
@@ -74,9 +98,13 @@
             }
  else             if (OStringSerializerHelper.startsWithIgnoreCase(lastCommand,"return ")) {
               lastResult=getValue(lastCommand.substring("return ".length()),db);
+              breakReturn=true;
               break;
             }
  else             if (lastCommand != null && lastCommand.length() > 0)             lastResult=executeCommand(lastCommand,db);
+          }
+          if (breakReturn) {
+            break;
           }
         }
       }

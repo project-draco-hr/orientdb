@@ -1,6 +1,6 @@
 {
   OrientBaseGraph graph=getGraph();
-  latch.await();
+  latchCreate.await();
   final int startIndex=random.nextInt(vertexes.size());
   final String startUUID=vertexes.get(startIndex).uuid;
   String currentUUID=startUUID;
@@ -35,7 +35,6 @@
  else {
             gToVertex=gVertexesIterator.next();
           }
-          Edge gEdge;
           Iterable<Edge> edges=graph.command(new OSQLSynchQuery<Edge>("select from TestEdge where uuid = '" + edge.uuid + "'")).execute();
           if (!edges.iterator().hasNext()) {
             graph.command(new OCommandSQL("CREATE EDGE TestEdge FROM " + gFromVertex.getId() + " TO "+ gToVertex.getId()+ " SET uuid = '"+ edge.uuid+ "'")).execute();
@@ -45,12 +44,14 @@
         }
  catch (        OConcurrentModificationException e) {
           graph.rollback();
-          versionCollisions.incrementAndGet();
+          versionCollisionsCreate.incrementAndGet();
+          if (printTempStats && versionCollisionsCreate.get() % 1000 == 0)           printStats(graph);
           Thread.yield();
         }
 catch (        ORecordDuplicatedException e) {
           graph.rollback();
-          indexCollisions.incrementAndGet();
+          indexCollisionsCreate.incrementAndGet();
+          if (indexCollisionsCreate.get() % 1000 == 0)           printStats(graph);
           Thread.yield();
         }
       }
@@ -66,12 +67,12 @@ catch (        ORecordDuplicatedException e) {
         }
  catch (        OConcurrentModificationException e) {
           graph.rollback();
-          versionCollisions.incrementAndGet();
+          versionCollisionsCreate.incrementAndGet();
           Thread.yield();
         }
 catch (        ORecordDuplicatedException e) {
           graph.rollback();
-          indexCollisions.incrementAndGet();
+          indexCollisionsCreate.incrementAndGet();
           Thread.yield();
         }
       }

@@ -1,0 +1,24 @@
+{
+  OrientBaseGraph graph=getGraph();
+  latchDelete.await();
+  for (  TestEdge edge : edges) {
+    do {
+      try {
+        graph.command(new OCommandSQL("delete edge TestEdge where uuid = '" + edge.uuid + "'")).execute();
+        graph.commit();
+        break;
+      }
+ catch (      ORecordNotFoundException e) {
+        break;
+      }
+catch (      OConcurrentModificationException e) {
+        graph.rollback();
+        versionCollisionsDelete.incrementAndGet();
+        if (printTempStats && versionCollisionsDelete.get() % 1000 == 0)         printStats(graph);
+        Thread.yield();
+      }
+    }
+ while (true);
+  }
+  return null;
+}

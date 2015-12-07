@@ -14,24 +14,20 @@
       for (      String fieldName : vertex.fieldNames()) {
         final OPair<Direction,String> connection=v.getConnection(Direction.BOTH,fieldName,null);
         if (connection == null)         continue;
-        final Object fieldValue=vertex.field(fieldName);
+        final Object fieldValue=vertex.rawField(fieldName);
         if (fieldValue != null) {
           if (fieldValue instanceof OIdentifiable) {
-            onScannedLink(stats,(OIdentifiable)fieldValue);
-            if ((((OIdentifiable)fieldValue).getIdentity()).getRecord() == null) {
+            if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)fieldValue,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
               modifiedVertex=true;
-              onRemovedLink(stats,(OIdentifiable)fieldValue);
               vertex.field(fieldName,(Object)null);
             }
           }
  else           if (fieldValue instanceof Collection<?>) {
             final Collection<?> coll=((Collection<?>)fieldValue);
             for (Iterator<?> it=coll.iterator(); it.hasNext(); ) {
-              Object o=it.next();
-              onScannedLink(stats,(OIdentifiable)o);
-              if (o == null || (((OIdentifiable)o).getIdentity()).getRecord() == null) {
+              final Object o=it.next();
+              if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)o,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
                 modifiedVertex=true;
-                onRemovedLink(stats,(OIdentifiable)o);
                 it.remove();
               }
             }
@@ -39,11 +35,9 @@
  else           if (fieldValue instanceof ORidBag) {
             final ORidBag ridbag=((ORidBag)fieldValue);
             for (Iterator<?> it=ridbag.rawIterator(); it.hasNext(); ) {
-              Object o=it.next();
-              onScannedLink(stats,(OIdentifiable)o);
-              if (o == null || (((OIdentifiable)o).getIdentity()).getRecord() == null) {
+              final Object o=it.next();
+              if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)o,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
                 modifiedVertex=true;
-                onRemovedLink(stats,(OIdentifiable)o);
                 it.remove();
               }
             }

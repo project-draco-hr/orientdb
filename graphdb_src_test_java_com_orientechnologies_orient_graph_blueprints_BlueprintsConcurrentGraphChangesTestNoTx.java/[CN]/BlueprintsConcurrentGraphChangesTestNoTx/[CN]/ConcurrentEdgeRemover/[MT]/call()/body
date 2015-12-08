@@ -1,0 +1,27 @@
+{
+  OrientBaseGraph graph=getGraph();
+  latchEdgeDelete.await();
+  while (graph.countEdges() > 0) {
+    final int randomEdge=random.nextInt(edges.size());
+    TestEdge edge=edges.get(randomEdge);
+    do {
+      try {
+        graph.command(new OCommandSQL("delete edge TestEdge where uuid = '" + edge.uuid + "'")).execute();
+        graph.commit();
+        break;
+      }
+ catch (      ORecordNotFoundException e) {
+        notFoundEdgeDelete.incrementAndGet();
+        break;
+      }
+catch (      OConcurrentModificationException e) {
+        graph.rollback();
+        versionCollisionsEdgeDelete.incrementAndGet();
+        if (printTempStats && versionCollisionsEdgeDelete.get() % 1000 == 0)         printStats(graph);
+        Thread.yield();
+      }
+    }
+ while (true);
+  }
+  return null;
+}

@@ -1,0 +1,46 @@
+{
+  onScannedLink(stats,edgeRID);
+  boolean broken=false;
+  if (edgeRID == null)   broken=true;
+ else {
+    ODocument record=null;
+    try {
+      record=edgeRID.getIdentity().getRecord();
+    }
+ catch (    ORecordNotFoundException e) {
+      broken=true;
+    }
+    if (record == null)     broken=true;
+ else {
+      final OImmutableClass immutableClass=ODocumentInternal.getImmutableSchemaClass(record);
+      if (immutableClass == null || (!immutableClass.isVertexType() && !immutableClass.isEdgeType()))       broken=true;
+ else {
+        if (immutableClass.isVertexType()) {
+          final String inverseFieldName=OrientVertex.getInverseConnectionFieldName(fieldName,useVertexFieldsForEdgeLabels);
+          final Object inverseEdgeContainer=record.field(inverseFieldName);
+          if (inverseEdgeContainer == null)           broken=true;
+ else {
+            if (inverseEdgeContainer instanceof OIdentifiable) {
+              if (!inverseEdgeContainer.equals(vertex))               broken=true;
+            }
+ else             if (inverseEdgeContainer instanceof Collection<?>) {
+              if (!((Collection)inverseEdgeContainer).contains(vertex))               broken=true;
+            }
+ else             if (inverseEdgeContainer instanceof ORidBag) {
+              if (!((ORidBag)inverseEdgeContainer).contains(vertex))               broken=true;
+            }
+          }
+        }
+ else {
+          final OIdentifiable backRID=OrientEdge.getConnection(record,direction);
+          if (backRID == null || !backRID.equals(vertex))           broken=true;
+        }
+      }
+    }
+  }
+  if (broken) {
+    onRemovedLink(stats,edgeRID);
+    return true;
+  }
+  return false;
+}

@@ -3,7 +3,9 @@
   ODocument outDocument=null;
   ODocument inDocument=null;
   boolean outDocumentModified=false;
-  for (int retry=0; retry < graph.getMaxRetries(); ++retry) {
+  final Settings settings=graph != null ? graph.settings : new Settings();
+  final int maxRetries=graph != null ? graph.getMaxRetries() : 1;
+  for (int retry=0; retry < maxRetries; ++retry) {
     try {
       if (outDocument == null) {
         outDocument=currentVertex.getRecord();
@@ -24,8 +26,8 @@
         if (edgeType == null)         graph.createEdgeType(label);
  else         label=edgeType.getName();
       }
-      final String outFieldName=currentVertex.getConnectionFieldName(Direction.OUT,label,graph.settings.isUseVertexFieldsForEdgeLabels());
-      final String inFieldName=currentVertex.getConnectionFieldName(Direction.IN,label,graph.settings.isUseVertexFieldsForEdgeLabels());
+      final String outFieldName=currentVertex.getConnectionFieldName(Direction.OUT,label,settings.isUseVertexFieldsForEdgeLabels());
+      final String inFieldName=currentVertex.getConnectionFieldName(Direction.IN,label,settings.isUseVertexFieldsForEdgeLabels());
       if (label == null)       throw ExceptionFactory.edgeLabelCanNotBeNull();
       final ODocument edgeRecord;
       final boolean lightWeightEdge;
@@ -34,7 +36,7 @@
         from=currentVertex.rawElement;
         to=inDocument;
         if (edge == null) {
-          if (graph.settings.isKeepInMemoryReferences())           edge=new OrientEdge(graph,from.getIdentity(),to.getIdentity(),label);
+          if (settings.isKeepInMemoryReferences())           edge=new OrientEdge(graph,from.getIdentity(),to.getIdentity(),label);
  else           edge=new OrientEdge(graph,from,to,label);
         }
         edgeRecord=null;
@@ -44,14 +46,14 @@
         if (edge == null) {
           edge=new OrientEdge(graph,label,fields);
           edgeRecord=edge.getRecord();
-          if (graph.settings.isKeepInMemoryReferences())           edgeRecord.fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
+          if (settings.isKeepInMemoryReferences())           edgeRecord.fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
  else           edgeRecord.fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
         }
  else         edgeRecord=edge.getRecord();
         from=edgeRecord;
         to=edgeRecord;
       }
-      if (graph.settings.isKeepInMemoryReferences()) {
+      if (settings.isKeepInMemoryReferences()) {
         from=from.getIdentity();
         to=to.getIdentity();
       }

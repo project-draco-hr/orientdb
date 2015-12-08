@@ -1,0 +1,55 @@
+{
+  final ODatabaseDocumentTx db=graph.getRawGraph();
+  final OMetadata metadata=db.getMetadata();
+  final OSchema schema=metadata.getSchema();
+  final OClass vertexClass=schema.getClass(OrientVertexType.CLASS_NAME);
+  if (vertexClass != null) {
+    final long countVertices=db.countClass(vertexClass.getName());
+    message(outputListener,"Scanning " + countVertices + " vertices...\n");
+    for (    ODocument vertex : db.browseClass(vertexClass.getName())) {
+      stats.scannedVertices++;
+      if (eventListener != null)       eventListener.onScannedVertex(vertex);
+      final OrientVertex v=new OrientVertex(graph,vertex);
+      boolean modifiedVertex=false;
+      for (      String fieldName : vertex.fieldNames()) {
+        final OPair<Direction,String> connection=v.getConnection(Direction.BOTH,fieldName,null);
+        if (connection == null)         continue;
+        final Object fieldValue=vertex.rawField(fieldName);
+        if (fieldValue != null) {
+          if (fieldValue instanceof OIdentifiable) {
+            if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)fieldValue,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
+              modifiedVertex=true;
+              vertex.field(fieldName,(Object)null);
+            }
+          }
+ else           if (fieldValue instanceof Collection<?>) {
+            final Collection<?> coll=((Collection<?>)fieldValue);
+            for (Iterator<?> it=coll.iterator(); it.hasNext(); ) {
+              final Object o=it.next();
+              if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)o,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
+                modifiedVertex=true;
+                it.remove();
+              }
+            }
+          }
+ else           if (fieldValue instanceof ORidBag) {
+            final ORidBag ridbag=((ORidBag)fieldValue);
+            for (Iterator<?> it=ridbag.rawIterator(); it.hasNext(); ) {
+              final Object o=it.next();
+              if (isEdgeBroken(vertex,fieldName,connection.getKey(),(OIdentifiable)o,stats,graph.settings.isUseVertexFieldsForEdgeLabels())) {
+                modifiedVertex=true;
+                it.remove();
+              }
+            }
+          }
+        }
+      }
+      if (modifiedVertex) {
+        stats.repairedVertices++;
+        if (eventListener != null)         eventListener.onRepairedVertex(vertex);
+        vertex.save();
+      }
+    }
+    message(outputListener,"Scanning vertices completed\n");
+  }
+}

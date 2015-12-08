@@ -1,0 +1,27 @@
+{
+  OrientBaseGraph graph=getGraph();
+  latchVertexDelete.await();
+  while (graph.countVertices() > 0) {
+    final int randomVertex=random.nextInt(vertexes.size());
+    TestVertex vertex=vertexes.get(randomVertex);
+    do {
+      try {
+        graph.command(new OCommandSQL("delete vertex TestVertex where uuid = '" + vertex.uuid + "'")).execute();
+        graph.commit();
+        break;
+      }
+ catch (      ORecordNotFoundException e) {
+        notFoundVertexDelete.incrementAndGet();
+        break;
+      }
+catch (      OConcurrentModificationException e) {
+        graph.rollback();
+        versionCollisionsVertexDelete.incrementAndGet();
+        if (printTempStats && versionCollisionsVertexDelete.get() % 1000 == 0)         printStats(graph);
+        Thread.yield();
+      }
+    }
+ while (true);
+  }
+  return null;
+}

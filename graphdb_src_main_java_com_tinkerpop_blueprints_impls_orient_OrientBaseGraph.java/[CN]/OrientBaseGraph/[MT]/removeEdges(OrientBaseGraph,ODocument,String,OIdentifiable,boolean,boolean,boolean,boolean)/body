@@ -1,0 +1,73 @@
+{
+  if (iVertex == null)   return;
+  final Object fieldValue=iVertexToRemove != null ? iVertex.field(iFieldName) : iVertex.removeField(iFieldName);
+  if (fieldValue == null)   return;
+  if (fieldValue instanceof OIdentifiable) {
+    if (iVertexToRemove != null) {
+      if (!fieldValue.equals(iVertexToRemove))       return;
+      iVertex.removeField(iFieldName);
+      deleteEdgeIfAny(iVertexToRemove,forceReload);
+    }
+    if (iAlsoInverse)     removeInverseEdge(graph,iVertex,iFieldName,iVertexToRemove,(OIdentifiable)fieldValue,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+  }
+ else   if (fieldValue instanceof ORidBag) {
+    final ORidBag bag=(ORidBag)fieldValue;
+    if (iVertexToRemove != null) {
+      for (Iterator<OIdentifiable> it=bag.rawIterator(); it.hasNext(); ) {
+        final ODocument curr=getDocument(it.next(),forceReload);
+        if (curr == null)         it.remove();
+ else         if (iVertexToRemove.equals(curr)) {
+          it.remove();
+          if (iAlsoInverse)           removeInverseEdge(graph,iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+          break;
+        }
+ else         if (ODocumentInternal.getImmutableSchemaClass(curr).isEdgeType()) {
+          final Direction direction=OrientVertex.getConnectionDirection(iFieldName,useVertexFieldsForEdgeLabels);
+          if (iVertexToRemove.equals(OrientEdge.getConnection(curr,direction.opposite()))) {
+            it.remove();
+            if (iAlsoInverse)             removeInverseEdge(graph,iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+            break;
+          }
+        }
+      }
+      deleteEdgeIfAny(iVertexToRemove,forceReload);
+    }
+ else {
+      for (Iterator<OIdentifiable> it=bag.rawIterator(); it.hasNext(); ) {
+        OIdentifiable edge=it.next();
+        if (iAlsoInverse)         removeInverseEdge(graph,iVertex,iFieldName,null,edge,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+        deleteEdgeIfAny(edge,forceReload);
+      }
+    }
+    if (autoScaleEdgeType && bag.isEmpty())     iVertex.removeField(iFieldName);
+  }
+ else   if (fieldValue instanceof Collection) {
+    final Collection col=(Collection)fieldValue;
+    if (iVertexToRemove != null) {
+      for (Iterator<OIdentifiable> it=col.iterator(); it.hasNext(); ) {
+        final ODocument curr=getDocument(it.next(),forceReload);
+        if (iVertexToRemove.equals(curr)) {
+          it.remove();
+          if (iAlsoInverse)           removeInverseEdge(graph,iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+          break;
+        }
+ else         if (ODocumentInternal.getImmutableSchemaClass(curr).isVertexType()) {
+          final Direction direction=OrientVertex.getConnectionDirection(iFieldName,useVertexFieldsForEdgeLabels);
+          if (iVertexToRemove.equals(OrientEdge.getConnection(curr,direction.opposite()))) {
+            it.remove();
+            if (iAlsoInverse)             removeInverseEdge(graph,iVertex,iFieldName,iVertexToRemove,curr,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+            break;
+          }
+        }
+      }
+      deleteEdgeIfAny(iVertexToRemove,forceReload);
+    }
+ else {
+      for (      OIdentifiable edge : (Iterable<OIdentifiable>)col) {
+        if (iAlsoInverse)         removeInverseEdge(graph,iVertex,iFieldName,null,edge,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+        deleteEdgeIfAny(edge,forceReload);
+      }
+    }
+    if (autoScaleEdgeType && col.isEmpty())     iVertex.removeField(iFieldName);
+  }
+}

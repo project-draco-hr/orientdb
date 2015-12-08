@@ -1,101 +1,88 @@
 {
   if (fromExpr == null && toExpr == null && rids == null && query == null && compiledFilter == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  for (int r=0; r < retry; ++r) {
-    try {
-      txAlreadyBegun=getDatabase().getTransaction().isActive();
-      if (rids != null) {
-        OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
-          @Override public Object call(          OrientBaseGraph graph){
-            for (            ORecordId rid : rids) {
-              final OrientEdge e=graph.getEdge(rid);
-              if (e != null) {
-                e.remove();
-                removed++;
-              }
-            }
-            return null;
+  txAlreadyBegun=getDatabase().getTransaction().isActive();
+  if (rids != null) {
+    OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+      @Override public Object call(      OrientBaseGraph graph){
+        for (        ORecordId rid : rids) {
+          final OrientEdge e=graph.getEdge(rid);
+          if (e != null) {
+            e.remove();
+            removed++;
           }
         }
-);
-        end();
+        return null;
       }
- else {
-        final Set<OrientEdge> edges=new HashSet<OrientEdge>();
-        if (query == null) {
-          OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
-            @Override public Object call(            OrientBaseGraph graph){
-              Set<OIdentifiable> fromIds=null;
-              if (fromExpr != null)               fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr,context,iArgs);
-              Set<OIdentifiable> toIds=null;
-              if (toExpr != null)               toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),toExpr,context,iArgs);
-              if (fromIds != null && toIds != null) {
-                for (                OIdentifiable fromId : fromIds) {
-                  final OrientVertex v=graph.getVertex(fromId);
-                  if (v != null)                   for (                  Edge e : v.getEdges(Direction.OUT)) {
-                    if (label != null && !label.equals(e.getLabel()))                     continue;
-                    final OIdentifiable inV=((OrientEdge)e).getInVertex();
-                    if (inV != null && toIds.contains(inV.getIdentity()))                     edges.add((OrientEdge)e);
-                  }
-                }
-              }
- else               if (fromIds != null) {
-                for (                OIdentifiable fromId : fromIds) {
-                  final OrientVertex v=graph.getVertex(fromId);
-                  if (v != null) {
-                    for (                    Edge e : v.getEdges(Direction.OUT)) {
-                      if (label != null && !label.equals(e.getLabel()))                       continue;
-                      edges.add((OrientEdge)e);
-                    }
-                  }
-                }
-              }
- else               if (toIds != null) {
-                for (                OIdentifiable toId : toIds) {
-                  final OrientVertex v=graph.getVertex(toId);
-                  if (v != null) {
-                    for (                    Edge e : v.getEdges(Direction.IN)) {
-                      if (label != null && !label.equals(e.getLabel()))                       continue;
-                      edges.add((OrientEdge)e);
-                    }
-                  }
-                }
-              }
- else               throw new OCommandExecutionException("Invalid target: " + toIds);
-              if (compiledFilter != null) {
-                for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
-                  final OrientEdge edge=it.next();
-                  if (!(Boolean)compiledFilter.evaluate(edge.getRecord(),null,context))                   it.remove();
-                }
-              }
-              removed=edges.size();
-              for (              OrientEdge edge : edges)               edge.remove();
-              return null;
-            }
-          }
-);
-          end();
-        }
- else {
-          OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<OrientGraph>(){
-            @Override public OrientGraph call(            final OrientBaseGraph iGraph){
-              currentGraph.set(iGraph);
-              query.setContext(getContext());
-              query.execute(iArgs);
-              return null;
-            }
-          }
-);
-        }
-      }
-      break;
     }
- catch (    OConcurrentModificationException e) {
-      if (r + 1 >= retry)       throw e;
-      if (wait > 0)       try {
-        Thread.sleep(wait);
+);
+    end();
+  }
+ else {
+    final Set<OrientEdge> edges=new HashSet<OrientEdge>();
+    if (query == null) {
+      OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<Object>(){
+        @Override public Object call(        OrientBaseGraph graph){
+          Set<OIdentifiable> fromIds=null;
+          if (fromExpr != null)           fromIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),fromExpr,context,iArgs);
+          Set<OIdentifiable> toIds=null;
+          if (toExpr != null)           toIds=OSQLEngine.getInstance().parseRIDTarget(graph.getRawGraph(),toExpr,context,iArgs);
+          if (fromIds != null && toIds != null) {
+            for (            OIdentifiable fromId : fromIds) {
+              final OrientVertex v=graph.getVertex(fromId);
+              if (v != null)               for (              Edge e : v.getEdges(Direction.OUT)) {
+                if (label != null && !label.equals(e.getLabel()))                 continue;
+                final OIdentifiable inV=((OrientEdge)e).getInVertex();
+                if (inV != null && toIds.contains(inV.getIdentity()))                 edges.add((OrientEdge)e);
+              }
+            }
+          }
+ else           if (fromIds != null) {
+            for (            OIdentifiable fromId : fromIds) {
+              final OrientVertex v=graph.getVertex(fromId);
+              if (v != null) {
+                for (                Edge e : v.getEdges(Direction.OUT)) {
+                  if (label != null && !label.equals(e.getLabel()))                   continue;
+                  edges.add((OrientEdge)e);
+                }
+              }
+            }
+          }
+ else           if (toIds != null) {
+            for (            OIdentifiable toId : toIds) {
+              final OrientVertex v=graph.getVertex(toId);
+              if (v != null) {
+                for (                Edge e : v.getEdges(Direction.IN)) {
+                  if (label != null && !label.equals(e.getLabel()))                   continue;
+                  edges.add((OrientEdge)e);
+                }
+              }
+            }
+          }
+ else           throw new OCommandExecutionException("Invalid target: " + toIds);
+          if (compiledFilter != null) {
+            for (Iterator<OrientEdge> it=edges.iterator(); it.hasNext(); ) {
+              final OrientEdge edge=it.next();
+              if (!(Boolean)compiledFilter.evaluate(edge.getRecord(),null,context))               it.remove();
+            }
+          }
+          removed=edges.size();
+          for (          OrientEdge edge : edges)           edge.remove();
+          return null;
+        }
       }
- catch (      InterruptedException e1) {
+);
+      end();
+    }
+ else {
+      OGraphCommandExecutorSQLFactory.runInConfiguredTxMode(new OGraphCommandExecutorSQLFactory.GraphCallBack<OrientGraph>(){
+        @Override public OrientGraph call(        final OrientBaseGraph iGraph){
+          currentGraph.set(iGraph);
+          query.setContext(getContext());
+          query.execute(iArgs);
+          return null;
+        }
       }
+);
     }
   }
   return removed;

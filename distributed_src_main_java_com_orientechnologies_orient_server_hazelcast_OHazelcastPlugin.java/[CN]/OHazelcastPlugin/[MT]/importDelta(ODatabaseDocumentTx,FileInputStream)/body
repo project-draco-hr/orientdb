@@ -1,0 +1,45 @@
+{
+  serverInstance.openDatabase(db);
+  final ZipInputStream zipInput=new ZipInputStream(in);
+  try {
+    final DataInputStream input=new DataInputStream(zipInput);
+    try {
+      while (input.available() > 1) {
+        final int clusterId=input.readInt();
+        final long clusterPos=input.readLong();
+        final boolean deleted=input.readBoolean();
+        final ORecordId rid=new ORecordId(clusterId,clusterPos);
+        if (deleted) {
+          db.delete(rid);
+        }
+ else {
+          final int recordVersion=input.readInt();
+          final int recordType=input.readByte();
+          final int recordSize=input.readInt();
+          final byte[] recordContent=new byte[recordSize];
+          input.read(recordContent);
+          final ORecord record;
+          if (recordVersion == 1) {
+            record=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+            ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
+          }
+ else {
+            record=rid.getRecord();
+            ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
+          }
+          record.save();
+        }
+      }
+    }
+  finally {
+      input.close();
+    }
+  }
+ catch (  Exception e) {
+    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
+    throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
+  }
+ finally {
+    zipInput.close();
+  }
+}

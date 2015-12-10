@@ -8,10 +8,15 @@
   final OHazelcastDistributedDatabase distrDatabase=messageService.registerDatabase(databaseName);
   String queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName);
   messageService.getQueue(queueName);
-  queueName=OHazelcastDistributedMessageService.getRequestQueueName(messageService.manager.getLocalNodeName(),databaseName + OCreateRecordTask.SUFFIX_QUEUE_NAME);
-  messageService.getQueue(queueName);
-  for (int retry=0; retry < DEPLOY_DB_MAX_RETRIES; ++retry) {
-    if (requestDatabase(distrDatabase,backupDatabase,databaseName,retry > 0))     return true;
+  if (distrDatabase.getSyncConfiguration().isEmpty()) {
+    return requestFullDatabase(databaseName,backupDatabase,distrDatabase);
   }
-  return false;
+ else {
+    try {
+      return requestDatabaseDelta(distrDatabase,databaseName);
+    }
+ catch (    ODistributedDatabaseDeltaBackupException e) {
+      return requestFullDatabase(databaseName,backupDatabase,distrDatabase);
+    }
+  }
 }

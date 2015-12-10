@@ -1,0 +1,31 @@
+{
+  OGlobalConfiguration.COMMAND_CACHE_ENABLED.setValue(true);
+  OGlobalConfiguration.COMMAND_CACHE_MIN_EXECUTION_TIME.setValue(1);
+  OGlobalConfiguration.COMMAND_CACHE_MAX_RESULSET_SIZE.setValue(10);
+  OGlobalConfiguration.COMMAND_CACHE_EVICT_STRATEGY.setValue(OCommandCache.STRATEGY.INVALIDATE_ALL);
+  String buildDirectory=System.getProperty("buildDirectory");
+  if (buildDirectory == null)   buildDirectory=".";
+  String dbPath="plocal:" + buildDirectory + File.separator+ OCommandCacheTest.class.getSimpleName();
+  ODatabaseDocument db=new ODatabaseDocumentTx(dbPath);
+  db.create();
+  try {
+    File commandCacheCfg=new File(buildDirectory + File.separator + OCommandCacheTest.class.getSimpleName()+ "/command-cache.json");
+    final String configurationContent=OIOUtils.readFileAsString(commandCacheCfg);
+    ODocument cfg=new ODocument().fromJSON(configurationContent);
+    Boolean enabled=cfg.field("enabled");
+    String evict=cfg.field("evictStrategy");
+    OCommandCache.STRATEGY evictStrategy=OCommandCache.STRATEGY.valueOf(evict);
+    int minExecutionTime=cfg.field("minExecutionTime");
+    int maxResultsetSize=cfg.field("maxResultsetSize");
+    Assert.assertEquals(OGlobalConfiguration.COMMAND_CACHE_ENABLED.getValue(),enabled);
+    Assert.assertEquals(OGlobalConfiguration.COMMAND_CACHE_EVICT_STRATEGY.getValue().toString(),evictStrategy.toString());
+    Assert.assertEquals(OGlobalConfiguration.COMMAND_CACHE_MIN_EXECUTION_TIME.getValue(),minExecutionTime);
+    Assert.assertEquals(OGlobalConfiguration.COMMAND_CACHE_MAX_RESULSET_SIZE.getValue(),maxResultsetSize);
+  }
+ catch (  IOException e) {
+    Assert.fail("Cannot find file configuration",e);
+  }
+ finally {
+    db.drop();
+  }
+}

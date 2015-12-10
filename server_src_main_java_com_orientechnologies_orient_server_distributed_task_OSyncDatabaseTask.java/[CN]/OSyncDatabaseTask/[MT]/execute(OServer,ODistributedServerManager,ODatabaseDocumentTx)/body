@@ -15,6 +15,7 @@
         iManager.setDatabaseStatus(iManager.getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.SYNCHRONIZING);
         ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"deploying database %s...",databaseName);
         final AtomicLong lastOperationId=new AtomicLong(-1);
+        final AtomicReference<OLogSequenceNumber> endLSN=new AtomicReference<OLogSequenceNumber>();
         File backupFile=((ODistributedStorage)database.getStorage()).getLastValidBackup();
         if (backupFile == null || !backupFile.exists()) {
           backupFile=new File(Orient.getTempPath() + "/backup_" + database.getName()+ ".zip");
@@ -33,6 +34,7 @@
                 database.backup(fileOutputStream,null,new Callable<Object>(){
                   @Override public Object call() throws Exception {
                     lastOperationId.set(database.getStorage().getLastOperationId());
+                    endLSN.set(((OAbstractPaginatedStorage)database.getStorage().getUnderlying()).getLSN());
                     return null;
                   }
                 }
@@ -73,7 +75,7 @@
           lastOperationId.set(database.getStorage().getLastOperationId());
           ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"reusing last backup of database '%s' in directory: %s...",databaseName,backupFile.getAbsolutePath());
         }
-        final ODistributedDatabaseChunk chunk=new ODistributedDatabaseChunk(lastOperationId.get(),backupFile,0,CHUNK_MAX_SIZE);
+        final ODistributedDatabaseChunk chunk=new ODistributedDatabaseChunk(lastOperationId.get(),backupFile,0,CHUNK_MAX_SIZE,endLSN.get(),false);
         ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.OUT,"- transferring chunk #%d offset=%d size=%s...",1,0,OFileUtils.getSizeAsNumber(chunk.buffer.length));
         if (chunk.last)         iManager.setDatabaseStatus(iManager.getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.ONLINE);
         return chunk;

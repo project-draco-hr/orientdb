@@ -38,13 +38,16 @@
             }
             fOut.flush();
             new File(file.getAbsolutePath() + ".completed").createNewFile();
-            try {
-              final ODistributedDatabase distrDatabase=getMessageService().getDatabase(databaseName);
-              distrDatabase.getSyncConfiguration().setLSN(iNode,lsn.get());
+            if (lsn.get() != null) {
+              try {
+                final ODistributedDatabase distrDatabase=getMessageService().getDatabase(databaseName);
+                distrDatabase.getSyncConfiguration().setLSN(iNode,lsn.get());
+              }
+ catch (              IOException e) {
+                ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"Error on updating distributed-sync.json file for database '%s'. Next request of delta of changes will contains old records too",e,databaseName);
+              }
             }
- catch (            IOException e) {
-              ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"Error on updating distributed-sync.json file for database '%s'. Next request of delta of changes will contains old records too",e,databaseName);
-            }
+ else             ODistributedServerLog.warn(this,nodeName,iNode,DIRECTION.IN,"LSN not found in database from network, database delta sync will be not available for database '%s'",databaseName);
             ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
           }
   finally {

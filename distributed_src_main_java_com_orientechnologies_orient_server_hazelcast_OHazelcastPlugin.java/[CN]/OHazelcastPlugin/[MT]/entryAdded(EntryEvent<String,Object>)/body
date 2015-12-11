@@ -4,22 +4,22 @@
   if (key.startsWith(CONFIG_NODE_PREFIX)) {
     if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember())) {
       final ODocument cfg=(ODocument)iEvent.getValue();
-      final String nodejoinedName=(String)cfg.field("name");
-      if (this.nodeName.equals(nodejoinedName)) {
-        ODistributedServerLog.error(this,nodejoinedName,getNodeName(iEvent.getMember()),DIRECTION.IN,"Found a new node with the same name as current: '" + nodejoinedName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
-        throw new ODistributedException("Found a new node with the same name as current: '" + nodejoinedName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
+      final String joinedNodeName=(String)cfg.field("name");
+      if (this.nodeName.equals(joinedNodeName)) {
+        ODistributedServerLog.error(this,joinedNodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"Found a new node with the same name as current: '" + joinedNodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
+        throw new ODistributedException("Found a new node with the same name as current: '" + joinedNodeName + "'. The node has been excluded. Change the name in its config/orientdb-dserver-config.xml file");
       }
       for (      ODistributedLifecycleListener l : listeners) {
-        if (!l.onNodeJoining(nodejoinedName)) {
-          ODistributedServerLog.info(this,nodejoinedName,getNodeName(iEvent.getMember()),DIRECTION.IN,"denied node to join the cluster id=%s name=%s",iEvent.getMember(),getNodeName(iEvent.getMember()));
+        if (!l.onNodeJoining(joinedNodeName)) {
+          ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"denied node to join the cluster id=%s name=%s",iEvent.getMember(),getNodeName(iEvent.getMember()));
           return;
         }
       }
-      activeNodes.put(nodejoinedName,(Member)iEvent.getMember());
-      ODistributedServerLog.info(this,nodejoinedName,getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
+      activeNodes.put(joinedNodeName,(Member)iEvent.getMember());
+      ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
       installNewDatabases(false);
+      for (      ODistributedLifecycleListener l : listeners)       l.onNodeJoined(joinedNodeName);
     }
-    for (    ODistributedLifecycleListener l : listeners)     l.onNodeJoined(nodeName);
   }
  else   if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
     final String databaseName=key.substring(CONFIG_DATABASE_PREFIX.length());

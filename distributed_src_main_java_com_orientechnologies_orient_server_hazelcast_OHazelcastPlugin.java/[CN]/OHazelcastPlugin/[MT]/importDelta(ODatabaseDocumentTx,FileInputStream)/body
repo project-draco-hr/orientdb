@@ -1,45 +1,60 @@
 {
   serverInstance.openDatabase(db);
-  final ZipInputStream zipInput=new ZipInputStream(in);
-  try {
-    final DataInputStream input=new DataInputStream(zipInput);
-    try {
-      while (input.available() > 1) {
-        final int clusterId=input.readInt();
-        final long clusterPos=input.readLong();
-        final boolean deleted=input.readBoolean();
-        final ORecordId rid=new ORecordId(clusterId,clusterPos);
-        if (deleted) {
-          db.delete(rid);
+  OScenarioThreadLocal.executeAsDistributed(new Callable<Object>(){
+    @Override public Object call() throws Exception {
+      db.activateOnCurrentThread();
+      long total=0;
+      final GZIPInputStream gzipInput=new GZIPInputStream(in);
+      try {
+        final DataInputStream input=new DataInputStream(gzipInput);
+        try {
+          final long records=input.readLong();
+          for (long i=0; i < records; ++i) {
+            final int clusterId=input.readInt();
+            final long clusterPos=input.readLong();
+            final boolean deleted=input.readBoolean();
+            final ORecordId rid=new ORecordId(clusterId,clusterPos);
+            total++;
+            if (deleted) {
+              OLogManager.instance().info(this,"DELTA <- deleted " + rid);
+              db.delete(rid);
+            }
+ else {
+              final int recordVersion=input.readInt();
+              final int recordType=input.readByte();
+              final int recordSize=input.readInt();
+              final byte[] recordContent=new byte[recordSize];
+              input.read(recordContent);
+              OLogManager.instance().info(this,"DELTA <- other rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
+              final ORecord record;
+              if (recordVersion == 1) {
+                record=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+                ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
+              }
+ else {
+                record=rid.getRecord();
+                ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
+              }
+              record.save();
+            }
+          }
+          db.getMetadata().reload();
         }
- else {
-          final int recordVersion=input.readInt();
-          final int recordType=input.readByte();
-          final int recordSize=input.readInt();
-          final byte[] recordContent=new byte[recordSize];
-          input.read(recordContent);
-          final ORecord record;
-          if (recordVersion == 1) {
-            record=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
-            ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
-          }
- else {
-            record=rid.getRecord();
-            ORecordInternal.fill(record,rid,recordVersion,recordContent,true);
-          }
-          record.save();
+  finally {
+          input.close();
         }
       }
-    }
-  finally {
-      input.close();
-    }
-  }
- catch (  Exception e) {
-    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
-    throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
-  }
+ catch (      Exception e) {
+        ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
+        throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
+      }
  finally {
-    zipInput.close();
+        gzipInput.close();
+      }
+      ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.IN,"Installed database delta for '%s', %d total records",db.getName(),total);
+      return null;
+    }
   }
+);
+  db.activateOnCurrentThread();
 }

@@ -3,15 +3,15 @@
   try {
     acquireSharedLock();
     try {
-      final long firstPos=iFrom > -1 ? iFrom : getFirstPosition();
-      final long lastPos=iTo > -1 ? iTo : getLastPosition();
+      final long firstPos=from > -1 ? from : getFirstPosition();
+      final long lastPos=to > -1 ? to : getLastPosition();
       final long recordsToScan=lastPos - firstPos;
       final long progressDump=recordsToScan / 10;
       final int prefetchPages=OGlobalConfiguration.QUERY_SCAN_PREFETCH_PAGES.getValueAsInteger();
-      long clusterPosition=iAscendingOrder ? firstPos : lastPos;
+      long clusterPosition=ascendingOrder ? firstPos : lastPos;
       long browsed=0;
-      for (; iAscendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(iAscendingOrder ? 1 : -1)) {
-        final ORawBuffer buffer=readRecordNoLock(clusterPosition,prefetchPages);
+      for (; ascendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(ascendingOrder ? 1 : -1)) {
+        final ORawBuffer buffer=readRecordNoLock(clusterPosition,Math.max(prefetchPages,1));
         if (buffer == null)         continue;
         if (progressDump > 1 && OLogManager.instance().isDebugEnabled()) {
           final long recordsScanned=clusterPosition - firstPos;
@@ -21,12 +21,12 @@
         }
         final ORecord rec=Orient.instance().getRecordFactoryManager().newInstance(buffer.recordType);
         ORecordInternal.fill(rec,new ORecordId(id,clusterPosition),buffer.version,buffer.buffer,false);
-        if (iCallback.call(rec).equals(Boolean.FALSE))         break;
+        if (callback.call(rec).equals(Boolean.FALSE))         break;
         if (Thread.currentThread().isInterrupted()) {
           Thread.currentThread().interrupt();
           break;
         }
-        if (iLimit > 0 && browsed++ > iLimit)         return clusterPosition;
+        if (limit > 0 && browsed++ > limit)         return clusterPosition;
       }
       return -1;
     }
@@ -36,8 +36,6 @@
   }
   finally {
     atomicOperationsManager.releaseReadLock(this);
-    if (OLogManager.instance().isDebugEnabled()) {
-      OLogManager.instance().debug(this,"Scan cluster id=%d completed",id);
-    }
+    OLogManager.instance().debug(this,"Scan cluster id=%d completed",id);
   }
 }

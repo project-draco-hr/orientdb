@@ -2,28 +2,22 @@
   offset=super.fromStream(content,offset);
   rollback=content[offset] > 0;
   offset++;
-  final int len=OIntegerSerializer.INSTANCE.deserializeNative(content,offset);
-  offset+=OIntegerSerializer.INT_SIZE;
-  if (len > 0) {
-    atomicOperationsMetadataBinary=new byte[len];
-    System.arraycopy(content,offset,atomicOperationsMetadataBinary,0,len);
-    final ByteArrayInputStream byteArrayInputStream=new ByteArrayInputStream(atomicOperationsMetadataBinary);
-    try {
-      final ObjectInputStream objectInputStream=new ObjectInputStream(byteArrayInputStream);
-      atomicOperationMetadataMap=(Map<String,OAtomicOperationMetadata<?>>)objectInputStream.readObject();
-      objectInputStream.close();
-      offset+=len;
+  atomicOperationMetadataMap=new HashMap<String,OAtomicOperationMetadata<?>>();
+  final int metadataId=content[offset];
+  offset++;
+  if (metadataId == 1) {
+    final int collectionsSize=OIntegerSerializer.INSTANCE.deserializeNative(content,offset);
+    offset+=OIntegerSerializer.INT_SIZE;
+    final ORecordOperationMetadata recordOperationMetadata=new ORecordOperationMetadata();
+    for (int i=0; i < collectionsSize; i++) {
+      final long clusterPosition=OLongSerializer.INSTANCE.deserializeNative(content,offset);
+      offset+=OLongSerializer.LONG_SIZE;
+      final int clusterId=OIntegerSerializer.INSTANCE.deserializeNative(content,offset);
+      offset+=OIntegerSerializer.INT_SIZE;
+      recordOperationMetadata.addRid(new ORecordId(clusterId,clusterPosition));
     }
- catch (    ClassNotFoundException cnfe) {
-      throw new IllegalStateException("Error during atomic operation metadata deserialization",cnfe);
-    }
-catch (    IOException ioe) {
-      throw new IllegalStateException("Error during atomic operation metadata deserialization",ioe);
-    }
+    atomicOperationMetadataMap.put(recordOperationMetadata.getKey(),recordOperationMetadata);
   }
- else {
-    atomicOperationsMetadataBinary=new byte[0];
-    atomicOperationMetadataMap=new HashMap<String,OAtomicOperationMetadata<?>>();
-  }
+ else   throw new IllegalStateException("Invalid metadata entry id " + metadataId);
   return offset;
 }

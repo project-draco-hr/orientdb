@@ -2,11 +2,29 @@
   offset=super.toStream(content,offset);
   content[offset]=rollback ? (byte)1 : 0;
   offset++;
-  OIntegerSerializer.INSTANCE.serializeNative(atomicOperationsMetadataBinary.length,content,offset);
-  offset+=OIntegerSerializer.INT_SIZE;
-  if (atomicOperationsMetadataBinary.length > 0) {
-    System.arraycopy(atomicOperationsMetadataBinary,0,content,offset,atomicOperationsMetadataBinary.length);
-    offset+=atomicOperationsMetadataBinary.length;
+  if (atomicOperationMetadataMap.size() > 0) {
+    for (    Map.Entry<String,OAtomicOperationMetadata<?>> entry : atomicOperationMetadataMap.entrySet()) {
+      if (entry.getKey().equals(ORecordOperationMetadata.RID_METADATA_KEY)) {
+        content[offset]=1;
+        offset++;
+        final ORecordOperationMetadata recordOperationMetadata=(ORecordOperationMetadata)entry.getValue();
+        final Set<ORID> rids=recordOperationMetadata.getValue();
+        OIntegerSerializer.INSTANCE.serializeNative(rids.size(),content,offset);
+        offset+=OIntegerSerializer.INT_SIZE;
+        for (        ORID rid : rids) {
+          OLongSerializer.INSTANCE.serializeNative(rid.getClusterPosition(),content,offset);
+          offset+=OLongSerializer.LONG_SIZE;
+          OIntegerSerializer.INSTANCE.serializeNative(rid.getClusterId(),content,offset);
+          offset+=OIntegerSerializer.INT_SIZE;
+        }
+      }
+ else {
+        throw new IllegalStateException("Invalid metadata key " + ORecordOperationMetadata.RID_METADATA_KEY);
+      }
+    }
+  }
+ else {
+    offset++;
   }
   return offset;
 }

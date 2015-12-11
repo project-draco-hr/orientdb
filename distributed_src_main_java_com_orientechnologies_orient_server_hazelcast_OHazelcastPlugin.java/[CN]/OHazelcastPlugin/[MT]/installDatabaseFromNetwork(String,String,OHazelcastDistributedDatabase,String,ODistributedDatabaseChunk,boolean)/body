@@ -1,7 +1,7 @@
 {
   distrDatabase.setWaitForMessage(value.getLastOperationId());
   final String fileName=Orient.getTempPath() + "install_" + databaseName+ ".zip";
-  final String localNodeName=getLocalNodeName();
+  final String localNodeName=nodeName;
   ODistributedServerLog.info(this,localNodeName,iNode,DIRECTION.IN,"copying remote database '%s' to: %s",databaseName,fileName);
   final File file=new File(fileName);
   if (file.exists())   file.delete();
@@ -29,7 +29,7 @@
               final Object result=sendRequest(databaseName,null,Collections.singleton(iNode),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length),EXECUTION_MODE.RESPONSE);
               if (result instanceof Boolean)               continue;
  else               if (result instanceof Exception) {
-                ODistributedServerLog.error(this,getLocalNodeName(),iNode,DIRECTION.IN,"error on installing database %s in %s (chunk #%d)",(Exception)result,databaseName,dbPath,chunkNum);
+                ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"error on installing database %s in %s (chunk #%d)",(Exception)result,databaseName,dbPath,chunkNum);
               }
  else               if (result instanceof ODistributedDatabaseChunk) {
                 chunk=(ODistributedDatabaseChunk)result;
@@ -38,7 +38,14 @@
             }
             fOut.flush();
             new File(file.getAbsolutePath() + ".completed").createNewFile();
-            ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
+            try {
+              final ODistributedDatabase distrDatabase=getMessageService().getDatabase(databaseName);
+              distrDatabase.getSyncConfiguration().setLSN(iNode,lsn.get());
+            }
+ catch (            IOException e) {
+              ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"Error on updating distributed-sync.json file for database '%s'. Next request of delta of changes will contains old records too",e,databaseName);
+            }
+            ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"database copied correctly, size=%s",OFileUtils.getSizeAsString(fileSize));
           }
   finally {
             try {
@@ -50,7 +57,7 @@
           }
         }
  catch (        Exception e) {
-          ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
+          ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
           throw OException.wrapException(new ODistributedException("Error on transferring database"),e);
         }
       }
@@ -58,7 +65,7 @@
 ).start();
   }
  catch (  Exception e) {
-    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
+    ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"error on transferring database '%s' to '%s'",e,databaseName,fileName);
     throw OException.wrapException(new ODistributedException("Error on transferring database"),e);
   }
   final ODatabaseDocumentTx db=installDatabaseOnLocalNode(distrDatabase,databaseName,dbPath,iNode,fileName,delta);

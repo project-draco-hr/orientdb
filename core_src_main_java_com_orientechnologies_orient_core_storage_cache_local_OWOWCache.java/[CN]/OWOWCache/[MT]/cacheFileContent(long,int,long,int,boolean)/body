@@ -7,14 +7,20 @@
   final long firstPageStartPosition=startPageIndex * pageSize;
   final long firstPageEndPosition=firstPageStartPosition + pageSize;
   if (fileClassic.getFileSize() >= firstPageEndPosition) {
-    if (pageCount == 1) {
-      final byte[] content=new byte[pageSize + 2 * PAGE_PADDING];
-      fileClassic.read(firstPageStartPosition,content,pageSize,PAGE_PADDING);
-      final ODirectMemoryPointer pointer=ODirectMemoryPointerFactory.instance().createPointer(content);
-      final OCachePointer dataPointer=new OCachePointer(pointer,lastLsn,fileId,startPageIndex);
-      return new OCachePointer[]{dataPointer};
+    final OStoragePerformanceStatistic storagePerformanceStatistic=OStoragePerformanceStatistic.getStatisticInstance();
+    if (storagePerformanceStatistic != null) {
+      storagePerformanceStatistic.startPageReadFromFileTimer();
     }
- else {
+    int pagesRead=0;
+    try {
+      if (pageCount == 1) {
+        final byte[] content=new byte[pageSize + 2 * PAGE_PADDING];
+        fileClassic.read(firstPageStartPosition,content,pageSize,PAGE_PADDING);
+        final ODirectMemoryPointer pointer=ODirectMemoryPointerFactory.instance().createPointer(content);
+        final OCachePointer dataPointer=new OCachePointer(pointer,lastLsn,fileId,startPageIndex);
+        pagesRead=1;
+        return new OCachePointer[]{dataPointer};
+      }
       final long maxPageCount=(fileClassic.getFileSize() - firstPageStartPosition) / pageSize;
       final int realPageCount=Math.min((int)maxPageCount,pageCount);
       final byte[] content=new byte[realPageCount * pageSize];
@@ -26,7 +32,13 @@
         final ODirectMemoryPointer pointer=ODirectMemoryPointerFactory.instance().createPointer(pageContent);
         dataPointers[n]=new OCachePointer(pointer,lastLsn,fileId,startPageIndex + n);
       }
+      pagesRead=dataPointers.length;
       return dataPointers;
+    }
+  finally {
+      if (storagePerformanceStatistic != null) {
+        storagePerformanceStatistic.stopPageReadFromFileTimer(pagesRead);
+      }
     }
   }
  else   if (addNewPages) {

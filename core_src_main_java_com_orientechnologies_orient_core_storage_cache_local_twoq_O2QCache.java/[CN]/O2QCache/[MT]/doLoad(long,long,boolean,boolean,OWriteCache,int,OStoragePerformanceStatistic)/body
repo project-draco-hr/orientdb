@@ -5,6 +5,9 @@
   Lock fileLock;
   Lock[] pageLocks;
   cacheQueriesCounter.increment();
+  if (storagePerformanceStatistic != null) {
+    storagePerformanceStatistic.incrementPageAccessOnCacheLevel();
+  }
   cacheLock.acquireReadLock();
   try {
     fileLock=fileLockManager.acquireSharedLock(fileId);
@@ -17,13 +20,16 @@
       try {
         if (checkPinnedPages)         cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
         if (cacheEntry == null) {
-          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex,addNewPages,writeCache,pageCount);
+          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex,addNewPages,writeCache,pageCount,storagePerformanceStatistic);
           if (cacheResult == null)           return null;
           cacheEntry=cacheResult.cacheEntry;
           removeColdPages=cacheResult.removeColdPages;
         }
  else {
           cacheHitCounter.increment();
+          if (storagePerformanceStatistic != null) {
+            storagePerformanceStatistic.incrementCacheHit();
+          }
         }
         cacheEntry.incrementUsages();
       }

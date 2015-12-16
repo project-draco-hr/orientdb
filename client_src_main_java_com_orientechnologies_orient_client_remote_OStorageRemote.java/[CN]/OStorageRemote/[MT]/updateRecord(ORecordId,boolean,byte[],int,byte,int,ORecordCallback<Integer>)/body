@@ -1,11 +1,11 @@
 {
-  if (iMode == 1 && iCallback == null)   iMode=2;
-  OChannelBinaryAsynchClient lastNetworkUsed=null;
-  do {
-    try {
-      final OChannelBinaryAsynchClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
-      lastNetworkUsed=network;
+  return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<Integer>>(){
+    @Override public OStorageOperationResult<Integer> execute(    final OChannelBinaryAsynchClient network) throws IOException {
+      int mode;
+      if (iMode == 1 && iCallback == null)       mode=2;
+ else       mode=iMode;
       try {
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
         network.writeRID(iRid);
         if (network.getSrvProtocolVersion() >= 23) {
           network.writeBoolean(updateContent);
@@ -13,12 +13,12 @@
         network.writeBytes(iContent);
         network.writeVersion(iVersion);
         network.writeByte(iRecordType);
-        network.writeByte((byte)iMode);
+        network.writeByte((byte)mode);
       }
   finally {
         endRequest(network);
       }
-switch (iMode) {
+switch (mode) {
 case 0:
         try {
           beginResponse(network);
@@ -54,12 +54,6 @@ asynchExecutor.submit(new FutureTask<Object>(response));
 }
 return new OStorageOperationResult<Integer>(iVersion);
 }
- catch (OModificationOperationProhibitedException mope) {
-handleDBFreeze();
 }
-catch (Exception e) {
-handleException(lastNetworkUsed,"Error on update record " + iRid,e);
-}
-}
- while (true);
+,"Error on update record " + iRid);
 }

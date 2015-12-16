@@ -1,11 +1,10 @@
 {
-  OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+  final OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
   final byte[] keyStream=new byte[keySerializer.getObjectSize(key)];
   keySerializer.serialize(key,keyStream,0);
-  OChannelBinaryAsynchClient client=null;
-  while (true) {
-    try {
-      client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET);
+  return storage.networkOperation(new OStorageRemoteOperation<V>(){
+    @Override public V execute(    final OChannelBinaryAsynchClient client) throws IOException {
+      storage.beginRequest(client,OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET);
       OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
       client.writeBytes(keyStream);
       storage.endRequest(client);
@@ -21,8 +20,6 @@
       final OBinarySerializer<V> serializer=(OBinarySerializer<V>)OBinarySerializerFactory.getInstance().getObjectSerializer(serializerId);
       return serializer.deserialize(stream,OByteSerializer.BYTE_SIZE);
     }
- catch (    Exception e) {
-      storage.handleException(client,"Cannot get by key from sb-tree bonsai",e);
-    }
   }
+,"Cannot get by key from sb-tree bonsai");
 }

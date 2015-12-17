@@ -1,0 +1,25 @@
+{
+  OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic=new OSessionStoragePerformanceStatistic(1024,new OSessionStoragePerformanceStatistic.NanoTimer(){
+    private long counter=0;
+    @Override public long getNano(){
+      return counter+=100;
+    }
+  }
+);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromFile(),0);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromFileInPages(),-1);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromFileInMB(),-1);
+  sessionStoragePerformanceStatistic.startCommitTimer();
+  for (int i=0; i < 100; i++) {
+    sessionStoragePerformanceStatistic.startPageReadFromFileTimer();
+    sessionStoragePerformanceStatistic.stopPageReadFromFileTimer(10);
+  }
+  sessionStoragePerformanceStatistic.stopCommitTimer();
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromFile(),1000);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromFileInPages(),100000000);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromFileInMB(),100000000 / 1024);
+  final ODocument doc=sessionStoragePerformanceStatistic.toDocument();
+  Assert.assertEquals(doc.field("amountOfPagesReadFromFile"),1000L);
+  Assert.assertEquals(doc.field("readSpeedFromFileInPages"),100000000L);
+  Assert.assertEquals(doc.field("readSpeedFromFileInMB"),100000000L / 1024);
+}

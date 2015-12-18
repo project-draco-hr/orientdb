@@ -2,7 +2,16 @@
   final Deque<Long> stamps=tlTimeStumps.get();
   if (stamps.size() > 0) {
     final long endTs=nanoTimer.getNano();
-    pageReadFromFileTime.add(endTs - stamps.pop());
-    pageReadFromFileCount.add(readPages);
+    final long timeDiff=endTs - stamps.pop();
+    final PerformanceCounters pf=performanceCounters.get();
+    if (pf != null) {
+      final AtomicReference<OTimeCounter> readSpeedFromFile=pf.readSpeedFromFile;
+      OTimeCounter oldReadSpeedFromFile=readSpeedFromFile.get();
+      OTimeCounter newReadSpeedFromFile=new OTimeCounter(oldReadSpeedFromFile.getTime() + timeDiff,oldReadSpeedFromFile.getCounter() + readPages);
+      while (!readSpeedFromFile.compareAndSet(oldReadSpeedFromFile,newReadSpeedFromFile)) {
+        oldReadSpeedFromFile=readSpeedFromFile.get();
+        newReadSpeedFromFile=new OTimeCounter(oldReadSpeedFromFile.getTime() + timeDiff,oldReadSpeedFromFile.getCounter() + readPages);
+      }
+    }
   }
 }

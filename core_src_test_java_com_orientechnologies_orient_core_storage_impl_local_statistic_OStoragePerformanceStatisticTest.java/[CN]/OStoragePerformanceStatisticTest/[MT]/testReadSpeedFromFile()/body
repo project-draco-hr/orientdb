@@ -1,65 +1,29 @@
 {
-  final AtomicLong nanoIncrement=new AtomicLong();
-  nanoIncrement.set(100);
-  final OStoragePerformanceStatistic storagePerformanceStatistic=new OStoragePerformanceStatistic(1024,"test",1,new OStoragePerformanceStatistic.NanoTimer(){
-    private long counter=0;
-    @Override public long getNano(){
-      return counter+=nanoIncrement.get();
+  final AssertDataFunction assertDataFunction=new AssertDataFunction(){
+    @Override public void assertData(    long[] data) throws AssertionError {
+      Assert.assertEquals(data[0],100000000);
+      Assert.assertEquals(data[1],100000000 / 1024);
     }
   }
-,100000);
-  Assert.assertFalse(storagePerformanceStatistic.isMeasurementEnabled());
-  Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInPages(),-1);
-  Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInMB(),-1);
-  storagePerformanceStatistic.startMeasurement();
-  final AtomicBoolean stop=new AtomicBoolean();
-  final ExecutorService executor=Executors.newSingleThreadExecutor();
-  final Future<Void> future=executor.submit(new Callable<Void>(){
-    @Override public Void call() throws Exception {
-      while (!stop.get()) {
-        storagePerformanceStatistic.startCommitTimer();
-        storagePerformanceStatistic.startPageReadFromFileTimer();
-        storagePerformanceStatistic.stopPageReadFromFileTimer(10);
-        storagePerformanceStatistic.stopCommitTimer();
-      }
-      return null;
+;
+  final GetDataFunction getDataFunction=new GetDataFunction(){
+    @Override public long[] getData(    OStoragePerformanceStatisticMXBean storagePerformanceStatistic){
+      final long[] result=new long[2];
+      result[0]=storagePerformanceStatistic.getReadSpeedFromFileInPages();
+      result[1]=storagePerformanceStatistic.getReadSpeedFromFileInMB();
+      return result;
     }
   }
-);
-  long notZeroSpeedCount=0;
-  long msStart=System.currentTimeMillis();
-  long counter=0;
-  while (notZeroSpeedCount < 1000) {
-    if (counter % 1000 == 0 && System.currentTimeMillis() - msStart > 10000)     break;
-    final long pagesSpeed=storagePerformanceStatistic.getReadSpeedFromFileInPages();
-    final long mbSpeed=storagePerformanceStatistic.getReadSpeedFromFileInMB();
-    if (pagesSpeed == -1) {
-      Thread.yield();
+;
+  final LoadLoop loadLoop=new LoadLoop(){
+    @Override public void execute(    OStoragePerformanceStatistic storagePerformanceStatistic,    boolean measurementStopped){
+      storagePerformanceStatistic.startCommitTimer();
+      storagePerformanceStatistic.startPageReadFromFileTimer();
+      storagePerformanceStatistic.stopPageReadFromFileTimer(10);
+      storagePerformanceStatistic.stopCommitTimer();
     }
- else {
-      notZeroSpeedCount++;
-      Assert.assertEquals(pagesSpeed,100000000);
-      Assert.assertEquals(mbSpeed,100000000 / 1024);
-    }
-    Thread.yield();
-    counter++;
   }
-  Assert.assertTrue(notZeroSpeedCount > 0);
-  System.out.println("testReadSpeedFromFile : not zero speed count " + notZeroSpeedCount);
-  storagePerformanceStatistic.stopMeasurement();
-  if (storagePerformanceStatistic.getReadSpeedFromFileInPages() > 0) {
-    System.out.println("testReadSpeedFromFile : check that values were not changed after stop measurement");
-    nanoIncrement.set(10);
-    Thread.sleep(200);
-    Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInPages(),100000000);
-    Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInMB(),100000000 / 1024);
-  }
-  stop.set(true);
-  future.get();
-  storagePerformanceStatistic.startMeasurement();
-  Thread.sleep(200);
-  Assert.assertTrue(storagePerformanceStatistic.isMeasurementEnabled());
-  Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInPages(),-1);
-  Assert.assertEquals(storagePerformanceStatistic.getReadSpeedFromFileInMB(),-1);
-  executor.shutdown();
+;
+  testNoMBeanCase("testReadSpeedFromFile",loadLoop,getDataFunction,assertDataFunction);
+  testMBeanCase("testReadSpeedFromFile",loadLoop,getDataFunction,assertDataFunction);
 }

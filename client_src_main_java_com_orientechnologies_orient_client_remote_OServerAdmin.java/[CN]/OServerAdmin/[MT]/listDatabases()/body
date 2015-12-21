@@ -1,19 +1,22 @@
 {
-  final ODocument result=new ODocument();
-  try {
-    final OChannelBinaryAsynchClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_DB_LIST);
-    storage.endRequest(network);
-    try {
-      storage.beginResponse(network);
-      result.fromStream(network.readBytes());
-    }
+  return networkAdminOperation(new OStorageRemoteOperation<Map<String,String>>(){
+    @Override public Map<String,String> execute(    OChannelBinaryAsynchClient network) throws IOException {
+      try {
+        storage.beginRequest(network,OChannelBinaryProtocol.REQUEST_DB_LIST);
+      }
   finally {
-      storage.endResponse(network);
+        storage.endRequest(network);
+      }
+      final ODocument result=new ODocument();
+      try {
+        storage.beginResponse(network);
+        result.fromStream(network.readBytes());
+      }
+  finally {
+        storage.endResponse(network);
+      }
+      return (Map<String,String>)result.field("databases");
     }
   }
- catch (  Exception e) {
-    storage.close(true,false);
-    throw OException.wrapException(new OStorageException("Cannot retrieve the configuration list"),e);
-  }
-  return (Map<String,String>)result.field("databases");
+,"Cannot retrieve the configuration list");
 }

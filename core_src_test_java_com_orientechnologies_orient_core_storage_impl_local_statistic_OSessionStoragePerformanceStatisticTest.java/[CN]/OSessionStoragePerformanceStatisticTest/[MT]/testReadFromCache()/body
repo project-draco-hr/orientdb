@@ -1,8 +1,9 @@
 {
+  final OModifiableInteger increment=new OModifiableInteger();
   OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic=new OSessionStoragePerformanceStatistic(1024,new OSessionStoragePerformanceStatistic.NanoTimer(){
     private long counter=0;
     @Override public long getNano(){
-      return counter+=100;
+      return counter+=increment.getValue();
     }
   }
 );
@@ -10,16 +11,51 @@
   Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB(),-1);
   Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB(),-1);
   sessionStoragePerformanceStatistic.startCommitTimer();
-  for (int i=0; i < 100; i++) {
+  increment.setValue(50);
+  sessionStoragePerformanceStatistic.setCurrentComponent("c1po");
+  for (int i=0; i < 50; i++) {
+    sessionStoragePerformanceStatistic.startPageReadFromCacheTimer();
+    sessionStoragePerformanceStatistic.stopPageReadFromCacheTimer();
+  }
+  sessionStoragePerformanceStatistic.clearCurrentComponent();
+  sessionStoragePerformanceStatistic.setCurrentComponent("c2po");
+  increment.setValue(150);
+  for (int i=0; i < 50; i++) {
+    sessionStoragePerformanceStatistic.startPageReadFromCacheTimer();
+    sessionStoragePerformanceStatistic.stopPageReadFromCacheTimer();
+  }
+  sessionStoragePerformanceStatistic.clearCurrentComponent();
+  increment.setValue(100);
+  for (int i=0; i < 50; i++) {
     sessionStoragePerformanceStatistic.startPageReadFromCacheTimer();
     sessionStoragePerformanceStatistic.stopPageReadFromCacheTimer();
   }
   sessionStoragePerformanceStatistic.stopCommitTimer();
-  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache(),100);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache(),150);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache(null),150);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache("c1po"),50);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache("c2po"),50);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getAmountOfPagesReadFromCache("c3po"),-1);
   Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInPages(),10000000);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInPages(null),10000000);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInPages("c1po"),20000000);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInPages("c2po"),6666666);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInPages("c3po"),-1);
   Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB(),10000000 / 1024);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB(null),10000000 / 1024);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB("c1po"),20000000 / 1024);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB("c2po"),6666666 / 1024);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getReadSpeedFromCacheInMB("c3po"),-1);
   final ODocument doc=sessionStoragePerformanceStatistic.toDocument();
-  Assert.assertEquals(doc.field("amountOfPagesReadFromCache"),100L);
+  Assert.assertEquals(doc.field("amountOfPagesReadFromCache"),150L);
   Assert.assertEquals(doc.field("readSpeedFromCacheInPages"),10000000L);
   Assert.assertEquals(doc.field("readSpeedFromCacheInMB"),10000000L / 1024);
+  final ODocument docC1PO=doc.<Map<String,ODocument>>field("dataByComponent").get("c1po");
+  Assert.assertEquals(docC1PO.field("amountOfPagesReadFromCache"),50L);
+  Assert.assertEquals(docC1PO.field("readSpeedFromCacheInPages"),20000000L);
+  Assert.assertEquals(docC1PO.field("readSpeedFromCacheInMB"),20000000L / 1024);
+  final ODocument docC2PO=doc.<Map<String,ODocument>>field("dataByComponent").get("c2po");
+  Assert.assertEquals(docC2PO.field("amountOfPagesReadFromCache"),50L);
+  Assert.assertEquals(docC2PO.field("readSpeedFromCacheInPages"),6666666L);
+  Assert.assertEquals(docC2PO.field("readSpeedFromCacheInMB"),6666666L / 1024);
 }

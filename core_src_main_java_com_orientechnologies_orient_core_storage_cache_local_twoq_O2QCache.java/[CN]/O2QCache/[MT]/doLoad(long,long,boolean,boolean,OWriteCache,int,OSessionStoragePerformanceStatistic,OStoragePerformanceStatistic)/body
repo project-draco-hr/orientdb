@@ -4,9 +4,6 @@
   OCacheEntry cacheEntry=null;
   Lock fileLock;
   Lock[] pageLocks;
-  if (sessionStoragePerformanceStatistic != null) {
-    sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel();
-  }
   final OModifiableBoolean cacheHit=new OModifiableBoolean(false);
   cacheLock.acquireReadLock();
   try {
@@ -20,15 +17,12 @@
       try {
         if (checkPinnedPages)         cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
         if (cacheEntry == null) {
-          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex,addNewPages,writeCache,pageCount,sessionStoragePerformanceStatistic,cacheHit);
+          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex,addNewPages,writeCache,pageCount,cacheHit);
           if (cacheResult == null)           return null;
           cacheEntry=cacheResult.cacheEntry;
           removeColdPages=cacheResult.removeColdPages;
         }
  else {
-          if (sessionStoragePerformanceStatistic != null) {
-            sessionStoragePerformanceStatistic.incrementCacheHit();
-          }
           cacheHit.setValue(true);
         }
         cacheEntry.incrementUsages();
@@ -47,5 +41,6 @@
     cacheLock.releaseReadLock();
   }
   storagePerformanceStatistic.incrementPageAccessOnCacheLevel(cacheHit.getValue());
+  if (sessionStoragePerformanceStatistic != null)   sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel(cacheHit.getValue());
   return new UpdateCacheResult(removeColdPages,cacheEntry);
 }

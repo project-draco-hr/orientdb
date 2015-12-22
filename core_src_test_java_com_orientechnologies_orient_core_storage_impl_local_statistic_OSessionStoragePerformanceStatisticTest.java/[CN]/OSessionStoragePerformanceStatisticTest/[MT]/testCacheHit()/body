@@ -7,11 +7,28 @@
   }
 );
   Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits(),-1);
-  for (int i=0; i < 100; i++) {
-    sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel();
-    if (i % 2 == 0)     sessionStoragePerformanceStatistic.incrementCacheHit();
+  sessionStoragePerformanceStatistic.setCurrentComponent("c1po");
+  for (int i=0; i < 50; i++) {
+    sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel(i % 2 == 0);
+  }
+  sessionStoragePerformanceStatistic.clearCurrentComponent();
+  sessionStoragePerformanceStatistic.setCurrentComponent("c2po");
+  for (int i=0; i < 50; i++) {
+    sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel(true);
+  }
+  sessionStoragePerformanceStatistic.clearCurrentComponent();
+  for (int i=0; i < 50; i++) {
+    sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel(false);
   }
   Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits(),50);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits(null),50);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits("c1po"),50);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits("c2po"),100);
+  Assert.assertEquals(sessionStoragePerformanceStatistic.getCacheHits("c3po"),-1);
   final ODocument doc=sessionStoragePerformanceStatistic.toDocument();
   Assert.assertEquals(doc.field("cacheHits"),50);
+  final ODocument docC1PO=doc.<Map<String,ODocument>>field("dataByComponent").get("c1po");
+  Assert.assertEquals(docC1PO.field("cacheHits"),50);
+  final ODocument docC2PO=doc.<Map<String,ODocument>>field("dataByComponent").get("c2po");
+  Assert.assertEquals(docC2PO.field("cacheHits"),100);
 }

@@ -1,21 +1,21 @@
 {
-  if (iMode == 1 && iCallback == null)   iMode=2;
-  final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
-  OChannelBinaryAsynchClient lastNetworkUsed=null;
-  do {
-    try {
-      final OChannelBinaryAsynchClient network=beginRequest(OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
-      lastNetworkUsed=network;
+  return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<OPhysicalPosition>>(){
+    @Override public OStorageOperationResult<OPhysicalPosition> execute(    final OChannelBinaryAsynchClient network) throws IOException {
+      int mode;
+      if (iMode == 1 && iCallback == null)       mode=2;
+ else       mode=iMode;
+      final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
       try {
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
         network.writeShort((short)iRid.clusterId);
         network.writeBytes(iContent);
         network.writeByte(iRecordType);
-        network.writeByte((byte)iMode);
+        network.writeByte((byte)mode);
       }
   finally {
         endRequest(network);
       }
-switch (iMode) {
+switch (mode) {
 case 0:
         try {
           beginResponse(network);
@@ -72,12 +72,6 @@ break;
 }
 return new OStorageOperationResult<OPhysicalPosition>(ppos);
 }
- catch (OModificationOperationProhibitedException mope) {
-handleDBFreeze();
 }
-catch (Exception e) {
-handleException(lastNetworkUsed,"Error on create record in cluster: " + iRid.clusterId,e);
-}
-}
- while (true);
+,"Error on create record in cluster: " + iRid.clusterId);
 }

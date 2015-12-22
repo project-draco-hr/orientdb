@@ -1,36 +1,33 @@
 {
-  storage.setSessionId(null,-1,null);
-  try {
-    final OChannelBinaryAsynchClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_CONNECT);
-    storage.sendClientInfo(network);
-    try {
-      network.writeString(iUserName);
-      network.writeString(iUserPassword);
-    }
-  finally {
-      storage.endRequest(network);
-    }
-    try {
-      network.beginResponse(getSessionId(),false);
-      sessionId=network.readInt();
-      sessionToken=network.readBytes();
-      if (sessionToken.length == 0) {
-        sessionToken=null;
+  networkAdminOperation(new OStorageRemoteOperation<Void>(){
+    @Override public Void execute(    OChannelBinaryAsynchClient network) throws IOException {
+      try {
+        storage.beginRequest(network,OChannelBinaryProtocol.REQUEST_CONNECT);
+        storage.sendClientInfo(network);
+        network.writeString(iUserName);
+        network.writeString(iUserPassword);
       }
+  finally {
+        storage.endRequest(network);
+      }
+      try {
+        network.beginResponse(getSessionId(),false);
+        sessionId=network.readInt();
+        sessionToken=network.readBytes();
+        if (sessionToken.length == 0) {
+          sessionToken=null;
+        }
  else {
-        network.getServiceThread().setTokenBased(true);
+          network.getServiceThread().setTokenBased(true);
+        }
+        storage.setSessionId(network.getServerURL(),sessionId,sessionToken);
       }
-      storage.setSessionId(network.getServerURL(),sessionId,sessionToken);
-    }
   finally {
-      storage.endResponse(network);
+        storage.endResponse(network);
+      }
+      return null;
     }
   }
- catch (  Exception e) {
-    storage.close(true,false);
-    final String message="Cannot connect to the remote server/database '" + storage.getURL() + "'";
-    OLogManager.instance().error(this,message,e);
-    throw OException.wrapException(new OStorageException(message),e);
-  }
+,"Cannot connect to the remote server/database '" + storage.getURL() + "'");
   return this;
 }

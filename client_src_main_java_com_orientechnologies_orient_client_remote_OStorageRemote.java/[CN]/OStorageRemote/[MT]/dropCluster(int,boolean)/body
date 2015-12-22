@@ -1,41 +1,36 @@
 {
-  OChannelBinaryAsynchClient network=null;
-  do {
-    stateLock.acquireWriteLock();
-    try {
+  return networkOperation(new OStorageRemoteOperation<Boolean>(){
+    @Override public Boolean execute(    OChannelBinaryAsynchClient network) throws IOException {
+      stateLock.acquireWriteLock();
       try {
-        network=beginRequest(OChannelBinaryProtocol.REQUEST_DATACLUSTER_DROP);
-        network.writeShort((short)iClusterId);
+        try {
+          beginRequest(network,OChannelBinaryProtocol.REQUEST_DATACLUSTER_DROP);
+          network.writeShort((short)iClusterId);
+        }
+  finally {
+          endRequest(network);
+        }
+        byte result=0;
+        try {
+          beginResponse(network);
+          result=network.readByte();
+        }
+  finally {
+          endResponse(network);
+        }
+        if (result == 1) {
+          final OCluster cluster=clusters[iClusterId];
+          clusters[iClusterId]=null;
+          clusterMap.remove(cluster.getName());
+          if (configuration.clusters.size() > iClusterId)           configuration.dropCluster(iClusterId);
+          return true;
+        }
+        return false;
       }
   finally {
-        endRequest(network);
+        stateLock.releaseWriteLock();
       }
-      byte result=0;
-      try {
-        beginResponse(network);
-        result=network.readByte();
-      }
-  finally {
-        endResponse(network);
-      }
-      if (result == 1) {
-        final OCluster cluster=clusters[iClusterId];
-        clusters[iClusterId]=null;
-        clusterMap.remove(cluster.getName());
-        if (configuration.clusters.size() > iClusterId)         configuration.dropCluster(iClusterId);
-        return true;
-      }
-      return false;
-    }
- catch (    OModificationOperationProhibitedException mope) {
-      handleDBFreeze();
-    }
-catch (    Exception e) {
-      handleException(network,"Error on removing of cluster",e);
-    }
- finally {
-      stateLock.releaseWriteLock();
     }
   }
- while (true);
+,"Error on removing of cluster");
 }

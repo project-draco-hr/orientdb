@@ -1,16 +1,14 @@
 {
-  boolean retry=true;
-  while (retry) {
-    OChannelBinaryAsynchClient network=null;
-    try {
-      network=storage.beginRequest(iRequest);
+  storage.setSessionId(getURL(),sessionId,sessionToken);
+  return storage.networkOperation(new OStorageRemoteOperation<ODocument>(){
+    @Override public ODocument execute(    OChannelBinaryAsynchClient network) throws IOException {
       try {
+        storage.beginRequest(network,iRequest);
         network.writeBytes(iPayLoad.toStream());
       }
   finally {
         storage.endRequest(network);
       }
-      retry=false;
       try {
         storage.beginResponse(network);
         return new ODocument(network.readBytes());
@@ -19,17 +17,6 @@
         storage.endResponse(network);
       }
     }
- catch (    OModificationOperationProhibitedException ompe) {
-      retry=handleDBFreeze();
-    }
-catch (    IOException e) {
-      if (network != null)       storage.getEngine().getConnectionManager().remove(network);
-      throw OException.wrapException(new OStorageException("Error on executing  '" + iActivity + "'"),e);
-    }
-catch (    Exception e2) {
-      if (network != null)       storage.getEngine().getConnectionManager().release(network);
-      throw OException.wrapException(new OStorageException("Error on executing  '" + iActivity + "'"),e2);
-    }
   }
-  return null;
+,"Error on executing  '" + iActivity + "'");
 }

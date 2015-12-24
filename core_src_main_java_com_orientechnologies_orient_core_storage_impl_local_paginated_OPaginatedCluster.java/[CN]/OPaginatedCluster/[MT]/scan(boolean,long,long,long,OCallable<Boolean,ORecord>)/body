@@ -11,22 +11,28 @@
       long clusterPosition=ascendingOrder ? firstPos : lastPos;
       long browsed=0;
       for (; ascendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(ascendingOrder ? 1 : -1)) {
-        final ORawBuffer buffer=readRecordNoLock(clusterPosition,Math.max(prefetchPages,1));
-        if (buffer == null)         continue;
-        if (progressDump > 1 && OLogManager.instance().isDebugEnabled()) {
-          final long recordsScanned=clusterPosition - firstPos;
-          if ((recordsScanned + 1) % progressDump == 0) {
-            OLogManager.instance().debug(this,"Scan cluster id=%d read %d/%d %.2f%%",id,recordsScanned,recordsToScan,((float)recordsScanned * 100 / recordsToScan));
+        startOperation();
+        try {
+          final ORawBuffer buffer=readRecordNoLock(clusterPosition,Math.max(prefetchPages,1));
+          if (buffer == null)           continue;
+          if (progressDump > 1 && OLogManager.instance().isDebugEnabled()) {
+            final long recordsScanned=clusterPosition - firstPos;
+            if ((recordsScanned + 1) % progressDump == 0) {
+              OLogManager.instance().debug(this,"Scan cluster id=%d read %d/%d %.2f%%",id,recordsScanned,recordsToScan,((float)recordsScanned * 100 / recordsToScan));
+            }
           }
+          final ORecord rec=Orient.instance().getRecordFactoryManager().newInstance(buffer.recordType);
+          ORecordInternal.fill(rec,new ORecordId(id,clusterPosition),buffer.version,buffer.buffer,false);
+          if (callback.call(rec).equals(Boolean.FALSE))           break;
+          if (Thread.currentThread().isInterrupted()) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+          if (limit > 0 && browsed++ > limit)           return clusterPosition;
         }
-        final ORecord rec=Orient.instance().getRecordFactoryManager().newInstance(buffer.recordType);
-        ORecordInternal.fill(rec,new ORecordId(id,clusterPosition),buffer.version,buffer.buffer,false);
-        if (callback.call(rec).equals(Boolean.FALSE))         break;
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.currentThread().interrupt();
-          break;
+  finally {
+          completeOperation();
         }
-        if (limit > 0 && browsed++ > limit)         return clusterPosition;
       }
       return -1;
     }

@@ -1,22 +1,28 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      final ODirectoryPage page=loadPage(nodeIndex,false,atomicOperation);
+      acquireSharedLock();
       try {
-        return page.getNodeLocalDepth(getLocalNodeIndex(nodeIndex));
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        final ODirectoryPage page=loadPage(nodeIndex,false,atomicOperation);
+        try {
+          return page.getNodeLocalDepth(getLocalNodeIndex(nodeIndex));
+        }
+  finally {
+          releasePage(page,false,atomicOperation);
+        }
       }
   finally {
-        releasePage(page,false,atomicOperation);
+        releaseSharedLock();
       }
     }
   finally {
-      releaseSharedLock();
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
   finally {
-    atomicOperationsManager.releaseReadLock(this);
+    completeOperation();
   }
 }

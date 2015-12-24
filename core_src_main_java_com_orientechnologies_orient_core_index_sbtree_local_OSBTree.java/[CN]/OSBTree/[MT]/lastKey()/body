@@ -1,28 +1,34 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      final BucketSearchResult searchResult=lastItem(atomicOperation);
-      if (searchResult == null)       return null;
-      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,searchResult.getLastPathItem(),false);
+      acquireSharedLock();
       try {
-        OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
-        return bucket.getKey(searchResult.itemIndex);
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        final BucketSearchResult searchResult=lastItem(atomicOperation);
+        if (searchResult == null)         return null;
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,searchResult.getLastPathItem(),false);
+        try {
+          OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+          return bucket.getKey(searchResult.itemIndex);
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry);
+        }
       }
   finally {
-        releasePage(atomicOperation,cacheEntry);
+        releaseSharedLock();
       }
     }
-  finally {
-      releaseSharedLock();
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeException("Error during finding last key in sbtree [" + getName() + "]",this),e);
     }
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during finding last key in sbtree [" + getName() + "]",this),e);
-  }
  finally {
-    atomicOperationsManager.releaseReadLock(this);
+      atomicOperationsManager.releaseReadLock(this);
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

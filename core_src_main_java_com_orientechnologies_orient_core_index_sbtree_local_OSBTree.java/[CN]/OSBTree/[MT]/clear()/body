@@ -1,39 +1,45 @@
 {
-  final OAtomicOperation atomicOperation;
+  startOperation();
   try {
-    atomicOperation=startAtomicOperation();
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during sbtree clear",this),e);
-  }
-  acquireExclusiveLock();
-  try {
-    truncateFile(atomicOperation,fileId);
-    if (nullPointerSupport)     truncateFile(atomicOperation,nullBucketFileId);
-    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false);
-    if (cacheEntry == null) {
-      cacheEntry=addPage(atomicOperation,fileId);
-    }
-    cacheEntry.acquireExclusiveLock();
+    final OAtomicOperation atomicOperation;
     try {
-      OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
-      rootBucket.setTreeSize(0);
+      atomicOperation=startAtomicOperation();
     }
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeException("Error during sbtree clear",this),e);
+    }
+    acquireExclusiveLock();
+    try {
+      truncateFile(atomicOperation,fileId);
+      if (nullPointerSupport)       truncateFile(atomicOperation,nullBucketFileId);
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,ROOT_INDEX,false);
+      if (cacheEntry == null) {
+        cacheEntry=addPage(atomicOperation,fileId);
+      }
+      cacheEntry.acquireExclusiveLock();
+      try {
+        OSBTreeBucket<K,V> rootBucket=new OSBTreeBucket<K,V>(cacheEntry,true,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,cacheEntry));
+        rootBucket.setTreeSize(0);
+      }
   finally {
-      cacheEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,cacheEntry);
+        cacheEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,cacheEntry);
+      }
+      endAtomicOperation(false,null);
     }
-    endAtomicOperation(false,null);
-  }
- catch (  IOException e) {
-    rollback(e);
-    throw OException.wrapException(new OSBTreeException("Error during clear of sbtree with name " + getName(),this),e);
-  }
-catch (  RuntimeException e) {
-    rollback(e);
-    throw e;
-  }
+ catch (    IOException e) {
+      rollback(e);
+      throw OException.wrapException(new OSBTreeException("Error during clear of sbtree with name " + getName(),this),e);
+    }
+catch (    RuntimeException e) {
+      rollback(e);
+      throw e;
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

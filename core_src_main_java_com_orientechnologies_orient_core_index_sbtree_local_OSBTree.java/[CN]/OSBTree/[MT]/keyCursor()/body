@@ -1,26 +1,32 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      final BucketSearchResult searchResult=firstItem(atomicOperation);
-      if (searchResult == null)       return new OSBTreeKeyCursor<K>(){
-        @Override public K next(        int prefetchSize){
-          return null;
+      acquireSharedLock();
+      try {
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        final BucketSearchResult searchResult=firstItem(atomicOperation);
+        if (searchResult == null)         return new OSBTreeKeyCursor<K>(){
+          @Override public K next(          int prefetchSize){
+            return null;
+          }
         }
-      }
 ;
-      return new OSBTreeFullKeyCursor(searchResult.getLastPathItem());
-    }
+        return new OSBTreeFullKeyCursor(searchResult.getLastPathItem());
+      }
   finally {
-      releaseSharedLock();
+        releaseSharedLock();
+      }
+    }
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeException("Error during finding first key in sbtree [" + getName() + "]",this),e);
+    }
+ finally {
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during finding first key in sbtree [" + getName() + "]",this),e);
-  }
- finally {
-    atomicOperationsManager.releaseReadLock(this);
+  finally {
+    completeOperation();
   }
 }

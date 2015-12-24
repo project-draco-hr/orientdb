@@ -1,25 +1,31 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true);
+      acquireSharedLock();
       try {
-        return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getSize();
+        final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true);
+        try {
+          return new OPaginatedClusterState(pinnedStateEntry,getChangesTree(atomicOperation,pinnedStateEntry)).getSize();
+        }
+  finally {
+          releasePage(atomicOperation,pinnedStateEntry);
+        }
       }
   finally {
-        releasePage(atomicOperation,pinnedStateEntry);
+        releaseSharedLock();
       }
     }
-  finally {
-      releaseSharedLock();
+ catch (    IOException ioe) {
+      throw OException.wrapException(new OPaginatedClusterException("Error during retrieval of size of '" + getName() + "' cluster",this),ioe);
     }
-  }
- catch (  IOException ioe) {
-    throw OException.wrapException(new OPaginatedClusterException("Error during retrieval of size of '" + getName() + "' cluster",this),ioe);
-  }
  finally {
-    atomicOperationsManager.releaseReadLock(this);
+      atomicOperationsManager.releaseReadLock(this);
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

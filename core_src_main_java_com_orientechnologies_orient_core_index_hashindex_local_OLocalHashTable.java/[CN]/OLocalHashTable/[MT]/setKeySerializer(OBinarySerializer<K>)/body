@@ -1,35 +1,41 @@
 {
-  final OAtomicOperation atomicOperation;
+  startOperation();
   try {
-    atomicOperation=startAtomicOperation();
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OIndexException("Error during hash set serializer for index keys"),e);
-  }
-  acquireExclusiveLock();
-  try {
-    this.keySerializer=keySerializer;
-    OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true);
-    hashStateEntry.acquireExclusiveLock();
+    final OAtomicOperation atomicOperation;
     try {
-      OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
-      metadataPage.setKeySerializerId(keySerializer.getId());
+      atomicOperation=startAtomicOperation();
     }
+ catch (    IOException e) {
+      throw OException.wrapException(new OIndexException("Error during hash set serializer for index keys"),e);
+    }
+    acquireExclusiveLock();
+    try {
+      this.keySerializer=keySerializer;
+      OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,hashStateEntryIndex,true);
+      hashStateEntry.acquireExclusiveLock();
+      try {
+        OHashIndexFileLevelMetadataPage metadataPage=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        metadataPage.setKeySerializerId(keySerializer.getId());
+      }
   finally {
-      hashStateEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,hashStateEntry);
+        hashStateEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,hashStateEntry);
+      }
+      endAtomicOperation(false,null);
     }
-    endAtomicOperation(false,null);
-  }
- catch (  IOException e) {
-    rollback(e);
-    throw OException.wrapException(new OIndexException("Cannot set serializer for index keys"),e);
-  }
-catch (  Exception e) {
-    rollback(e);
-    throw OException.wrapException(new OStorageException("Cannot set serializer for index keys"),e);
-  }
+ catch (    IOException e) {
+      rollback(e);
+      throw OException.wrapException(new OIndexException("Cannot set serializer for index keys"),e);
+    }
+catch (    Exception e) {
+      rollback(e);
+      throw OException.wrapException(new OStorageException("Cannot set serializer for index keys"),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

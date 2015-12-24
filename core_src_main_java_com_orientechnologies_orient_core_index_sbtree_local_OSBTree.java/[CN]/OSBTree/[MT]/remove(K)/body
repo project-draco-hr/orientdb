@@ -1,72 +1,78 @@
 {
-  final OAtomicOperation atomicOperation;
+  startOperation();
   try {
-    atomicOperation=startAtomicOperation();
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during sbtree entrie remove",this),e);
-  }
-  acquireExclusiveLock();
-  try {
-    V removedValue;
-    if (key != null) {
-      key=keySerializer.preprocess(key,(Object[])keyTypes);
-      BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
-      if (bucketSearchResult.itemIndex < 0) {
-        endAtomicOperation(false,null);
-        return null;
-      }
-      OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketSearchResult.getLastPathItem(),false);
-      keyBucketCacheEntry.acquireExclusiveLock();
-      try {
-        OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
-        final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
-        final V value=readValue(removed,atomicOperation);
-        long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
-        if (removedValueLink >= 0)         removeLinkedValue(removedValueLink,atomicOperation);
-        setSize(size() - 1,atomicOperation);
-        removedValue=value;
-      }
-  finally {
-        keyBucketCacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,keyBucketCacheEntry);
-      }
+    final OAtomicOperation atomicOperation;
+    try {
+      atomicOperation=startAtomicOperation();
     }
- else {
-      if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
-        endAtomicOperation(false,null);
-        return null;
-      }
-      OCacheEntry nullCacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
-      nullCacheEntry.acquireExclusiveLock();
-      try {
-        ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getChangesTree(atomicOperation,nullCacheEntry),valueSerializer,false);
-        OSBTreeValue<V> treeValue=nullBucket.getValue();
-        if (treeValue == null) {
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeException("Error during sbtree entrie remove",this),e);
+    }
+    acquireExclusiveLock();
+    try {
+      V removedValue;
+      if (key != null) {
+        key=keySerializer.preprocess(key,(Object[])keyTypes);
+        BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
+        if (bucketSearchResult.itemIndex < 0) {
           endAtomicOperation(false,null);
           return null;
         }
-        removedValue=readValue(treeValue,atomicOperation);
-        nullBucket.removeValue();
-      }
+        OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,bucketSearchResult.getLastPathItem(),false);
+        keyBucketCacheEntry.acquireExclusiveLock();
+        try {
+          OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
+          final OSBTreeValue<V> removed=keyBucket.getEntry(bucketSearchResult.itemIndex).value;
+          final V value=readValue(removed,atomicOperation);
+          long removedValueLink=keyBucket.remove(bucketSearchResult.itemIndex);
+          if (removedValueLink >= 0)           removeLinkedValue(removedValueLink,atomicOperation);
+          setSize(size() - 1,atomicOperation);
+          removedValue=value;
+        }
   finally {
-        nullCacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,nullCacheEntry);
+          keyBucketCacheEntry.releaseExclusiveLock();
+          releasePage(atomicOperation,keyBucketCacheEntry);
+        }
       }
-      if (removedValue != null)       setSize(size() - 1,atomicOperation);
+ else {
+        if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
+          endAtomicOperation(false,null);
+          return null;
+        }
+        OCacheEntry nullCacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
+        nullCacheEntry.acquireExclusiveLock();
+        try {
+          ONullBucket<V> nullBucket=new ONullBucket<V>(nullCacheEntry,getChangesTree(atomicOperation,nullCacheEntry),valueSerializer,false);
+          OSBTreeValue<V> treeValue=nullBucket.getValue();
+          if (treeValue == null) {
+            endAtomicOperation(false,null);
+            return null;
+          }
+          removedValue=readValue(treeValue,atomicOperation);
+          nullBucket.removeValue();
+        }
+  finally {
+          nullCacheEntry.releaseExclusiveLock();
+          releasePage(atomicOperation,nullCacheEntry);
+        }
+        if (removedValue != null)         setSize(size() - 1,atomicOperation);
+      }
+      endAtomicOperation(false,null);
+      return removedValue;
     }
-    endAtomicOperation(false,null);
-    return removedValue;
-  }
- catch (  IOException e) {
-    rollback(e);
-    throw OException.wrapException(new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),this),e);
-  }
-catch (  RuntimeException e) {
-    rollback(e);
-    throw e;
-  }
+ catch (    IOException e) {
+      rollback(e);
+      throw OException.wrapException(new OSBTreeException("Error during removing key " + key + " from sbtree "+ getName(),this),e);
+    }
+catch (    RuntimeException e) {
+      rollback(e);
+      throw e;
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

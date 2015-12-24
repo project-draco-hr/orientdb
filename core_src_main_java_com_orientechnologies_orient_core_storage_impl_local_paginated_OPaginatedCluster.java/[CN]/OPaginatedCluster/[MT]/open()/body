@@ -1,19 +1,25 @@
 {
-  acquireExclusiveLock();
+  startOperation();
   try {
-    final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-    fileId=openFile(atomicOperation,getFullName());
-    final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,0,false);
+    acquireExclusiveLock();
     try {
-      pinPage(atomicOperation,pinnedStateEntry);
-      pinnedStateEntryIndex=pinnedStateEntry.getPageIndex();
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      fileId=openFile(atomicOperation,getFullName());
+      final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,0,false);
+      try {
+        pinPage(atomicOperation,pinnedStateEntry);
+        pinnedStateEntryIndex=pinnedStateEntry.getPageIndex();
+      }
+  finally {
+        releasePage(atomicOperation,pinnedStateEntry);
+      }
+      clusterPositionMap.open();
     }
   finally {
-      releasePage(atomicOperation,pinnedStateEntry);
+      releaseExclusiveLock();
     }
-    clusterPositionMap.open();
   }
   finally {
-    releaseExclusiveLock();
+    completeOperation();
   }
 }

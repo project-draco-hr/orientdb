@@ -1,20 +1,26 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      if (ascSortOrder)       return iterateEntriesBetweenAscOrder(keyFrom,fromInclusive,keyTo,toInclusive,atomicOperation);
- else       return iterateEntriesBetweenDescOrder(keyFrom,fromInclusive,keyTo,toInclusive,atomicOperation);
-    }
+      acquireSharedLock();
+      try {
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        if (ascSortOrder)         return iterateEntriesBetweenAscOrder(keyFrom,fromInclusive,keyTo,toInclusive,atomicOperation);
+ else         return iterateEntriesBetweenDescOrder(keyFrom,fromInclusive,keyTo,toInclusive,atomicOperation);
+      }
   finally {
-      releaseSharedLock();
+        releaseSharedLock();
+      }
+    }
+ catch (    IOException ioe) {
+      throw OException.wrapException(new OSBTreeException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ getName(),this),ioe);
+    }
+ finally {
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
- catch (  IOException ioe) {
-    throw OException.wrapException(new OSBTreeException("Error during fetch of values between key " + keyFrom + " and key "+ keyTo+ " in sbtree "+ getName(),this),ioe);
-  }
- finally {
-    atomicOperationsManager.releaseReadLock(this);
+  finally {
+    completeOperation();
   }
 }

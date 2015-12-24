@@ -1,32 +1,38 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,1);
-      if (positionEntry == null)       throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
-      int recordPosition=positionEntry.getRecordPosition();
-      long pageIndex=positionEntry.getPageIndex();
-      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)       throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
-      int loadedRecordVersion=0;
-      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+      acquireSharedLock();
       try {
-        final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-        if (localPage.isDeleted(recordPosition))         throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
-        loadedRecordVersion=localPage.getRecordVersion(recordPosition);
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,1);
+        if (positionEntry == null)         throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
+        int recordPosition=positionEntry.getRecordPosition();
+        long pageIndex=positionEntry.getPageIndex();
+        if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)         throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
+        int loadedRecordVersion=0;
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        try {
+          final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+          if (localPage.isDeleted(recordPosition))           throw new ORecordNotFoundException("Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
+          loadedRecordVersion=localPage.getRecordVersion(recordPosition);
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry);
+        }
+        if (loadedRecordVersion > recordVersion)         return readRecord(clusterPosition);
+        return null;
       }
   finally {
-        releasePage(atomicOperation,cacheEntry);
+        releaseSharedLock();
       }
-      if (loadedRecordVersion > recordVersion)       return readRecord(clusterPosition);
-      return null;
     }
   finally {
-      releaseSharedLock();
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
   finally {
-    atomicOperationsManager.releaseReadLock(this);
+    completeOperation();
   }
 }

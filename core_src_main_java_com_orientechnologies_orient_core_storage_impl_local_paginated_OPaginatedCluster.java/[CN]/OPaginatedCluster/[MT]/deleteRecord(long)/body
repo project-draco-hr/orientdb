@@ -1,71 +1,77 @@
 {
-  OAtomicOperation atomicOperation=startAtomicOperation();
-  acquireExclusiveLock();
+  startOperation();
   try {
-    OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,1);
-    if (positionEntry == null) {
-      endAtomicOperation(false,null);
-      return false;
-    }
-    long pageIndex=positionEntry.getPageIndex();
-    int recordPosition=positionEntry.getRecordPosition();
-    if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-      endAtomicOperation(false,null);
-      return false;
-    }
-    long nextPagePointer;
-    int removedContentSize=0;
-    do {
-      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-      cacheEntry.acquireExclusiveLock();
-      int initialFreePageIndex;
-      try {
-        OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-        initialFreePageIndex=calculateFreePageIndex(localPage);
-        if (localPage.isDeleted(recordPosition)) {
-          if (removedContentSize == 0) {
-            endAtomicOperation(false,null);
-            return false;
+    OAtomicOperation atomicOperation=startAtomicOperation();
+    acquireExclusiveLock();
+    try {
+      OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,1);
+      if (positionEntry == null) {
+        endAtomicOperation(false,null);
+        return false;
+      }
+      long pageIndex=positionEntry.getPageIndex();
+      int recordPosition=positionEntry.getRecordPosition();
+      if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
+        endAtomicOperation(false,null);
+        return false;
+      }
+      long nextPagePointer;
+      int removedContentSize=0;
+      do {
+        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireExclusiveLock();
+        int initialFreePageIndex;
+        try {
+          OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+          initialFreePageIndex=calculateFreePageIndex(localPage);
+          if (localPage.isDeleted(recordPosition)) {
+            if (removedContentSize == 0) {
+              endAtomicOperation(false,null);
+              return false;
+            }
+ else             throw new OPaginatedClusterException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.",this);
           }
- else           throw new OPaginatedClusterException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.",this);
+ else           if (removedContentSize == 0) {
+            cacheEntry.releaseExclusiveLock();
+            releasePage(atomicOperation,cacheEntry);
+            cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+            cacheEntry.acquireExclusiveLock();
+            localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+          }
+          byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
+          int initialFreeSpace=localPage.getFreeSpace();
+          localPage.deleteRecord(recordPosition);
+          removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
+          nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
         }
- else         if (removedContentSize == 0) {
+  finally {
           cacheEntry.releaseExclusiveLock();
           releasePage(atomicOperation,cacheEntry);
-          cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-          cacheEntry.acquireExclusiveLock();
-          localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
         }
-        byte[] content=localPage.getRecordBinaryValue(recordPosition,0,localPage.getRecordSize(recordPosition));
-        int initialFreeSpace=localPage.getFreeSpace();
-        localPage.deleteRecord(recordPosition);
-        removedContentSize+=localPage.getFreeSpace() - initialFreeSpace;
-        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+        updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
+        pageIndex=getPageIndex(nextPagePointer);
+        recordPosition=getRecordPosition(nextPagePointer);
       }
-  finally {
-        cacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,cacheEntry);
-      }
-      updateFreePagesIndex(initialFreePageIndex,pageIndex,atomicOperation);
-      pageIndex=getPageIndex(nextPagePointer);
-      recordPosition=getRecordPosition(nextPagePointer);
-    }
  while (nextPagePointer >= 0);
-    updateClusterState(-1,-removedContentSize,atomicOperation);
-    clusterPositionMap.remove(clusterPosition);
-    addAtomicOperationMetadata(new ORecordId(id,clusterPosition),atomicOperation);
-    endAtomicOperation(false,null);
-    return true;
-  }
- catch (  IOException e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OPaginatedClusterException("Error during record deletion",this),e);
-  }
-catch (  RuntimeException e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OPaginatedClusterException("Error during record deletion",this),e);
-  }
+      updateClusterState(-1,-removedContentSize,atomicOperation);
+      clusterPositionMap.remove(clusterPosition);
+      addAtomicOperationMetadata(new ORecordId(id,clusterPosition),atomicOperation);
+      endAtomicOperation(false,null);
+      return true;
+    }
+ catch (    IOException e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OPaginatedClusterException("Error during record deletion",this),e);
+    }
+catch (    RuntimeException e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OPaginatedClusterException("Error during record deletion",this),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

@@ -1,82 +1,88 @@
 {
-  final OAtomicOperation atomicOperation;
+  startOperation();
   try {
-    atomicOperation=startAtomicOperation();
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OIndexException("Error during hash table entry deletion"),e);
-  }
-  acquireExclusiveLock();
-  try {
-    checkNullSupport(key);
-    int sizeDiff=0;
-    if (key != null) {
-      key=keySerializer.preprocess(key,(Object[])keyTypes);
-      final long hashCode=keyHashFunction.hashCode(key);
-      final OHashTable.BucketPath nodePath=getBucket(hashCode);
-      final long bucketPointer=directory.getNodePointer(nodePath.nodeIndex,nodePath.itemIndex + nodePath.hashMapOffset);
-      final long pageIndex=getPageIndex(bucketPointer);
-      final V removed;
-      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-      cacheEntry.acquireExclusiveLock();
-      try {
-        final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
-        final int positionIndex=bucket.getIndex(hashCode,key);
-        if (positionIndex < 0) {
+    final OAtomicOperation atomicOperation;
+    try {
+      atomicOperation=startAtomicOperation();
+    }
+ catch (    IOException e) {
+      throw OException.wrapException(new OIndexException("Error during hash table entry deletion"),e);
+    }
+    acquireExclusiveLock();
+    try {
+      checkNullSupport(key);
+      int sizeDiff=0;
+      if (key != null) {
+        key=keySerializer.preprocess(key,(Object[])keyTypes);
+        final long hashCode=keyHashFunction.hashCode(key);
+        final OHashTable.BucketPath nodePath=getBucket(hashCode);
+        final long bucketPointer=directory.getNodePointer(nodePath.nodeIndex,nodePath.itemIndex + nodePath.hashMapOffset);
+        final long pageIndex=getPageIndex(bucketPointer);
+        final V removed;
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireExclusiveLock();
+        try {
+          final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChangesTree(atomicOperation,cacheEntry));
+          final int positionIndex=bucket.getIndex(hashCode,key);
+          if (positionIndex < 0) {
+            endAtomicOperation(false,null);
+            return null;
+          }
+          removed=bucket.deleteEntry(positionIndex).value;
+          sizeDiff--;
+        }
+  finally {
+          cacheEntry.releaseExclusiveLock();
+          releasePage(atomicOperation,cacheEntry);
+        }
+        if (nodePath.parent != null) {
+          final int hashMapSize=1 << nodePath.nodeLocalDepth;
+          final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(directory.getNode(nodePath.nodeIndex),hashMapSize);
+          if (allMapsContainSameBucket)           mergeNodeToParent(nodePath);
+        }
+        changeSize(sizeDiff,atomicOperation);
+        endAtomicOperation(false,null);
+        return removed;
+      }
+ else {
+        if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
           endAtomicOperation(false,null);
           return null;
         }
-        removed=bucket.deleteEntry(positionIndex).value;
-        sizeDiff--;
-      }
-  finally {
-        cacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,cacheEntry);
-      }
-      if (nodePath.parent != null) {
-        final int hashMapSize=1 << nodePath.nodeLocalDepth;
-        final boolean allMapsContainSameBucket=checkAllMapsContainSameBucket(directory.getNode(nodePath.nodeIndex),hashMapSize);
-        if (allMapsContainSameBucket)         mergeNodeToParent(nodePath);
-      }
-      changeSize(sizeDiff,atomicOperation);
-      endAtomicOperation(false,null);
-      return removed;
-    }
- else {
-      if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0) {
-        endAtomicOperation(false,null);
-        return null;
-      }
-      V removed=null;
-      OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
-      if (cacheEntry == null)       cacheEntry=addPage(atomicOperation,nullBucketFileId);
-      cacheEntry.acquireExclusiveLock();
-      try {
-        final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChangesTree(atomicOperation,cacheEntry),valueSerializer,false);
-        removed=nullBucket.getValue();
-        if (removed != null) {
-          nullBucket.removeValue();
-          sizeDiff--;
+        V removed=null;
+        OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
+        if (cacheEntry == null)         cacheEntry=addPage(atomicOperation,nullBucketFileId);
+        cacheEntry.acquireExclusiveLock();
+        try {
+          final ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChangesTree(atomicOperation,cacheEntry),valueSerializer,false);
+          removed=nullBucket.getValue();
+          if (removed != null) {
+            nullBucket.removeValue();
+            sizeDiff--;
+          }
         }
-      }
   finally {
-        cacheEntry.releaseExclusiveLock();
-        releasePage(atomicOperation,cacheEntry);
+          cacheEntry.releaseExclusiveLock();
+          releasePage(atomicOperation,cacheEntry);
+        }
+        changeSize(sizeDiff,atomicOperation);
+        endAtomicOperation(false,null);
+        return removed;
       }
-      changeSize(sizeDiff,atomicOperation);
-      endAtomicOperation(false,null);
-      return removed;
+    }
+ catch (    IOException e) {
+      rollback(e);
+      throw OException.wrapException(new OIndexException("Error during index removal"),e);
+    }
+catch (    Exception e) {
+      rollback(e);
+      throw OException.wrapException(new OStorageException("Error during index removal"),e);
+    }
+ finally {
+      releaseExclusiveLock();
     }
   }
- catch (  IOException e) {
-    rollback(e);
-    throw OException.wrapException(new OIndexException("Error during index removal"),e);
-  }
-catch (  Exception e) {
-    rollback(e);
-    throw OException.wrapException(new OStorageException("Error during index removal"),e);
-  }
- finally {
-    releaseExclusiveLock();
+  finally {
+    completeOperation();
   }
 }

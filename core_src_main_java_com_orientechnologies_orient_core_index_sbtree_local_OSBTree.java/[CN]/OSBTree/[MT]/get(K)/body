@@ -1,47 +1,53 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      checkNullSupport(key);
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      if (key != null) {
-        key=keySerializer.preprocess(key,(Object[])keyTypes);
-        BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
-        if (bucketSearchResult.itemIndex < 0)         return null;
-        long pageIndex=bucketSearchResult.getLastPathItem();
-        OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-        try {
-          OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
-          OSBTreeBucket.SBTreeEntry<K,V> treeEntry=keyBucket.getEntry(bucketSearchResult.itemIndex);
-          return readValue(treeEntry.value,atomicOperation);
-        }
+      acquireSharedLock();
+      try {
+        checkNullSupport(key);
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        if (key != null) {
+          key=keySerializer.preprocess(key,(Object[])keyTypes);
+          BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
+          if (bucketSearchResult.itemIndex < 0)           return null;
+          long pageIndex=bucketSearchResult.getLastPathItem();
+          OCacheEntry keyBucketCacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+          try {
+            OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(keyBucketCacheEntry,keySerializer,keyTypes,valueSerializer,getChangesTree(atomicOperation,keyBucketCacheEntry));
+            OSBTreeBucket.SBTreeEntry<K,V> treeEntry=keyBucket.getEntry(bucketSearchResult.itemIndex);
+            return readValue(treeEntry.value,atomicOperation);
+          }
   finally {
-          releasePage(atomicOperation,keyBucketCacheEntry);
+            releasePage(atomicOperation,keyBucketCacheEntry);
+          }
         }
-      }
  else {
-        if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0)         return null;
-        final OCacheEntry nullBucketCacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
-        try {
-          final ONullBucket<V> nullBucket=new ONullBucket<V>(nullBucketCacheEntry,getChangesTree(atomicOperation,nullBucketCacheEntry),valueSerializer,false);
-          final OSBTreeValue<V> treeValue=nullBucket.getValue();
-          if (treeValue == null)           return null;
-          return readValue(treeValue,atomicOperation);
-        }
+          if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0)           return null;
+          final OCacheEntry nullBucketCacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
+          try {
+            final ONullBucket<V> nullBucket=new ONullBucket<V>(nullBucketCacheEntry,getChangesTree(atomicOperation,nullBucketCacheEntry),valueSerializer,false);
+            final OSBTreeValue<V> treeValue=nullBucket.getValue();
+            if (treeValue == null)             return null;
+            return readValue(treeValue,atomicOperation);
+          }
   finally {
-          releasePage(atomicOperation,nullBucketCacheEntry);
+            releasePage(atomicOperation,nullBucketCacheEntry);
+          }
         }
       }
-    }
   finally {
-      releaseSharedLock();
+        releaseSharedLock();
+      }
+    }
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeException("Error during retrieving  of sbtree with name " + getName(),this),e);
+    }
+ finally {
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeException("Error during retrieving  of sbtree with name " + getName(),this),e);
-  }
- finally {
-    atomicOperationsManager.releaseReadLock(this);
+  finally {
+    completeOperation();
   }
 }

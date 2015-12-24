@@ -1,26 +1,32 @@
 {
-  OAtomicOperation atomicOperation=startAtomicOperation();
-  acquireExclusiveLock();
+  startOperation();
   try {
-    final ODirectoryPage page=loadPage(nodeIndex,true,atomicOperation);
+    OAtomicOperation atomicOperation=startAtomicOperation();
+    acquireExclusiveLock();
     try {
-      final int localNodeIndex=getLocalNodeIndex(nodeIndex);
-      for (int i=0; i < LEVEL_SIZE; i++)       page.setPointer(localNodeIndex,i,node[i]);
-    }
+      final ODirectoryPage page=loadPage(nodeIndex,true,atomicOperation);
+      try {
+        final int localNodeIndex=getLocalNodeIndex(nodeIndex);
+        for (int i=0; i < LEVEL_SIZE; i++)         page.setPointer(localNodeIndex,i,node[i]);
+      }
   finally {
-      releasePage(page,true,atomicOperation);
+        releasePage(page,true,atomicOperation);
+      }
+      endAtomicOperation(false,null);
     }
-    endAtomicOperation(false,null);
-  }
- catch (  IOException e) {
-    endAtomicOperation(true,e);
-    throw e;
-  }
-catch (  Exception e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OHashTableDirectoryException("Error during setting of node",this),e);
-  }
+ catch (    IOException e) {
+      endAtomicOperation(true,e);
+      throw e;
+    }
+catch (    Exception e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OHashTableDirectoryException("Error during setting of node",this),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

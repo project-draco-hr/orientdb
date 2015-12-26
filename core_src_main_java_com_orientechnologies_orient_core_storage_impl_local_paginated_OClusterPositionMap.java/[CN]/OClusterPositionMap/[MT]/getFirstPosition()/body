@@ -1,30 +1,36 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      final long filledUpTo=getFilledUpTo(atomicOperation,fileId);
-      for (long pageIndex=0; pageIndex < filledUpTo; pageIndex++) {
-        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,0);
-        try {
-          OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
-          int bucketSize=bucket.getSize();
-          for (int index=0; index < bucketSize; index++) {
-            if (bucket.exists(index))             return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;
+      acquireSharedLock();
+      try {
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        final long filledUpTo=getFilledUpTo(atomicOperation,fileId);
+        for (long pageIndex=0; pageIndex < filledUpTo; pageIndex++) {
+          OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,1);
+          try {
+            OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
+            int bucketSize=bucket.getSize();
+            for (int index=0; index < bucketSize; index++) {
+              if (bucket.exists(index))               return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index;
+            }
+          }
+  finally {
+            releasePage(atomicOperation,cacheEntry);
           }
         }
-  finally {
-          releasePage(atomicOperation,cacheEntry);
-        }
+        return ORID.CLUSTER_POS_INVALID;
       }
-      return ORID.CLUSTER_POS_INVALID;
+  finally {
+        releaseSharedLock();
+      }
     }
   finally {
-      releaseSharedLock();
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
   finally {
-    atomicOperationsManager.releaseReadLock(this);
+    completeOperation();
   }
 }

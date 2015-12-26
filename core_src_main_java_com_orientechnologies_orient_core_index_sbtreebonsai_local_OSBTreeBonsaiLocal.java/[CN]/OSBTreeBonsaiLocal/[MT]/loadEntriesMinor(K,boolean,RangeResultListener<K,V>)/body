@@ -1,44 +1,50 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    final Lock lock=fileLockManager.acquireSharedLock(fileId);
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
-      OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
-      int index;
-      if (bucketSearchResult.itemIndex >= 0) {
-        index=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex - 1;
-      }
+      final Lock lock=fileLockManager.acquireSharedLock(fileId);
+      try {
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        BucketSearchResult bucketSearchResult=findBucket(key,atomicOperation);
+        OBonsaiBucketPointer bucketPointer=bucketSearchResult.getLastPathItem();
+        int index;
+        if (bucketSearchResult.itemIndex >= 0) {
+          index=inclusive ? bucketSearchResult.itemIndex : bucketSearchResult.itemIndex - 1;
+        }
  else {
-        index=-bucketSearchResult.itemIndex - 2;
-      }
-      boolean firstBucket=true;
-      do {
-        OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
-        try {
-          OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry),this);
-          if (!firstBucket)           index=bucket.size() - 1;
-          for (int i=index; i >= 0; i--) {
-            if (!listener.addResult(bucket.getEntry(i)))             return;
+          index=-bucketSearchResult.itemIndex - 2;
+        }
+        boolean firstBucket=true;
+        do {
+          OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
+          try {
+            OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,cacheEntry),this);
+            if (!firstBucket)             index=bucket.size() - 1;
+            for (int i=index; i >= 0; i--) {
+              if (!listener.addResult(bucket.getEntry(i)))               return;
+            }
+            bucketPointer=bucket.getLeftSibling();
+            firstBucket=false;
           }
-          bucketPointer=bucket.getLeftSibling();
-          firstBucket=false;
-        }
   finally {
-          releasePage(atomicOperation,cacheEntry);
+            releasePage(atomicOperation,cacheEntry);
+          }
         }
-      }
  while (bucketPointer.getPageIndex() >= 0);
-    }
+      }
   finally {
-      lock.unlock();
+        lock.unlock();
+      }
+    }
+ catch (    IOException ioe) {
+      throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during fetch of minor values for key " + key + " in sbtree "+ getName(),this),ioe);
+    }
+ finally {
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
- catch (  IOException ioe) {
-    throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during fetch of minor values for key " + key + " in sbtree "+ getName(),this),ioe);
-  }
- finally {
-    atomicOperationsManager.releaseReadLock(this);
+  finally {
+    completeOperation();
   }
 }

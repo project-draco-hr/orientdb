@@ -1,20 +1,21 @@
 {
-  OCacheEntry cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer,0);
+  OStoragePerformanceStatistic storagePerformanceStatistic=new OStoragePerformanceStatistic(OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,"test",1);
+  OCacheEntry cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer,1,storagePerformanceStatistic);
   if (cacheEntry == null) {
     do {
-      if (cacheEntry != null)       readBuffer.release(cacheEntry,writeBuffer);
-      cacheEntry=readBuffer.allocateNewPage(fileIds.get(fileNumber),writeBuffer);
+      if (cacheEntry != null)       readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
+      cacheEntry=readBuffer.allocateNewPage(fileIds.get(fileNumber),writeBuffer,storagePerformanceStatistic);
     }
  while (cacheEntry.getPageIndex() < pageIndex);
   }
   if (cacheEntry.getPageIndex() > pageIndex) {
-    readBuffer.release(cacheEntry,writeBuffer);
-    cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer,0);
+    readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
+    cacheEntry=readBuffer.load(fileIds.get(fileNumber),pageIndex,false,writeBuffer,1,storagePerformanceStatistic);
   }
   OCachePointer pointer=cacheEntry.getCachePointer();
   pointer.acquireExclusiveLock();
   pointer.getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{version.byteValue(),2,3,seed,5,6,(byte)fileNumber,(byte)(pageIndex & 0xFF)},0,8);
   cacheEntry.markDirty();
   pointer.releaseExclusiveLock();
-  readBuffer.release(cacheEntry,writeBuffer);
+  readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
 }

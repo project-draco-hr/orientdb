@@ -1,46 +1,52 @@
 {
-  final OAtomicOperation atomicOperation=startAtomicOperation();
-  acquireExclusiveLock();
+  startOperation();
   try {
-    OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true);
-    firstEntry.acquireExclusiveLock();
+    final OAtomicOperation atomicOperation=startAtomicOperation(true);
+    acquireExclusiveLock();
     try {
-      ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
-      if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
-        firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
-        firstPage.setTombstone(nodeIndex);
-      }
- else {
-        final int pageIndex=nodeIndex / ODirectoryPage.NODES_PER_PAGE;
-        final int localNodeIndex=nodeIndex % ODirectoryPage.NODES_PER_PAGE;
-        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true);
-        cacheEntry.acquireExclusiveLock();
-        try {
-          ODirectoryPage page=new ODirectoryPage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),cacheEntry);
-          page.setPointer(localNodeIndex,0,firstPage.getTombstone());
+      OCacheEntry firstEntry=loadPage(atomicOperation,fileId,firstEntryIndex,true);
+      firstEntry.acquireExclusiveLock();
+      try {
+        ODirectoryFirstPage firstPage=new ODirectoryFirstPage(firstEntry,getChangesTree(atomicOperation,firstEntry),firstEntry);
+        if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
+          firstPage.setPointer(nodeIndex,0,firstPage.getTombstone());
           firstPage.setTombstone(nodeIndex);
         }
+ else {
+          final int pageIndex=nodeIndex / ODirectoryPage.NODES_PER_PAGE;
+          final int localNodeIndex=nodeIndex % ODirectoryPage.NODES_PER_PAGE;
+          final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,true);
+          cacheEntry.acquireExclusiveLock();
+          try {
+            ODirectoryPage page=new ODirectoryPage(cacheEntry,getChangesTree(atomicOperation,cacheEntry),cacheEntry);
+            page.setPointer(localNodeIndex,0,firstPage.getTombstone());
+            firstPage.setTombstone(nodeIndex);
+          }
   finally {
-          cacheEntry.releaseExclusiveLock();
-          releasePage(atomicOperation,cacheEntry);
+            cacheEntry.releaseExclusiveLock();
+            releasePage(atomicOperation,cacheEntry);
+          }
         }
       }
-    }
   finally {
-      firstEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,firstEntry);
+        firstEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,firstEntry);
+      }
+      endAtomicOperation(false,null);
     }
-    endAtomicOperation(false,null);
-  }
- catch (  IOException e) {
-    endAtomicOperation(true,e);
-    throw e;
-  }
-catch (  Exception e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OHashTableDirectoryException("Error during node deletion",this),e);
-  }
+ catch (    IOException e) {
+      endAtomicOperation(true,e);
+      throw e;
+    }
+catch (    Exception e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OHashTableDirectoryException("Error during node deletion",this),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

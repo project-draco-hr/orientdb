@@ -1,0 +1,22 @@
+{
+  long fileId=readBuffer.addFile(fileName,writeBuffer);
+  OCacheEntry[] entries=new OCacheEntry[4];
+  byte[][] content=new byte[4][];
+  for (int i=0; i < 4; i++) {
+    entries[i]=readBuffer.load(fileId,i,false,writeBuffer,1,storagePerformanceStatistic);
+    if (entries[i] == null) {
+      entries[i]=readBuffer.allocateNewPage(fileId,writeBuffer,storagePerformanceStatistic);
+      Assert.assertEquals(entries[i].getPageIndex(),i);
+    }
+    entries[i].getCachePointer().acquireExclusiveLock();
+    content[i]=entries[i].getCachePointer().getDataPointer().get(systemOffset + OWOWCache.PAGE_PADDING,8);
+    entries[i].getCachePointer().releaseExclusiveLock();
+    readBuffer.release(entries[i],writeBuffer,storagePerformanceStatistic);
+  }
+  readBuffer.deleteFile(fileId,writeBuffer);
+  writeBuffer.flush();
+  for (int i=0; i < 4; i++) {
+    File file=new File(storageLocal.getConfiguration().getDirectory() + "/readWriteDiskCacheTest.tst");
+    Assert.assertFalse(file.exists());
+  }
+}

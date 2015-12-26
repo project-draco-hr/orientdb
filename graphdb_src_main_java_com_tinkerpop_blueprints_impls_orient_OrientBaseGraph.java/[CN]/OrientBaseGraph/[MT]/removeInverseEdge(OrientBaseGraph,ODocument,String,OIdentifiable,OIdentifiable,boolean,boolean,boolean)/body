@@ -1,0 +1,28 @@
+{
+  final ODocument r=getDocument(currentRecord,forceReload);
+  if (r == null)   return;
+  final String inverseFieldName=OrientVertex.getInverseConnectionFieldName(iFieldName,useVertexFieldsForEdgeLabels);
+  OImmutableClass immutableClass=ODocumentInternal.getImmutableSchemaClass(r);
+  if (immutableClass.isVertexType()) {
+    removeEdges(graph,r,inverseFieldName,iVertex,false,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+    r.save();
+  }
+ else   if (immutableClass.isEdgeType()) {
+    final OIdentifiable otherVertex=OrientEdge.getConnection(r,OrientVertex.getConnectionDirection(inverseFieldName,useVertexFieldsForEdgeLabels));
+    if (otherVertex != null) {
+      if (iVertexToRemove == null || otherVertex.equals(iVertexToRemove)) {
+        final int maxRetries=graph.getMaxRetries();
+        for (int retry=0; retry < maxRetries; ++retry) {
+          try {
+            final ODocument otherVertexRecord=getDocument(otherVertex,forceReload);
+            removeEdges(graph,otherVertexRecord,inverseFieldName,(OIdentifiable)currentRecord,false,useVertexFieldsForEdgeLabels,autoScaleEdgeType,forceReload);
+            if (otherVertexRecord != null)             otherVertexRecord.save();
+          }
+ catch (          ONeedRetryException e) {
+          }
+        }
+      }
+    }
+ else     throw new IllegalStateException("Invalid content found in " + iFieldName + " field");
+  }
+}

@@ -1,25 +1,31 @@
 {
-  Lock lock=fileLockManager.acquireExclusiveLock(fileId);
+  startOperation();
   try {
-    this.rootBucketPointer=rootBucketPointer;
-    final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-    this.fileId=openFile(atomicOperation,getFullName());
-    OCacheEntry rootCacheEntry=loadPage(atomicOperation,this.fileId,this.rootBucketPointer.getPageIndex(),false);
-    rootCacheEntry.acquireSharedLock();
+    Lock lock=fileLockManager.acquireExclusiveLock(fileId);
     try {
-      OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry),this);
-      keySerializer=(OBinarySerializer<K>)storage.getComponentsFactory().binarySerializerFactory.getObjectSerializer(rootBucket.getKeySerializerId());
-      valueSerializer=(OBinarySerializer<V>)storage.getComponentsFactory().binarySerializerFactory.getObjectSerializer(rootBucket.getValueSerializerId());
-    }
+      this.rootBucketPointer=rootBucketPointer;
+      final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      this.fileId=openFile(atomicOperation,getFullName());
+      OCacheEntry rootCacheEntry=loadPage(atomicOperation,this.fileId,this.rootBucketPointer.getPageIndex(),false);
+      rootCacheEntry.acquireSharedLock();
+      try {
+        OSBTreeBonsaiBucket<K,V> rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,this.rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry),this);
+        keySerializer=(OBinarySerializer<K>)storage.getComponentsFactory().binarySerializerFactory.getObjectSerializer(rootBucket.getKeySerializerId());
+        valueSerializer=(OBinarySerializer<V>)storage.getComponentsFactory().binarySerializerFactory.getObjectSerializer(rootBucket.getValueSerializerId());
+      }
   finally {
-      rootCacheEntry.releaseSharedLock();
-      releasePage(atomicOperation,rootCacheEntry);
+        rootCacheEntry.releaseSharedLock();
+        releasePage(atomicOperation,rootCacheEntry);
+      }
+    }
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeBonsaiLocalException("Exception during loading of sbtree " + fileId,this),e);
+    }
+ finally {
+      lock.unlock();
     }
   }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeBonsaiLocalException("Exception during loading of sbtree " + fileId,this),e);
-  }
- finally {
-    lock.unlock();
+  finally {
+    completeOperation();
   }
 }

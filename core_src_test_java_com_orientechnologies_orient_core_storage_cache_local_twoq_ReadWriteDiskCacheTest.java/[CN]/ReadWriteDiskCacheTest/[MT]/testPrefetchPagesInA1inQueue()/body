@@ -1,0 +1,50 @@
+{
+  final long fileId=readBuffer.addFile(fileName,writeBuffer);
+  for (int i=0; i < 4; i++) {
+    OCacheEntry cacheEntry=readBuffer.allocateNewPage(fileId,writeBuffer,storagePerformanceStatistic);
+    cacheEntry.acquireExclusiveLock();
+    try {
+      byte[] userData=new byte[userDataSize];
+      for (int n=0; n < userData.length; n++) {
+        userData[n]=(byte)(i + 1);
+      }
+      final ODirectMemoryPointer directMemoryPointer=cacheEntry.getCachePointer().getDataPointer();
+      directMemoryPointer.set(OWOWCache.PAGE_PADDING + systemOffset,userData,0,userData.length);
+      setLsn(directMemoryPointer,new OLogSequenceNumber(1,i));
+      cacheEntry.markDirty();
+    }
+  finally {
+      cacheEntry.releaseExclusiveLock();
+      readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
+    }
+  }
+  readBuffer.clear();
+  writeBuffer.flush();
+  for (int i=0; i < 4; i++) {
+    byte[] userData=new byte[userDataSize];
+    for (int n=0; n < userData.length; n++) {
+      userData[n]=(byte)(i + 1);
+    }
+    assertFile(i,userData,new OLogSequenceNumber(1,i));
+  }
+  LRUList am=readBuffer.getAm();
+  LRUList a1in=readBuffer.getA1in();
+  LRUList a1out=readBuffer.getA1out();
+  Assert.assertEquals(am.size(),0);
+  Assert.assertEquals(a1out.size(),0);
+  Assert.assertEquals(a1in.size(),0);
+  OCacheEntry cacheEntry=readBuffer.load(fileId,0,false,writeBuffer,1,storagePerformanceStatistic);
+  readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
+  Assert.assertEquals(am.size(),0);
+  Assert.assertEquals(a1out.size(),0);
+  Assert.assertEquals(a1in.size(),1);
+  readBuffer.clear();
+  Assert.assertEquals(am.size(),0);
+  Assert.assertEquals(a1out.size(),0);
+  Assert.assertEquals(a1in.size(),0);
+  cacheEntry=readBuffer.load(fileId,0,false,writeBuffer,4,storagePerformanceStatistic);
+  readBuffer.release(cacheEntry,writeBuffer,storagePerformanceStatistic);
+  Assert.assertEquals(am.size(),0);
+  Assert.assertEquals(a1out.size(),0);
+  Assert.assertEquals(a1in.size(),4);
+}

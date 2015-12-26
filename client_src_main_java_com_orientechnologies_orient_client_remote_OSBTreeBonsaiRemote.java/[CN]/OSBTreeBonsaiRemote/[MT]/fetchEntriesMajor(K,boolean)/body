@@ -1,16 +1,19 @@
 {
-  byte[] keyStream=new byte[keySerializer.getObjectSize(key)];
+  final byte[] keyStream=new byte[keySerializer.getObjectSize(key)];
   keySerializer.serialize(key,keyStream,0);
-  OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
-  OChannelBinaryAsynchClient client=null;
-  while (true) {
-    try {
-      client=storage.beginRequest(OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET_ENTRIES_MAJOR);
-      OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
-      client.writeBytes(keyStream);
-      client.writeBoolean(inclusive);
-      if (client.getSrvProtocolVersion() >= 21)       client.writeInt(128);
-      storage.endRequest(client);
+  final OStorageRemote storage=(OStorageRemote)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying();
+  return storage.networkOperation(new OStorageRemoteOperation<List<Map.Entry<K,V>>>(){
+    @Override public List<Map.Entry<K,V>> execute(    final OChannelBinaryAsynchClient client) throws IOException {
+      try {
+        storage.beginRequest(client,OChannelBinaryProtocol.REQUEST_SBTREE_BONSAI_GET_ENTRIES_MAJOR);
+        OCollectionNetworkSerializer.INSTANCE.writeCollectionPointer(client,getCollectionPointer());
+        client.writeBytes(keyStream);
+        client.writeBoolean(inclusive);
+        if (client.getSrvProtocolVersion() >= 21)         client.writeInt(128);
+      }
+  finally {
+        storage.endRequest(client);
+      }
       List<Map.Entry<K,V>> list=null;
       try {
         storage.beginResponse(client);
@@ -32,8 +35,6 @@
       }
       return list;
     }
- catch (    Exception e) {
-      storage.handleException(client,"Cannot get first key from sb-tree bonsai",e);
-    }
   }
+,"Cannot get first key from sb-tree bonsai");
 }

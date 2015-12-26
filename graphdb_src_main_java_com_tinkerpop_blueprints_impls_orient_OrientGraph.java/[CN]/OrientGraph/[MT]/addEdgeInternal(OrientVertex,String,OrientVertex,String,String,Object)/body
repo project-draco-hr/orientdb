@@ -1,0 +1,51 @@
+{
+  if (currentVertex.checkDeletedInTx())   throw new ORecordNotFoundException("The vertex " + currentVertex.getIdentity() + " has been deleted");
+  if (inVertex.checkDeletedInTx())   throw new ORecordNotFoundException("The vertex " + inVertex.getIdentity() + " has been deleted");
+  autoStartTransaction();
+  final ODocument outDocument=currentVertex.getRecord();
+  if (outDocument == null)   throw new IllegalArgumentException("source vertex is invalid (rid=" + currentVertex.getIdentity() + ")");
+  if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())   throw new IllegalArgumentException("source record is not a vertex");
+  ODocument inDocument=inVertex.getRecord();
+  if (inDocument == null)   throw new IllegalArgumentException("destination vertex is invalid (rid=" + inVertex.getIdentity() + ")");
+  if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())   throw new IllegalArgumentException("destination record is not a vertex");
+  OIdentifiable to;
+  OIdentifiable from;
+  label=OrientBaseGraph.encodeClassName(label);
+  if (label == null && iClassName != null)   label=OrientBaseGraph.encodeClassName(iClassName);
+  if (isUseClassForEdgeLabel()) {
+    final OrientEdgeType edgeType=getEdgeType(label);
+    if (edgeType == null)     createEdgeType(label);
+ else     label=edgeType.getName();
+  }
+  final String outFieldName=currentVertex.getConnectionFieldName(Direction.OUT,label,settings.isUseVertexFieldsForEdgeLabels());
+  final String inFieldName=currentVertex.getConnectionFieldName(Direction.IN,label,settings.isUseVertexFieldsForEdgeLabels());
+  if (label == null)   throw ExceptionFactory.edgeLabelCanNotBeNull();
+  OrientEdge edge=null;
+  if (currentVertex.canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
+    from=currentVertex.rawElement;
+    to=inDocument;
+    if (edge == null) {
+      if (settings.isKeepInMemoryReferences())       edge=new OrientEdge(this,from.getIdentity(),to.getIdentity(),label);
+ else       edge=new OrientEdge(this,from,to,label);
+    }
+  }
+ else {
+    if (edge == null) {
+      edge=new OrientEdge(this,label,fields);
+      if (settings.isKeepInMemoryReferences())       edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
+ else       edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,currentVertex.rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
+    }
+    from=edge.getRecord();
+    to=edge.getRecord();
+  }
+  if (settings.isKeepInMemoryReferences()) {
+    from=from.getIdentity();
+    to=to.getIdentity();
+  }
+  edge.save(iClusterName);
+  currentVertex.createLink(this,outDocument,to,outFieldName);
+  currentVertex.createLink(this,inDocument,from,inFieldName);
+  outDocument.save();
+  inDocument.save();
+  return edge;
+}

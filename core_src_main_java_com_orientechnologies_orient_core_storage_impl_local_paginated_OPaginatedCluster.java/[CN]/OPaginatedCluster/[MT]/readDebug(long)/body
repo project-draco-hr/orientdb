@@ -1,56 +1,62 @@
 {
-  OPaginatedClusterDebug debug=new OPaginatedClusterDebug();
-  debug.clusterPosition=clusterPosition;
-  debug.fileId=fileId;
-  OAtomicOperation atomicOperation=storageLocal.getAtomicOperationsManager().getCurrentOperation();
-  OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,0);
-  if (positionEntry == null) {
-    debug.empty=true;
-    return debug;
-  }
-  long pageIndex=positionEntry.getPageIndex();
-  int recordPosition=positionEntry.getRecordPosition();
-  if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
-    debug.empty=true;
-    return debug;
-  }
-  debug.pages=new ArrayList<OClusterPageDebug>();
-  int contentSize=0;
-  long nextPagePointer;
-  boolean firstEntry=true;
-  do {
-    OClusterPageDebug debugPage=new OClusterPageDebug();
-    debugPage.pageIndex=pageIndex;
-    OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
-    try {
-      final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
-      if (localPage.isDeleted(recordPosition)) {
-        if (debug.pages.isEmpty()) {
+  startOperation();
+  try {
+    OPaginatedClusterDebug debug=new OPaginatedClusterDebug();
+    debug.clusterPosition=clusterPosition;
+    debug.fileId=fileId;
+    OAtomicOperation atomicOperation=storageLocal.getAtomicOperationsManager().getCurrentOperation();
+    OClusterPositionMapBucket.PositionEntry positionEntry=clusterPositionMap.get(clusterPosition,1);
+    if (positionEntry == null) {
+      debug.empty=true;
+      return debug;
+    }
+    long pageIndex=positionEntry.getPageIndex();
+    int recordPosition=positionEntry.getRecordPosition();
+    if (getFilledUpTo(atomicOperation,fileId) <= pageIndex) {
+      debug.empty=true;
+      return debug;
+    }
+    debug.pages=new ArrayList<OClusterPageDebug>();
+    int contentSize=0;
+    long nextPagePointer;
+    boolean firstEntry=true;
+    do {
+      OClusterPageDebug debugPage=new OClusterPageDebug();
+      debugPage.pageIndex=pageIndex;
+      OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+      try {
+        final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChangesTree(atomicOperation,cacheEntry));
+        if (localPage.isDeleted(recordPosition)) {
+          if (debug.pages.isEmpty()) {
+            debug.empty=true;
+            return debug;
+          }
+ else           throw new OPaginatedClusterException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.",this);
+        }
+        debugPage.inPagePosition=recordPosition;
+        debugPage.inPageSize=localPage.getRecordSize(recordPosition);
+        byte[] content=localPage.getRecordBinaryValue(recordPosition,0,debugPage.inPageSize);
+        debugPage.content=content;
+        if (firstEntry && content[content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE] == 0) {
           debug.empty=true;
           return debug;
         }
- else         throw new OPaginatedClusterException("Content of record " + new ORecordId(id,clusterPosition) + " was broken.",this);
+        debug.pages.add(debugPage);
+        nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
+        contentSize+=content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
+        firstEntry=false;
       }
-      debugPage.inPagePosition=recordPosition;
-      debugPage.inPageSize=localPage.getRecordSize(recordPosition);
-      byte[] content=localPage.getRecordBinaryValue(recordPosition,0,debugPage.inPageSize);
-      debugPage.content=content;
-      if (firstEntry && content[content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE] == 0) {
-        debug.empty=true;
-        return debug;
-      }
-      debug.pages.add(debugPage);
-      nextPagePointer=OLongSerializer.INSTANCE.deserializeNative(content,content.length - OLongSerializer.LONG_SIZE);
-      contentSize+=content.length - OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE;
-      firstEntry=false;
-    }
   finally {
-      releasePage(atomicOperation,cacheEntry);
+        releasePage(atomicOperation,cacheEntry);
+      }
+      pageIndex=getPageIndex(nextPagePointer);
+      recordPosition=getRecordPosition(nextPagePointer);
     }
-    pageIndex=getPageIndex(nextPagePointer);
-    recordPosition=getRecordPosition(nextPagePointer);
-  }
  while (nextPagePointer >= 0);
-  debug.contentSize=contentSize;
-  return debug;
+    debug.contentSize=contentSize;
+    return debug;
+  }
+  finally {
+    completeOperation();
+  }
 }

@@ -13,6 +13,7 @@
     configuration.load(iProperties);
     componentsFactory=new OCurrentStorageComponentsFactory(configuration);
     preOpenSteps();
+    storagePerformanceStatistic=new OStoragePerformanceStatistic(OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,name,id);
     initWalAndDiskCache();
     atomicOperationsManager=new OAtomicOperationsManager(this);
     try {
@@ -21,11 +22,17 @@
  catch (    Exception e) {
       OLogManager.instance().error(this,"MBean for atomic operations manager cannot be registered",e);
     }
-    restoreIfNeeded();
+    recoverIfNeeded();
     openClusters();
     openIndexes();
     if (OGlobalConfiguration.STORAGE_MAKE_FULL_CHECKPOINT_AFTER_OPEN.getValueAsBoolean())     makeFullCheckpoint();
     writeCache.startFuzzyCheckpoints();
+    try {
+      storagePerformanceStatistic.registerMBean();
+    }
+ catch (    Exception e) {
+      OLogManager.instance().error(this,"Error during of registering of MBean for storage performance statistic",e);
+    }
     status=STATUS.OPEN;
   }
  catch (  Exception e) {

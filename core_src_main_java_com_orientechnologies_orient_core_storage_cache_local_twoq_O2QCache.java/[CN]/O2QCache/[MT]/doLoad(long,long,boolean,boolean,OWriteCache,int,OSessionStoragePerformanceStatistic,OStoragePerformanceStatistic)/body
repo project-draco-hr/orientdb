@@ -1,0 +1,46 @@
+{
+  if (pageCount < 1)   throw new IllegalArgumentException("Amount of pages to load from cache should be not less than 1 but passed value is " + pageCount);
+  boolean removeColdPages=false;
+  OCacheEntry cacheEntry=null;
+  Lock fileLock;
+  Lock[] pageLocks;
+  final OModifiableBoolean cacheHit=new OModifiableBoolean(false);
+  cacheLock.acquireReadLock();
+  try {
+    fileLock=fileLockManager.acquireSharedLock(fileId);
+    try {
+      final PageKey[] pageKeys=new PageKey[pageCount];
+      for (int i=0; i < pageKeys.length; i++) {
+        pageKeys[i]=new PageKey(fileId,pageIndex + i);
+      }
+      pageLocks=pageLockManager.acquireExclusiveLocksInBatch(pageKeys);
+      try {
+        if (checkPinnedPages)         cacheEntry=pinnedPages.get(new PinnedPage(fileId,pageIndex));
+        if (cacheEntry == null) {
+          UpdateCacheResult cacheResult=updateCache(fileId,pageIndex,addNewPages,writeCache,pageCount,cacheHit);
+          if (cacheResult == null)           return null;
+          cacheEntry=cacheResult.cacheEntry;
+          removeColdPages=cacheResult.removeColdPages;
+        }
+ else {
+          cacheHit.setValue(true);
+        }
+        cacheEntry.incrementUsages();
+      }
+  finally {
+        for (        Lock pageLock : pageLocks) {
+          pageLock.unlock();
+        }
+      }
+    }
+  finally {
+      fileLockManager.releaseLock(fileLock);
+    }
+  }
+  finally {
+    cacheLock.releaseReadLock();
+  }
+  storagePerformanceStatistic.incrementPageAccessOnCacheLevel(cacheHit.getValue());
+  if (sessionStoragePerformanceStatistic != null)   sessionStoragePerformanceStatistic.incrementPageAccessOnCacheLevel(cacheHit.getValue());
+  return new UpdateCacheResult(removeColdPages,cacheEntry);
+}

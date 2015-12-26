@@ -1,51 +1,6 @@
 {
   if (inVertex == null)   throw new IllegalArgumentException("destination vertex is null");
-  if (checkDeletedInTx())   throw new IllegalStateException("The vertex " + getIdentity() + " has been deleted");
-  if (inVertex.checkDeletedInTx())   throw new IllegalStateException("The vertex " + inVertex.getIdentity() + " has been deleted");
-  final OrientBaseGraph graph=setCurrentGraphInThreadLocal();
-  if (graph != null)   graph.autoStartTransaction();
-  final ODocument outDocument=getRecord();
-  if (outDocument == null)   throw new IllegalArgumentException("source vertex is invalid (rid=" + getIdentity() + ")");
-  if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())   throw new IllegalArgumentException("source record is not a vertex");
-  final ODocument inDocument=inVertex.getRecord();
-  if (inDocument == null)   throw new IllegalArgumentException("destination vertex is invalid (rid=" + inVertex.getIdentity() + ")");
-  if (!ODocumentInternal.getImmutableSchemaClass(outDocument).isVertexType())   throw new IllegalArgumentException("destination record is not a vertex");
-  final OrientEdge edge;
-  OIdentifiable to;
-  OIdentifiable from;
-  label=OrientBaseGraph.encodeClassName(label);
-  if (label == null && iClassName != null)   label=OrientBaseGraph.encodeClassName(iClassName);
-  if (graph != null && graph.isUseClassForEdgeLabel()) {
-    final OrientEdgeType edgeType=graph.getEdgeType(label);
-    if (edgeType == null)     graph.createEdgeType(label);
- else     label=edgeType.getName();
-  }
-  final String outFieldName=getConnectionFieldName(Direction.OUT,label,settings.isUseVertexFieldsForEdgeLabels());
-  final String inFieldName=getConnectionFieldName(Direction.IN,label,settings.isUseVertexFieldsForEdgeLabels());
-  if (label == null)   throw ExceptionFactory.edgeLabelCanNotBeNull();
-  if (canCreateDynamicEdge(outDocument,inDocument,outFieldName,inFieldName,fields,label)) {
-    from=rawElement;
-    to=inDocument;
-    if (settings.isKeepInMemoryReferences())     edge=new OrientEdge(graph,from.getIdentity(),to.getIdentity(),label);
- else     edge=new OrientEdge(graph,from,to,label);
-  }
- else {
-    edge=new OrientEdge(graph,label,fields);
-    if (settings.isKeepInMemoryReferences())     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement.getIdentity(),OrientBaseGraph.CONNECTION_IN,inDocument.getIdentity());
- else     edge.getRecord().fields(OrientBaseGraph.CONNECTION_OUT,rawElement,OrientBaseGraph.CONNECTION_IN,inDocument);
-    from=edge.getRecord();
-    to=edge.getRecord();
-  }
-  if (settings.isKeepInMemoryReferences()) {
-    from=from.getIdentity();
-    to=to.getIdentity();
-  }
-  createLink(graph,outDocument,to,outFieldName);
-  createLink(graph,inDocument,from,inFieldName);
-  if (graph != null) {
-    edge.save(iClusterName);
-    inDocument.save();
-    outDocument.save();
-  }
-  return edge;
+  final OrientBaseGraph graph=getGraph();
+  if (graph != null)   return graph.addEdgeInternal(this,label,inVertex,iClassName,iClusterName,fields);
+  return OrientGraphNoTx.addEdgeInternal(null,this,label,inVertex,iClassName,iClusterName,fields);
 }

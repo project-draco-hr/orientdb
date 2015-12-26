@@ -1,0 +1,54 @@
+{
+  ODistributedServerLog.info(this,nodeName,iNode,DIRECTION.IN,"installing database '%s' to: %s...",databaseName,dbPath);
+  try {
+    final File f=new File(iDatabaseCompressedFile);
+    final File fCompleted=new File(iDatabaseCompressedFile + ".completed");
+    new File(dbPath).mkdirs();
+    final ODatabaseDocumentTx db=new ODatabaseDocumentTx("plocal:" + dbPath);
+    final FileInputStream in=new FileInputStream(f){
+      @Override public int read(      final byte[] b,      final int off,      final int len) throws IOException {
+        while (true) {
+          final int read=super.read(b,off,len);
+          if (read > 0)           return read;
+          if (fCompleted.exists())           return 0;
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+      @Override public int available() throws IOException {
+        while (true) {
+          final int avail=super.available();
+          if (avail > 0)           return avail;
+          if (fCompleted.exists())           return 0;
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+    }
+;
+    try {
+      if (delta) {
+        importDelta(db,in);
+      }
+ else {
+        db.restore(in,null,null,this);
+      }
+    }
+  finally {
+      in.close();
+    }
+    db.close();
+    ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"installed database '%s'",databaseName);
+    return db;
+  }
+ catch (  IOException e) {
+    ODistributedServerLog.warn(this,nodeName,null,DIRECTION.IN,"error on copying database '%s' on local server",e,databaseName);
+  }
+  return null;
+}

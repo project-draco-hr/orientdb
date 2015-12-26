@@ -4,12 +4,13 @@
   do {
     do {
       try {
-        final byte[] curToken=tokens.get(currentURL);
+        network=getAvailableNetwork(currentURL);
+        final byte[] curToken=tokens.get(network.getServerURL());
         if (curToken == null || curToken.length == 0) {
-          return openRemoteDatabase(currentURL);
+          openRemoteDatabase(network);
+          return network.getServerURL();
         }
  else {
-          network=getAvailableNetwork(currentURL);
           try {
             network.writeByte(OChannelBinaryProtocol.REQUEST_DB_REOPEN);
             network.writeInt(getSessionId());
@@ -44,6 +45,8 @@
         OLogManager.instance().error(this,"Can not open database with url " + currentURL,e);
       }
 catch (      OSecurityException ex) {
+        OLogManager.instance().debug(this,"Invalidate token for url=%s",ex,currentURL);
+        tokens.remove(currentURL);
         if (network != null) {
           try {
             engine.getConnectionManager().remove(network);

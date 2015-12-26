@@ -1,20 +1,26 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    acquireSharedLock();
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      if (!ascSortOrder)       return iterateEntriesMinorDesc(key,inclusive,atomicOperation);
-      return iterateEntriesMinorAsc(key,inclusive,atomicOperation);
-    }
+      acquireSharedLock();
+      try {
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        if (!ascSortOrder)         return iterateEntriesMinorDesc(key,inclusive,atomicOperation);
+        return iterateEntriesMinorAsc(key,inclusive,atomicOperation);
+      }
   finally {
-      releaseSharedLock();
+        releaseSharedLock();
+      }
+    }
+ catch (    IOException ioe) {
+      throw OException.wrapException(new OSBTreeException("Error during iteration of minor values for key " + key + " in sbtree "+ getName(),this),ioe);
+    }
+ finally {
+      atomicOperationsManager.releaseReadLock(this);
     }
   }
- catch (  IOException ioe) {
-    throw OException.wrapException(new OSBTreeException("Error during iteration of minor values for key " + key + " in sbtree "+ getName(),this),ioe);
-  }
- finally {
-    atomicOperationsManager.releaseReadLock(this);
+  finally {
+    completeOperation();
   }
 }

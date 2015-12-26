@@ -1,22 +1,26 @@
 {
   boolean retry=true;
-  while (retry)   try {
-    final OChannelBinaryAsynchClient network=storage.beginRequest(OChannelBinaryProtocol.REQUEST_DB_DROP);
-    try {
-      network.writeString(iDatabaseName);
-      network.writeString(storageType);
-    }
+  while (retry) {
+    retry=networkAdminOperation(new OStorageRemoteOperation<Boolean>(){
+      @Override public Boolean execute(      final OChannelBinaryAsynchClient network) throws IOException {
+        try {
+          try {
+            storage.beginRequest(network,OChannelBinaryProtocol.REQUEST_DB_DROP);
+            network.writeString(iDatabaseName);
+            network.writeString(storageType);
+          }
   finally {
-      storage.endRequest(network);
+            storage.endRequest(network);
+          }
+          storage.getResponse(network);
+          return false;
+        }
+ catch (        OModificationOperationProhibitedException oope) {
+          return handleDBFreeze();
+        }
+      }
     }
-    storage.getResponse(network);
-    retry=false;
-  }
- catch (  OModificationOperationProhibitedException oope) {
-    retry=handleDBFreeze();
-  }
-catch (  Exception e) {
-    throw OException.wrapException(new OStorageException("Cannot delete the remote storage: " + storage.getName()),e);
+,"Cannot delete the remote storage: " + storage.getName());
   }
   final Set<OStorage> underlyingStorages=new HashSet<OStorage>();
   for (  OStorage s : Orient.instance().getStorages()) {

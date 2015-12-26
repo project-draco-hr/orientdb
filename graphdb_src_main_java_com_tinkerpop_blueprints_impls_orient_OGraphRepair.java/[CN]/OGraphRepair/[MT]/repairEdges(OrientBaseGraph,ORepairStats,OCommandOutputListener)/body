@@ -1,0 +1,65 @@
+{
+  final ODatabaseDocumentTx db=graph.getRawGraph();
+  final OMetadata metadata=db.getMetadata();
+  final OSchema schema=metadata.getSchema();
+  final OrientConfigurableGraph.Settings settings=graph.settings;
+  final boolean useVertexFieldsForEdgeLabels=settings.isUseVertexFieldsForEdgeLabels();
+  final OClass edgeClass=schema.getClass(OrientEdgeType.CLASS_NAME);
+  if (edgeClass != null) {
+    final long countEdges=db.countClass(edgeClass.getName());
+    message(outputListener,"Scanning " + countEdges + " edges...\n");
+    for (    ODocument edge : db.browseClass(edgeClass.getName())) {
+      final ORID edgeId=edge.getIdentity();
+      stats.scannedEdges++;
+      if (eventListener != null)       eventListener.onScannedEdge(edge);
+      boolean removeEdge=false;
+      final OIdentifiable out=OrientEdge.getConnection(edge,Direction.OUT);
+      if (out == null)       removeEdge=true;
+ else {
+        final ODocument outVertex=out.getRecord();
+        if (outVertex == null)         removeEdge=true;
+        final String outFieldName=OrientVertex.getConnectionFieldName(Direction.OUT,edge.getClassName(),useVertexFieldsForEdgeLabels);
+        final Object outEdges=outVertex.field(outFieldName);
+        if (outEdges == null)         removeEdge=true;
+ else         if (outEdges instanceof ORidBag) {
+          if (!((ORidBag)outEdges).contains(edgeId))           removeEdge=true;
+        }
+ else         if (outEdges instanceof Collection) {
+          if (!((Collection)outEdges).contains(edgeId))           removeEdge=true;
+        }
+ else         if (outEdges instanceof OIdentifiable) {
+          if (((OIdentifiable)outEdges).getIdentity().equals(edgeId))           removeEdge=true;
+        }
+      }
+      final OIdentifiable in=OrientEdge.getConnection(edge,Direction.IN);
+      if (in == null)       removeEdge=true;
+ else {
+        final ODocument inVertex=in.getRecord();
+        if (inVertex == null)         removeEdge=true;
+        final String inFieldName=OrientVertex.getConnectionFieldName(Direction.IN,edge.getClassName(),useVertexFieldsForEdgeLabels);
+        final Object inEdges=inVertex.field(inFieldName);
+        if (inEdges == null)         removeEdge=true;
+ else         if (inEdges instanceof ORidBag) {
+          if (!((ORidBag)inEdges).contains(edgeId))           removeEdge=true;
+        }
+ else         if (inEdges instanceof Collection) {
+          if (!((Collection)inEdges).contains(edgeId))           removeEdge=true;
+        }
+ else         if (inEdges instanceof OIdentifiable) {
+          if (((OIdentifiable)inEdges).getIdentity().equals(edgeId))           removeEdge=true;
+        }
+      }
+      if (removeEdge) {
+        try {
+          edge.delete();
+          stats.removedEdges++;
+          if (eventListener != null)           eventListener.onRemovedEdge(edge);
+        }
+ catch (        Exception e) {
+          message(outputListener,"Error on deleting edge " + edge.getIdentity() + " ("+ e.getMessage()+ ")");
+        }
+      }
+    }
+    message(outputListener,"Scanning edges completed\n");
+  }
+}

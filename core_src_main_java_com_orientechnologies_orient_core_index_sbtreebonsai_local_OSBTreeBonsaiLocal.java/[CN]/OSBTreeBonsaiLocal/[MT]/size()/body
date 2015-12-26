@@ -1,26 +1,32 @@
 {
-  atomicOperationsManager.acquireReadLock(this);
+  startOperation();
   try {
-    final Lock lock=fileLockManager.acquireSharedLock(fileId);
+    atomicOperationsManager.acquireReadLock(this);
     try {
-      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-      OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,rootBucketPointer.getPageIndex(),false);
+      final Lock lock=fileLockManager.acquireSharedLock(fileId);
       try {
-        OSBTreeBonsaiBucket rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry),this);
-        return rootBucket.getTreeSize();
+        OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        OCacheEntry rootCacheEntry=loadPage(atomicOperation,fileId,rootBucketPointer.getPageIndex(),false);
+        try {
+          OSBTreeBonsaiBucket rootBucket=new OSBTreeBonsaiBucket<K,V>(rootCacheEntry,rootBucketPointer.getPageOffset(),keySerializer,valueSerializer,getChangesTree(atomicOperation,rootCacheEntry),this);
+          return rootBucket.getTreeSize();
+        }
+  finally {
+          releasePage(atomicOperation,rootCacheEntry);
+        }
       }
   finally {
-        releasePage(atomicOperation,rootCacheEntry);
+        lock.unlock();
       }
     }
-  finally {
-      lock.unlock();
+ catch (    IOException e) {
+      throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during retrieving of size of index " + getName(),this),e);
     }
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OSBTreeBonsaiLocalException("Error during retrieving of size of index " + getName(),this),e);
-  }
  finally {
-    atomicOperationsManager.releaseReadLock(this);
+      atomicOperationsManager.releaseReadLock(this);
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

@@ -1,32 +1,38 @@
 {
-  acquireExclusiveLock();
+  startOperation();
   try {
-    if (keyTypes != null)     this.keyTypes=Arrays.copyOf(keyTypes,keyTypes.length);
- else     this.keyTypes=null;
-    this.nullKeyIsSupported=nullKeyIsSupported;
-    OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
-    fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension);
-    final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,0,true);
-    hashStateEntryIndex=hashStateEntry.getPageIndex();
-    directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
-    directory.open();
-    pinPage(atomicOperation,hashStateEntry);
+    acquireExclusiveLock();
     try {
-      OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
-      OBinarySerializerFactory serializerFactory=OBinarySerializerFactory.create(storage.getConfiguration().binaryFormatVersion);
-      keySerializer=(OBinarySerializer<K>)serializerFactory.getObjectSerializer(page.getKeySerializerId());
-      valueSerializer=(OBinarySerializer<V>)serializerFactory.getObjectSerializer(page.getValueSerializerId());
-    }
+      if (keyTypes != null)       this.keyTypes=Arrays.copyOf(keyTypes,keyTypes.length);
+ else       this.keyTypes=null;
+      this.nullKeyIsSupported=nullKeyIsSupported;
+      OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+      fileStateId=openFile(atomicOperation,name + metadataConfigurationFileExtension);
+      final OCacheEntry hashStateEntry=loadPage(atomicOperation,fileStateId,0,true);
+      hashStateEntryIndex=hashStateEntry.getPageIndex();
+      directory=new OHashTableDirectory(treeStateFileExtension,name,durableInNonTxMode,storage);
+      directory.open();
+      pinPage(atomicOperation,hashStateEntry);
+      try {
+        OHashIndexFileLevelMetadataPage page=new OHashIndexFileLevelMetadataPage(hashStateEntry,getChangesTree(atomicOperation,hashStateEntry),false);
+        OBinarySerializerFactory serializerFactory=OBinarySerializerFactory.create(storage.getConfiguration().binaryFormatVersion);
+        keySerializer=(OBinarySerializer<K>)serializerFactory.getObjectSerializer(page.getKeySerializerId());
+        valueSerializer=(OBinarySerializer<V>)serializerFactory.getObjectSerializer(page.getValueSerializerId());
+      }
   finally {
-      releasePage(atomicOperation,hashStateEntry);
+        releasePage(atomicOperation,hashStateEntry);
+      }
+      if (nullKeyIsSupported)       nullBucketFileId=openFile(atomicOperation,name + nullBucketFileExtension);
+      fileId=openFile(atomicOperation,getFullName());
     }
-    if (nullKeyIsSupported)     nullBucketFileId=openFile(atomicOperation,name + nullBucketFileExtension);
-    fileId=openFile(atomicOperation,getFullName());
-  }
- catch (  IOException e) {
-    throw OException.wrapException(new OLocalHashTableException("Exception during hash table loading",this),e);
-  }
+ catch (    IOException e) {
+      throw OException.wrapException(new OLocalHashTableException("Exception during hash table loading",this),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

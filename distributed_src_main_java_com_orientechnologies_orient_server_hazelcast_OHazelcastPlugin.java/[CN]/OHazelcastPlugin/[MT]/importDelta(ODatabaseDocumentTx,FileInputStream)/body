@@ -1,0 +1,67 @@
+{
+  try {
+    serverInstance.openDatabase(db);
+    OScenarioThreadLocal.executeAsDistributed(new Callable<Object>(){
+      @Override public Object call() throws Exception {
+        db.activateOnCurrentThread();
+        long total=0;
+        final GZIPInputStream gzipInput=new GZIPInputStream(in);
+        try {
+          final DataInputStream input=new DataInputStream(gzipInput);
+          try {
+            final long records=input.readLong();
+            for (long i=0; i < records; ++i) {
+              final int clusterId=input.readInt();
+              final long clusterPos=input.readLong();
+              final boolean deleted=input.readBoolean();
+              final ORecordId rid=new ORecordId(clusterId,clusterPos);
+              total++;
+              if (deleted) {
+                OLogManager.instance().info(this,"DELTA <- deleted " + rid);
+                db.delete(rid);
+              }
+ else {
+                final int recordVersion=input.readInt();
+                final int recordType=input.readByte();
+                final int recordSize=input.readInt();
+                final byte[] recordContent=new byte[recordSize];
+                input.read(recordContent);
+                OLogManager.instance().info(this,"DELTA <- other rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
+                final int forcedVersion=ORecordVersionHelper.setRollbackMode(recordVersion);
+                final ORecord record;
+                if (recordVersion == 1) {
+                  record=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+                  ORecordInternal.fill(record,rid,forcedVersion,recordContent,true);
+                }
+ else {
+                  record=rid.getRecord();
+                  ORecordInternal.fill(record,rid,forcedVersion,recordContent,true);
+                }
+                record.save();
+              }
+            }
+            db.getMetadata().reload();
+          }
+  finally {
+            input.close();
+          }
+        }
+ catch (        Exception e) {
+          ODistributedServerLog.error(this,nodeName,null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
+          throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
+        }
+ finally {
+          gzipInput.close();
+        }
+        ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"Installed database delta for '%s', %d total records",db.getName(),total);
+        return null;
+      }
+    }
+);
+    db.activateOnCurrentThread();
+  }
+ catch (  Exception e) {
+    ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Error while applying changes of database delta sync on '%s': forcing full database sync...",e,db.getName());
+    throw OException.wrapException(new ODistributedDatabaseDeltaSyncException("Error while applying changes of database delta sync on '" + db.getName() + "': forcing full database sync..."),e);
+  }
+}

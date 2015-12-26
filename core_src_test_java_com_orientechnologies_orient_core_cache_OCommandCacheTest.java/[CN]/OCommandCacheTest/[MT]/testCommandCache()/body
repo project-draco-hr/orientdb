@@ -1,0 +1,23 @@
+{
+  OGlobalConfiguration.COMMAND_CACHE_ENABLED.setValue(true);
+  OGlobalConfiguration.COMMAND_CACHE_MIN_EXECUTION_TIME.setValue(1);
+  ODatabaseDocument db=new ODatabaseDocumentTx("memory:" + OCommandCacheTest.class.getSimpleName());
+  db.create();
+  try {
+    db.getMetadata().getSchema().createClass("OCommandCache");
+    for (int i=0; i < 200; i++) {
+      ODocument doc=new ODocument("OCommandCache");
+      db.save(doc);
+    }
+    OSQLSynchQuery<List<ODocument>> query=new OSQLSynchQuery<List<ODocument>>("select from OCommandCache");
+    query.setCacheableResult(true);
+    List<ODocument> results=db.query(query);
+    OCommandCache commandCache=db.getMetadata().getCommandCache();
+    Collection cachedResults=(Collection)commandCache.get(new OUser("admin"),"select from OCommandCache",-1);
+    Assert.assertNotNull(cachedResults);
+    Assert.assertEquals(results.size(),cachedResults.size());
+  }
+  finally {
+    db.drop();
+  }
+}

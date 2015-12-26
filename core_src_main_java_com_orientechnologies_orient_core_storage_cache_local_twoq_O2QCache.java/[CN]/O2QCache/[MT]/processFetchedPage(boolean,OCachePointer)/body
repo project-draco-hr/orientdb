@@ -1,0 +1,30 @@
+{
+  final long fileId=dataPointer.getFileId();
+  final long pageIndex=dataPointer.getPageIndex();
+  if (pinnedPages.containsKey(new PinnedPage(fileId,pageIndex))) {
+    return removeColdPages;
+  }
+  OCacheEntry cacheEntry=am.get(fileId,pageIndex);
+  if (cacheEntry != null) {
+    final boolean rcp=entryIsInAmQueue(fileId,pageIndex,cacheEntry);
+    removeColdPages=removeColdPages || rcp;
+    dataPointer.decrementReadersReferrer();
+    return removeColdPages;
+  }
+  cacheEntry=a1out.remove(fileId,pageIndex);
+  if (cacheEntry != null) {
+    final boolean rcp=entryWasInA1OutQueue(fileId,pageIndex,dataPointer,cacheEntry);
+    removeColdPages=removeColdPages || rcp;
+    return removeColdPages;
+  }
+  cacheEntry=a1in.get(fileId,pageIndex);
+  if (cacheEntry != null) {
+    final boolean rcp=entryIsInA1InQueue(fileId,pageIndex);
+    removeColdPages=removeColdPages || rcp;
+    dataPointer.decrementReadersReferrer();
+    return removeColdPages;
+  }
+  final boolean rcp=entryIsAbsentInQueues(fileId,pageIndex,dataPointer).removeColdPages;
+  removeColdPages=removeColdPages || rcp;
+  return removeColdPages;
+}

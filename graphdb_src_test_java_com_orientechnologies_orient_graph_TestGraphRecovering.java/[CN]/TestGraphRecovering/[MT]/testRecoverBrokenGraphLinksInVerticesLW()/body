@@ -1,0 +1,25 @@
+{
+  final OrientBaseGraph g=new OrientGraphNoTx("memory:testRecoverBrokenGraphLinksInVerticesLW");
+  try {
+    init(g,true);
+    for (    Vertex v : g.getVertices()) {
+      final ODocument record=((OrientVertex)v).getRecord();
+      int key=v.getProperty("key");
+      if (key == 0)       record.field("out_",record);
+ else       if (key == 1)       record.field("in_E1",new ORecordId(100,200));
+ else       if (key == 2)       record.field("out_E2",record);
+      record.save();
+    }
+    final TestListener eventListener=new TestListener();
+    new OGraphRepair().setEventListener(eventListener).repair(g,null);
+    Assert.assertEquals(eventListener.scannedEdges,0);
+    Assert.assertEquals(eventListener.removedEdges,0);
+    Assert.assertEquals(eventListener.scannedVertices,3);
+    Assert.assertEquals(eventListener.scannedLinks,7);
+    Assert.assertEquals(eventListener.removedLinks,5);
+    Assert.assertEquals(eventListener.repairedVertices,3);
+  }
+  finally {
+    g.shutdown();
+  }
+}

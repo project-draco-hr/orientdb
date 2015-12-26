@@ -1,31 +1,37 @@
 {
-  OAtomicOperation atomicOperation=startAtomicOperation();
-  acquireExclusiveLock();
+  startOperation();
   try {
-    long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
-    int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
-    if (pageIndex >= getFilledUpTo(atomicOperation,fileId))     throw new OClusterPositionMapException("Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map.",this);
-    final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,0);
-    cacheEntry.acquireExclusiveLock();
+    OAtomicOperation atomicOperation=startAtomicOperation(true);
+    acquireExclusiveLock();
     try {
-      final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
-      bucket.set(index,entry);
-    }
+      long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
+      int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+      if (pageIndex >= getFilledUpTo(atomicOperation,fileId))       throw new OClusterPositionMapException("Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map.",this);
+      final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,1);
+      cacheEntry.acquireExclusiveLock();
+      try {
+        final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChangesTree(atomicOperation,cacheEntry));
+        bucket.set(index,entry);
+      }
   finally {
-      cacheEntry.releaseExclusiveLock();
-      releasePage(atomicOperation,cacheEntry);
+        cacheEntry.releaseExclusiveLock();
+        releasePage(atomicOperation,cacheEntry);
+      }
+      endAtomicOperation(false,null);
     }
-    endAtomicOperation(false,null);
-  }
- catch (  IOException e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OClusterPositionMapException("Error of update of mapping between logical adn physical record position",this),e);
-  }
-catch (  RuntimeException e) {
-    endAtomicOperation(true,e);
-    throw OException.wrapException(new OClusterPositionMapException("Error of update of mapping between logical adn physical record position",this),e);
-  }
+ catch (    IOException e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OClusterPositionMapException("Error of update of mapping between logical adn physical record position",this),e);
+    }
+catch (    RuntimeException e) {
+      endAtomicOperation(true,e);
+      throw OException.wrapException(new OClusterPositionMapException("Error of update of mapping between logical adn physical record position",this),e);
+    }
  finally {
-    releaseExclusiveLock();
+      releaseExclusiveLock();
+    }
+  }
+  finally {
+    completeOperation();
   }
 }

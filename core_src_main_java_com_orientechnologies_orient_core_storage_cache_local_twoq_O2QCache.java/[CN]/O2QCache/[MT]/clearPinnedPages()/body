@@ -1,0 +1,17 @@
+{
+  for (  OCacheEntry pinnedEntry : pinnedPages.values()) {
+    if (pinnedEntry.getUsagesCount() == 0) {
+      final OCachePointer cachePointer=pinnedEntry.getCachePointer();
+      cachePointer.decrementReadersReferrer();
+      pinnedEntry.clearCachePointer();
+      MemoryData memoryData=memoryDataContainer.get();
+      MemoryData newMemoryData=new MemoryData(memoryData.maxSize,memoryData.pinnedPages - 1);
+      while (!memoryDataContainer.compareAndSet(memoryData,newMemoryData)) {
+        memoryData=memoryDataContainer.get();
+        newMemoryData=new MemoryData(memoryData.maxSize,memoryData.pinnedPages - 1);
+      }
+    }
+ else     throw new OStorageException("Page with index " + pinnedEntry.getPageIndex() + " for file with id "+ pinnedEntry.getFileId()+ "cannot be freed because it is used.");
+  }
+  pinnedPages.clear();
+}

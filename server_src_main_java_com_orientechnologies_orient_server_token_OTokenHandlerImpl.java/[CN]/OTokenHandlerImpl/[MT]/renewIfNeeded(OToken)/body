@@ -1,10 +1,17 @@
 {
   if (token == null)   throw new IllegalArgumentException("Token is null");
   final long curTime=System.currentTimeMillis();
-  if (token.getExpiry() + (sessionInMills / 2) > curTime && (token.getExpiry() - (sessionInMills + 1)) < curTime) {
+  if (token.getExpiry() - curTime < (sessionInMills / 2) && token.getExpiry() >= curTime) {
     final long expiryMinutes=sessionInMills;
     final long currTime=System.currentTimeMillis();
     token.setExpiry(currTime + expiryMinutes);
+    try {
+      if (token instanceof OBinaryToken)       return serializeSignedToken((OBinaryToken)token);
+ else       throw new OTokenException("renew of web token not supported");
+    }
+ catch (    IOException e) {
+      throw OException.wrapException(new OSystemException("Error on token parsing"),e);
+    }
   }
   return OCommonConst.EMPTY_BYTE_ARRAY;
 }

@@ -1,9 +1,7 @@
 {
-  ByteArrayOutputStream baos=new ByteArrayOutputStream();
   try {
     final OBinaryToken token=new OBinaryToken();
-    long expiryMinutes=sessionInMills;
-    long currTime=System.currentTimeMillis();
+    long curTime=System.currentTimeMillis();
     final OrientJwtHeader header=new OrientJwtHeader();
     header.setAlgorithm(algorithm);
     header.setKeyId(keyProvider.getDefaultKey());
@@ -18,14 +16,12 @@
       token.setUserName(data.serverUsername);
     }
     if (user != null)     token.setUserRid(user.getIdentity().getIdentity());
-    token.setExpiry(currTime + expiryMinutes);
+    token.setExpiry(curTime + sessionInMills);
     token.setProtocolVersion(data.protocolVersion);
     token.setSerializer(data.serializationImpl);
     token.setDriverName(data.driverName);
     token.setDriverVersion(data.driverVersion);
-    binarySerializer.serialize(token,baos);
-    final byte[] signature=signToken(header,baos.toByteArray());
-    baos.write(signature);
+    return serializeSignedToken(token);
   }
  catch (  RuntimeException e) {
     throw e;
@@ -33,5 +29,4 @@
 catch (  Exception e) {
     throw OException.wrapException(new OSystemException("Error on token parsing"),e);
   }
-  return baos.toByteArray();
 }

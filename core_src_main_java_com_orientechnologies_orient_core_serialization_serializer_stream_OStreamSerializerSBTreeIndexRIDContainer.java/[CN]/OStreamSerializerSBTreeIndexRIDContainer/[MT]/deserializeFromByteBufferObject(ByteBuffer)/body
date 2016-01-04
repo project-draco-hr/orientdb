@@ -1,0 +1,28 @@
+{
+  final int offset=buffer.position();
+  buffer.position(offset + FILE_ID_OFFSET);
+  final long fileId=LONG_SERIALIZER.deserializeFromByteBuffer(buffer);
+  buffer.position(offset + DURABLE_OFFSET);
+  final boolean durable=BOOLEAN_SERIALIZER.deserializeFromByteBuffer(buffer);
+  buffer.position(offset + EMBEDDED_OFFSET);
+  if (BOOLEAN_SERIALIZER.deserializeFromByteBuffer(buffer)) {
+    buffer.position(offset + EMBEDDED_SIZE_OFFSET);
+    final int size=INT_SERIALIZER.deserializeFromByteBuffer(buffer);
+    final Set<OIdentifiable> underlying=new HashSet<OIdentifiable>(Math.max((int)(size / .75f) + 1,16));
+    final int p=offset + EMBEDDED_VALUES_OFFSET;
+    for (int i=0; i < size; i++) {
+      underlying.add(LINK_SERIALIZER.deserializeFromByteBufferObject(buffer));
+    }
+    return new OIndexRIDContainer(fileId,underlying,durable);
+  }
+ else {
+    buffer.position(offset + SBTREE_ROOTINDEX_OFFSET);
+    final long pageIndex=LONG_SERIALIZER.deserializeFromByteBuffer(buffer);
+    buffer.position(offset + SBTREE_ROOTOFFSET_OFFSET);
+    final int pageOffset=INT_SERIALIZER.deserializeFromByteBuffer(buffer);
+    final OBonsaiBucketPointer rootPointer=new OBonsaiBucketPointer(pageIndex,pageOffset);
+    final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    final OIndexRIDContainerSBTree underlying=new OIndexRIDContainerSBTree(fileId,rootPointer,durable,(OAbstractPaginatedStorage)db.getStorage().getUnderlying());
+    return new OIndexRIDContainer(fileId,underlying,durable);
+  }
+}

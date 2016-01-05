@@ -1,8 +1,9 @@
 {
+  final OByteBufferPool bufferPool=new OByteBufferPool(1);
   OCachePointer[] cachePointers=new OCachePointer[11];
   for (int i=0; i < 11; i++) {
-    ODirectMemoryPointer directMemoryPointer=ODirectMemoryPointerFactory.instance().createPointer(1);
-    cachePointers[i]=new OCachePointer(directMemoryPointer,new OLogSequenceNumber(0,0),0,0);
+    ByteBuffer buffer=bufferPool.acquireDirect(true);
+    cachePointers[i]=new OCachePointer(buffer,bufferPool,new OLogSequenceNumber(0,0),0,0);
     lruList.putToMRU(new OCacheEntry(1,i * 10,cachePointers[i],false));
   }
   Assert.assertEquals(lruList.remove(1,50),new OCacheEntry(1,50,cachePointers[5],false));
@@ -13,8 +14,5 @@
     if (i == 5)     continue;
     Assert.assertTrue(entryIterator.hasNext());
     Assert.assertEquals(entryIterator.next(),new OCacheEntry(1,i * 10,cachePointers[i],false));
-  }
-  for (int i=0; i < 11; i++) {
-    cachePointers[i].getDataPointer().free();
   }
 }

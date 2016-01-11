@@ -1,17 +1,33 @@
 {
-  init((OCommandRequestText)iRequest);
-  StringBuilder word=new StringBuilder();
-  int oldPos=0;
-  int pos=nextWord(parserText,parserTextUpperCase,oldPos,word,true);
-  if (pos == -1 || !word.toString().equals(KEYWORD_TRUNCATE))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_TRUNCATE + " not found. Use "+ getSyntax(),parserText,oldPos);
-  oldPos=pos;
-  pos=nextWord(parserText,parserTextUpperCase,oldPos,word,true);
-  if (pos == -1 || !word.toString().equals(KEYWORD_CLUSTER))   throw new OCommandSQLParsingException("Keyword " + KEYWORD_CLUSTER + " not found. Use "+ getSyntax(),parserText,oldPos);
-  oldPos=pos;
-  pos=nextWord(parserText,parserText,oldPos,word,true);
-  if (pos == -1)   throw new OCommandSQLParsingException("Expected cluster name. Use " + getSyntax(),parserText,oldPos);
-  clusterName=word.toString();
-  final ODatabaseDocument database=getDatabase();
-  if (database.getClusterIdByName(clusterName) == -1)   throw new OCommandSQLParsingException("Cluster '" + clusterName + "' not found",parserText,oldPos);
+  final OCommandRequestText textRequest=(OCommandRequestText)iRequest;
+  String queryText=textRequest.getText();
+  String originalQuery=queryText;
+  try {
+    queryText=preParse(queryText,iRequest);
+    textRequest.setText(queryText);
+    init((OCommandRequestText)iRequest);
+    StringBuilder word=new StringBuilder();
+    int oldPos=0;
+    int pos=nextWord(parserText,parserTextUpperCase,oldPos,word,true);
+    if (pos == -1 || !word.toString().equals(KEYWORD_TRUNCATE))     throw new OCommandSQLParsingException("Keyword " + KEYWORD_TRUNCATE + " not found. Use "+ getSyntax(),parserText,oldPos);
+    oldPos=pos;
+    pos=nextWord(parserText,parserTextUpperCase,oldPos,word,true);
+    if (pos == -1 || !word.toString().equals(KEYWORD_CLUSTER))     throw new OCommandSQLParsingException("Keyword " + KEYWORD_CLUSTER + " not found. Use "+ getSyntax(),parserText,oldPos);
+    oldPos=pos;
+    pos=nextWord(parserText,parserText,oldPos,word,true);
+    if (pos == -1)     throw new OCommandSQLParsingException("Expected cluster name. Use " + getSyntax(),parserText,oldPos);
+    clusterName=word.toString();
+    if (preParsedStatement != null) {
+      OIdentifier name=((OTruncateClusterStatement)preParsedStatement).clusterName;
+      if (name != null) {
+        clusterName=name.getValue();
+      }
+    }
+    final ODatabaseDocument database=getDatabase();
+    if (database.getClusterIdByName(clusterName) == -1)     throw new OCommandSQLParsingException("Cluster '" + clusterName + "' not found",parserText,oldPos);
+  }
+  finally {
+    textRequest.setText(originalQuery);
+  }
   return this;
 }

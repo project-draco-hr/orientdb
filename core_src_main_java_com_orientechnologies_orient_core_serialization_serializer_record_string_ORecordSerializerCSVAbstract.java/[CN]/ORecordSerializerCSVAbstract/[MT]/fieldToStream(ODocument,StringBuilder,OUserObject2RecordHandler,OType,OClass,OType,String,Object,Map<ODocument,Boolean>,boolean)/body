@@ -74,14 +74,22 @@ case LINKLIST:
   }
 case LINKSET:
 {
-  final OStringBuilderSerializable coll;
-  if (!(iValue instanceof OMVRBTreeRIDSet)) {
+  if (!(iValue instanceof OStringBuilderSerializable)) {
     if (iValue instanceof OAutoConvertToRecord)     ((OAutoConvertToRecord)iValue).setAutoConvertToRecord(false);
-    coll=new OMVRBTreeRIDSet(iRecord,(Collection<OIdentifiable>)iValue);
-    if (!(iValue instanceof ORecordLazySet))     iRecord.field(iName,coll);
+    final Collection<OIdentifiable> coll;
+    if (!(iValue instanceof ORecordLazySet)) {
+      final ORecordLazySet set=new ORecordLazySet(iRecord);
+      set.addAll((Collection<OIdentifiable>)iValue);
+      iRecord.field(iName,set);
+      coll=set;
+    }
+ else     coll=(Collection<OIdentifiable>)iValue;
+    serializeSet(coll,iOutput);
   }
- else   coll=(OStringBuilderSerializable)iValue;
-  coll.toStream(iOutput);
+ else {
+    final OStringBuilderSerializable coll=(OStringBuilderSerializable)iValue;
+    coll.toStream(iOutput);
+  }
   PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.linkSet2string"),"Serialize linkset to string",timer);
   break;
 }

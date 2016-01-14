@@ -8,7 +8,9 @@
     pageData[i]=data;
     final OCachePointer cachePointer=wowCache.load(fileId,i,1,true,new OModifiableBoolean())[0];
     cachePointer.acquireExclusiveLock();
-    cachePointer.getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,data,0,data.length);
+    ByteBuffer buffer=cachePointer.getSharedBuffer();
+    buffer.position(systemOffset);
+    buffer.put(data);
     cachePointer.releaseExclusiveLock();
     wowCache.store(fileId,i,cachePointer);
     cachePointer.decrementReferrer();
@@ -16,7 +18,10 @@
   for (int i=0; i < pageData.length; i++) {
     byte[] dataOne=pageData[i];
     OCachePointer cachePointer=wowCache.load(fileId,i,1,false,new OModifiableBoolean())[0];
-    byte[] dataTwo=cachePointer.getDataPointer().get(systemOffset + OWOWCache.PAGE_PADDING,8);
+    byte[] dataTwo=new byte[8];
+    ByteBuffer buffer=cachePointer.getSharedBuffer();
+    buffer.position(systemOffset);
+    buffer.get(dataTwo);
     cachePointer.decrementReferrer();
     Assert.assertEquals(dataTwo,dataOne);
   }

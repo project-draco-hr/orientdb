@@ -9,8 +9,10 @@
     }
     entries[i].getCachePointer().acquireExclusiveLock();
     entries[i].markDirty();
-    entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,(byte)i},0,8);
-    setLsn(entries[i].getCachePointer().getDataPointer(),new OLogSequenceNumber(1,i));
+    final ByteBuffer buffer=entries[i].getCachePointer().getSharedBuffer();
+    buffer.position(systemOffset);
+    buffer.put(new byte[]{(byte)i,1,2,seed,4,5,6,(byte)i});
+    setLsn(buffer,new OLogSequenceNumber(1,i));
     entries[i].getCachePointer().releaseExclusiveLock();
     readBuffer.release(entries[i],writeBuffer,storagePerformanceStatistic);
   }
@@ -20,8 +22,9 @@
   Assert.assertEquals(a1in.size(),4);
   Assert.assertEquals(a1out.size(),2);
   Assert.assertEquals(am.size(),0);
+  OByteBufferPool bufferPool=OByteBufferPool.instance();
   for (int i=6; i < 10; i++) {
-    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getDataPointer(),false,new OLogSequenceNumber(0,0));
+    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getSharedBuffer(),bufferPool,false,new OLogSequenceNumber(0,0));
     Assert.assertEquals(a1in.get(fileId,i),lruEntry);
   }
   for (int i=4; i < 6; i++) {
@@ -36,7 +39,7 @@
   Assert.assertEquals(a1in.size(),2);
   Assert.assertEquals(a1out.size(),2);
   for (int i=4; i < 6; i++) {
-    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getDataPointer(),false,new OLogSequenceNumber(1,i));
+    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getSharedBuffer(),bufferPool,false,new OLogSequenceNumber(1,i));
     Assert.assertEquals(am.get(fileId,i),lruEntry);
   }
   for (int i=6; i < 8; i++) {
@@ -44,7 +47,7 @@
     Assert.assertEquals(a1out.get(fileId,i),lruEntry);
   }
   for (int i=8; i < 10; i++) {
-    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getDataPointer(),false,new OLogSequenceNumber(0,0));
+    OCacheEntry lruEntry=generateEntry(fileId,i,entries[i].getCachePointer().getSharedBuffer(),bufferPool,false,new OLogSequenceNumber(0,0));
     Assert.assertEquals(a1in.get(fileId,i),lruEntry);
   }
   writeBuffer.flush();

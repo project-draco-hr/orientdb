@@ -1,0 +1,169 @@
+{
+  if (iValue == null)   return;
+  final long timer=PROFILER.startChrono();
+switch (iType) {
+case LINK:
+{
+      if (!(iValue instanceof OIdentifiable))       throw new OSerializationException("Found an unexpected type during marshalling of a LINK where a OIdentifiable (ORID or any Record) was expected. The string representation of the object is: " + iValue);
+      if (!((OIdentifiable)iValue).getIdentity().isValid() && iValue instanceof ODocument && ((ODocument)iValue).isEmbedded()) {
+        fieldToStream(iRecord,iOutput,iObjHandler,OType.EMBEDDED,iLinkedClass,iLinkedType,iName,iValue,iSaveOnlyDirty);
+      }
+ else {
+        final Object link=linkToStream(iOutput,iRecord,iValue);
+        if (link != null)         iRecord.field(iName,link);
+        PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.link2string"),"Serialize link to string",timer);
+      }
+      break;
+    }
+case LINKLIST:
+{
+    iOutput.append(OStringSerializerHelper.LIST_BEGIN);
+    if (iValue instanceof ORecordLazyList && ((ORecordLazyList)iValue).getStreamedContent() != null) {
+      iOutput.append(((ORecordLazyList)iValue).getStreamedContent());
+      PROFILER.updateCounter(PROFILER.getProcessMetric("serializer.record.string.linkList2string.cached"),"Serialize linklist to string in stream mode",+1);
+    }
+ else {
+      final ORecordLazyList coll;
+      final Iterator<OIdentifiable> it;
+      if (iValue instanceof OMultiCollectionIterator<?>) {
+        final OMultiCollectionIterator<OIdentifiable> iterator=(OMultiCollectionIterator<OIdentifiable>)iValue;
+        iterator.reset();
+        it=iterator;
+        coll=null;
+      }
+ else       if (!(iValue instanceof ORecordLazyList)) {
+        coll=new ORecordLazyList(iRecord);
+        if (iValue.getClass().isArray()) {
+          Iterable<Object> iterab=OMultiValue.getMultiValueIterable(iValue,false);
+          for (          Object i : iterab) {
+            coll.add((OIdentifiable)i);
+          }
+        }
+ else {
+          coll.addAll((Collection<? extends OIdentifiable>)iValue);
+          ((Collection<? extends OIdentifiable>)iValue).clear();
+        }
+        iRecord.field(iName,coll);
+        it=coll.rawIterator();
+      }
+ else {
+        coll=(ORecordLazyList)iValue;
+        if (coll.getStreamedContent() != null) {
+          iOutput.append(coll.getStreamedContent());
+          PROFILER.updateCounter(PROFILER.getProcessMetric("serializer.record.string.linkList2string.cached"),"Serialize linklist to string in stream mode",+1);
+          it=coll.newItemsIterator();
+        }
+ else         it=coll.rawIterator();
+      }
+      if (it != null && it.hasNext()) {
+        final StringBuilder buffer=new StringBuilder(128);
+        for (int items=0; it.hasNext(); items++) {
+          if (items > 0)           buffer.append(OStringSerializerHelper.RECORD_SEPARATOR);
+          final OIdentifiable item=it.next();
+          final OIdentifiable newRid=linkToStream(buffer,iRecord,item);
+          if (newRid != null)           ((OLazyIterator<OIdentifiable>)it).update(newRid);
+        }
+        if (coll != null)         coll.convertRecords2Links();
+        iOutput.append(buffer);
+        if (coll != null)         coll.setStreamedContent(buffer);
+      }
+    }
+    iOutput.append(OStringSerializerHelper.LIST_END);
+    PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.linkList2string"),"Serialize linklist to string",timer);
+    break;
+  }
+case LINKSET:
+{
+  if (!(iValue instanceof OStringBuilderSerializable)) {
+    if (iValue instanceof OAutoConvertToRecord)     ((OAutoConvertToRecord)iValue).setAutoConvertToRecord(false);
+    final Collection<OIdentifiable> coll;
+    if (!(iValue instanceof ORecordLazySet)) {
+      final ORecordLazySet set=new ORecordLazySet(iRecord);
+      set.addAll((Collection<OIdentifiable>)iValue);
+      iRecord.field(iName,set);
+      coll=set;
+    }
+ else     coll=(Collection<OIdentifiable>)iValue;
+    serializeSet(coll,iOutput);
+  }
+ else {
+    final OStringBuilderSerializable coll=(OStringBuilderSerializable)iValue;
+    coll.toStream(iOutput);
+  }
+  PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.linkSet2string"),"Serialize linkset to string",timer);
+  break;
+}
+case LINKMAP:
+{
+iOutput.append(OStringSerializerHelper.MAP_BEGIN);
+Map<Object,Object> map=(Map<Object,Object>)iValue;
+if (map instanceof OLazyObjectMapInterface<?>) ((OLazyObjectMapInterface<?>)map).setConvertToRecord(false);
+boolean invalidMap=false;
+try {
+  int items=0;
+  for (  Map.Entry<Object,Object> entry : map.entrySet()) {
+    if (items++ > 0)     iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
+    fieldTypeToString(iOutput,OType.STRING,entry.getKey());
+    iOutput.append(OStringSerializerHelper.ENTRY_SEPARATOR);
+    final Object link=linkToStream(iOutput,iRecord,entry.getValue());
+    if (link != null && !invalidMap)     invalidMap=true;
+  }
+}
+  finally {
+  if (map instanceof OLazyObjectMapInterface<?>) {
+    ((OLazyObjectMapInterface<?>)map).setConvertToRecord(true);
+  }
+}
+if (invalidMap) {
+  final ORecordLazyMap newMap=new ORecordLazyMap(iRecord,ODocument.RECORD_TYPE);
+  for (  Map.Entry<Object,Object> entry : map.entrySet()) {
+    newMap.put(entry.getKey(),(OIdentifiable)entry.getValue());
+  }
+  map.clear();
+  iRecord.field(iName,newMap);
+}
+iOutput.append(OStringSerializerHelper.MAP_END);
+PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.linkMap2string"),"Serialize linkmap to string",timer);
+break;
+}
+case EMBEDDED:
+if (iValue instanceof ORecord) {
+iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+toString((ORecord)iValue,iOutput,null,iObjHandler,false,true);
+iOutput.append(OStringSerializerHelper.EMBEDDED_END);
+}
+ else if (iValue instanceof ODocumentSerializable) {
+final ODocument doc=((ODocumentSerializable)iValue).toDocument();
+doc.field(ODocumentSerializable.CLASS_NAME,iValue.getClass().getName());
+iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+toString(doc,iOutput,null,iObjHandler,false,true);
+iOutput.append(OStringSerializerHelper.EMBEDDED_END);
+}
+ else if (iValue != null) iOutput.append(iValue.toString());
+PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embed2string"),"Serialize embedded to string",timer);
+break;
+case EMBEDDEDLIST:
+embeddedCollectionToStream(null,iObjHandler,iOutput,iLinkedClass,iLinkedType,iValue,iSaveOnlyDirty,false);
+PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedList2string"),"Serialize embeddedlist to string",timer);
+break;
+case EMBEDDEDSET:
+embeddedCollectionToStream(null,iObjHandler,iOutput,iLinkedClass,iLinkedType,iValue,iSaveOnlyDirty,true);
+PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedSet2string"),"Serialize embeddedset to string",timer);
+break;
+case EMBEDDEDMAP:
+{
+embeddedMapToStream(null,iObjHandler,iOutput,iLinkedClass,iLinkedType,iValue,iSaveOnlyDirty);
+PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedMap2string"),"Serialize embeddedmap to string",timer);
+break;
+}
+case LINKBAG:
+{
+iOutput.append(OStringSerializerHelper.BAG_BEGIN);
+((ORidBag)iValue).toStream(iOutput);
+iOutput.append(OStringSerializerHelper.BAG_END);
+break;
+}
+default :
+fieldTypeToString(iOutput,iType,iValue);
+}
+}

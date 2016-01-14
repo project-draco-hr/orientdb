@@ -9,7 +9,9 @@
     }
     entries[i].getCachePointer().acquireExclusiveLock();
     entries[i].markDirty();
-    entries[i].getCachePointer().getDataPointer().set(systemOffset + OWOWCache.PAGE_PADDING,new byte[]{(byte)i,1,2,seed,4,5,6,(byte)i},0,8);
+    final ByteBuffer buffer=entries[i].getCachePointer().getSharedBuffer();
+    buffer.position(systemOffset);
+    buffer.put(new byte[]{(byte)i,1,2,seed,4,5,6,(byte)i});
     entries[i].getCachePointer().releaseExclusiveLock();
     readBuffer.release(entries[i],writeBuffer,storagePerformanceStatistic);
   }
@@ -18,8 +20,9 @@
   LRUList a1out=readBuffer.getA1out();
   Assert.assertEquals(am.size(),0);
   Assert.assertEquals(a1out.size(),0);
+  final OByteBufferPool bufferPool=OByteBufferPool.instance();
   for (int i=0; i < 4; i++) {
-    OCacheEntry entry=generateEntry(fileId,i,entries[i].getCachePointer().getDataPointer(),false,new OLogSequenceNumber(0,0));
+    OCacheEntry entry=generateEntry(fileId,i,entries[i].getCachePointer().getSharedBuffer(),bufferPool,false,new OLogSequenceNumber(0,0));
     Assert.assertEquals(a1in.get(entry.getFileId(),entry.getPageIndex()),entry);
   }
   Assert.assertEquals(writeBuffer.getFilledUpTo(fileId),4);

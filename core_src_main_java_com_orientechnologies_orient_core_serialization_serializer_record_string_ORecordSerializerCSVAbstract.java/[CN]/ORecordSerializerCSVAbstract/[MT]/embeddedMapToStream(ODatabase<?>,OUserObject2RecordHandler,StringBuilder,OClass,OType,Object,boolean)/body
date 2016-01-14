@@ -1,0 +1,65 @@
+{
+  iOutput.append(OStringSerializerHelper.MAP_BEGIN);
+  if (iValue != null) {
+    int items=0;
+    for (    Entry<String,Object> o : ((Map<String,Object>)iValue).entrySet()) {
+      if (items > 0)       iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
+      if (o != null) {
+        fieldTypeToString(iOutput,OType.STRING,o.getKey());
+        iOutput.append(OStringSerializerHelper.ENTRY_SEPARATOR);
+        if (o.getValue() instanceof ODocument && ((ODocument)o.getValue()).getIdentity().isValid()) {
+          fieldTypeToString(iOutput,OType.LINK,o.getValue());
+        }
+ else         if (o.getValue() instanceof ORecord || o.getValue() instanceof ODocumentSerializable) {
+          final ODocument record;
+          if (o.getValue() instanceof ODocument)           record=(ODocument)o.getValue();
+ else           if (o.getValue() instanceof ODocumentSerializable) {
+            record=((ODocumentSerializable)o.getValue()).toDocument();
+            record.field(ODocumentSerializable.CLASS_NAME,o.getValue().getClass().getName());
+          }
+ else {
+            if (iDatabase == null && ODatabaseRecordThreadLocal.INSTANCE.isDefined())             iDatabase=ODatabaseRecordThreadLocal.INSTANCE.get();
+            record=OObjectSerializerHelperManager.getInstance().toStream(o.getValue(),new ODocument(o.getValue().getClass().getSimpleName()),iDatabase instanceof ODatabaseObject ? ((ODatabaseObject)iDatabase).getEntityManager() : OEntityManagerInternal.INSTANCE,iLinkedClass,iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler(){
+              public Object getUserObjectByRecord(              OIdentifiable iRecord,              final String iFetchPlan){
+                return iRecord;
+              }
+              public ORecord getRecordByUserObject(              Object iPojo,              boolean iCreateIfNotAvailable){
+                return new ODocument(iLinkedClass);
+              }
+              public boolean existsUserObjectByRID(              ORID iRID){
+                return false;
+              }
+              public void registerUserObject(              Object iObject,              ORecord iRecord){
+              }
+              public void registerUserObjectAfterLinkSave(              ORecord iRecord){
+              }
+            }
+,null,iSaveOnlyDirty);
+          }
+          iOutput.append(OStringSerializerHelper.EMBEDDED_BEGIN);
+          toString(record,iOutput,null,iObjHandler,false,true);
+          iOutput.append(OStringSerializerHelper.EMBEDDED_END);
+        }
+ else         if (o.getValue() instanceof Set<?>) {
+          fieldTypeToString(iOutput,OType.EMBEDDEDSET,o.getValue());
+        }
+ else         if (o.getValue() instanceof Collection<?>) {
+          fieldTypeToString(iOutput,OType.EMBEDDEDLIST,o.getValue());
+        }
+ else         if (o.getValue() instanceof Map<?,?>) {
+          fieldTypeToString(iOutput,OType.EMBEDDEDMAP,o.getValue());
+        }
+ else {
+          if (iLinkedType == null && o.getValue() != null) {
+            fieldTypeToString(iOutput,OType.getTypeByClass(o.getValue().getClass()),o.getValue());
+          }
+ else {
+            fieldTypeToString(iOutput,iLinkedType,o.getValue());
+          }
+        }
+      }
+      items++;
+    }
+  }
+  iOutput.append(OStringSerializerHelper.MAP_END);
+}

@@ -21,29 +21,23 @@
     timer.schedule(new TimerTask(){
       @Override public void run(){
         Assert.assertTrue("Insert was too fast",inserting);
-        banner("STARTING BACKUP SERVER " + (SERVERS - 1));
+        banner("STARTING LOCKING SERVER " + (SERVERS - 1));
         OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + (SERVERS - 1) + "/databases/"+ getDatabaseName());
         OrientGraphNoTx g=factory.getNoTx();
-        backupInProgress=true;
-        File file=null;
+        nodeStalled=true;
         try {
-          file=File.createTempFile("orientdb_test_backup",".zip");
-          if (file.exists())           Assert.assertTrue(file.delete());
-          g.getRawGraph().backup(new FileOutputStream(file),null,new Callable<Object>(){
+          final OAbstractPaginatedStorage stg=(OAbstractPaginatedStorage)g.getRawGraph().getStorage().getUnderlying();
+          stg.callInLock(new Callable<Object>(){
             @Override public Object call() throws Exception {
-              Thread.sleep(10000);
+              Thread.sleep(3000);
               return null;
             }
           }
-,null,9,1000000);
+,true);
         }
- catch (        IOException e) {
-          e.printStackTrace();
-        }
- finally {
-          banner("COMPLETED BACKUP SERVER " + (SERVERS - 1));
-          backupInProgress=false;
-          if (file != null)           file.delete();
+  finally {
+          banner("RELEASED STALLED SERVER " + (SERVERS - 1));
+          nodeStalled=false;
         }
       }
     }

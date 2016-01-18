@@ -1,6 +1,24 @@
 {
   super.onServerStarted(server);
   if (serverStarted++ == (SERVERS - 1)) {
+    new Timer(true).schedule(new TimerTask(){
+      @Override public void run(){
+        System.out.println("---------------------------------------------------------------------");
+        for (int i=0; i < SERVERS; ++i) {
+          try {
+            final OHazelcastPlugin dInstance=(OHazelcastPlugin)serverInstance.get(i).getServerInstance().getDistributedManager();
+            if (dInstance.getMessageService() == null)             break;
+            final String queueName=OHazelcastDistributedMessageService.getRequestQueueName(dInstance.getLocalNodeName(),getDatabaseName());
+            final IQueue<Object> queue=dInstance.getMessageService().getQueue(queueName);
+            System.out.println("Queue " + queueName + " size = "+ queue.size());
+          }
+ catch (          Exception e) {
+          }
+        }
+        System.out.println("---------------------------------------------------------------------");
+      }
+    }
+,1000,1000);
     timer.schedule(new TimerTask(){
       @Override public void run(){
         Assert.assertTrue("Insert was too fast",inserting);
@@ -8,8 +26,9 @@
         OrientGraphFactory factory=new OrientGraphFactory("plocal:target/server" + (SERVERS - 1) + "/databases/"+ getDatabaseName());
         OrientGraphNoTx g=factory.getNoTx();
         backupInProgress=true;
+        File file=null;
         try {
-          final File file=File.createTempFile("orientdb_test_backup",".zip");
+          file=File.createTempFile("orientdb_test_backup",".zip");
           if (file.exists())           Assert.assertTrue(file.delete());
           g.getRawGraph().backup(new FileOutputStream(file),null,new Callable<Object>(){
             @Override public Object call() throws Exception {
@@ -25,6 +44,7 @@
  finally {
           banner("COMPLETED BACKUP SERVER " + (SERVERS - 1));
           backupInProgress=false;
+          if (file != null)           file.delete();
         }
       }
     }

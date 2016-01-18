@@ -4,12 +4,23 @@
     if (messageService.getDatabase(databaseName) == null) {
       ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"opening database '%s'...",databaseName);
       ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
-      if (!getConfigurationMap().containsKey(CONFIG_DATABASE_PREFIX + databaseName)) {
+      boolean publishCfg=!getConfigurationMap().containsKey(CONFIG_DATABASE_PREFIX + databaseName);
+      if (activeNodes.size() == 1 && !cfg.isHotAlignment()) {
+        final Set<String> cfgServers=cfg.getAllConfiguredServers();
+        for (        String cfgServer : cfgServers) {
+          if (!isNodeAvailable(cfgServer,databaseName)) {
+            ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Removing offline server '%s' for database '%s' in distributed configuration",cfgServer,databaseName);
+            cfg.removeNodeInServerList(cfgServer,true);
+            publishCfg=true;
+          }
+        }
+      }
+      if (publishCfg) {
         ODocument cfgDoc=cfg.serialize();
         ORecordInternal.setRecordSerializer(cfgDoc,ODatabaseDocumentTx.getDefaultSerializer());
         getConfigurationMap().put(CONFIG_DATABASE_PREFIX + databaseName,cfgDoc);
       }
-      final OHazelcastDistributedDatabase db=messageService.registerDatabase(databaseName).configureDatabase(null);
+      final OHazelcastDistributedDatabase db=messageService.registerDatabase(databaseName).configureDatabase(null,true);
       final ODatabaseDocumentTx database=(ODatabaseDocumentTx)serverInstance.openDatabase(databaseName,"internal","internal",null,true);
       try {
         cfg=getDatabaseConfiguration(databaseName);

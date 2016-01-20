@@ -1,0 +1,37 @@
+{
+  final Properties info=new Properties();
+  info.setProperty("db.usePool","TRUE");
+  info.setProperty("db.pool.min","1");
+  info.setProperty("db.pool.max","10");
+  final OrientDataSource ds=new OrientDataSource();
+  ds.setUrl("jdbc:orient:memory:test");
+  ds.setUsername("admin");
+  ds.setPassword("admin");
+  ds.setInfo(info);
+  final AtomicBoolean queryTheDb=new AtomicBoolean(true);
+  Callable<Boolean> dbClient=new Callable<Boolean>(){
+    @Override public Boolean call() throws Exception {
+      while (queryTheDb.get()) {
+        Connection conn=ds.getConnection();
+        Statement statement=conn.createStatement();
+        ResultSet rs=statement.executeQuery("SELECT stringKey, intKey, text, length, date FROM Item");
+        assertThat(rs.first()).isTrue();
+        assertThat(rs.getString("stringKey")).isEqualTo("1");
+        rs.close();
+        statement.close();
+        conn.close();
+        assertThat(conn.isClosed()).isTrue();
+      }
+      return Boolean.TRUE;
+    }
+  }
+;
+  ExecutorService pool=Executors.newCachedThreadPool();
+  pool.submit(dbClient);
+  pool.submit(dbClient);
+  pool.submit(dbClient);
+  pool.submit(dbClient);
+  TimeUnit.SECONDS.sleep(2);
+  queryTheDb.set(false);
+  pool.shutdown();
+}

@@ -6,18 +6,11 @@ synchronized (rndFile) {
     byte[] content=new byte[OWALPage.PAGE_SIZE];
     rndFile.readFully(content);
     if (checkPageIntegrity(content)) {
-      final ByteBuffer pageBuffer=byteBufferPool.acquireDirect(false);
-      pageBuffer.put(content);
-      currentPage=new OWALPage(pageBuffer,false);
-      filledUpTo=(pagesCount - 1) * OWALPage.PAGE_SIZE + currentPage.getFilledUpTo();
-      nextPositionToFlush=(pagesCount - 1) * OWALPage.PAGE_SIZE;
+      int freeSpace=OIntegerSerializer.INSTANCE.deserializeNative(content,OWALPage.FREE_SPACE_OFFSET);
+      filledUpTo=(pagesCount - 1) * OWALPage.PAGE_SIZE + (OWALPage.PAGE_SIZE - freeSpace);
     }
  else {
-      final ByteBuffer pageBuffer=byteBufferPool.acquireDirect(false);
-      currentPage=new OWALPage(pageBuffer,true);
-      filledUpTo=pagesCount * OWALPage.PAGE_SIZE + currentPage.getFilledUpTo();
-      nextPositionToFlush=pagesCount * OWALPage.PAGE_SIZE;
+      filledUpTo=pagesCount * OWALPage.PAGE_SIZE + OWALPage.RECORDS_OFFSET;
     }
-    pagesCache.add(currentPage);
   }
 }

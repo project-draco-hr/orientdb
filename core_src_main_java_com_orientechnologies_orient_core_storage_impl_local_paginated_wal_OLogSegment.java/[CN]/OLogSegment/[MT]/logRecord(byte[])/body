@@ -3,11 +3,18 @@
   OLogRecord rec=generateLogRecord(filledUpTo,record);
   filledUpTo=rec.writeTo;
   last=new OLogSequenceNumber(order,rec.writeFrom);
-  logCache.get().add(rec);
+  try {
+    cacheLock.lock();
+    logCache.add(rec);
+  }
+  finally {
+    cacheLock.unlock();
+  }
   long flushedPos=0;
   if (writeAheadLog.getFlushedLsn() != null)   flushedPos=writeAheadLog.getFlushedLsn().getPosition();
-  if ((filledUpTo - flushedPos) / OWALPage.PAGE_SIZE > maxPagesCacheSize) {
-    OLogManager.instance().info(this,"Max cache limit is reached (%d vs. %d), sync flush is performed",maxPagesCacheSize,pagesCache.size());
+  long pagesInCache=(filledUpTo - flushedPos) / OWALPage.PAGE_SIZE;
+  if (pagesInCache > maxPagesCacheSize) {
+    OLogManager.instance().info(this,"Max cache limit is reached (%d vs. %d), sync flush is performed",maxPagesCacheSize,pagesInCache);
     flush();
   }
   return last;

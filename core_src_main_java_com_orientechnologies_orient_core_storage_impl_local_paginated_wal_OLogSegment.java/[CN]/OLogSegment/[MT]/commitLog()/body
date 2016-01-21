@@ -1,8 +1,16 @@
 {
-  if (logCache.get().isEmpty())   return;
   if (!flushNewData)   return;
   flushNewData=false;
-  List<OLogRecord> toFlush=logCache.getAndSet(new ArrayList<OLogRecord>());
+  List<OLogRecord> toFlush;
+  try {
+    cacheLock.lock();
+    if (logCache.isEmpty())     return;
+    toFlush=logCache;
+    logCache=new ArrayList<OLogRecord>();
+  }
+  finally {
+    cacheLock.unlock();
+  }
   if (toFlush.isEmpty())   return;
   byte[] pageContent=new byte[OWALPage.PAGE_SIZE];
   OLogRecord first=toFlush.get(0);
@@ -16,7 +24,6 @@ synchronized (rndFile) {
   }
   OLogSequenceNumber lsn=null;
   int pageIndex=0;
-  int flushedPage=curIndex;
   int pos=0;
   boolean lastToFlush=false;
   for (  OLogRecord log : toFlush) {
@@ -24,27 +31,15 @@ synchronized (rndFile) {
     pos=(int)(log.writeFrom % OWALPage.PAGE_SIZE);
     pageIndex=(int)(log.writeFrom / OWALPage.PAGE_SIZE);
     int written=0;
-    boolean mergeWithNextPage=true;
-    boolean recordTail=false;
     while (written < log.record.length) {
       lastToFlush=true;
       int pageFreeSpace=OWALPage.calculateRecordSize(OWALPage.PAGE_SIZE - pos);
       int contentLength=Math.min(pageFreeSpace,(log.record.length - written));
       int fromRecord=written;
       written+=contentLength;
-      if (written == log.record.length) {
-        mergeWithNextPage=false;
-        recordTail=true;
-      }
-      OByteSerializer.INSTANCE.serializeNative(mergeWithNextPage ? (byte)1 : 0,pageContent,pos);
-      OByteSerializer.INSTANCE.serializeNative(recordTail ? (byte)1 : 0,pageContent,pos + 1);
-      OIntegerSerializer.INSTANCE.serializeNative(contentLength,pageContent,pos + 2);
-      System.arraycopy(log.record,fromRecord,pageContent,pos + OIntegerSerializer.INT_SIZE + 2,contentLength);
-      pos+=OWALPage.calculateSerializedSize(contentLength);
-      OIntegerSerializer.INSTANCE.serializeNative(OWALPage.PAGE_SIZE - pos,pageContent,OWALPage.FREE_SPACE_OFFSET);
+      pos=writeContentInPage(pageContent,pos,log.record,written == log.record.length,fromRecord,contentLength);
       if (OWALPage.PAGE_SIZE - pos < OWALPage.MIN_RECORD_SIZE) {
 synchronized (rndFile) {
-          OLongSerializer.INSTANCE.serializeNative(OWALPage.MAGIC_NUMBER,pageContent,OWALPage.MAGIC_NUMBER_OFFSET);
           rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
           flushPage(pageContent);
         }
@@ -60,7 +55,6 @@ synchronized (rndFile) {
   }
   if (lastToFlush) {
 synchronized (rndFile) {
-      OLongSerializer.INSTANCE.serializeNative(OWALPage.MAGIC_NUMBER,pageContent,OWALPage.MAGIC_NUMBER_OFFSET);
       rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
       flushPage(pageContent);
     }

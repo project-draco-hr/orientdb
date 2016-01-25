@@ -1,5 +1,34 @@
 {
-  if (parallel)   executeParallel();
- else   executeSequentially();
-  return this;
+  ExecutorService executor=Executors.newCachedThreadPool();
+  try {
+    begin();
+    out(LOG_LEVELS.INFO,"Started execution with %d worker threads",workers);
+    extractor.extract(source.read());
+    final BlockingQueue<OExtractedItem> queue=new LinkedBlockingQueue<OExtractedItem>(workers * 500);
+    final AtomicLong counter=new AtomicLong();
+    final AtomicBoolean extractionFinished=new AtomicBoolean(false);
+    List<Future<Boolean>> tasks=new ArrayList<Future<Boolean>>();
+    for (int i=0; i < workers; i++) {
+      final OETLPipeline pipeline=new OETLPipeline(this,transformers,loader,logLevel,maxRetries,haltOnError);
+      pipeline.begin();
+      OETLPipelineWorker task=new OETLPipelineWorker(extractionFinished,queue,pipeline);
+      tasks.add(executor.submit(task));
+    }
+    Future<Boolean> extractorFuture=executor.submit(new OETLExtractorWorker(queue,counter,extractionFinished));
+    Boolean extracted=extractorFuture.get();
+    for (    Future<Boolean> future : tasks) {
+      out(LOG_LEVELS.DEBUG,"Pipeline worker done without errors:: " + future.get());
+    }
+    out(LOG_LEVELS.DEBUG,"all items extracted");
+    executor.shutdown();
+    end();
+  }
+ catch (  OETLProcessHaltedException e) {
+    out(LOG_LEVELS.ERROR,"ETL process halted: %s",e);
+  }
+catch (  Exception e) {
+  }
+ finally {
+    executor.shutdownNow();
+  }
 }

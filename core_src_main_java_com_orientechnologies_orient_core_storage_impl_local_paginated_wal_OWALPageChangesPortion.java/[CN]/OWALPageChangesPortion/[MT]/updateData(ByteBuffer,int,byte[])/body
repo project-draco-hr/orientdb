@@ -1,2 +1,33 @@
 {
+  if (pageChunks == null) {
+    pageChunks=new byte[(pageSize + (PORTION_BYTES - 1)) / PORTION_BYTES][][];
+  }
+  int portionIndex=offset / PORTION_BYTES;
+  if (pageChunks[portionIndex] == null) {
+    pageChunks[portionIndex]=new byte[PORTION_SIZE][];
+  }
+  int chunkIndex=(offset - portionIndex * PORTION_BYTES) / CHUNK_SIZE;
+  int chunkOffset=offset - (portionIndex * PORTION_BYTES + chunkIndex * CHUNK_SIZE);
+  int written=0;
+  while (written < data.length) {
+    byte[] chunk=pageChunks[portionIndex][chunkIndex];
+    if (chunk == null) {
+      chunk=new byte[CHUNK_SIZE];
+      if (pointer != null) {
+        pointer.position(portionIndex * PORTION_BYTES + (chunkIndex) * CHUNK_SIZE);
+        pointer.get(chunk);
+      }
+      pageChunks[portionIndex][chunkIndex]=chunk;
+    }
+    final int wl=Math.min(CHUNK_SIZE - chunkOffset,data.length - written);
+    System.arraycopy(data,written,chunk,chunkOffset,wl);
+    written+=wl;
+    chunkOffset=0;
+    chunkIndex++;
+    if (chunkIndex == PORTION_SIZE && written < data.length) {
+      portionIndex++;
+      if (pageChunks[portionIndex] == null)       pageChunks[portionIndex]=new byte[PORTION_SIZE][];
+      chunkIndex=0;
+    }
+  }
 }

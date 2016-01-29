@@ -5,9 +5,8 @@
       @Override public Object call() throws Exception {
         db.activateOnCurrentThread();
         long total=0;
-        final GZIPInputStream gzipInput=new GZIPInputStream(in);
         try {
-          final DataInputStream input=new DataInputStream(gzipInput);
+          final DataInputStream input=new DataInputStream(in);
           try {
             final long records=input.readLong();
             for (long i=0; i < records; ++i) {
@@ -27,17 +26,22 @@
                 final byte[] recordContent=new byte[recordSize];
                 input.read(recordContent);
                 OLogManager.instance().info(this,"DELTA <- other rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
-                final int forcedVersion=ORecordVersionHelper.setRollbackMode(recordVersion);
-                final ORecord record;
-                if (recordVersion == 1) {
-                  record=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
-                  ORecordInternal.fill(record,rid,forcedVersion,recordContent,true);
+                ORecord newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+                final ORecord loadedRecord=rid.getRecord();
+                if (loadedRecord == null) {
+                  ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),0,recordContent,true);
                 }
  else {
-                  record=rid.getRecord();
-                  ORecordInternal.fill(record,rid,forcedVersion,recordContent,true);
+                  ORecordInternal.fill(newRecord,rid,ORecordVersionHelper.setRollbackMode(recordVersion),recordContent,true);
+                  if (loadedRecord instanceof ODocument) {
+                    ODocument loadedDocument=(ODocument)loadedRecord;
+                    loadedDocument.merge((ODocument)newRecord,false,false).getVersion();
+                    loadedDocument.setDirty();
+                    newRecord=loadedDocument;
+                  }
                 }
-                record.save();
+                newRecord.save();
+                if (!newRecord.getIdentity().equals(rid))                 throw new ODistributedDatabaseDeltaSyncException("Error on synchronization of records, rids are different: saved " + newRecord.getIdentity() + ", but it should be "+ rid);
               }
             }
             db.getMetadata().reload();
@@ -51,7 +55,6 @@
           throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
         }
  finally {
-          gzipInput.close();
         }
         ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"Installed database delta for '%s', %d total records",db.getName(),total);
         return null;

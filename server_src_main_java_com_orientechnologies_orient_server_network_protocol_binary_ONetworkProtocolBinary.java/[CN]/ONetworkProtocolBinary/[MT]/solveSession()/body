@@ -29,39 +29,36 @@
     byte[] bytes=channel.readBytes();
     if (connection == null && bytes != null && bytes.length > 0) {
       connection=server.getClientConnectionManager().connect(this);
-      connection.tokenBytes=bytes;
     }
     if (connection == null) {
       throw new OTokenSecurityException("missing session and token");
     }
     if (requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN)     connection.acquire();
-    if (!Arrays.equals(bytes,connection.tokenBytes) || connection.database == null) {
-      connection.validateSession(bytes,server.getTokenHandler());
-      if (connection.database != null && !connection.database.isClosed()) {
-        connection.database.activateOnCurrentThread();
-        connection.database.close();
-      }
-      connection.database=null;
-      if (requestType == OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
-        server.getClientConnectionManager().disconnect(clientTxId);
-        connection=server.getClientConnectionManager().reConnect(this,connection.tokenBytes,connection.token);
-        connection.acquire();
-      }
-      if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE && connection.database == null) {
-        final ONetworkProtocolData data=server.getTokenHandler().getProtocolDataFromToken(connection.token);
-        if (data != null)         connection.data=data;
-        final String db=connection.token.getDatabase();
-        final String type=connection.token.getDatabaseType();
-        if (db != null && type != null) {
-          if (connection.data.serverUser) {
-            connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token.getUserName(),null,connection.data,true);
-          }
- else           connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token);
+    connection.validateSession(bytes,server.getTokenHandler());
+    if (connection.database != null && !connection.database.isClosed()) {
+      connection.database.activateOnCurrentThread();
+      connection.database.close();
+    }
+    connection.database=null;
+    if (requestType == OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
+      server.getClientConnectionManager().disconnect(clientTxId);
+      connection=server.getClientConnectionManager().reConnect(this,connection.tokenBytes,connection.token);
+      connection.acquire();
+    }
+    if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE && connection.database == null) {
+      final ONetworkProtocolData data=server.getTokenHandler().getProtocolDataFromToken(connection.token);
+      if (data != null)       connection.data=data;
+      final String db=connection.token.getDatabase();
+      final String type=connection.token.getDatabaseType();
+      if (db != null && type != null) {
+        if (connection.data.serverUser) {
+          connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token.getUserName(),null,connection.data,true);
         }
+ else         connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token);
       }
-      if (connection.data.serverUser) {
-        connection.serverUser=server.getUser(connection.data.serverUsername);
-      }
+    }
+    if (connection.data.serverUser) {
+      connection.serverUser=server.getUser(connection.data.serverUsername);
     }
   }
 }

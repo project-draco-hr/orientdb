@@ -26,20 +26,23 @@
                 final int recordSize=input.readInt();
                 final byte[] recordContent=new byte[recordSize];
                 input.read(recordContent);
-                ORecord newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+                ORecord newRecord=null;
                 if (loadedRecord == null) {
-                  OLogManager.instance().info(this,"DELTA <- creating rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
-                  ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),recordVersion - 1,recordContent,true);
-                  final long[] range=db.getStorage().getClusterDataRange(clusterId);
-                  for (long p=range[1]; p < clusterPos - 1; ++p) {
-                    final ORecordId tempRid=new ORecordId(clusterId,p);
-                    db.getStorage().createRecord(tempRid,new byte[]{},1,ODocument.RECORD_TYPE,0,null);
-                    db.getStorage().deleteRecord(tempRid,-1,0,null);
-                    OLogManager.instance().info(this,"DELTA <- creating hole rid=" + tempRid);
+                  OLogManager.instance().info(this,"DELTA <- creating rid=%s type=%d size=%d v=%d",rid,recordType,recordSize,recordVersion);
+                  do {
+                    newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+                    ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),recordVersion - 1,recordContent,true);
+                    newRecord.save();
+                    if (newRecord.getIdentity().getClusterPosition() < clusterPos) {
+                      OLogManager.instance().info(this,"DELTA <- creating hole rid=%s",newRecord.getIdentity());
+                      newRecord.delete();
+                    }
                   }
+ while (newRecord.getIdentity().getClusterPosition() < clusterPos);
                 }
  else {
-                  OLogManager.instance().info(this,"DELTA <- updating rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
+                  OLogManager.instance().info(this,"DELTA <- updating rid=%s type=%d size=%d v=%d",rid,recordType,recordSize,recordVersion);
+                  newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
                   ORecordInternal.fill(newRecord,rid,ORecordVersionHelper.setRollbackMode(recordVersion),recordContent,true);
                   if (loadedRecord instanceof ODocument) {
                     ODocument loadedDocument=(ODocument)loadedRecord;
@@ -47,8 +50,8 @@
                     loadedDocument.setDirty();
                     newRecord=loadedDocument;
                   }
+                  newRecord.save();
                 }
-                newRecord.save();
                 if (!newRecord.getIdentity().equals(rid))                 throw new ODistributedDatabaseDeltaSyncException("Error on synchronization of records, rids are different: saved " + newRecord.getIdentity() + ", but it should be "+ rid);
               }
             }

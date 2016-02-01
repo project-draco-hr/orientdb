@@ -34,20 +34,39 @@
         final String node=entry.getKey();
         final IQueue queue=entry.getValue();
         if (queue != null) {
-          if (queueMaxSize > 0 && queue.size() > queueMaxSize) {
+          int nodeQueueSize=queue.size();
+          if (queueMaxSize > 0 && nodeQueueSize > queueMaxSize) {
+            final int nodeQueuePrevSize=queueSizes.getOrDefault(node,0);
+            final int nodeQueueWarnings=queueWarningCounter.getOrDefault(node,0);
             final ODistributedServerManager.DB_STATUS nodeStatus=manager.getDatabaseStatus(node,databaseName);
             if (nodeStatus == ODistributedServerManager.DB_STATUS.SYNCHRONIZING || nodeStatus == ODistributedServerManager.DB_STATUS.BACKUP) {
               queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
+              queueWarningCounter.remove(node);
+            }
+ else             if (nodeQueueSize < nodeQueuePrevSize || nodeQueueWarnings < 10) {
+              queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
+              if (System.currentTimeMillis() - manager.getLastClusterChangeOn() > 10000) {
+                queueWarningCounter.put(node,nodeQueueWarnings + 1);
+                ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), checking if the node is in stall (warnings=%d)",queue.getName(),nodeQueueSize,nodeQueueWarnings);
+              }
+ else {
+                queueWarningCounter.remove(node);
+                ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), but the cluster shape is changed recently (%d secs)",queue.getName(),nodeQueueSize,((System.currentTimeMillis() - manager.getLastClusterChangeOn()) / 1000));
+              }
             }
  else {
-              ODistributedServerLog.warn(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"queue has too many messages (%d), treating the node as in stall: trying to restart it...",queue.size());
+              ODistributedServerLog.warn(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), treating the node as in stall: trying to restart it...",queue.getName(),nodeQueueSize);
               queue.clear();
+              queueWarningCounter.remove(node);
+              nodeQueueSize=0;
               manager.disconnectNode(entry.getKey());
             }
           }
  else {
             queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
+            queueWarningCounter.remove(node);
           }
+          queueSizes.put(node,nodeQueueSize);
         }
       }
     }

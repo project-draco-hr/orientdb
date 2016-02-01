@@ -15,9 +15,10 @@
               final boolean deleted=input.readBoolean();
               final ORecordId rid=new ORecordId(clusterId,clusterPos);
               total++;
+              final ORecord loadedRecord=rid.getRecord();
               if (deleted) {
-                OLogManager.instance().info(this,"DELTA <- deleted " + rid);
-                db.delete(rid);
+                OLogManager.instance().info(this,"DELTA <- deleting " + rid);
+                if (loadedRecord != null)                 db.delete(rid);
               }
  else {
                 final int recordVersion=input.readInt();
@@ -25,13 +26,20 @@
                 final int recordSize=input.readInt();
                 final byte[] recordContent=new byte[recordSize];
                 input.read(recordContent);
-                OLogManager.instance().info(this,"DELTA <- other rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
                 ORecord newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
-                final ORecord loadedRecord=rid.getRecord();
                 if (loadedRecord == null) {
-                  ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),0,recordContent,true);
+                  OLogManager.instance().info(this,"DELTA <- creating rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
+                  ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),recordVersion - 1,recordContent,true);
+                  final long[] range=db.getStorage().getClusterDataRange(clusterId);
+                  for (long p=range[1]; p < clusterPos - 1; ++p) {
+                    final ORecordId tempRid=new ORecordId(clusterId,p);
+                    db.getStorage().createRecord(tempRid,new byte[]{},1,ODocument.RECORD_TYPE,0,null);
+                    db.getStorage().deleteRecord(tempRid,-1,0,null);
+                    OLogManager.instance().info(this,"DELTA <- creating hole rid=" + tempRid);
+                  }
                 }
  else {
+                  OLogManager.instance().info(this,"DELTA <- updating rid=" + rid + " type="+ recordType+ " size="+ recordSize+ " v="+ recordVersion);
                   ORecordInternal.fill(newRecord,rid,ORecordVersionHelper.setRollbackMode(recordVersion),recordContent,true);
                   if (loadedRecord instanceof ODocument) {
                     ODocument loadedDocument=(ODocument)loadedRecord;

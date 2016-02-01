@@ -3,24 +3,31 @@
   createSchema(testDocumentTx);
   System.out.println("Start data propagation");
   List<Future> futures=new ArrayList<Future>();
-  for (int i=0; i < 8; i++) {
+  for (int i=0; i < 4; i++) {
+    System.out.println("--> " + i);
     futures.add(executorService.submit(new DataPropagationTask(baseDocumentTx,testDocumentTx)));
   }
-  Thread.sleep(300000);
+  System.out.println("Wait for 300 second");
+  TimeUnit.SECONDS.sleep(60);
   System.out.println("Wait for process to destroy");
+  process.destroyForcibly();
   process.waitFor();
   System.out.println("Process was destroyed");
   for (  Future future : futures) {
     try {
       future.get();
+      System.out.println("Cancelling future");
     }
  catch (    Exception e) {
-      e.printStackTrace();
+      future.cancel(true);
     }
   }
+  System.out.println("All loaders done");
+  System.out.println("Open remote crashed DB in plocal to recover");
   testDocumentTx=new ODatabaseDocumentTx("plocal:" + buildDir.getAbsolutePath() + "/testIndexCrashRestoreMultivalue");
   testDocumentTx.open("admin","admin");
   testDocumentTx.close();
+  System.out.println("Reopen cleaned db");
   testDocumentTx.open("admin","admin");
   System.out.println("Start data comparison.");
   compareIndexes();

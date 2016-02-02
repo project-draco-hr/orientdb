@@ -26,7 +26,14 @@
       idx=oClass.createIndex(indexName,indexType.toString(),null,metadataDoc,engine,fields);
     }
  else {
-      final List<OType> fieldTypeList=keyTypes != null ? Arrays.asList(keyTypes) : ((OClassImpl)oClass).extractFieldTypes(fields);
+      final List<OType> fieldTypeList;
+      if (keyTypes == null) {
+        for (        final String fieldName : fields) {
+          if (!fieldName.equals("@rid") && !oClass.existsProperty(fieldName))           throw new OIndexException("Index with name : '" + indexName + "' cannot be created on class : '"+ oClass.getName()+ "' because field: '"+ fieldName+ "' is absent in class definition.");
+        }
+        fieldTypeList=((OClassImpl)oClass).extractFieldTypes(fields);
+      }
+ else       fieldTypeList=Arrays.asList(keyTypes);
       final OIndexDefinition idxDef=OIndexDefinitionFactory.createIndexDefinition(oClass,Arrays.asList(fields),fieldTypeList,collatesList,indexType.toString(),null);
       idx=database.getMetadata().getIndexManager().createIndex(indexName,indexType.name(),idxDef,oClass.getPolymorphicClusterIds(),null,metadataDoc,engine);
     }

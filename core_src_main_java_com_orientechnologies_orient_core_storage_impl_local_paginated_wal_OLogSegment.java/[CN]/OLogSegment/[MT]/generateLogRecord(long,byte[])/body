@@ -1,0 +1,29 @@
+{
+  long from=starting;
+  long length=record.length;
+  long resultSize;
+  int freePageSpace=OWALPage.PAGE_SIZE - (int)Math.max(starting % OWALPage.PAGE_SIZE,OWALPage.RECORDS_OFFSET);
+  int inPage=OWALPage.calculateRecordSize(freePageSpace);
+  if (inPage >= length) {
+    resultSize=OWALPage.calculateSerializedSize((int)length);
+    if (from % OWALPage.PAGE_SIZE == 0)     from+=OWALPage.RECORDS_OFFSET;
+    return new OLogRecord(record,from,from + resultSize);
+  }
+ else {
+    if (inPage > 0) {
+      length-=inPage;
+      resultSize=freePageSpace;
+      if (from % OWALPage.PAGE_SIZE == 0)       from+=OWALPage.RECORDS_OFFSET;
+    }
+ else {
+      from=starting + freePageSpace + OWALPage.RECORDS_OFFSET;
+      resultSize=-OWALPage.RECORDS_OFFSET;
+    }
+    resultSize+=length / OWALPage.calculateRecordSize(OWALPage.MAX_ENTRY_SIZE) * OWALPage.PAGE_SIZE;
+    int leftSize=(int)length % OWALPage.calculateRecordSize(OWALPage.MAX_ENTRY_SIZE);
+    if (leftSize > 0) {
+      resultSize+=OWALPage.RECORDS_OFFSET + OWALPage.calculateSerializedSize(leftSize);
+    }
+    return new OLogRecord(record,from,from + resultSize);
+  }
+}

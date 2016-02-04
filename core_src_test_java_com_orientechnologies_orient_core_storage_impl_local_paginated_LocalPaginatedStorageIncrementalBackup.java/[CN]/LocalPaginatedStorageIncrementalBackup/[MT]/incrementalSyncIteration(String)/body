@@ -1,0 +1,48 @@
+{
+  OLogSequenceNumber startLSN=((OAbstractPaginatedStorage)originalDB.getStorage()).getWALInstance().end();
+  final Random rnd=new Random();
+  int created=0;
+  int updated=0;
+  int deleted=0;
+  while (created + updated + deleted < 10000) {
+    final int operation=rnd.nextInt(3);
+switch (operation) {
+case 0:
+      createRecord(rnd);
+    created++;
+  break;
+case 1:
+if (updateRecord(rnd)) updated++;
+break;
+case 2:
+if (deleteRecord(rnd)) deleted++;
+break;
+}
+}
+System.out.println("Created " + created);
+System.out.println("Updated " + updated);
+System.out.println("Deleted " + deleted);
+final File changesFile=new File(buildDirectory,LocalPaginatedStorageIncrementalBackup.class.getSimpleName() + ".dt");
+if (changesFile.exists()) {
+Assert.assertTrue(changesFile.delete());
+}
+RandomAccessFile dataFile=new RandomAccessFile(changesFile,"rw");
+try {
+FileChannel channel=dataFile.getChannel();
+final OutputStream outputStream=Channels.newOutputStream(channel);
+final OutputStream bufferedOutputStream=new BufferedOutputStream(outputStream);
+((OAbstractPaginatedStorage)originalDB.getStorage()).recordsChangedAfterLSN(startLSN,bufferedOutputStream);
+bufferedOutputStream.close();
+dataFile.close();
+dataFile=new RandomAccessFile(changesFile,"rw");
+channel=dataFile.getChannel();
+final InputStream inputStream=Channels.newInputStream(channel);
+final BufferedInputStream bufferedInputStream=new BufferedInputStream(inputStream);
+replicateDelta(syncDB,bufferedInputStream);
+}
+  finally {
+dataFile.close();
+}
+assertDatabasesAreInSynch();
+Assert.assertTrue(changesFile.delete());
+}

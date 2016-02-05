@@ -2,6 +2,7 @@
   if (!OGlobalConfiguration.STORAGE_KEEP_DISK_CACHE_STATE.getValueAsBoolean()) {
     return;
   }
+  cacheLock.acquireWriteLock();
   try {
     final File rootDirectory=writeCache.getRootDirectory();
     final File stateFile=new File(rootDirectory,CACHE_STATE_FILE);
@@ -10,10 +11,7 @@
         OLogManager.instance().warn(this,"Can not delete cache state file %s",stateFile);
       }
     }
-    final Set<Long> filesToStore=new HashSet<Long>();
-    for (    long fileId : files) {
-      filesToStore.add(fileId);
-    }
+    final Set<Long> filesToStore=new HashSet<Long>(writeCache.files().values());
     final RandomAccessFile cacheState=new RandomAccessFile(stateFile,"rw");
     try {
       final FileChannel channel=cacheState.getChannel();
@@ -21,12 +19,13 @@
       final BufferedOutputStream bufferedOutputStream=new BufferedOutputStream(channelStream);
       final DataOutputStream dataOutputStream=new DataOutputStream(bufferedOutputStream);
       try {
-        storeQueueState(filesToStore,dataOutputStream,am);
-        dataOutputStream.writeLong(-1);
-        storeQueueState(filesToStore,dataOutputStream,a1in);
-        dataOutputStream.writeLong(-1);
-        storeQueueState(filesToStore,dataOutputStream,a1out);
-        dataOutputStream.writeLong(-1);
+        dataOutputStream.writeLong(memoryDataContainer.get().maxSize);
+        storeQueueState(writeCache,filesToStore,dataOutputStream,am);
+        dataOutputStream.writeInt(-1);
+        storeQueueState(writeCache,filesToStore,dataOutputStream,a1in);
+        dataOutputStream.writeInt(-1);
+        storeQueueState(writeCache,filesToStore,dataOutputStream,a1out);
+        dataOutputStream.writeInt(-1);
       }
   finally {
         dataOutputStream.close();
@@ -38,5 +37,8 @@
   }
  catch (  IOException ioe) {
     OLogManager.instance().error(this,"Can not store state of cache for storage placed under %s",writeCache.getRootDirectory(),ioe);
+  }
+ finally {
+    cacheLock.releaseWriteLock();
   }
 }

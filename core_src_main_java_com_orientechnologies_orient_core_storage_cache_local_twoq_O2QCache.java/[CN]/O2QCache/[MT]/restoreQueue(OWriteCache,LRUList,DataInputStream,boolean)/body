@@ -1,9 +1,10 @@
 {
   final OModifiableBoolean cacheHit=new OModifiableBoolean();
-  long fileId=dataInputStream.readLong();
-  while (fileId >= 0) {
+  int internalFileId=dataInputStream.readInt();
+  while (internalFileId >= 0) {
     final long pageIndex=dataInputStream.readLong();
     try {
+      final long fileId=writeCache.externalFileId(internalFileId);
       final OCacheEntry cacheEntry;
       if (loadPages) {
         if (!writeCache.isOpen(fileId))         writeCache.openFile(fileId);
@@ -15,10 +16,19 @@
  else {
         cacheEntry=new OCacheEntry(fileId,pageIndex,null,false);
       }
+      Set<Long> pages=filePages.get(fileId);
+      if (pages == null) {
+        pages=new HashSet<Long>();
+        Set<Long> op=filePages.putIfAbsent(fileId,pages);
+        if (op != null) {
+          pages=op;
+        }
+      }
       queue.putToMRU(cacheEntry);
+      pages.add(cacheEntry.getPageIndex());
     }
   finally {
-      fileId=dataInputStream.readLong();
+      internalFileId=dataInputStream.readInt();
     }
   }
 }

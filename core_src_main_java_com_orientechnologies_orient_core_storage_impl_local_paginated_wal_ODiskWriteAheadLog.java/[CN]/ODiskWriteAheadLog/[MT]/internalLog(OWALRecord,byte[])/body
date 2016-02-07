@@ -1,0 +1,58 @@
+{
+  syncObject.lock();
+  try {
+    checkForClose();
+    if (segmentCreationFlag && record instanceof OOperationUnitRecord && !activeOperations.contains(((OOperationUnitRecord)record).getOperationUnitId())) {
+      while (segmentCreationFlag) {
+        try {
+          segmentCreationComplete.await();
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new OInterruptedException("Segment creation was interrupted");
+        }
+      }
+    }
+    OLogSegment last=logSegments.get(logSegments.size() - 1);
+    long lastSize=last.filledUpTo();
+    final OLogSequenceNumber lsn=last.logRecord(recordContent);
+    record.setLsn(lsn);
+    if (record.isUpdateMasterRecord()) {
+      lastCheckpoint=lsn;
+      if (useFirstMasterRecord) {
+        firstMasterRecord=lsn;
+        writeMasterRecord(0,firstMasterRecord);
+        useFirstMasterRecord=false;
+      }
+ else {
+        secondMasterRecord=lsn;
+        writeMasterRecord(1,secondMasterRecord);
+        useFirstMasterRecord=true;
+      }
+    }
+    final long sizeDiff=last.filledUpTo() - lastSize;
+    logSize+=sizeDiff;
+    if (last.filledUpTo() >= maxSegmentSize) {
+      segmentCreationFlag=true;
+      if (record instanceof OAtomicUnitEndRecord && activeOperations.size() == 1 || (!(record instanceof OOperationUnitRecord) && activeOperations.isEmpty())) {
+        last.stopFlush(true);
+        last=new OLogSegment(this,new File(walLocation,getSegmentName(last.getOrder() + 1)),maxPagesCacheSize);
+        last.init();
+        last.startFlush();
+        logSegments.add(last);
+        segmentCreationFlag=false;
+        segmentCreationComplete.signalAll();
+      }
+    }
+    if (logSize > walSizeLimit && logSegments.size() > 1) {
+      for (      WeakReference<OFullCheckpointRequestListener> listenerWeakReference : fullCheckpointListeners) {
+        final OFullCheckpointRequestListener listener=listenerWeakReference.get();
+        if (listener != null)         listener.requestCheckpoint();
+      }
+    }
+    return lsn;
+  }
+  finally {
+    syncObject.unlock();
+  }
+}

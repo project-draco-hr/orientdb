@@ -1,0 +1,42 @@
+{
+  if (!OGlobalConfiguration.STORAGE_KEEP_DISK_CACHE_STATE.getValueAsBoolean()) {
+    return;
+  }
+  cacheLock.acquireReadLock();
+  try {
+    final File rootDirectory=writeCache.getRootDirectory();
+    final File stateFile=new File(rootDirectory,CACHE_STATE_FILE);
+    if (stateFile.exists()) {
+      final RandomAccessFile cacheState=new RandomAccessFile(stateFile,"rw");
+      try {
+        final FileChannel channel=cacheState.getChannel();
+        final InputStream stream=Channels.newInputStream(channel);
+        final BufferedInputStream bufferedInputStream=new BufferedInputStream(stream);
+        final DataInputStream dataInputStream=new DataInputStream(bufferedInputStream);
+        try {
+          final long maxCacheSize=dataInputStream.readLong();
+          final long currentMaxCacheSize=memoryDataContainer.get().maxSize;
+          if (maxCacheSize > currentMaxCacheSize) {
+            OLogManager.instance().error(this,"Previous maximum cache size was %d current maximum cache size is %d. Cache state for storage %s will not be restored.",maxCacheSize,currentMaxCacheSize,rootDirectory);
+            return;
+          }
+          restoreQueue(writeCache,am,dataInputStream,true);
+          restoreQueue(writeCache,a1in,dataInputStream,true);
+          restoreQueue(writeCache,a1out,dataInputStream,false);
+        }
+  finally {
+          dataInputStream.close();
+        }
+      }
+  finally {
+        cacheState.close();
+      }
+    }
+  }
+ catch (  Exception e) {
+    OLogManager.instance().error(this,"Can not restore state of cache for storage placed under %s",writeCache.getRootDirectory(),e);
+  }
+ finally {
+    cacheLock.releaseReadLock();
+  }
+}

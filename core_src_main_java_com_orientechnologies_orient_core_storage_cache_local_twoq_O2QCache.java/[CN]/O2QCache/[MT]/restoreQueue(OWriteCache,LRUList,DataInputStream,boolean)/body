@@ -1,0 +1,34 @@
+{
+  final OModifiableBoolean cacheHit=new OModifiableBoolean();
+  int internalFileId=dataInputStream.readInt();
+  while (internalFileId >= 0) {
+    final long pageIndex=dataInputStream.readLong();
+    try {
+      final long fileId=writeCache.externalFileId(internalFileId);
+      final OCacheEntry cacheEntry;
+      if (loadPages) {
+        if (!writeCache.isOpen(fileId))         writeCache.openFile(fileId);
+        final OCachePointer[] pointers=writeCache.load(fileId,pageIndex,1,false,cacheHit);
+        if (pointers.length == 0)         continue;
+        final OCachePointer cachePointer=pointers[0];
+        cacheEntry=new OCacheEntry(fileId,pageIndex,cachePointer,false);
+      }
+ else {
+        cacheEntry=new OCacheEntry(fileId,pageIndex,null,false);
+      }
+      Set<Long> pages=filePages.get(fileId);
+      if (pages == null) {
+        pages=new HashSet<Long>();
+        Set<Long> op=filePages.putIfAbsent(fileId,pages);
+        if (op != null) {
+          pages=op;
+        }
+      }
+      queue.putToMRU(cacheEntry);
+      pages.add(cacheEntry.getPageIndex());
+    }
+  finally {
+      internalFileId=dataInputStream.readInt();
+    }
+  }
+}

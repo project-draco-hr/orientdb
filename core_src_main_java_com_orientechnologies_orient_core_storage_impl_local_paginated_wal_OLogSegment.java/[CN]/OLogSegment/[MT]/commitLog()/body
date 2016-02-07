@@ -1,0 +1,68 @@
+{
+  if (!flushNewData)   return;
+  flushNewData=false;
+  List<OLogRecord> toFlush;
+  try {
+    cacheLock.lock();
+    if (logCache.isEmpty())     return;
+    toFlush=logCache;
+    logCache=new ArrayList<OLogRecord>();
+  }
+  finally {
+    cacheLock.unlock();
+  }
+  if (toFlush.isEmpty())   return;
+  byte[] pageContent=new byte[OWALPage.PAGE_SIZE];
+  OLogRecord first=toFlush.get(0);
+  int curIndex=(int)(first.writeFrom / OWALPage.PAGE_SIZE);
+synchronized (rndFile) {
+    long pagesCount=rndFile.length() / OWALPage.PAGE_SIZE;
+    if (pagesCount > curIndex) {
+      rndFile.seek(curIndex * OWALPage.PAGE_SIZE);
+      rndFile.readFully(pageContent);
+    }
+  }
+  OLogSequenceNumber lsn=null;
+  int pageIndex=0;
+  int pos=0;
+  boolean lastToFlush=false;
+  for (  OLogRecord log : toFlush) {
+    lsn=new OLogSequenceNumber(order,log.writeFrom);
+    pos=(int)(log.writeFrom % OWALPage.PAGE_SIZE);
+    pageIndex=(int)(log.writeFrom / OWALPage.PAGE_SIZE);
+    int written=0;
+    while (written < log.record.length) {
+      lastToFlush=true;
+      int pageFreeSpace=OWALPage.calculateRecordSize(OWALPage.PAGE_SIZE - pos);
+      int contentLength=Math.min(pageFreeSpace,(log.record.length - written));
+      int fromRecord=written;
+      written+=contentLength;
+      pos=writeContentInPage(pageContent,pos,log.record,written == log.record.length,fromRecord,contentLength);
+      if (OWALPage.PAGE_SIZE - pos < OWALPage.MIN_RECORD_SIZE) {
+synchronized (rndFile) {
+          rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
+          flushPage(pageContent);
+        }
+        if (pendingLSNToFlush != null) {
+          this.writeAheadLog.setFlushedLsn(pendingLSNToFlush);
+        }
+        pendingLSNToFlush=lsn;
+        lastToFlush=false;
+        pageIndex++;
+        pos=OWALPage.RECORDS_OFFSET;
+      }
+    }
+  }
+  if (lastToFlush) {
+synchronized (rndFile) {
+      rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
+      flushPage(pageContent);
+    }
+  }
+  if (OGlobalConfiguration.WAL_SYNC_ON_PAGE_FLUSH.getValueAsBoolean()) {
+synchronized (rndFile) {
+      rndFile.getFD().sync();
+    }
+  }
+  this.writeAheadLog.setFlushedLsn(lsn);
+}

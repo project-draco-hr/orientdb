@@ -3,49 +3,17 @@
   try {
     if (!active)     return this;
     active=false;
-    workers.shutdown();
-    try {
-      workers.awaitTermination(2,TimeUnit.MINUTES);
-    }
- catch (    InterruptedException e) {
-    }
-    OLogManager.instance().debug(this,"Orient Engine is shutting down...");
-    shutdownAllStorages();
-    for (    OEngine engine : engines.values())     engine.shutdown();
-    engines.clear();
-    if (threadGroup != null)     threadGroup.interrupt();
-    if (shutdownHook != null) {
-      shutdownHook.cancel();
-      shutdownHook=null;
-    }
-    if (signalHandler != null) {
-      signalHandler.cancel();
-      signalHandler=null;
-    }
-    timer.cancel();
-    timer=null;
-    profiler.shutdown();
-    purgeWeakShutdownListeners();
-    for (    final WeakHashSetValueHolder<OOrientShutdownListener> wl : weakShutdownListeners)     try {
-      if (wl != null) {
-        final OOrientShutdownListener l=wl.get();
-        if (l != null) {
-          l.onShutdown();
-        }
-      }
-    }
- catch (    Exception e) {
-      OLogManager.instance().error(this,"Error during orient shutdown",e);
-    }
-    for (    OOrientListener l : browseListeners()) {
-      if (l != null)       try {
-        l.onShutdown();
+    OLogManager.instance().info(this,"Orient Engine is shutting down...");
+    for (    OShutdownHandler handler : shutdownHandlers) {
+      try {
+        OLogManager.instance().info(this,"Shutdown handler %s is going to be called",handler);
+        handler.shutdown();
+        OLogManager.instance().info(this,"Shutdown handler %s completed",handler);
       }
  catch (      Exception e) {
-        OLogManager.instance().error(this,"Error during orient shutdown",e);
+        OLogManager.instance().error(this,"Exception during calling of shutdown handler %s",handler);
       }
     }
-    System.gc();
     OLogManager.instance().info(this,"OrientDB Engine shutdown complete");
     OLogManager.instance().flush();
   }

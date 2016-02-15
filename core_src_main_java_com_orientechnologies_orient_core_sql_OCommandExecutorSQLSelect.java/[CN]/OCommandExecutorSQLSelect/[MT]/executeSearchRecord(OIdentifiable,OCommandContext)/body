@@ -9,31 +9,37 @@
   final LOCKING_STRATEGY contextLockingStrategy=iContext.getVariable("$locking") != null ? (LOCKING_STRATEGY)iContext.getVariable("$locking") : null;
   final LOCKING_STRATEGY localLockingStrategy=contextLockingStrategy != null ? contextLockingStrategy : lockingStrategy;
   if (localLockingStrategy != null && !(localLockingStrategy == LOCKING_STRATEGY.DEFAULT || localLockingStrategy == LOCKING_STRATEGY.NONE || localLockingStrategy == LOCKING_STRATEGY.EXCLUSIVE_LOCK || localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK))   throw new IllegalStateException("Unsupported locking strategy " + localLockingStrategy);
-  final ORecord record;
-  if (!(id instanceof ORecord)) {
-    record=getDatabase().load(id.getIdentity(),null,!isUseCache());
-    if (id instanceof OContextualRecordId && ((OContextualRecordId)id).getContext() != null) {
-      Map<String,Object> ridContext=((OContextualRecordId)id).getContext();
-      for (      String key : ridContext.keySet()) {
-        context.setVariable(key,ridContext.get(key));
-      }
+  if (localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK) {
+    id.lock(false);
+    if (id instanceof ORecord) {
+      final ORecord record=(ORecord)id;
+      record.reload(null,true,false);
     }
   }
- else {
-    record=(ORecord)id;
-  }
-  iContext.updateMetric("recordReads",+1);
-  if (record == null || ORecordInternal.getRecordType(record) != ODocument.RECORD_TYPE)   return true;
-  iContext.updateMetric("documentReads",+1);
-  if (localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK) {
-    record.lock(false);
-    record.reload(null,true,false);
-  }
  else   if (localLockingStrategy == LOCKING_STRATEGY.EXCLUSIVE_LOCK) {
-    record.lock(true);
-    record.reload(null,true,false);
+    id.lock(true);
+    if (id instanceof ORecord) {
+      final ORecord record=(ORecord)id;
+      record.reload(null,true,false);
+    }
   }
+  ORecord record=null;
   try {
+    if (!(id instanceof ORecord)) {
+      record=getDatabase().load(id.getIdentity(),null,!isUseCache());
+      if (id instanceof OContextualRecordId && ((OContextualRecordId)id).getContext() != null) {
+        Map<String,Object> ridContext=((OContextualRecordId)id).getContext();
+        for (        String key : ridContext.keySet()) {
+          context.setVariable(key,ridContext.get(key));
+        }
+      }
+    }
+ else {
+      record=(ORecord)id;
+    }
+    iContext.updateMetric("recordReads",+1);
+    if (record == null || ORecordInternal.getRecordType(record) != ODocument.RECORD_TYPE)     return true;
+    iContext.updateMetric("documentReads",+1);
     iContext.setVariable("current",record);
     if (filter(record,iContext)) {
       if (parallel) {
@@ -58,7 +64,7 @@
     }
   }
   finally {
-    if (localLockingStrategy != null && record.isLocked()) {
+    if (localLockingStrategy != null && record != null && record.isLocked()) {
       if (localLockingStrategy == LOCKING_STRATEGY.EXCLUSIVE_LOCK || localLockingStrategy == LOCKING_STRATEGY.SHARED_LOCK) {
         record.unlock();
       }

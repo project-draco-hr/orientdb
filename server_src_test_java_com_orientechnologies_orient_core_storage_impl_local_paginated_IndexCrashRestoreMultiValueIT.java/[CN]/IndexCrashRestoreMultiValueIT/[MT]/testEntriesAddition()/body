@@ -1,0 +1,32 @@
+{
+  createSchema(baseDocumentTx);
+  createSchema(testDocumentTx);
+  System.out.println("Start data propagation");
+  List<Future> futures=new ArrayList<Future>();
+  for (int i=0; i < 4; i++) {
+    futures.add(executorService.submit(new DataPropagationTask(baseDocumentTx,testDocumentTx)));
+  }
+  System.out.println("Wait for 5 minutes");
+  TimeUnit.MINUTES.sleep(5);
+  System.out.println("Wait for process to destroy");
+  serverProcess.destroy();
+  serverProcess.waitFor();
+  System.out.println("Process was destroyed");
+  for (  Future future : futures) {
+    try {
+      future.get();
+    }
+ catch (    Exception e) {
+      future.cancel(true);
+    }
+  }
+  System.out.println("All loaders done");
+  System.out.println("Open remote crashed DB in plocal to recover");
+  testDocumentTx=new ODatabaseDocumentTx("plocal:" + buildDir.getAbsolutePath() + "/"+ testIndexName);
+  testDocumentTx.open("admin","admin");
+  testDocumentTx.close();
+  System.out.println("Reopen cleaned db");
+  testDocumentTx.open("admin","admin");
+  System.out.println("Start data comparison.");
+  compareIndexes();
+}

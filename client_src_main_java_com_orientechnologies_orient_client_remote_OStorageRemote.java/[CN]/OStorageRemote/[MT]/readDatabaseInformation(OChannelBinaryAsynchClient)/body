@@ -1,21 +1,27 @@
 {
   final int tot=network.getSrvProtocolVersion() >= 7 ? network.readShort() : network.readInt();
-  clusters=new OCluster[tot];
-  clusterMap.clear();
-  for (int i=0; i < tot; ++i) {
-    final OClusterRemote cluster=new OClusterRemote();
-    String clusterName=network.readString();
-    final int clusterId=network.readShort();
-    if (clusterName != null) {
-      clusterName=clusterName.toLowerCase();
-      if (network.getSrvProtocolVersion() < 24)       network.readString();
-      final int dataSegmentId=network.getSrvProtocolVersion() >= 12 && network.getSrvProtocolVersion() < 24 ? (int)network.readShort() : 0;
-      cluster.configure(this,clusterId,clusterName);
-      if (clusterId >= clusters.length)       clusters=Arrays.copyOf(clusters,clusterId + 1);
-      clusters[clusterId]=cluster;
-      clusterMap.put(clusterName,cluster);
+  stateLock.acquireWriteLock();
+  try {
+    clusters=new OCluster[tot];
+    clusterMap.clear();
+    for (int i=0; i < tot; ++i) {
+      final OClusterRemote cluster=new OClusterRemote();
+      String clusterName=network.readString();
+      final int clusterId=network.readShort();
+      if (clusterName != null) {
+        clusterName=clusterName.toLowerCase();
+        if (network.getSrvProtocolVersion() < 24)         network.readString();
+        final int dataSegmentId=network.getSrvProtocolVersion() >= 12 && network.getSrvProtocolVersion() < 24 ? (int)network.readShort() : 0;
+        cluster.configure(this,clusterId,clusterName);
+        if (clusterId >= clusters.length)         clusters=Arrays.copyOf(clusters,clusterId + 1);
+        clusters[clusterId]=cluster;
+        clusterMap.put(clusterName,cluster);
+      }
     }
+    final OCluster defaultCluster=clusterMap.get(CLUSTER_DEFAULT_NAME);
+    if (defaultCluster != null)     defaultClusterId=clusterMap.get(CLUSTER_DEFAULT_NAME).getId();
   }
-  final OCluster defaultCluster=clusterMap.get(CLUSTER_DEFAULT_NAME);
-  if (defaultCluster != null)   defaultClusterId=clusterMap.get(CLUSTER_DEFAULT_NAME).getId();
+  finally {
+    stateLock.releaseWriteLock();
+  }
 }

@@ -1,0 +1,35 @@
+{
+  baseDB.open("admin","admin");
+  testDB.open("admin","admin");
+  try {
+    while (true) {
+      long id=idGen.getAndIncrement();
+      long ts=System.currentTimeMillis();
+      ODatabaseRecordThreadLocal.INSTANCE.set(baseDB);
+      ODocument doc=new ODocument();
+      doc.field("ts",ts);
+      doc.save();
+      if (id % 1000 == 0)       System.out.println(Thread.currentThread().getName() + " inserted:: " + id);
+      baseDB.command(new OCommandSQL("insert into index:mi (key, rid) values (" + id + ", "+ doc.getIdentity()+ ")")).execute();
+      ODatabaseRecordThreadLocal.INSTANCE.set(testDB);
+      for (int i=0; i < 10; i++) {
+        testDB.command(new OCommandSQL("insert into index:mi (key, rid) values (" + id + ", #0:"+ i+ ")")).execute();
+      }
+    }
+  }
+ catch (  Exception e) {
+    throw e;
+  }
+ finally {
+    try {
+      baseDB.close();
+    }
+ catch (    Exception e) {
+    }
+    try {
+      testDB.close();
+    }
+ catch (    Exception e) {
+    }
+  }
+}

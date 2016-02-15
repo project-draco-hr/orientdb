@@ -8,8 +8,10 @@
       for (      OTransformer t : transformers) {
         current=t.transform(current);
         if (current == null) {
-          if (logLevel == OETLProcessor.LOG_LEVELS.DEBUG)           OLogManager.instance().warn(this,"Transformer [%s] returned null, skip rest of pipeline execution",t);
-          break;
+          if (logLevel == DEBUG) {
+            OLogManager.instance().warn(this,"Transformer [%s] returned null, skip rest of pipeline execution",t);
+            break;
+          }
         }
       }
       if (current != null)       loader.load(current,context);
@@ -18,18 +20,20 @@
  catch (    ONeedRetryException e) {
       loader.rollback();
       retry++;
-      processor.out(OETLProcessor.LOG_LEVELS.INFO,"Error in pipeline execution, retry = %d/%d (exception=%s)",retry,maxRetries,e);
+      processor.out(INFO,"Error in pipeline execution, retry = %d/%d (exception=%s)",retry,maxRetries,e);
     }
 catch (    OETLProcessHaltedException e) {
-      processor.out(OETLProcessor.LOG_LEVELS.ERROR,"Pipeline execution halted");
+      processor.out(ERROR,"Pipeline execution halted");
       processor.getStats().incrementErrors();
       loader.rollback();
       throw e;
     }
 catch (    Exception e) {
-      processor.out(OETLProcessor.LOG_LEVELS.ERROR,"Error in Pipeline execution: %s",e);
+      processor.out(ERROR,"Error in Pipeline execution: %s",e);
       processor.getStats().incrementErrors();
-      if (!haltOnError)       return null;
+      if (!haltOnError) {
+        return null;
+      }
       loader.rollback();
       throw OException.wrapException(new OETLProcessHaltedException("Halt"),e);
     }

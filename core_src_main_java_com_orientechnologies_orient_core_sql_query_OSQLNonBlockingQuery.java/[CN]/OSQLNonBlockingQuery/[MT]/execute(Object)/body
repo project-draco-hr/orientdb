@@ -2,9 +2,16 @@
   final ODatabaseDocumentInternal database=ODatabaseRecordThreadLocal.INSTANCE.get();
   final ONonBlockingQueryFuture future=new ONonBlockingQueryFuture();
   if (database instanceof ODatabaseDocumentTx) {
+    ODatabaseDocumentInternal currentThreadLocal=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+    final ODatabaseDocumentTx db=((ODatabaseDocumentTx)database).copy();
+    if (currentThreadLocal != null) {
+      currentThreadLocal.activateOnCurrentThread();
+    }
+ else {
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
     Thread t=new Thread(new Runnable(){
       @Override public void run(){
-        final ODatabaseDocumentTx db=((ODatabaseDocumentTx)database).copy();
         db.activateOnCurrentThread();
         try {
           OSQLNonBlockingQuery.super.execute(iArgs);

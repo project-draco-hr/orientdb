@@ -1,2 +1,55 @@
 {
+  final ORecord rec=txEntry.getRecord();
+  if (txEntry.type != ORecordOperation.DELETED && !rec.isDirty())   return;
+  ORecordId rid=(ORecordId)rec.getIdentity();
+  if (txEntry.type == ORecordOperation.UPDATED && rid.isNew())   txEntry.type=ORecordOperation.CREATED;
+  ORecordSerializationContext.pushContext();
+  try {
+    final OCluster cluster=getClusterById(rid.clusterId);
+    if (cluster.getName().equals(OMetadataDefault.CLUSTER_INDEX_NAME) || cluster.getName().equals(OMetadataDefault.CLUSTER_MANUAL_INDEX_NAME))     return;
+    if (rec instanceof OTxListener)     ((OTxListener)rec).onEvent(txEntry,OTxListener.EVENT.BEFORE_COMMIT);
+switch (txEntry.type) {
+case ORecordOperation.LOADED:
+      break;
+case ORecordOperation.CREATED:
+{
+      final byte[] stream=rec.toStream();
+      if (allocated != null) {
+        final OPhysicalPosition ppos;
+        final byte recordType=ORecordInternal.getRecordType(rec);
+        ppos=doCreateRecord(rid,stream,rec.getVersion(),recordType,null,cluster,new OPhysicalPosition(recordType),allocated).getResult();
+        ORecordInternal.setVersion(rec,ppos.recordVersion);
+      }
+ else {
+        ORecordInternal.setVersion(rec,updateRecord(rid,ORecordInternal.isContentChanged(rec),stream,-2,ORecordInternal.getRecordType(rec),-1,null).getResult());
+      }
+      break;
+    }
+case ORecordOperation.UPDATED:
+{
+    final byte[] stream=rec.toStream();
+    OStorageOperationResult<Integer> updateRes=doUpdateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getVersion(),ORecordInternal.getRecordType(rec),null,cluster);
+    ORecordInternal.setVersion(rec,updateRes.getResult());
+    if (updateRes.getModifiedRecordContent() != null) {
+      ORecordInternal.fill(rec,rid,updateRes.getResult(),updateRes.getModifiedRecordContent(),false);
+    }
+    break;
+  }
+case ORecordOperation.DELETED:
+{
+  deleteRecord(rid,rec.getVersion(),-1,null);
+  break;
+}
+default :
+throw new OStorageException("Unknown record operation " + txEntry.type);
+}
+}
+  finally {
+ORecordSerializationContext.pullContext();
+}
+if (rec instanceof ODocument && ((ODocument)rec).isTrackingChanges()) {
+ODocumentInternal.clearTrackData(((ODocument)rec));
+}
+ORecordInternal.unsetDirty(rec);
+if (rec instanceof OTxListener) ((OTxListener)rec).onEvent(txEntry,OTxListener.EVENT.AFTER_COMMIT);
 }

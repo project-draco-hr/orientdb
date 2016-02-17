@@ -7,21 +7,21 @@
   if (requestType == OChannelBinaryProtocol.REQUEST_CONNECT || requestType == OChannelBinaryProtocol.REQUEST_DB_OPEN || requestType == OChannelBinaryProtocol.REQUEST_SHUTDOWN) {
     noToken=true;
   }
-  if (connection != null && !Boolean.TRUE.equals(connection.tokenBased)) {
+  if (connection != null && !Boolean.TRUE.equals(connection.getTokenBased())) {
     noToken=true;
   }
   if (noToken) {
     if (clientTxId < 0) {
       short protocolId=0;
-      if (connection != null)       protocolId=connection.data.protocolVersion;
+      if (connection != null)       protocolId=connection.getData().protocolVersion;
       connection=server.getClientConnectionManager().connect(this);
       if (connection != null) {
-        connection.data.protocolVersion=protocolId;
-        connection.data.sessionId=clientTxId;
+        connection.getData().protocolVersion=protocolId;
+        connection.getData().sessionId=clientTxId;
       }
     }
     if (connection != null) {
-      connection.tokenBytes=null;
+      connection.setTokenBytes(null);
       connection.acquire();
     }
   }
@@ -35,28 +35,19 @@
     }
     if (requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
       connection.acquire();
-      connection.validateSession(bytes,server.getTokenHandler());
+      connection.validateSession(bytes,server.getTokenHandler(),this);
     }
  else {
-      connection.validateSession(bytes,server.getTokenHandler());
+      connection.validateSession(bytes,server.getTokenHandler(),this);
       server.getClientConnectionManager().disconnect(clientTxId);
-      connection=server.getClientConnectionManager().reConnect(this,connection.tokenBytes,connection.token);
+      connection=server.getClientConnectionManager().reConnect(this,connection.getTokenBytes(),connection.getToken());
       connection.acquire();
     }
-    if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE && connection.database == null) {
-      final ONetworkProtocolData data=server.getTokenHandler().getProtocolDataFromToken(connection.token);
-      if (data != null)       connection.data=data;
-      final String db=connection.token.getDatabase();
-      final String type=connection.token.getDatabaseType();
-      if (db != null && type != null) {
-        if (connection.data.serverUser) {
-          connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token.getUserName(),null,connection.data,true);
-        }
- else         connection.database=(ODatabaseDocumentTx)server.openDatabase(type + ":" + db,connection.token);
-      }
+    if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE) {
+      connection.init(server);
     }
-    if (connection.data.serverUser) {
-      connection.serverUser=server.getUser(connection.data.serverUsername);
+    if (connection.getData().serverUser) {
+      connection.setServerUser(server.getUser(connection.getData().serverUsername));
     }
   }
 }

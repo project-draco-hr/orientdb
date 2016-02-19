@@ -3,7 +3,14 @@
   Lock pageLock;
   MemoryData memoryData=memoryDataContainer.get();
   if ((100 * (memoryData.pinnedPages + 1)) / memoryData.maxSize > percentOfPinnedPages) {
-    OLogManager.instance().warn(this,"Maximum amount of pinned pages is reached , given page " + cacheEntry + " will not be marked as pinned which may lead to performance degradation. You may consider to increase percent of pined pages "+ "by changing of property "+ OGlobalConfiguration.DISK_CACHE_PINNED_PAGES.getKey());
+    if (pinnedPagesWarningsCache < MAX_PERCENT_OF_PINED_PAGES) {
+      pinnedPagesWarningCounter.increment();
+      final long warnings=pinnedPagesWarningCounter.get();
+      if (warnings < MAX_PERCENT_OF_PINED_PAGES) {
+        pinnedPagesWarningsCache=(int)warnings;
+        OLogManager.instance().warn(this,"Maximum amount of pinned pages is reached , given page " + cacheEntry + " will not be marked as pinned which may lead to performance degradation. You may consider to increase percent of pined pages "+ "by changing of property "+ OGlobalConfiguration.DISK_CACHE_PINNED_PAGES.getKey());
+      }
+    }
     return;
   }
   cacheLock.acquireReadLock();

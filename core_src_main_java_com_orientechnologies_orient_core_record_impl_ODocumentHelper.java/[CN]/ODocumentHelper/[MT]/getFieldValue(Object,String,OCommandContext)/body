@@ -117,17 +117,22 @@
         final List<String> indexParts=OStringSerializerHelper.smartSplit(indexAsString,',');
         final List<String> indexRanges=OStringSerializerHelper.smartSplit(indexAsString,'-');
         final List<String> indexCondition=OStringSerializerHelper.smartSplit(indexAsString,'=',' ');
-        if (indexParts.size() == 1 && indexRanges.size() == 1 && indexCondition.size() == 1) {
+        if (isFieldName(indexAsString)) {
           if (value instanceof Map<?,?>)           value=getMapEntry((Map<String,?>)value,index);
  else           if (Character.isDigit(indexAsString.charAt(0)))           value=OMultiValue.getValue(value,Integer.parseInt(indexAsString));
  else           value=getFieldValue(value,indexAsString,iContext);
         }
- else         if (indexParts.size() > 1) {
+ else         if (isListOfNumbers(indexParts)) {
           final Object[] values=new Object[indexParts.size()];
           for (int i=0; i < indexParts.size(); ++i)           values[i]=OMultiValue.getValue(value,Integer.parseInt(indexParts.get(i)));
-          value=values;
+          if (indexParts.size() > 1) {
+            value=values;
+          }
+ else {
+            value=values[0];
+          }
         }
- else         if (indexRanges.size() > 1) {
+ else         if (isListOfNumbers(indexRanges)) {
           String from=indexRanges.get(0);
           String to=indexRanges.get(1);
           final int rangeFrom=from != null && !from.isEmpty() ? Integer.parseInt(from) : 0;
@@ -136,15 +141,16 @@
           for (int i=rangeFrom; i <= rangeTo; ++i)           values[i - rangeFrom]=OMultiValue.getValue(value,i);
           value=values;
         }
- else         if (!indexCondition.isEmpty()) {
-          final String conditionFieldName=indexCondition.get(0);
-          Object conditionFieldValue=ORecordSerializerStringAbstract.getTypeValue(indexCondition.get(1));
-          if (conditionFieldValue instanceof String)           conditionFieldValue=OIOUtils.getStringContent(conditionFieldValue);
+ else {
+          OSQLPredicate pred=new OSQLPredicate(indexAsString);
           final HashSet<Object> values=new HashSet<Object>();
           for (          Object v : OMultiValue.getMultiValueIterable(value)) {
-            Object filtered=filterItem(conditionFieldName,conditionFieldValue,v);
-            if (filtered != null)             if (filtered instanceof Collection<?>)             values.addAll((Collection<? extends Object>)filtered);
- else             values.add(filtered);
+            if (v instanceof OIdentifiable) {
+              Object result=pred.evaluate((OIdentifiable)v,(ODocument)((OIdentifiable)v).getRecord(),iContext);
+              if (Boolean.TRUE.equals(result)) {
+                values.add(v);
+              }
+            }
           }
           if (values.isEmpty())           value=values;
  else           if (values.size() == 1)           value=values.iterator().next();

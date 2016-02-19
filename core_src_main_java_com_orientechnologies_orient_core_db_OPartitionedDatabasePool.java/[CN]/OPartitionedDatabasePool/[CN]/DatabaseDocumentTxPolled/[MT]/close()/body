@@ -6,9 +6,23 @@
     if (data.acquireCount > 0)     return;
     PoolPartition p=partition;
     partition=null;
-    super.close();
-    data.acquiredDatabase=null;
-    p.queue.offer(this);
+    final OStorage storage=getStorage();
+    if (!storage.isClosed()) {
+      super.close();
+      data.acquiredDatabase=null;
+      p.queue.offer(this);
+    }
+ else {
+      try {
+        super.close();
+      }
+ catch (      Exception e) {
+        OLogManager.instance().error(this,"Error during closing of database % when storage %s was already closed",e,getUrl(),storage.getName());
+      }
+      data.acquiredDatabase=null;
+      final DatabaseDocumentTxPolled db=new DatabaseDocumentTxPolled(url);
+      p.queue.offer(db);
+    }
     p.acquiredConnections.decrementAndGet();
   }
  else {

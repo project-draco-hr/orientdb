@@ -1,2 +1,22 @@
 {
+  storagePerformanceStatistic.startPageWriteToFileTimer();
+  try {
+    if (writeAheadLog != null) {
+      final OLogSequenceNumber lsn=ODurablePage.getLogSequenceNumberFromPage(buffer);
+      final OLogSequenceNumber flushedLSN=writeAheadLog.getFlushedLsn();
+      if (flushedLSN == null || flushedLSN.compareTo(lsn) < 0)       writeAheadLog.flush();
+    }
+    final byte[] content=new byte[pageSize];
+    buffer.position(0);
+    buffer.get(content);
+    OLongSerializer.INSTANCE.serializeNative(MAGIC_NUMBER,content,0);
+    final int crc32=calculatePageCrc(content);
+    OIntegerSerializer.INSTANCE.serializeNative(crc32,content,OLongSerializer.LONG_SIZE);
+    final OFileClassic fileClassic=files.get(fileId);
+    fileClassic.write(pageIndex * pageSize,content);
+    if (syncOnPageFlush)     fileClassic.synch();
+  }
+  finally {
+    storagePerformanceStatistic.stopPageWriteToFileTimer();
+  }
 }

@@ -34,11 +34,18 @@
         ctx.edgeType=iParams[3] == null ? null : "" + iParams[3];
       }
       ctx.edgeTypeParam=new String[]{ctx.edgeType};
+      if (iParams.length > 4) {
+        bindAdditionalParams(iParams[4],ctx);
+      }
       ctx.queueLeft.add(ctx.sourceVertex);
       ctx.leftVisited.add(ctx.sourceVertex.getIdentity());
       ctx.queueRight.add(ctx.destinationVertex);
       ctx.rightVisited.add(ctx.destinationVertex.getIdentity());
+      int depth=1;
       while (true) {
+        if (ctx.maxDepth != null && ctx.maxDepth <= depth) {
+          break;
+        }
         if (ctx.queueLeft.isEmpty() || ctx.queueRight.isEmpty())         break;
         if (Thread.interrupted())         throw new OCommandExecutionException("The shortestPath() function has been interrupted");
         if (!OCommandExecutorAbstract.checkInterruption(iContext))         break;
@@ -46,6 +53,10 @@
         if (ctx.queueLeft.size() <= ctx.queueRight.size()) {
           neighborIdentity=walkLeft(ctx);
           if (neighborIdentity != null)           return neighborIdentity;
+          depth++;
+          if (ctx.maxDepth != null && ctx.maxDepth <= depth) {
+            break;
+          }
           if (ctx.queueLeft.isEmpty())           break;
           neighborIdentity=walkRight(ctx);
           if (neighborIdentity != null)           return neighborIdentity;
@@ -53,10 +64,15 @@
  else {
           neighborIdentity=walkRight(ctx);
           if (neighborIdentity != null)           return neighborIdentity;
+          depth++;
+          if (ctx.maxDepth != null && ctx.maxDepth <= depth) {
+            break;
+          }
           if (ctx.queueRight.isEmpty())           break;
           neighborIdentity=walkLeft(ctx);
           if (neighborIdentity != null)           return neighborIdentity;
         }
+        depth++;
       }
       return new ArrayList<ORID>();
     }

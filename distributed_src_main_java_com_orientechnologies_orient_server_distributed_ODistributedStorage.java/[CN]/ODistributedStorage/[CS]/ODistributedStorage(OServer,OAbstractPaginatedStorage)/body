@@ -1,0 +1,55 @@
+{
+  this.serverInstance=iServer;
+  this.dManager=(OHazelcastPlugin)iServer.getDistributedManager();
+  this.wrapped=wrapped;
+  ODistributedServerLog.debug(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.NONE,"Installing distributed storage on database '%s'",wrapped.getName());
+  purgeDeletedRecordsTask=new TimerTask(){
+    @Override public void run(){
+      final long now=System.currentTimeMillis();
+      for (Iterator<Map.Entry<ORecordId,OPair<Long,Integer>>> it=deletedRecords.entrySet().iterator(); it.hasNext(); ) {
+        final Map.Entry<ORecordId,OPair<Long,Integer>> entry=it.next();
+        try {
+          final ORecordId rid=entry.getKey();
+          final long time=entry.getValue().getKey();
+          final int version=entry.getValue().getValue();
+          if (now - time > (OGlobalConfiguration.DISTRIBUTED_ASYNCH_RESPONSES_TIMEOUT.getValueAsLong() * 2)) {
+            final OStorageOperationResult<Boolean> result=wrapped.deleteRecord(rid,version,0,null);
+            if (result == null || !result.getResult())             OLogManager.instance().error(this,"Error on deleting record %s v.%s",rid,version);
+          }
+        }
+  finally {
+          it.remove();
+        }
+      }
+    }
+  }
+;
+  Orient.instance().scheduleTask(purgeDeletedRecordsTask,OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_PURGE_RESPONSES_TIMER_DELAY.getValueAsLong());
+  final int queueSize=OGlobalConfiguration.DISTRIBUTED_ASYNCH_QUEUE_SIZE.getValueAsInteger();
+  if (queueSize <= 0)   asynchronousOperationsQueue=new LinkedBlockingQueue<OAsynchDistributedOperation>();
+ else   asynchronousOperationsQueue=new LinkedBlockingQueue<OAsynchDistributedOperation>(queueSize);
+  asynchWorker=new Thread(){
+    @Override public void run(){
+      while (running || !asynchronousOperationsQueue.isEmpty()) {
+        try {
+          final OAsynchDistributedOperation operation=asynchronousOperationsQueue.take();
+          final Object result=dManager.sendRequest(operation.getDatabaseName(),operation.getClusterNames(),operation.getNodes(),operation.getTask(),operation.getCallback() != null ? EXECUTION_MODE.RESPONSE : EXECUTION_MODE.NO_RESPONSE);
+          if (operation.getCallback() != null)           operation.getCallback().call(result);
+        }
+ catch (        InterruptedException e) {
+          final int pendingMessages=asynchronousOperationsQueue.size();
+          if (pendingMessages > 0)           ODistributedServerLog.warn(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.NONE,"Received shutdown signal, waiting for asynchronous queue is empty (pending msgs=%d)...",pendingMessages);
+          Thread.interrupted();
+        }
+catch (        Throwable e) {
+          if (running)           if (e instanceof ONeedRetryException)           ODistributedServerLog.debug(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.OUT,"Error on executing asynchronous operation",e);
+ else           ODistributedServerLog.error(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.OUT,"Error on executing asynchronous operation",e);
+        }
+      }
+      ODistributedServerLog.warn(this,dManager != null ? dManager.getLocalNodeName() : "?",null,ODistributedServerLog.DIRECTION.NONE,"Shutdown asynchronous queue worker for database '%s' completed",wrapped.getName());
+    }
+  }
+;
+  asynchWorker.setName("OrientDB Distributed asynch ops node=" + getNodeId() + " db="+ getName());
+  asynchWorker.start();
+}

@@ -22,8 +22,6 @@
   }
   final boolean waitLocalNode=waitForLocalNode(cfg,iClusterNames,iNodes);
   final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(queueSize),groupByResponse);
-  final long timeout=OGlobalConfiguration.DISTRIBUTED_QUEUE_TIMEOUT.getValueAsLong();
-  final int queueMaxSize=OGlobalConfiguration.DISTRIBUTED_QUEUE_MAXSIZE.getValueAsInteger();
   try {
     requestLock.lock();
     try {
@@ -32,48 +30,8 @@
       msgService.registerRequest(iRequest.getId(),currentResponseMgr);
       for (      OPair<String,IQueue> entry : reqQueues) {
         final String node=entry.getKey();
-        final IQueue queue=entry.getValue();
-        if (queue != null) {
-          int nodeQueueSize=queue.size();
-          if (queueMaxSize > 0 && nodeQueueSize > queueMaxSize) {
-            Integer nodeQueuePrevSize=queueSizes.get(node);
-            if (nodeQueuePrevSize == null) {
-              nodeQueuePrevSize=0;
-            }
-            Integer nodeQueueWarnings=queueWarningCounter.get(node);
-            if (nodeQueueWarnings == null) {
-              nodeQueueWarnings=0;
-            }
-            final ODistributedServerManager.DB_STATUS nodeStatus=manager.getDatabaseStatus(node,databaseName);
-            if (nodeStatus == ODistributedServerManager.DB_STATUS.SYNCHRONIZING || nodeStatus == ODistributedServerManager.DB_STATUS.BACKUP) {
-              queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
-              queueWarningCounter.remove(node);
-            }
- else             if (nodeQueueSize < nodeQueuePrevSize || nodeQueueWarnings < 10) {
-              queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
-              if (System.currentTimeMillis() - manager.getLastClusterChangeOn() > 10000) {
-                queueWarningCounter.put(node,nodeQueueWarnings + 1);
-                ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), checking if the node is in stall (warnings=%d)",queue.getName(),nodeQueueSize,nodeQueueWarnings);
-              }
- else {
-                queueWarningCounter.remove(node);
-                ODistributedServerLog.debug(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), but the cluster shape is changed recently (%d secs)",queue.getName(),nodeQueueSize,((System.currentTimeMillis() - manager.getLastClusterChangeOn()) / 1000));
-              }
-            }
- else {
-              ODistributedServerLog.warn(this,getLocalNodeName(),node,DIRECTION.OUT,"queue '%s' has too many messages (%d), treating the node as in stall: trying to restart it...",queue.getName(),nodeQueueSize);
-              queue.clear();
-              queueWarningCounter.remove(node);
-              nodeQueueSize=0;
-              manager.disconnectNode(entry.getKey());
-            }
-          }
- else {
-            queue.offer(iRequest,timeout,TimeUnit.MILLISECONDS);
-            queueWarningCounter.remove(node);
-          }
-          queueSizes.put(node,nodeQueueSize);
-        }
+        final ORemoteServerController remoteServer=manager.getRemoteServer(node);
+        remoteServer.executeRequest(iRequest);
       }
     }
   finally {

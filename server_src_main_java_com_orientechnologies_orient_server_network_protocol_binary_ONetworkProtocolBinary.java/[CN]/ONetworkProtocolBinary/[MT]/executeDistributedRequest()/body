@@ -1,0 +1,44 @@
+{
+  setDataCommandInfo("Distributed request");
+  final byte[] serializedReq=channel.readBytes();
+  final ODistributedServerManager manager=server.getDistributedManager();
+  final ODistributedRequest req=manager.createRequest();
+  for (int retry=1; ; ++retry) {
+    final ObjectInputStream in=new ObjectInputStream(new ByteArrayInputStream(serializedReq));
+    try {
+      req.readExternal(in);
+    }
+ catch (    ClassNotFoundException e) {
+      throw new IOException("Error on unmarshalling of remote task",e);
+    }
+    final Object responsePayload;
+    final ORemoteTask task=req.getTask();
+    try {
+      responsePayload=task.execute(server,server.getDistributedManager(),connection.getDatabase());
+    }
+ catch (    Exception e) {
+      throw new IOException("Error on executing remote task",e);
+    }
+    if (responsePayload instanceof OModificationOperationProhibitedException) {
+      try {
+        ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"Database is frozen, waiting and retrying. Request %s (retry=%d)",req,retry);
+        Thread.sleep(1000);
+      }
+ catch (      InterruptedException e) {
+      }
+    }
+ else {
+      if (retry > 1)       ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"Request %s succeed after retry=%d",req,retry);
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"sending back response '%s' to request %d (%s)",responsePayload,req.getId(),task);
+      final ODistributedResponse response=manager.createResponse(req.getId(),manager.getLocalNodeName(),req.getSenderNodeName(),(Serializable)responsePayload);
+      try {
+        final ORemoteServerController remoteSenderServer=manager.getRemoteServer(req.getSenderNodeName());
+        remoteSenderServer.sendResponse(response);
+      }
+ catch (      Exception e) {
+        throw OException.wrapException(new ODistributedException("Cannot send response to the sender node " + req.getSenderNodeName()),e);
+      }
+      break;
+    }
+  }
+}

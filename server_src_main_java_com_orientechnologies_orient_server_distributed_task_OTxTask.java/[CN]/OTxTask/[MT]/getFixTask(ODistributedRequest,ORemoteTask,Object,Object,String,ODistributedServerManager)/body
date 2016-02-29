@@ -1,0 +1,21 @@
+{
+  if (!(iBadResponse instanceof OTxTaskResult)) {
+    ODistributedServerLog.debug(this,getNodeSource(),null,DIRECTION.NONE,"Error on creating fix-task for request: '%s' because bad response is not expected type: %s",iRequest,iBadResponse);
+    return Collections.EMPTY_LIST;
+  }
+  if (!(iGoodResponse instanceof OTxTaskResult)) {
+    ODistributedServerLog.debug(this,getNodeSource(),null,DIRECTION.NONE,"Error on creating fix-task for request: '%s' because good response is not expected type: %s",iRequest,iBadResponse);
+    return Collections.EMPTY_LIST;
+  }
+  final List<ORemoteTask> fixTasks=new ArrayList<ORemoteTask>();
+  final OFixTxTask fixTask=new OFixTxTask(((OTxTaskResult)iBadResponse).locks);
+  fixTasks.add(fixTask);
+  for (int i=0; i < tasks.size(); ++i) {
+    final OAbstractRecordReplicatedTask t=tasks.get(i);
+    final Object badResult=((OTxTaskResult)iBadResponse).results.get(i);
+    final Object goodResult=((OTxTaskResult)iGoodResponse).results.get(i);
+    final List<ORemoteTask> tasks=t.getFixTask(iRequest,t,badResult,goodResult,executorNodeName,dManager);
+    if (tasks != null)     fixTask.addAll(tasks);
+  }
+  return fixTasks;
+}

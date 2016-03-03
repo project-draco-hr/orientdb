@@ -5,12 +5,23 @@
   if (nodeLeftName != null) {
     for (    ODistributedLifecycleListener l : listeners)     l.onNodeLeft(nodeLeftName);
     if (messageService != null)     for (    String dbName : messageService.getDatabases())     messageService.getDatabase(dbName).unlockRecords(nodeLeftName);
-    for (Iterator<String> it=getConfigurationMap().keySet().iterator(); it.hasNext(); ) {
+    final HashSet<String> entriesToRemove=new HashSet<String>();
+    final Map<String,Object> map=getConfigurationMap();
+    for (Iterator<String> it=map.keySet().iterator(); it.hasNext(); ) {
       final String n=it.next();
-      if (n.startsWith(CONFIG_DBSTATUS_PREFIX))       if (n.substring(CONFIG_DBSTATUS_PREFIX.length()).equals(nodeLeftName)) {
-        ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"removing dbstatus for the node %s that just left: %s",nodeLeftName,n);
-        it.remove();
+      if (n.startsWith(CONFIG_DBSTATUS_PREFIX)) {
+        final String part=n.substring(CONFIG_DBSTATUS_PREFIX.length());
+        final int pos=part.indexOf(".");
+        if (pos > -1) {
+          if (part.substring(0,pos).equals(nodeLeftName)) {
+            ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"removing dbstatus for the node %s that just left: %s",nodeLeftName,n);
+            entriesToRemove.add(n);
+          }
+        }
       }
+    }
+    for (    String entry : entriesToRemove) {
+      map.remove(entry);
     }
     activeNodes.remove(nodeLeftName);
     if (messageService != null)     messageService.handleUnreachableNode(nodeLeftName);

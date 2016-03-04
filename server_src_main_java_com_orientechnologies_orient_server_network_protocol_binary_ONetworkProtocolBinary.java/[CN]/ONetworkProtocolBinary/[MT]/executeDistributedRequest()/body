@@ -11,9 +11,21 @@
  catch (    ClassNotFoundException e) {
       throw new IOException("Error on unmarshalling of remote task",e);
     }
-    ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Received request %s (%d bytes)",req,serializedReq.length);
-    final Object responsePayload;
+    ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Received request %s (%d bytes)",req,serializedReq.length);
     final ORemoteTask task=req.getTask();
+    final ODistributedDatabase ddb=manager.getMessageService().getDatabase(req.getDatabaseName());
+    if (ddb != null) {
+      final long waitForMessage=ddb.getWaitForMessageId();
+      if (waitForMessage > -1) {
+        if (!(task instanceof ODistributedDatabaseChunk)) {
+          ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Skipping request %s waiting for %d",req,waitForMessage);
+          return;
+        }
+        ddb.setWaitForMessage(-1);
+      }
+    }
+    if (task.isRequiredOpenDatabase())     waitNodeIsOnline(req);
+    Object responsePayload;
     try {
       task.setNodeSource(req.getSenderNodeName());
       ODatabaseDocumentTx db=connection.getDatabase();
@@ -22,7 +34,7 @@
         connection.setDatabase(db);
       }
       final ODatabaseDocumentTx database=db;
-      ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Executing request %s (%d bytes)",req,serializedReq.length);
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Executing request %s (%d bytes)",req,serializedReq.length);
       responsePayload=OScenarioThreadLocal.executeAsDistributed(new Callable<Object>(){
         @Override public Object call() throws Exception {
           return task.execute(server,server.getDistributedManager(),database);
@@ -31,11 +43,11 @@
 );
     }
  catch (    RuntimeException e) {
-      throw e;
+      responsePayload=e;
     }
 catch (    Exception e) {
       ODistributedServerLog.error(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Error on executing request %s",e,req);
-      throw new IOException("Error on executing remote task",e);
+      responsePayload=e;
     }
     if (responsePayload instanceof OModificationOperationProhibitedException) {
       try {
@@ -47,11 +59,11 @@ catch (    Exception e) {
     }
  else {
       if (retry > 1)       ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.IN,"Request %s succeed after retry=%d",req,retry);
-      ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"sending back response '%s' to request %d (%s)",responsePayload,req.getId(),task);
+      ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"sending back response '%s' to request %d (%s)",responsePayload,req.getId(),task);
       final ODistributedResponse response=manager.createResponse(req.getId(),manager.getLocalNodeName(),req.getSenderNodeName(),(Serializable)responsePayload);
       try {
         final ORemoteServerController remoteSenderServer=manager.getRemoteServer(req.getSenderNodeName());
-        ODistributedServerLog.info(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"Sending back response %s to %s",response,req.getSenderNodeName());
+        ODistributedServerLog.debug(this,manager.getLocalNodeName(),req.getSenderNodeName(),ODistributedServerLog.DIRECTION.OUT,"Sending back response %s to %s",response,req.getSenderNodeName());
         remoteSenderServer.sendResponse(response,req.getSenderNodeName());
       }
  catch (      Exception e) {

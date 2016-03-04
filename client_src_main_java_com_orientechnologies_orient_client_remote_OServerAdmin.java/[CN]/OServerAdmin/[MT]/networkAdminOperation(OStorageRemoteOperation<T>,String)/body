@@ -1,12 +1,21 @@
 {
-  OChannelBinaryAsynchClient network=null;
-  try {
-    storage.pushSessionId(getURL(),sessionId,sessionToken,connections);
-    network=storage.getAvailableNetwork(getURL());
-    return operation.execute(network);
+  Exception lastException=null;
+  for (int retry=0; retry < 2; ++retry) {
+    OChannelBinaryAsynchClient network=null;
+    try {
+      storage.pushSessionId(getURL(),sessionId,sessionToken,connections);
+      network=storage.getAvailableNetwork(getURL());
+      return operation.execute(network);
+    }
+ catch (    IOException e) {
+      network.close();
+      lastException=e;
+    }
+catch (    Exception e) {
+      storage.close(true,false);
+      lastException=e;
+      break;
+    }
   }
- catch (  Exception e) {
-    storage.close(true,false);
-    throw OException.wrapException(new OStorageException(errorMessage),e);
-  }
+  throw OException.wrapException(new OStorageException(errorMessage),lastException);
 }

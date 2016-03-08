@@ -1,7 +1,9 @@
 {
+  distrDatabase.setWaitForMessageId(value.getLastOperationId() + 1);
   final String fileName=Orient.getTempPath() + "install_" + databaseName+ ".zip";
   final String localNodeName=nodeName;
-  ODistributedServerLog.info(this,localNodeName,iNode,DIRECTION.IN,"copying remote database '%s' to: %s",databaseName,fileName);
+  ODistributedServerLog.info(this,localNodeName,iNode,DIRECTION.IN,"Waiting for next request %d",distrDatabase.getWaitForMessageId());
+  ODistributedServerLog.info(this,localNodeName,iNode,DIRECTION.IN,"Copying remote database '%s' to: %s",databaseName,fileName);
   final File file=new File(fileName);
   if (file.exists())   file.delete();
   try {
@@ -25,7 +27,7 @@
           try {
             long fileSize=writeDatabaseChunk(1,chunk,fOut);
             for (int chunkNum=2; !chunk.last; chunkNum++) {
-              final Object result=sendRequest(databaseName,null,Collections.singleton(iNode),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length,false),EXECUTION_MODE.RESPONSE);
+              final Object result=sendRequest(databaseName,null,Collections.singletonList(iNode),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length,false),EXECUTION_MODE.RESPONSE);
               if (result instanceof Boolean)               continue;
  else               if (result instanceof Exception) {
                 ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"error on installing database %s in %s (chunk #%d)",(Exception)result,databaseName,dbPath,chunkNum);
@@ -90,7 +92,7 @@
           return null;
         }
       }
-,false);
+);
     }
   finally {
       lock.unlock();

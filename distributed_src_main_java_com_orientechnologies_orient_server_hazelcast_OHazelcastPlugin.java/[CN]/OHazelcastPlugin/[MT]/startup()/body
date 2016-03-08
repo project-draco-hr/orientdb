@@ -8,6 +8,7 @@
   status=NODE_STATUS.STARTING;
   final String localNodeName=nodeName;
   activeNodes.clear();
+  remoteServers.clear();
   try {
     hazelcastInstance=configureHazelcast();
     nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
@@ -21,7 +22,10 @@
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
       if (!m.getUuid().equals(getLocalNodeId())) {
         final String memberName=getNodeName(m);
-        if (memberName != null)         activeNodes.put(memberName,m);
+        if (memberName != null) {
+          activeNodes.put(memberName,m);
+          getRemoteServer(memberName);
+        }
  else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
       }
     }
@@ -35,6 +39,7 @@
     loadDistributedDatabases();
     setNodeStatus(NODE_STATUS.ONLINE);
     publishLocalNodeConfiguration();
+    getRemoteServer(localNodeName);
     final long delay=OGlobalConfiguration.DISTRIBUTED_PUBLISH_NODE_STATUS_EVERY.getValueAsLong();
     if (delay > 0) {
       publishLocalNodeConfigurationTask=new TimerTask(){

@@ -41,33 +41,41 @@
     }
     Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
     if (executionModeSynch == null)     executionModeSynch=iMode == 0;
-    if (executionModeSynch) {
-      final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE);
-      if (masterResult instanceof ONeedRetryException)       throw (ONeedRetryException)masterResult;
- else       if (masterResult instanceof Exception)       throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)masterResult);
-      final OPlaceholder masterPlaceholder=(OPlaceholder)masterResult;
-      iRecordId.copyFrom(masterPlaceholder.getIdentity());
-      return new OStorageOperationResult<OPhysicalPosition>(new OPhysicalPosition(masterPlaceholder.getIdentity().getClusterPosition(),masterPlaceholder.getVersion()));
-    }
     final OStorageOperationResult<OPhysicalPosition> localResult;
-    localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-      @Override public Object call() throws Exception {
-        final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-        final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
-        ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
-        db.save(record);
-        final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
-        ppos.clusterPosition=record.getIdentity().getClusterPosition();
-        ppos.recordVersion=record.getVersion();
-        return new OStorageOperationResult<OPhysicalPosition>(ppos);
+    nodes.remove(localNodeName);
+    dManager.getAvailableNodes(nodes,getName());
+    final OCluster cluster=getClusterById(clusterId);
+synchronized (cluster) {
+      localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+        @Override public Object call() throws Exception {
+          final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+          final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
+          ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
+          db.save(record);
+          final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
+          ppos.clusterPosition=record.getIdentity().getClusterPosition();
+          ppos.recordVersion=record.getVersion();
+          return new OStorageOperationResult<OPhysicalPosition>(ppos);
+        }
+      }
+);
+      iRecordId.clusterPosition=localResult.getResult().clusterPosition;
+      if (!nodes.isEmpty()) {
+        if (executionModeSynch) {
+          final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,1);
+          if (masterResult != null) {
+            if (masterResult instanceof ONeedRetryException)             throw (ONeedRetryException)masterResult;
+ else             if (masterResult instanceof Exception)             throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)masterResult);
+            final OPlaceholder masterPlaceholder=(OPlaceholder)masterResult;
+            iRecordId.copyFrom(masterPlaceholder.getIdentity());
+            return new OStorageOperationResult<OPhysicalPosition>(new OPhysicalPosition(masterPlaceholder.getIdentity().getClusterPosition(),masterPlaceholder.getVersion()));
+          }
+        }
+ else {
+          asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),1));
+        }
       }
     }
-);
-    nodes.remove(localNodeName);
-    if (!nodes.isEmpty()) {
-      asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType)));
-    }
-    iRecordId.clusterPosition=localResult.getResult().clusterPosition;
     return localResult;
   }
  catch (  ONeedRetryException e) {

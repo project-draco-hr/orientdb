@@ -1,0 +1,44 @@
+{
+  checkForServerOnline(iRequest);
+  final String databaseName=iRequest.getDatabaseName();
+  if (iNodes.isEmpty()) {
+    ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.OUT,"No nodes configured for database '%s' request: %s",databaseName,iRequest);
+    throw new ODistributedException("No nodes configured for partition '" + databaseName + "' request: "+ iRequest);
+  }
+  final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
+  iRequest.setSenderNodeId(manager.getLocalNodeId());
+  final int onlineNodes=manager.getAvailableNodes(iNodes,databaseName);
+  final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,onlineNodes,iExecutionMode,quorumOffset);
+  int expectedSynchronousResponses=onlineNodes;
+  final boolean groupByResponse;
+  if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
+    expectedSynchronousResponses=onlineNodes;
+    groupByResponse=false;
+  }
+ else {
+    groupByResponse=true;
+  }
+  final boolean waitLocalNode=waitForLocalNode(cfg,iClusterNames,iNodes);
+  final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(onlineNodes),groupByResponse);
+  Collections.sort(iNodes);
+  try {
+    iRequest.setId(manager.getLocalMessageIdCounter().getAndIncrement());
+    msgService.registerRequest(iRequest.getId(),currentResponseMgr);
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"Sending request %s",iRequest);
+    for (    String node : iNodes) {
+      try {
+        final ORemoteServerController remoteServer=manager.getRemoteServer(node);
+        remoteServer.sendRequest(iRequest,node);
+      }
+ catch (      Throwable e) {
+        ODistributedServerLog.info(this,manager.getLocalNodeName(),node,ODistributedServerLog.DIRECTION.OUT,"Error on sending distributed request %s (%s). Active nodes: %s",iRequest,e.getMessage(),manager.getAvailableNodeNames(databaseName));
+      }
+    }
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,getLocalNodeName(),iNodes.toString(),DIRECTION.OUT,"Sent request %s",iRequest);
+    Orient.instance().getProfiler().updateCounter("distributed.db." + databaseName + ".msgSent","Number of replication messages sent from current node",+1,"distributed.db.*.msgSent");
+    return waitForResponse(iRequest,currentResponseMgr);
+  }
+ catch (  Exception e) {
+    throw OException.wrapException(new ODistributedException("Error on executing distributed request (" + iRequest + ") against database '"+ databaseName+ (iClusterNames != null ? "." + iClusterNames : "")+ "' to nodes "+ iNodes),e);
+  }
+}

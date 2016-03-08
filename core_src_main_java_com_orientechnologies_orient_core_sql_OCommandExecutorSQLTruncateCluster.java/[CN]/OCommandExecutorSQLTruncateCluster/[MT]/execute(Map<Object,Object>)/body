@@ -1,12 +1,27 @@
 {
   if (clusterName == null)   throw new OCommandExecutionException("Cannot execute the command because it has not been parsed yet");
-  final OCluster cluster=getDatabase().getStorage().getClusterByName(clusterName);
-  final long recs=cluster.getEntries();
-  try {
-    cluster.truncate();
+  final ODatabaseDocumentInternal database=getDatabase();
+  final int clusterId=database.getClusterIdByName(clusterName);
+  if (clusterId < 0) {
+    throw new ODatabaseException("Cluster with name " + clusterName + " does not exist");
   }
- catch (  IOException e) {
-    throw OException.wrapException(new OCommandExecutionException("Error on executing command"),e);
+  final OSchema schema=database.getMetadata().getSchema();
+  final OClass clazz=schema.getClassByClusterId(clusterId);
+  if (clazz == null) {
+    final OStorage storage=database.getStorage();
+    final OCluster cluster=storage.getClusterById(clusterId);
+    if (cluster == null) {
+      throw new ODatabaseException("Cluster with name " + clusterName + " does not exist");
+    }
+    try {
+      cluster.truncate();
+    }
+ catch (    IOException ioe) {
+      throw OException.wrapException(new ODatabaseException("Error during truncation of cluster with name " + clusterName),ioe);
+    }
   }
-  return recs;
+ else {
+    clazz.truncateCluster(clusterName);
+  }
+  return true;
 }

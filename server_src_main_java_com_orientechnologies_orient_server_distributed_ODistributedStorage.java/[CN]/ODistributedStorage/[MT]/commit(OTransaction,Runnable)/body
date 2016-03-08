@@ -61,7 +61,7 @@ txTask.add(task);
 }
 OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
 final List<String> nodes=dbCfg.getServers(involvedClusters);
-if (executionModeSynch) {
+if (executionModeSynch && !iTx.hasRecordCreation()) {
 final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
 final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
 Object result=null;
@@ -85,8 +85,9 @@ for (ORecordOperation ent : iTx.getAllRecordEntries()) {
 ORecordInternal.getDirtyManager(ent.getRecord()).clear();
 }
 nodes.remove(localNodeName);
+dManager.getAvailableNodes(nodes,getName());
 if (!nodes.isEmpty()) {
-if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,0);
+if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,1);
  else {
 final OAsyncReplicationOk onAsyncReplicationOk=OExecutionThreadLocal.INSTANCE.get().onAsyncReplicationOk;
 final OAsyncReplicationError onAsyncReplicationError=getAsyncReplicationError();
@@ -127,7 +128,7 @@ asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters
     throw new OTransactionException("Error on committing async distributed transaction, received unknown response type " + iArgument);
   }
 }
-,0));
+,1));
 }
 }
 }

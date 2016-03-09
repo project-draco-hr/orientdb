@@ -1,5 +1,7 @@
 {
-  String defaultAnalyzerFQN=metadata.field("analyzer");
+  String defaultAnalyzerFQN=metadata.field("default");
+  String prefix="";
+  if (metadata.containsField("prefix_with_class_name") && metadata.<Boolean>field("prefix_with_class_name"))   prefix=index.getClassName() + ".";
   OLucenePerFieldAnalyzerWrapper analyzer;
   if (defaultAnalyzerFQN == null) {
     analyzer=new OLucenePerFieldAnalyzerWrapper(new StandardAnalyzer());
@@ -7,17 +9,21 @@
  else {
     analyzer=new OLucenePerFieldAnalyzerWrapper(buildAnalyzer(defaultAnalyzerFQN));
   }
-  String indexAnalyzerFQN=metadata.field(kind + "_analyzer");
-  if (indexAnalyzerFQN != null) {
+  String specializedAnalyzerFQN=metadata.field(kind.toString());
+  if (specializedAnalyzerFQN != null) {
     for (    String field : index.getFields()) {
-      analyzer.add(field,buildAnalyzer(indexAnalyzerFQN));
+      analyzer.add(prefix + field,buildAnalyzer(specializedAnalyzerFQN));
     }
   }
   for (  String field : index.getFields()) {
-    for (    String meta : metadata.fieldNames()) {
-      if (meta.startsWith(field) && meta.contains(kind + "_analyzer")) {
-        analyzer.add(field,buildAnalyzer(metadata.<String>field(meta)));
-      }
+    String analyzerName=field + "_" + kind.toString();
+    String analyzerStopwords=analyzerName + "_stopwords";
+    if (metadata.containsField(analyzerName) && metadata.containsField(analyzerStopwords)) {
+      Collection<String> stopwords=metadata.field(analyzerStopwords);
+      analyzer.add(prefix + field,buildAnalyzer(metadata.<String>field(analyzerName),stopwords));
+    }
+ else     if (metadata.containsField(analyzerName)) {
+      analyzer.add(prefix + field,buildAnalyzer(metadata.<String>field(analyzerName)));
     }
   }
   return analyzer;

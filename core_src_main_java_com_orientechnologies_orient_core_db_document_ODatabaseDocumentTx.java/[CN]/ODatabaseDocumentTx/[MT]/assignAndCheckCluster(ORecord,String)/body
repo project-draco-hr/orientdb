@@ -1,0 +1,30 @@
+{
+  ORecordId rid=(ORecordId)record.getIdentity();
+  if (rid.clusterId <= ORID.CLUSTER_POS_INVALID && iClusterName != null) {
+    rid.clusterId=getClusterIdByName(iClusterName);
+    if (rid.clusterId == -1)     throw new IllegalArgumentException("Cluster name '" + iClusterName + "' is not configured");
+  }
+  OClass schemaClass=null;
+  if (rid.getClusterId() <= ORID.CLUSTER_ID_INVALID && storage.isAssigningClusterIds()) {
+    if (record instanceof ODocument) {
+      schemaClass=ODocumentInternal.getImmutableSchemaClass(((ODocument)record));
+      if (schemaClass != null) {
+        if (schemaClass.isAbstract())         throw new OSchemaException("Document belongs to abstract class " + schemaClass.getName() + " and cannot be saved");
+        rid.clusterId=schemaClass.getClusterForNewInstance((ODocument)record);
+      }
+ else       rid.clusterId=getDefaultClusterId();
+    }
+ else     rid.clusterId=getDefaultClusterId();
+  }
+ else   if (record instanceof ODocument)   schemaClass=ODocumentInternal.getImmutableSchemaClass(((ODocument)record));
+  if (rid.getClusterId() > ORID.CLUSTER_ID_INVALID) {
+    if (schemaClass != null) {
+      String messageClusterName=getClusterNameById(rid.getClusterId());
+      checkRecordClass(schemaClass,messageClusterName,rid);
+      if (!schemaClass.hasClusterId(rid.getClusterId())) {
+        throw new IllegalArgumentException("Cluster name '" + messageClusterName + "' (id="+ rid.getClusterId()+ ") is not configured to store the class '"+ schemaClass.getName()+ "', valid are "+ Arrays.toString(schemaClass.getClusterIds()));
+      }
+    }
+  }
+  return rid.getClusterId();
+}

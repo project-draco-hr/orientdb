@@ -8,6 +8,7 @@
   status=NODE_STATUS.STARTING;
   final String localNodeName=nodeName;
   activeNodes.clear();
+  for (  ORemoteServerController server : remoteServers.values())   server.close();
   remoteServers.clear();
   registeredNodeById=null;
   registeredNodeByName=null;
@@ -66,13 +67,12 @@
       ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on registering local node on cluster");
       throw new ODistributedStartupException("Error on registering local node on cluster");
     }
-    for (    String m : activeNodes.keySet())     getRemoteServer(m);
+    for (    String m : activeNodes.keySet())     if (!m.equals(nodeName))     getRemoteServer(m);
     messageService=new OHazelcastDistributedMessageService(this);
     installNewDatabases(true);
     loadDistributedDatabases();
     setNodeStatus(NODE_STATUS.ONLINE);
     publishLocalNodeConfiguration();
-    getRemoteServer(localNodeName);
     final long delay=OGlobalConfiguration.DISTRIBUTED_PUBLISH_NODE_STATUS_EVERY.getValueAsLong();
     if (delay > 0) {
       publishLocalNodeConfigurationTask=new TimerTask(){

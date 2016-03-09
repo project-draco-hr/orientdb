@@ -3,8 +3,8 @@
   final boolean intentInstalled=getDatabase().declareIntent(new OIntentMassiveInsert());
   acquireExclusiveLock();
   try {
-    rebuildThread=Thread.currentThread();
     rebuilding=true;
+    rebuildVersion.incrementAndGet();
     try {
       if (indexId >= 0)       storage.deleteIndexEngine(indexId);
     }
@@ -14,6 +14,22 @@
     removeValuesContainer();
     indexId=storage.addIndexEngine(name,algorithm,type,indexDefinition,determineValueSerializer(),isAutomatic(),isDurableInNonTxMode(),version,getEngineProperties());
     onIndexEngineChange(indexId);
+  }
+ catch (  Exception e) {
+    try {
+      if (indexId >= 0)       storage.clearIndex(indexId);
+    }
+ catch (    Exception e2) {
+      OLogManager.instance().error(this,"Error during index rebuild",e2);
+    }
+    rebuilding=false;
+    throw OException.wrapException(new OIndexException("Error on rebuilding the index for clusters: " + clustersToIndex),e);
+  }
+ finally {
+    releaseExclusiveLock();
+  }
+  acquireSharedLock();
+  try {
     documentIndexed=fillIndex(iProgressListener);
   }
  catch (  final Exception e) {
@@ -27,9 +43,8 @@
   }
  finally {
     rebuilding=false;
-    rebuildThread=null;
     if (intentInstalled)     getDatabase().declareIntent(null);
-    releaseExclusiveLock();
+    releaseSharedLock();
   }
   return documentIndexed;
 }

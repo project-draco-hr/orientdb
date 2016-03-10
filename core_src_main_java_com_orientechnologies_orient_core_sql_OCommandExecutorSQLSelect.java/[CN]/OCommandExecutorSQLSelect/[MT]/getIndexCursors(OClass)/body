@@ -23,7 +23,8 @@
       final List<OIndex<?>> involvedIndexes=filterAnalyzer.getInvolvedIndexes(iSchemaClass,searchResult);
       Collections.sort(involvedIndexes,new IndexComparator());
       for (      final OIndex index : involvedIndexes) {
-        if (index.isRebuiding()) {
+        final long indexRebuildVersion=index.getRebuildVersion();
+        if (index.isRebuilding()) {
           continue;
         }
         final OIndexDefinition indexDefinition=index.getDefinition();
@@ -78,10 +79,12 @@ catch (        Exception e) {
         if (cursor == null) {
           continue;
         }
-        cursors.add(cursor);
-        indexUseAttempts.add(new IndexUsageLog(index,keyParams,indexDefinition));
-        indexUsed=true;
-        break;
+        if (indexRebuildVersion == index.getRebuildVersion()) {
+          cursors.add(OIndexChangesWrapper.wrap(index,cursor));
+          indexUseAttempts.add(new IndexUsageLog(index,keyParams,indexDefinition));
+          indexUsed=true;
+          break;
+        }
       }
       if (indexUsed) {
         break;

@@ -1,27 +1,12 @@
 {
-  Exception lastException=null;
-  for (int retry=0; retry < 2; ++retry) {
-    OChannelBinaryAsynchClient network=null;
-    try {
-      storage.pushSessionId(getURL(),sessionId,sessionToken,connections);
-      network=storage.getAvailableNetwork(getURL());
-      if (!storage.getServerURL().contains(network.getServerURL())) {
-        storage.setSessionId(network.getServerURL(),-1,null);
-        storage.openRemoteDatabase(network);
-        if (!network.tryLock())         throw new OStorageException(errorMessage);
-      }
-      return operation.execute(network);
-    }
- catch (    IOException e) {
-      network.close();
-      lastException=e;
-    }
-catch (    Exception e) {
-      if (network != null)       network.close();
-      storage.close(true,false);
-      lastException=e;
-      break;
-    }
+  OChannelBinaryAsynchClient network=null;
+  try {
+    storage.pushSessionId(getURL(),sessionId,sessionToken,connections);
+    network=storage.getAvailableNetwork(getURL());
+    return operation.execute(network);
   }
-  throw OException.wrapException(new OStorageException(errorMessage),lastException);
+ catch (  Exception e) {
+    storage.close(true,false);
+    throw OException.wrapException(new OStorageException(errorMessage),e);
+  }
 }

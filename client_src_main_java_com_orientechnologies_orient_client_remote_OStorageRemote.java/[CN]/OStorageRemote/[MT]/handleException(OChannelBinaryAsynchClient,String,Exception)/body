@@ -1,7 +1,7 @@
 {
   final Throwable firstCause=OException.getFirstCause(exception);
-  final boolean tokenException=firstCause instanceof OTokenException;
-  if (!(firstCause instanceof IOException) && !(firstCause instanceof OIOException) && !(firstCause instanceof IllegalMonitorStateException)&& !(firstCause instanceof OOfflineNodeException)) {
+  final boolean tokenException=firstCause instanceof OTokenException || firstCause instanceof OTokenSecurityException;
+  if (!(firstCause instanceof IOException) && !(firstCause instanceof OIOException) && !(firstCause instanceof IllegalMonitorStateException)&& !(firstCause instanceof OOfflineNodeException)&& !tokenException) {
     if (exception instanceof OException)     throw (OException)exception;
     throw OException.wrapException(new OStorageException(message),exception);
   }
@@ -45,6 +45,7 @@ synchronized (serverURLs) {
     try {
       if (OLogManager.instance().isDebugEnabled())       OLogManager.instance().debug(this,"Retrying to connect to remote server #" + (retry + 1) + "/"+ currentMaxRetry+ "...");
       setSessionId(null,-1,null);
+      if (tokenException)       tokens.remove(iNetwork.getServerURL());
       final String currentURL=reopenRemoteDatabase();
       if (!tokenException)       OLogManager.instance().warn(this,"Connection re-acquired transparently after %dms and %d retries to server '%s': no errors will be thrown at application level",System.currentTimeMillis() - lostConnectionTime,retry + 1,currentURL);
       return;

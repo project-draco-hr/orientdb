@@ -1,5 +1,5 @@
 {
-  if (iAvailableNodes == 0 && iExecutionMode == ODistributedRequest.EXECUTION_MODE.RESPONSE)   throw new ODistributedException("Quorum cannot be reached because there are no nodes available");
+  if (availableNodes == 0 && iExecutionMode == ODistributedRequest.EXECUTION_MODE.RESPONSE)   throw new ODistributedException("Quorum cannot be reached because there are no nodes available");
   final String clusterName=clusterNames == null || clusterNames.isEmpty() ? null : clusterNames.iterator().next();
   int quorum=1;
   final OCommandDistributedReplicateRequest.QUORUM_TYPE quorumType=iRequest.getTask().getQuorumType();
@@ -7,24 +7,18 @@ switch (quorumType) {
 case NONE:
     break;
 case READ:
-  quorum=cfg.getReadQuorum(clusterName);
+  quorum=cfg.getReadQuorum(clusterName,availableNodes);
 break;
 case WRITE:
-quorum=cfg.getWriteQuorum(clusterName);
+quorum=cfg.getWriteQuorum(clusterName,availableNodes);
 break;
 case ALL:
-quorum=iAvailableNodes;
+quorum=availableNodes;
 break;
 }
-if (quorum > iAvailableNodes) {
-final boolean failureAvailableNodesLessQuorum=cfg.getFailureAvailableNodesLessQuorum(clusterName);
-if (failureAvailableNodesLessQuorum) throw new ODistributedException("Quorum cannot be reached because it is major than available nodes and failureAvailableNodesLessQuorum=true");
- else {
-ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"quorum less then available nodes, downgrade quorum to %d",iAvailableNodes);
-quorum=iAvailableNodes;
-}
-}
+final int originalQuorum=quorum;
 quorum-=quorumOffset;
 if (quorum < 0) quorum=0;
+if (quorum > availableNodes) throw new ODistributedException("Quorum (" + originalQuorum + ") cannot be reached because it is major than available nodes ("+ availableNodes+ ")");
 return quorum;
 }

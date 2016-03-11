@@ -1,30 +1,12 @@
 {
-  Exception lastException=null;
-  for (int retry=1; retry <= MAX_RETRY; ++retry) {
-    try {
-      channel.setWaitResponseTimeout();
-      channel.beginRequest(operationId,sessionId,sessionToken);
-      final T result=operation.execute();
-      channel.flush();
-      return result;
-    }
- catch (    IOException e) {
-      lastException=e;
-      ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"IO Exception during %s (%s). Retrying (%d/%d)...",operation.toString(),lastException.getMessage(),retry,MAX_RETRY);
-      for (; retry <= MAX_RETRY; ++retry) {
-        try {
-          close();
-          channel=new OChannelBinarySynchClient(remoteHost,remotePort,null,contextConfig,OChannelBinaryProtocol.CURRENT_PROTOCOL_VERSION);
-          authenticate();
-          break;
-        }
- catch (        IOException e1) {
-          lastException=e;
-          ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"IO Exception during %s (%s). Retrying (%d/%d)...",operation.toString(),lastException.getMessage(),retry,MAX_RETRY);
-        }
-      }
-    }
+  try {
+    channel.acquireWriteLock();
+    channel.setWaitResponseTimeout();
+    channel.beginRequest(operationId,sessionId,sessionToken);
+    return operation.execute();
   }
-  ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"IO Exception during %s (%s)",operation.toString(),lastException.getMessage());
-  throw OException.wrapException(new ODistributedException(errorMessage),new IOException("Cannot connect to remote node " + url,lastException));
+ catch (  Exception e) {
+    close();
+    throw OException.wrapException(new OStorageException(errorMessage),e);
+  }
 }

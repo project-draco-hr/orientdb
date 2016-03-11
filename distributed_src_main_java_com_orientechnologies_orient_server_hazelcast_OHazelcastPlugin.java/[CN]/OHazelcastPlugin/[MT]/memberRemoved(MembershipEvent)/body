@@ -32,5 +32,20 @@
       ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"removed node id=%s name=%s has not being recognized. Remove the node manually (registeredNodes=%s)",member,nodeLeftName,registeredNodes);
     }
   }
+  for (  String databaseName : getManagedDatabases()) {
+    final ODatabaseDocumentTx database=(ODatabaseDocumentTx)serverInstance.openDatabase(databaseName,"internal","internal",null,true);
+    ODistributedConfiguration cfg;
+    try {
+      cfg=getDatabaseConfiguration(databaseName);
+      final boolean distribCfgDirty=rebalanceClusterOwnership(database,cfg);
+      if (distribCfgDirty) {
+        OLogManager.instance().info(this,"Distributed configuration modified");
+        updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+      }
+    }
+  finally {
+      database.close();
+    }
+  }
   serverInstance.getClientConnectionManager().pushDistribCfg2Clients(getClusterConfiguration());
 }

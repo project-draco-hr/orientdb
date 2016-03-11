@@ -2,9 +2,16 @@
   final ODistributedConfiguration.ROLES role=cfg.getServerRole(nodeName);
   if (role != ODistributedConfiguration.ROLES.MASTER)   return false;
   if (iDatabase.isClosed())   getServerInstance().openDatabase(iDatabase);
+  boolean distributedCfgDirty=false;
+  final Set<String> availableNodes=getAvailableNodeNames(iDatabase.getName());
+  final Set<String> clustersWithNotAvailableOwner=new HashSet<String>();
+  for (  String server : cfg.getAllConfiguredServers()) {
+    if (!availableNodes.contains(server)) {
+      clustersWithNotAvailableOwner.addAll(cfg.getClustersWithOwner(server));
+    }
+  }
+  ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Found %d clusters without an active node as owner %s",clustersWithNotAvailableOwner.size(),clustersWithNotAvailableOwner);
   final OSchema schema=((ODatabaseInternal<?>)iDatabase).getDatabaseOwner().getMetadata().getSchema();
-  boolean distribCfgDirty=false;
-  for (  Object cl : iDatabase.getClusterNames())   if (assignLocalClusters(iDatabase,cfg,(String)cl))   distribCfgDirty=true;
-  for (  final OClass c : schema.getClasses())   if (installLocalClusterPerClass(iDatabase,cfg,c))   distribCfgDirty=true;
-  return distribCfgDirty;
+  for (  final OClass clazz : schema.getClasses())   if (rebalanceClusterOwnershipOfClass(iDatabase,cfg,clazz,availableNodes,clustersWithNotAvailableOwner))   distributedCfgDirty=true;
+  return distributedCfgDirty;
 }

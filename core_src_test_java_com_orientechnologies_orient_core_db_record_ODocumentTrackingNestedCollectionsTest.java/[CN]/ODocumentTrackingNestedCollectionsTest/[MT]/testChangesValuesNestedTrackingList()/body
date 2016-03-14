@@ -1,0 +1,24 @@
+{
+  ODocument document=new ODocument();
+  List objects=new ArrayList();
+  document.field("objects",objects);
+  List subObjects=new ArrayList();
+  objects.add(subObjects);
+  ODocument nestedDoc=new ODocument();
+  subObjects.add(nestedDoc);
+  document.save();
+  objects=document.field("objects");
+  subObjects=(List)objects.iterator().next();
+  subObjects.add("one");
+  subObjects.add(new ODocument());
+  OMultiValueChangeTimeLine<Object,Object> timeLine=document.getCollectionTimeLine("objects");
+  assertEquals(1,timeLine.getMultiValueChangeEvents().size());
+  assertTrue(timeLine.getMultiValueChangeEvents().get(0) instanceof ONestedMultiValueChangeEvent);
+  ONestedMultiValueChangeEvent nesetedEvent=(ONestedMultiValueChangeEvent)timeLine.getMultiValueChangeEvents().get(0);
+  assertEquals(2,nesetedEvent.getTimeLine().getMultiValueChangeEvents().size());
+  List<OMultiValueChangeEvent<?,?>> multiValueChangeEvents=nesetedEvent.getTimeLine().getMultiValueChangeEvents();
+  assertEquals(1,multiValueChangeEvents.get(0).getKey());
+  assertEquals("one",multiValueChangeEvents.get(0).getValue());
+  assertEquals(2,multiValueChangeEvents.get(1).getKey());
+  assertTrue(multiValueChangeEvents.get(1).getValue() instanceof ODocument);
+}

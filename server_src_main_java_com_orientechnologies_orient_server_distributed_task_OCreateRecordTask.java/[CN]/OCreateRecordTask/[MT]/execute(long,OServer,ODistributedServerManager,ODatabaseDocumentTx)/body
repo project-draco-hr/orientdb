@@ -1,9 +1,9 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"creating record %s/%s v.%d...",database.getName(),rid.toString(),version);
-  final ORecord loadedRecord=rid.getRecord();
-  if (loadedRecord != null) {
-    if (!Arrays.equals(loadedRecord.toStream(),content))     throw new ODistributedException("Record " + rid + " is already present with different content");
-    record=loadedRecord;
+  final OStorageOperationResult<ORawBuffer> loadedRecord=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().readRecord(rid,null,true,null);
+  if (loadedRecord.getResult() != null) {
+    if (!Arrays.equals(loadedRecord.getResult().getBuffer(),content))     throw new ODistributedException("Record " + rid + " is already present with different content");
+    return new OPlaceholder(rid,loadedRecord.getResult().version);
   }
  else {
     getRecord();
@@ -13,6 +13,6 @@
     final ORecordId newRid=(ORecordId)record.getIdentity();
     if (!rid.equals(newRid))     throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid);
     ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d",database.getName(),rid.toString(),record.getVersion());
+    return new OPlaceholder(record);
   }
-  return new OPlaceholder(record);
 }

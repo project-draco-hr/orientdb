@@ -1,6 +1,6 @@
 {
   if (availableNodes.isEmpty())   return false;
-  ((OClassImpl)iClass).setClusterSelectionInternal(new OLocalClusterStrategy(this,iDatabase.getName(),iClass));
+  ((OClassImpl)iClass).setClusterSelectionInternal(new OLocalClusterStrategy(manager,iDatabase.getName(),iClass));
   if (iClass.isAbstract())   return false;
   final int[] clusterIds=iClass.getClusterIds();
   final Set<String> clusterNames=new HashSet<String>(clusterIds.length);
@@ -25,6 +25,12 @@
       }
     }
   }
+  boolean cfgChanged=!clusterToAssignOwnership.isEmpty();
+  for (  Map.Entry<String,String> entry : clusterToAssignOwnership.entrySet()) {
+    final String cluster=entry.getKey();
+    final String node=entry.getValue();
+    assignClusterOwnerswhip(iDatabase,cfg,iClass,cluster,node);
+  }
   final Collection<String> allClusterNames=iDatabase.getClusterNames();
   for (  String server : availableNodes) {
     final List<String> ownedClusters=cfg.getOwnedClusters(clusterNames,server);
@@ -34,7 +40,7 @@
         newClusterName=iClass.getName().toLowerCase() + "_" + i;
         if (!allClusterNames.contains(newClusterName))         break;
       }
-      ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"class '%s', creation of new local cluster '%s' (id=%d)",iClass,newClusterName,iDatabase.getClusterIdByName(newClusterName));
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"class '%s', creation of new local cluster '%s' (id=%d)",iClass,newClusterName,iDatabase.getClusterIdByName(newClusterName));
       final OScenarioThreadLocal.RUN_MODE currentDistributedMode=OScenarioThreadLocal.INSTANCE.get();
       if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)       OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.DEFAULT);
       try {
@@ -44,20 +50,15 @@
         if (!e.getMessage().endsWith("already exists"))         throw e;
       }
 catch (      Exception e) {
-        ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"error on creating cluster '%s' in class '%s': ",newClusterName,iClass,e);
+        ODistributedServerLog.error(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"error on creating cluster '%s' in class '%s': ",newClusterName,iClass,e);
         throw OException.wrapException(new ODistributedException("Error on creating cluster '" + newClusterName + "' in class '"+ iClass+ "'"),e);
       }
  finally {
         if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)         OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
       }
-      clusterToAssignOwnership.put(newClusterName,server);
+      assignClusterOwnerswhip(iDatabase,cfg,iClass,newClusterName,server);
+      cfgChanged=true;
     }
   }
-  for (  Map.Entry<String,String> entry : clusterToAssignOwnership.entrySet()) {
-    final String cluster=entry.getKey();
-    final String node=entry.getValue();
-    ODistributedServerLog.info(this,node,null,DIRECTION.NONE,"Class '%s': change mastership of cluster '%s' (id=%d) to node '%s'",iClass,cluster,iDatabase.getClusterIdByName(cluster),node);
-    cfg.setServerOwner(cluster,node);
-  }
-  return !clusterToAssignOwnership.isEmpty();
+  return cfgChanged;
 }

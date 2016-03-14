@@ -3,25 +3,12 @@
   lock.lock();
   try {
     final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-    boolean distribCfgDirty=false;
     final List<String> foundPartition=cfg.addNewNodeInServerList(getLocalNodeName());
     if (foundPartition != null) {
       manager.setDatabaseStatus(getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.ONLINE);
       ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: db=%s %s",getLocalNodeName(),databaseName,foundPartition);
-      distribCfgDirty=true;
+      manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
     }
-    final String suffix2Search="_" + getLocalNodeName();
-    for (    String c : cfg.getClusterNames()) {
-      if (c.endsWith(suffix2Search)) {
-        final String currentMaster=cfg.getOwnerOfCluster(c);
-        if (!getLocalNodeName().equals(currentMaster)) {
-          ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"changing mastership of cluster '%s' from node '%s' to '%s'",c,currentMaster,getLocalNodeName());
-          cfg.setServerOwner(c,getLocalNodeName());
-          distribCfgDirty=true;
-        }
-      }
-    }
-    if (distribCfgDirty)     manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
   }
   finally {
     lock.unlock();

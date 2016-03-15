@@ -1,18 +1,17 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"creating record %s/%s v.%d...",database.getName(),rid.toString(),version);
-  if (rid.isPersistent()) {
-    final OStorageOperationResult<ORawBuffer> loadedRecord=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().readRecord(rid,null,true,null);
-    if (loadedRecord.getResult() != null) {
-      if (!Arrays.equals(loadedRecord.getResult().getBuffer(),content))       throw new ODistributedException("Record " + rid + " is already present with different content");
-      return new OPlaceholder(rid,loadedRecord.getResult().version);
-    }
+  if (!rid.isPersistent())   throw new ODistributedException("Record " + rid + " has not been saved on owner node first (temporary rid)");
+  final OStorageOperationResult<ORawBuffer> loadedRecord=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().readRecord(rid,null,true,null);
+  if (loadedRecord.getResult() != null) {
+    if (!Arrays.equals(loadedRecord.getResult().getBuffer(),content))     throw new ODistributedException("Record " + rid + " is already present with different content");
+    return new OPlaceholder(rid,loadedRecord.getResult().version);
   }
   getRecord();
   if (clusterId > -1)   record.save(database.getClusterNameById(clusterId),true);
  else   if (rid.getClusterId() != -1)   record.save(database.getClusterNameById(rid.getClusterId()),true);
  else   record.save();
   final ORecordId newRid=(ORecordId)record.getIdentity();
-  if (!rid.equals(newRid))   throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid);
+  if (!rid.equals(newRid))   throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid+ " on server "+ iManager.getLocalNodeName());
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d",database.getName(),rid.toString(),record.getVersion());
   return new OPlaceholder(record);
 }

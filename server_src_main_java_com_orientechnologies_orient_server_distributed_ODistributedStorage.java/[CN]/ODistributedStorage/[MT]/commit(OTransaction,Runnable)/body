@@ -60,24 +60,28 @@ involvedClusters.add(getClusterNameByRID(rid));
 txTask.add(task);
 }
 OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.COMMITTING);
-ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-@Override public Object call() throws Exception {
-wrapped.commit(iTx,callback);
-return null;
-}
-}
-);
 final List<String> nodes=dbCfg.getServers(involvedClusters);
 nodes.remove(localNodeName);
 dManager.getAvailableNodes(nodes,getName());
+final boolean exclusiveLock=iTx.hasRecordCreation();
+if (exclusiveLock) sequentialRIDLock.lock();
+try {
+ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+@Override public Object call() throws Exception {
+  wrapped.commit(iTx,callback);
+  return null;
+}
+}
+);
+if (nodes.isEmpty()) return;
 if (executionModeSynch) {
 final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
 final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
 Object result=null;
 for (int retry=1; retry <= maxAutoRetry; ++retry) {
-result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,0);
-if (!processCommitResult(localNodeName,iTx,txTask,involvedClusters,tmpEntries,nodes,autoRetryDelay,result)) continue;
-return;
+  result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,0);
+  if (!processCommitResult(localNodeName,iTx,txTask,involvedClusters,tmpEntries,nodes,autoRetryDelay,result))   continue;
+  return;
 }
 if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
 throw (ODistributedRecordLockedException)result;
@@ -88,47 +92,51 @@ ORecordInternal.getDirtyManager(ent.getRecord()).clear();
 if (!nodes.isEmpty()) {
 if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,1);
  else {
-final OAsyncReplicationOk onAsyncReplicationOk=OExecutionThreadLocal.INSTANCE.get().onAsyncReplicationOk;
-final OAsyncReplicationError onAsyncReplicationError=getAsyncReplicationError();
-asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask,new OCallable(){
-  @Override public Object call(  final Object iArgument){
-    if (iArgument instanceof OTxTaskResult) {
-      sendTxCompleted(localNodeName,involvedClusters,nodes,(OTxTaskResult)iArgument);
-      if (onAsyncReplicationOk != null)       onAsyncReplicationOk.onAsyncReplicationOk();
-      return null;
-    }
- else     if (iArgument instanceof Exception) {
-      try {
-        final ORemoteTask undo=txTask.getUndoTaskForLocalStorage(iArgument);
-        if (undo != null)         try {
-          final ODatabaseDocumentTx database=new ODatabaseDocumentTx(getURL());
-          database.setProperty(ODatabase.OPTIONS.SECURITY.toString(),OSecurityServerUser.class);
-          database.open("system","system");
-          try {
-            undo.execute(0,serverInstance,dManager,database);
-          }
-  finally {
-            database.close();
-          }
-        }
- catch (        Exception e) {
-          ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction failed, cannot revert local transaction. Current node could have a not aligned database. Remote answer: %s",e,iArgument);
-          throw OException.wrapException(new OTransactionException("Error on execution async distributed transaction, the database could be inconsistent"),(Exception)iArgument);
-        }
-        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction failed: %s",iArgument);
-        if (iArgument instanceof RuntimeException)         throw (RuntimeException)iArgument;
- else         throw OException.wrapException(new OTransactionException("Error on execution async distributed transaction"),(Exception)iArgument);
+  final OAsyncReplicationOk onAsyncReplicationOk=OExecutionThreadLocal.INSTANCE.get().onAsyncReplicationOk;
+  final OAsyncReplicationError onAsyncReplicationError=getAsyncReplicationError();
+  asynchronousExecution(new OAsynchDistributedOperation(getName(),involvedClusters,nodes,txTask,new OCallable(){
+    @Override public Object call(    final Object iArgument){
+      if (iArgument instanceof OTxTaskResult) {
+        sendTxCompleted(localNodeName,involvedClusters,nodes,(OTxTaskResult)iArgument);
+        if (onAsyncReplicationOk != null)         onAsyncReplicationOk.onAsyncReplicationOk();
+        return null;
       }
+ else       if (iArgument instanceof Exception) {
+        try {
+          final ORemoteTask undo=txTask.getUndoTaskForLocalStorage(iArgument);
+          if (undo != null)           try {
+            final ODatabaseDocumentTx database=new ODatabaseDocumentTx(getURL());
+            database.setProperty(ODatabase.OPTIONS.SECURITY.toString(),OSecurityServerUser.class);
+            database.open("system","system");
+            try {
+              undo.execute(0,serverInstance,dManager,database);
+            }
   finally {
-        if (onAsyncReplicationError != null)         onAsyncReplicationError.onAsyncReplicationError((Throwable)iArgument,0);
+              database.close();
+            }
+          }
+ catch (          Exception e) {
+            ODistributedServerLog.error(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction failed, cannot revert local transaction. Current node could have a not aligned database. Remote answer: %s",e,iArgument);
+            throw OException.wrapException(new OTransactionException("Error on execution async distributed transaction, the database could be inconsistent"),(Exception)iArgument);
+          }
+          if (ODistributedServerLog.isDebugEnabled())           ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction failed: %s",iArgument);
+          if (iArgument instanceof RuntimeException)           throw (RuntimeException)iArgument;
+ else           throw OException.wrapException(new OTransactionException("Error on execution async distributed transaction"),(Exception)iArgument);
+        }
+  finally {
+          if (onAsyncReplicationError != null)           onAsyncReplicationError.onAsyncReplicationError((Throwable)iArgument,0);
+        }
       }
+      if (ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction error, received unknown response type: %s",iArgument);
+      throw new OTransactionException("Error on committing async distributed transaction, received unknown response type " + iArgument);
     }
-    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction error, received unknown response type: %s",iArgument);
-    throw new OTransactionException("Error on committing async distributed transaction, received unknown response type " + iArgument);
   }
-}
 ,1));
 }
+}
+}
+  finally {
+if (exclusiveLock) sequentialRIDLock.unlock();
 }
 }
  catch (OValidationException e) {

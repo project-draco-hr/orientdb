@@ -1,51 +1,60 @@
 {
-  updateLastClusterChange();
-  final Member member=iEvent.getMember();
-  final String nodeLeftName=getNodeName(member);
-  if (nodeLeftName != null) {
-    closeRemoteServer(nodeLeftName);
-    for (    ODistributedLifecycleListener l : listeners)     l.onNodeLeft(nodeLeftName);
-    if (messageService != null)     for (    String dbName : messageService.getDatabases())     messageService.getDatabase(dbName).unlockRecords(nodeLeftName);
-    final HashSet<String> entriesToRemove=new HashSet<String>();
-    final Map<String,Object> map=getConfigurationMap();
-    for (Iterator<String> it=map.keySet().iterator(); it.hasNext(); ) {
-      final String n=it.next();
-      if (n.startsWith(CONFIG_DBSTATUS_PREFIX)) {
-        final String part=n.substring(CONFIG_DBSTATUS_PREFIX.length());
-        final int pos=part.indexOf(".");
-        if (pos > -1) {
-          if (part.substring(0,pos).equals(nodeLeftName)) {
-            ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"removing dbstatus for the node %s that just left: %s",nodeLeftName,n);
-            entriesToRemove.add(n);
+  if (hazelcastInstance == null || !hazelcastInstance.getLifecycleService().isRunning())   return;
+  try {
+    updateLastClusterChange();
+    final Member member=iEvent.getMember();
+    final String nodeLeftName=getNodeName(member);
+    if (nodeLeftName != null) {
+      closeRemoteServer(nodeLeftName);
+      for (      ODistributedLifecycleListener l : listeners)       l.onNodeLeft(nodeLeftName);
+      if (messageService != null)       for (      String dbName : messageService.getDatabases())       messageService.getDatabase(dbName).unlockRecords(nodeLeftName);
+      final HashSet<String> entriesToRemove=new HashSet<String>();
+      final Map<String,Object> map=getConfigurationMap();
+      for (Iterator<String> it=map.keySet().iterator(); it.hasNext(); ) {
+        final String n=it.next();
+        if (n.startsWith(CONFIG_DBSTATUS_PREFIX)) {
+          final String part=n.substring(CONFIG_DBSTATUS_PREFIX.length());
+          final int pos=part.indexOf(".");
+          if (pos > -1) {
+            if (part.substring(0,pos).equals(nodeLeftName)) {
+              ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"removing dbstatus for the node %s that just left: %s",nodeLeftName,n);
+              entriesToRemove.add(n);
+            }
           }
         }
       }
-    }
-    for (    String entry : entriesToRemove) {
-      map.remove(entry);
-    }
-    activeNodes.remove(nodeLeftName);
-    if (messageService != null)     messageService.handleUnreachableNode(nodeLeftName);
-    ODistributedServerLog.warn(this,nodeLeftName,null,DIRECTION.NONE,"node removed id=%s name=%s",member,nodeLeftName);
-    if (nodeLeftName.startsWith("ext:")) {
-      final List<String> registeredNodes=getRegisteredNodes();
-      ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"removed node id=%s name=%s has not being recognized. Remove the node manually (registeredNodes=%s)",member,nodeLeftName,registeredNodes);
-    }
-  }
-  for (  String databaseName : getManagedDatabases()) {
-    final ODatabaseDocumentTx database=(ODatabaseDocumentTx)serverInstance.openDatabase(databaseName,"internal","internal",null,true);
-    ODistributedConfiguration cfg;
-    try {
-      cfg=getDatabaseConfiguration(databaseName);
-      final boolean distribCfgDirty=rebalanceClusterOwnership(database,cfg);
-      if (distribCfgDirty) {
-        OLogManager.instance().info(this,"Distributed configuration modified");
-        updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+      for (      String entry : entriesToRemove) {
+        map.remove(entry);
+      }
+      activeNodes.remove(nodeLeftName);
+      if (messageService != null)       messageService.handleUnreachableNode(nodeLeftName);
+      ODistributedServerLog.warn(this,nodeLeftName,null,DIRECTION.NONE,"node removed id=%s name=%s",member,nodeLeftName);
+      if (nodeLeftName.startsWith("ext:")) {
+        final List<String> registeredNodes=getRegisteredNodes();
+        ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"removed node id=%s name=%s has not being recognized. Remove the node manually (registeredNodes=%s)",member,nodeLeftName,registeredNodes);
       }
     }
+    for (    String databaseName : getManagedDatabases()) {
+      final ODatabaseDocumentTx database=(ODatabaseDocumentTx)serverInstance.openDatabase(databaseName,"internal","internal",null,true);
+      ODistributedConfiguration cfg;
+      try {
+        cfg=getDatabaseConfiguration(databaseName);
+        final boolean distribCfgDirty=rebalanceClusterOwnership(database,cfg);
+        if (distribCfgDirty) {
+          OLogManager.instance().info(this,"Distributed configuration modified");
+          updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+        }
+      }
   finally {
-      database.close();
+        database.close();
+      }
     }
+    serverInstance.getClientConnectionManager().pushDistribCfg2Clients(getClusterConfiguration());
   }
-  serverInstance.getClientConnectionManager().pushDistribCfg2Clients(getClusterConfiguration());
+ catch (  HazelcastInstanceNotActiveException e) {
+    OLogManager.instance().error(this,"Hazelcast is not running");
+  }
+catch (  RetryableHazelcastException e) {
+    OLogManager.instance().error(this,"Hazelcast is not running");
+  }
 }

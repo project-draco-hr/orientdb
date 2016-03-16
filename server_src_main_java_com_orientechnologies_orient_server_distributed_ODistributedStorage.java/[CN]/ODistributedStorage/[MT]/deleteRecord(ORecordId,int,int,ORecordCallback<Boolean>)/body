@@ -17,30 +17,45 @@
       }
 );
     }
-    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
-    if (executionModeSynch == null)     executionModeSynch=iMode == 0;
-    if (executionModeSynch) {
-      final Object result=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new ODeleteRecordTask(iRecordId,iVersion),EXECUTION_MODE.RESPONSE,0);
-      if (result instanceof ONeedRetryException)       throw (ONeedRetryException)result;
- else       if (result instanceof Exception)       throw OException.wrapException(new ODistributedException("Error on execution distributed DELETE_RECORD"),(Exception)result);
-      return new OStorageOperationResult<Boolean>(true);
-    }
+    nodes.remove(localNodeName);
+    dManager.getAvailableNodes(nodes,getName());
     final OStorageOperationResult<Boolean> localResult;
-    localResult=(OStorageOperationResult<Boolean>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-      @Override public Object call() throws Exception {
-        final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-        try {
-          db.delete(iRecordId,iVersion);
-          return new OStorageOperationResult<Boolean>(true);
+    sequentialRIDLock.writeLock().lock();
+    try {
+      clusterLocks[iRecordId.clusterId % clusterLocks.length].lock();
+      try {
+        localResult=(OStorageOperationResult<Boolean>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+          @Override public Object call() throws Exception {
+            final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+            try {
+              db.delete(iRecordId,iVersion);
+              return new OStorageOperationResult<Boolean>(true);
+            }
+ catch (            ORecordNotFoundException e) {
+              return new OStorageOperationResult<Boolean>(false);
+            }
+          }
         }
- catch (        ORecordNotFoundException e) {
-          return new OStorageOperationResult<Boolean>(false);
+);
+        if (!nodes.isEmpty()) {
+          Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
+          if (executionModeSynch == null)           executionModeSynch=iMode == 0;
+          if (executionModeSynch) {
+            final Object result=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new ODeleteRecordTask(iRecordId,iVersion),EXECUTION_MODE.RESPONSE,0);
+            if (result instanceof ONeedRetryException)             throw (ONeedRetryException)result;
+ else             if (result instanceof Exception)             throw OException.wrapException(new ODistributedException("Error on execution distributed DELETE_RECORD"),(Exception)result);
+            return new OStorageOperationResult<Boolean>(true);
+          }
+          if (!nodes.isEmpty())           asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new ODeleteRecordTask(iRecordId,iVersion),0));
         }
       }
+  finally {
+        clusterLocks[iRecordId.clusterId % clusterLocks.length].unlock();
+      }
     }
-);
-    nodes.remove(localNodeName);
-    if (!nodes.isEmpty())     asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new ODeleteRecordTask(iRecordId,iVersion),0));
+  finally {
+      sequentialRIDLock.writeLock().unlock();
+    }
     return localResult;
   }
  catch (  ONeedRetryException e) {

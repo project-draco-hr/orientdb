@@ -1,0 +1,44 @@
+{
+  final ExecutorService executorService=Executors.newSingleThreadExecutor();
+  final OrientGraphFactory factory=new OrientGraphFactory("memory:NestedTxTest.testNestedTx","admin","admin").setupPool(2,10);
+  factory.setAutoStartTx(false);
+  final OrientGraph graph=factory.getTx();
+  graph.createVertexType("A");
+  graph.createVertexType("B");
+  executorService.submit(new Runnable(){
+    @Override public void run(){
+      final OrientGraph graph=getGraph(factory);
+      graph.begin();
+      graph.addVertex("class:A");
+    }
+  }
+).get();
+  Assert.assertTrue(!vertexExists(graph,"A"),"vertex A should not exist before top-level commit");
+  executorService.submit(new Runnable(){
+    @Override public void run(){
+      final OrientGraph graph=getGraph(factory);
+      graph.begin();
+      graph.addVertex("class:B");
+    }
+  }
+).get();
+  Assert.assertTrue(!vertexExists(graph,"B"),"vertex B should not exist before top-level commit");
+  executorService.submit(new Runnable(){
+    @Override public void run(){
+      final OrientGraph graph=getGraph(factory);
+      graph.commit();
+    }
+  }
+).get();
+  Assert.assertTrue(!vertexExists(graph,"A"),"vertex A should not exist before top-level commit");
+  Assert.assertTrue(!vertexExists(graph,"B"),"vertex B should not exist before top-level commit");
+  executorService.submit(new Runnable(){
+    @Override public void run(){
+      final OrientGraph graph=getGraph(factory);
+      graph.commit();
+    }
+  }
+).get();
+  Assert.assertTrue(vertexExists(graph,"A"),"vertex A should exist after top-level commit");
+  Assert.assertTrue(vertexExists(graph,"B"),"vertex B should exist after top-level commit");
+}

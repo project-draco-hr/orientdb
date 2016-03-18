@@ -42,9 +42,9 @@
       clusterName=newClusterName;
       iRecordId.clusterId=db.getClusterIdByName(newClusterName);
     }
-    final OStorageOperationResult<OPhysicalPosition> localResult;
     nodes.remove(localNodeName);
     dManager.getAvailableNodes(nodes,getName());
+    final OStorageOperationResult<OPhysicalPosition> localResult;
     sequentialRIDLock.writeLock().lock();
     try {
       clusterLocks[clusterId % clusterLocks.length].lock();
@@ -63,11 +63,12 @@
         }
 );
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;
+        final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
         if (!nodes.isEmpty()) {
           Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
           if (executionModeSynch == null)           executionModeSynch=iMode == 0;
           if (executionModeSynch) {
-            final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,1);
+            final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,localPlaceholder);
             if (masterResult != null) {
               if (masterResult instanceof ONeedRetryException)               throw (ONeedRetryException)masterResult;
  else               if (masterResult instanceof Exception)               throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)masterResult);
@@ -77,7 +78,7 @@
             }
           }
  else {
-            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),1));
+            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),null,localPlaceholder));
           }
         }
       }

@@ -2,7 +2,7 @@
   resetLastValidBackup();
   if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED) {
     wrapped.commit(iTx,callback);
-    return;
+    return null;
   }
   final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
   final String localNodeName=dManager.getLocalNodeName();
@@ -16,7 +16,7 @@
         }
       }
 );
-      return;
+      return null;
     }
     OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.BEGUN);
     final OTxTask txTask=new OTxTask();
@@ -66,22 +66,25 @@ dManager.getAvailableNodes(nodes,getName());
 final boolean exclusiveLock=iTx.hasRecordCreation();
 if (exclusiveLock) sequentialRIDLock.writeLock().lock();
 try {
-ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+final List<OPair<ORecordOperation,Object>> uResult=(List<OPair<ORecordOperation,Object>>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
 @Override public Object call() throws Exception {
-  wrapped.commit(iTx,callback);
-  return null;
+  return wrapped.commit(iTx,callback);
 }
 }
 );
-if (nodes.isEmpty()) return;
+final OTxTaskResult localResult=new OTxTaskResult();
+for (OPair<ORecordOperation,Object> o : uResult) {
+localResult.results.add(o.getValue());
+}
+if (nodes.isEmpty()) return null;
 if (executionModeSynch) {
 final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
 final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
 Object result=null;
 for (int retry=1; retry <= maxAutoRetry; ++retry) {
-  result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,0);
+  result=dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,localResult);
   if (!processCommitResult(localNodeName,iTx,txTask,involvedClusters,tmpEntries,nodes,autoRetryDelay,result))   continue;
-  return;
+  return null;
 }
 if (ODistributedServerLog.isDebugEnabled()) ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
 throw (ODistributedRecordLockedException)result;
@@ -90,7 +93,7 @@ for (ORecordOperation ent : iTx.getAllRecordEntries()) {
 ORecordInternal.getDirtyManager(ent.getRecord()).clear();
 }
 if (!nodes.isEmpty()) {
-if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,1);
+if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,txTask,EXECUTION_MODE.RESPONSE,localResult);
  else {
   final OAsyncReplicationOk onAsyncReplicationOk=OExecutionThreadLocal.INSTANCE.get().onAsyncReplicationOk;
   final OAsyncReplicationError onAsyncReplicationError=getAsyncReplicationError();
@@ -131,7 +134,7 @@ if (executionModeSynch) dManager.sendRequest(getName(),involvedClusters,nodes,tx
       throw new OTransactionException("Error on committing async distributed transaction, received unknown response type " + iArgument);
     }
   }
-,1));
+,localResult));
 }
 }
 }
@@ -145,4 +148,5 @@ throw e;
 catch (Exception e) {
 handleDistributedException("Cannot route TX operation against distributed node",e);
 }
+return null;
 }

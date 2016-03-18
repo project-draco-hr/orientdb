@@ -25,7 +25,7 @@
           try {
             long fileSize=writeDatabaseChunk(1,chunk,fOut);
             for (int chunkNum=2; !chunk.last; chunkNum++) {
-              final Object result=sendRequest(databaseName,null,OMultiValue.getSingletonList(iNode),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length,false),EXECUTION_MODE.RESPONSE,0);
+              final Object result=sendRequest(databaseName,null,OMultiValue.getSingletonList(iNode),new OCopyDatabaseChunkTask(chunk.filePath,chunkNum,chunk.offset + chunk.buffer.length,false),EXECUTION_MODE.RESPONSE,null);
               if (result instanceof Boolean)               continue;
  else               if (result instanceof Exception) {
                 ODistributedServerLog.error(this,nodeName,iNode,DIRECTION.IN,"error on installing database %s in %s (chunk #%d)",(Exception)result,databaseName,dbPath,chunkNum);
@@ -80,17 +80,12 @@
     lock.lock();
     try {
       final ODistributedConfiguration cfg=getDatabaseConfiguration(db.getName());
-      distrDatabase.configureDatabase(new Callable<Void>(){
-        @Override public Void call() throws Exception {
-          final boolean distribCfgDirty=rebalanceClusterOwnership(db,cfg);
-          if (distribCfgDirty) {
-            OLogManager.instance().warn(this,"Distributed configuration modified");
-            updateCachedDatabaseConfiguration(db.getName(),cfg.serialize(),true,true);
-          }
-          return null;
-        }
+      final boolean distribCfgDirty=rebalanceClusterOwnership(db,cfg);
+      if (distribCfgDirty) {
+        OLogManager.instance().warn(this,"Distributed configuration modified");
+        updateCachedDatabaseConfiguration(db.getName(),cfg.serialize(),true,true);
       }
-);
+      distrDatabase.setOnline();
     }
   finally {
       lock.unlock();

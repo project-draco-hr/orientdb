@@ -1,40 +1,52 @@
 {
-  final int partitionKey=request.getTask().getPartitionKey();
-  if (queueLatch != null) {
-    try {
-      queueLatch.await();
-    }
- catch (    InterruptedException e) {
-    }
-    queueLatch=null;
-  }
+  final ORemoteTask task=request.getTask();
+  final int partitionKey=task.getPartitionKey();
   if (partitionKey < 0) {
-    boolean anyQueueWorkerIsWorking=false;
-    if (anyQueueWorkerIsWorking) {
-      ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s waiting for all the previous requests to be completed",request,databaseName);
-      final CountDownLatch emptyQueues=new CountDownLatch(workerThreads.size());
+    processLock.writeLock().lock();
+    try {
+      boolean anyQueueWorkerIsWorking=false;
       for (      ODistributedWorker w : workerThreads) {
-        w.processRequest(new OHazelcastDistributedRequest(-1,databaseName,new OSynchronizedTaskWrapper(emptyQueues),ODistributedRequest.EXECUTION_MODE.NO_RESPONSE).setSenderNodeId(request.getSenderNodeId()));
+        if (!w.localQueue.isEmpty()) {
+          anyQueueWorkerIsWorking=true;
+          break;
+        }
       }
-      try {
-        emptyQueues.await();
-        queueLatch=new CountDownLatch(1);
-        final String senderNodeName=manager.getNodeNameById(request.getSenderNodeId());
-        request.setTask(new OSynchronizedTaskWrapper(senderNodeName,queueLatch,request.getTask()));
+      if (anyQueueWorkerIsWorking) {
+        ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s waiting for all the previous requests to be completed",request,databaseName);
+        final CountDownLatch emptyQueues=new CountDownLatch(workerThreads.size());
+        for (        ODistributedWorker w : workerThreads) {
+          w.processRequest(new OHazelcastDistributedRequest(-1,databaseName,new OSynchronizedTaskWrapper(emptyQueues),ODistributedRequest.EXECUTION_MODE.NO_RESPONSE).setSenderNodeId(request.getSenderNodeId()));
+        }
+        try {
+          emptyQueues.await();
+          final CountDownLatch queueLatch=new CountDownLatch(1);
+          final String senderNodeName=manager.getNodeNameById(request.getSenderNodeId());
+          request.setTask(new OSynchronizedTaskWrapper(senderNodeName,queueLatch,task));
+          workerThreads.get(0).processRequest(request);
+          queueLatch.await();
+        }
+ catch (        InterruptedException e) {
+        }
+      }
+ else {
+        ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Synchronous request %s on database %s dispatched to the worker 0",request,databaseName);
         workerThreads.get(0).processRequest(request);
       }
- catch (      InterruptedException e) {
-      }
     }
- else {
-      ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Synchronous request %s on database %s dispatched to the worker 0",request,databaseName);
-      workerThreads.get(0).processRequest(request);
+  finally {
+      processLock.writeLock().unlock();
     }
   }
  else {
-    final int partition=partitionKey % workerThreads.size();
-    ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s dispatched to the worker %d",request,databaseName,partition);
-    final ODistributedWorker worker=workerThreads.get(partition);
-    worker.processRequest(request);
+    processLock.readLock().lock();
+    try {
+      final int partition=partitionKey % workerThreads.size();
+      ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s dispatched to the worker %d",request,databaseName,partition);
+      final ODistributedWorker worker=workerThreads.get(partition);
+      worker.processRequest(request);
+    }
+  finally {
+      processLock.readLock().unlock();
+    }
   }
 }

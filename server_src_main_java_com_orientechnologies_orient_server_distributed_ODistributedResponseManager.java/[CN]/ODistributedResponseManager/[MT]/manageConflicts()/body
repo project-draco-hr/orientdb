@@ -3,9 +3,11 @@
   if (dManager.getNodeStatus() != ODistributedServerManager.NODE_STATUS.ONLINE)   return;
   final int bestResponsesGroupIndex=getBestResponsesGroup();
   final List<ODistributedResponse> bestResponsesGroup=responseGroups.get(bestResponsesGroupIndex);
+  if (bestResponsesGroup.get(0) instanceof RuntimeException)   throw (RuntimeException)bestResponsesGroup.get(0);
+ else   if (bestResponsesGroup.get(0) instanceof Throwable)   throw OException.wrapException(new ODistributedException("Error on executing distributed request"),(Throwable)bestResponsesGroup.get(0));
   final int maxCoherentResponses=bestResponsesGroup.size();
   final int conflicts=getExpectedResponses() - (maxCoherentResponses + discardedResponses);
-  if (!(bestResponsesGroup.get(0) instanceof Throwable) && isMinimumQuorumReached()) {
+  if (isMinimumQuorumReached()) {
     if (responseGroups.size() == 1)     return;
     if (checkNoWinnerCase(bestResponsesGroup))     return;
     fixNodesInConflict(bestResponsesGroup,conflicts);

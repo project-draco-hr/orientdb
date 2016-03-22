@@ -2,7 +2,7 @@
   if (iBadResponse instanceof Throwable)   return null;
   final OPlaceholder badResult=(OPlaceholder)iBadResponse;
   final OPlaceholder goodResult=(OPlaceholder)iGoodResponse;
-  final List<ORemoteTask> result=new ArrayList<ORemoteTask>(2);
+  ORemoteTask result=null;
   if (!badResult.equals(goodResult)) {
     if (badResult.getIdentity().getClusterId() == goodResult.getIdentity().getClusterId() && badResult.getIdentity().getClusterPosition() < goodResult.getIdentity().getClusterPosition()) {
       final long minPos=Math.max(badResult.getIdentity().getClusterPosition() - 1,0);
@@ -12,7 +12,8 @@
         if (dManager.getLocalNodeName().equals(executorNode)) {
           final ODistributedConfiguration dCfg=dManager.getDatabaseConfiguration(iRequest.getDatabaseName());
           final List<String> nodes=dCfg.getServers(ODatabaseRecordThreadLocal.INSTANCE.get().getClusterNameById(clusterId),dManager.getLocalNodeName());
-          final ORawBuffer remoteReadRecord=(ORawBuffer)dManager.sendRequest(iRequest.getDatabaseName(),null,nodes,new OReadRecordTask(toUpdateRid),ODistributedRequest.EXECUTION_MODE.RESPONSE,null);
+          final ODistributedResponse response=dManager.sendRequest(iRequest.getDatabaseName(),null,nodes,new OReadRecordTask(toUpdateRid),ODistributedRequest.EXECUTION_MODE.RESPONSE,null);
+          final ORawBuffer remoteReadRecord=(ORawBuffer)response.getPayload();
           if (remoteReadRecord != null) {
             toUpdateRecord=Orient.instance().getRecordFactoryManager().newInstance(recordType);
             ORecordInternal.fill(toUpdateRecord,toUpdateRid,remoteReadRecord.version,remoteReadRecord.buffer,false);
@@ -20,13 +21,13 @@
  else           toUpdateRecord=null;
         }
  else         toUpdateRecord=toUpdateRid.getRecord();
-        if (toUpdateRecord != null)         result.add(new OUpdateRecordTask(toUpdateRid,toUpdateRecord.toStream(),toUpdateRecord.getVersion(),toUpdateRecord.toStream(),toUpdateRecord.getVersion(),ORecordInternal.getRecordType(toUpdateRecord)));
+        if (toUpdateRecord != null)         result=new OUpdateRecordTask(toUpdateRid,toUpdateRecord.toStream(),toUpdateRecord.getVersion(),ORecordInternal.getRecordType(toUpdateRecord));
       }
-      result.add(new OCreateRecordTask((ORecordId)goodResult.getIdentity(),content,version,recordType));
+      result=new OCreateRecordTask((ORecordId)goodResult.getIdentity(),content,version,recordType);
     }
  else     if (badResult.getIdentity().getClusterId() == goodResult.getIdentity().getClusterId() && badResult.getIdentity().getClusterPosition() > goodResult.getIdentity().getClusterPosition()) {
     }
- else     result.add(new ODeleteRecordTask(new ORecordId(badResult.getIdentity()),badResult.getVersion()).setDelayed(false));
+ else     result=new ODeleteRecordTask(new ORecordId(badResult.getIdentity()),badResult.getVersion()).setDelayed(false);
   }
   return result;
 }

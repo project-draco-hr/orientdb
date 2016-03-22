@@ -1,0 +1,35 @@
+{
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"%s transaction db=%s originalReqId=%s...",(success ? "committing" : fixTasks.isEmpty() ? "rolling back" : "fixing"),database.getName(),requestId,requestId);
+  ODatabaseRecordThreadLocal.INSTANCE.set(database);
+  final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+  final ODistributedTxContext pRequest=ddb.popTxContext(requestId);
+  if (success) {
+    if (pRequest != null)     pRequest.commit();
+ else {
+      ODistributedServerLog.error(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Error on committing transaction %s db=%s",requestId,database.getName());
+      return Boolean.FALSE;
+    }
+  }
+ else   if (fixTasks.isEmpty()) {
+    if (pRequest != null)     pRequest.rollback(database);
+ else {
+      ODistributedServerLog.error(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Error on rolling back transaction %s db=%s",requestId,database.getName());
+      return Boolean.FALSE;
+    }
+  }
+ else {
+    if (pRequest != null) {
+      ODistributedServerLog.info(this,ddb.getManager().getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: fixing transaction %s",requestId);
+      for (      ORemoteTask fixTask : fixTasks) {
+        try {
+          fixTask.execute(requestId,iManager.getServerInstance(),iManager,database);
+        }
+ catch (        Exception e) {
+          ODistributedServerLog.error(this,iManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on fixing transaction %s task %s",e,requestId,fixTask);
+        }
+      }
+      pRequest.fix();
+    }
+  }
+  return Boolean.TRUE;
+}

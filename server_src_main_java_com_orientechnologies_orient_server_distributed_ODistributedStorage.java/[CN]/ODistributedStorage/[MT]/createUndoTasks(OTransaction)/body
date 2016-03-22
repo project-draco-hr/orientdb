@@ -1,0 +1,27 @@
+{
+  final List<OAbstractRemoteTask> undoTasks=new ArrayList<OAbstractRemoteTask>();
+  for (  ORecordOperation op : iTx.getAllRecordEntries()) {
+    OAbstractRemoteTask undoTask=null;
+    final ORecord record=op.getRecord();
+switch (op.type) {
+case ORecordOperation.CREATED:
+      break;
+case ORecordOperation.UPDATED:
+{
+      final ORecord currentRecord=record.getIdentity().getRecord();
+      undoTask=new OUpdateRecordTask(currentRecord,ORecordVersionHelper.clearRollbackMode(currentRecord.getVersion()));
+      break;
+    }
+case ORecordOperation.DELETED:
+{
+    final ORecord currentRecord=record.getIdentity().getRecord();
+    undoTask=new OResurrectRecordTask(currentRecord,ORecordVersionHelper.clearRollbackMode(currentRecord.getVersion()));
+    break;
+  }
+default :
+continue;
+}
+undoTasks.add(undoTask);
+}
+return undoTasks;
+}

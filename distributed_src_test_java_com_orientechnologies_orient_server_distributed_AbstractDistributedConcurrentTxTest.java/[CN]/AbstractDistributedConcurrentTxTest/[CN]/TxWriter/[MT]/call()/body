@@ -5,27 +5,32 @@
     final OrientVertex localVertex=graph.getVertex(v);
     try {
       if ((i + 1) % 100 == 0)       System.out.println("\nWriter " + databaseUrl + " managed "+ (i + 1)+ "/"+ count+ " vertices so far");
+      int retry=0;
       boolean success=false;
-      for (int retry=0; retry < 100; ++retry) {
+      for (; retry < 200; ++retry) {
         try {
-          updateVertex(graph,localVertex);
+          updateVertex(localVertex);
           graph.commit();
+          OLogManager.instance().info(this,"Success count %d retry %d",i,retry);
           success=true;
           break;
         }
- catch (        OConcurrentModificationException e) {
-          graph.rollback();
-        }
-catch (        ODistributedRecordLockedException e) {
+ catch (        ODistributedRecordLockedException e) {
           lockExceptions.incrementAndGet();
-          graph.rollback();
+          OLogManager.instance().info(this,"increment lockExceptions %d",lockExceptions.get());
+        }
+catch (        ONeedRetryException e) {
+          OLogManager.instance().info(this,"Concurrent Exceptions %s",e);
         }
 catch (        Exception e) {
           graph.rollback();
           throw e;
         }
+        Thread.sleep(1 + new Random().nextInt(10));
+        localVertex.reload();
+        OLogManager.instance().info(this,"Retry with reloaded vertex v=%d",localVertex.getRecord().getVersion());
       }
-      Assert.assertTrue(success);
+      Assert.assertTrue("Unable to complete the transaction, even after " + retry + " retries",success);
     }
  catch (    InterruptedException e) {
       System.out.println("Writer received interrupt (db=" + databaseUrl);
@@ -42,7 +47,8 @@ catch (    Exception e) {
     }
   }
   System.out.println("\nWriter " + name + " END. count = "+ count+ " lockExceptions: "+ lockExceptions);
-  if (expectedConcurrentException)   Assert.assertTrue(lockExceptions.get() > 0);
- else   Assert.assertTrue(lockExceptions.get() == 0);
+  final long totalLockExceptions=lockExceptions.get();
+  if (expectedConcurrentException)   Assert.assertTrue("lockExceptions are " + totalLockExceptions,totalLockExceptions > 0);
+ else   Assert.assertTrue("lockExceptions are " + totalLockExceptions,totalLockExceptions == 0);
   return null;
 }

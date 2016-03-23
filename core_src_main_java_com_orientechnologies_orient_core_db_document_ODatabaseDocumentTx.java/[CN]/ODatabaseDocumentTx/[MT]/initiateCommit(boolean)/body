@@ -1,0 +1,15 @@
+{
+  checkOpeness();
+  checkIfActive();
+  if (!currentTx.isActive())   return OUnfinishedCommit.NO_OPERATION;
+  if (!force && currentTx.amountOfNestedTxs() > 1)   return currentTx.initiateCommit(false);
+  for (  ODatabaseListener listener : browseListeners())   try {
+    listener.onBeforeTxCommit(this);
+  }
+ catch (  Exception e) {
+    rollback(force);
+    OLogManager.instance().error(this,"Cannot commit the transaction: caught exception on execution of %s.onBeforeTxCommit()",listener.getClass().getName(),e);
+    throw OException.wrapException(new OTransactionException("Cannot commit the transaction: caught exception on execution of " + listener.getClass().getName() + "#onBeforeTxCommit()"),e);
+  }
+  return new UnfinishedCommit(currentTx.initiateCommit(force));
+}

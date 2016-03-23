@@ -5,12 +5,12 @@
   }
   try {
     String clusterName=getClusterNameByRID(iRecordId);
-    int clusterId=iRecordId.getClusterId();
+    final int clusterId=iRecordId.getClusterId();
     if (clusterId == ORID.CLUSTER_ID_INVALID)     throw new IllegalArgumentException("Cluster not valid");
     final String localNodeName=dManager.getLocalNodeName();
     final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
     checkNodeIsMaster(localNodeName,dbCfg);
-    List<String> nodes=dbCfg.getServers(clusterName,null);
+    final List<String> nodes=dbCfg.getServers(clusterName,null);
     if (nodes.isEmpty()) {
       return (OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
         @Override public Object call() throws Exception {
@@ -34,7 +34,8 @@
         OLogManager.instance().warn(this,"Local node '" + localNodeName + "' is not the master for cluster '"+ clusterName+ "' (it is '"+ masterNode+ "'). Reloading distributed configuration for database '"+ getName()+ "'");
         ((OLocalClusterStrategy)clSel).readConfiguration();
         newClusterName=getPhysicalClusterNameById(clSel.getCluster(cls,null));
-        nodes=dbCfg.getServers(newClusterName,null);
+        nodes.clear();
+        nodes.addAll(dbCfg.getServers(newClusterName,null));
         masterNode=nodes.get(0);
       }
       if (!masterNode.equals(localNodeName))       throw new ODistributedException("Error on inserting into cluster '" + clusterName + "' where local node '"+ localNodeName+ "' is not the master of it, but it is '"+ masterNode+ "'");
@@ -42,33 +43,41 @@
       clusterName=newClusterName;
       iRecordId.clusterId=db.getClusterIdByName(newClusterName);
     }
+    final String finalClusterName=clusterName;
     nodes.remove(localNodeName);
     dManager.getAvailableNodes(nodes,getName());
-    final OStorageOperationResult<OPhysicalPosition> localResult;
-    sequentialRIDLock.writeLock().lock();
-    try {
-      clusterLocks[clusterId % clusterLocks.length].lock();
-      try {
-        localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-          @Override public Object call() throws Exception {
-            final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-            final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
-            ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
-            db.save(record);
-            final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
-            ppos.clusterPosition=record.getIdentity().getClusterPosition();
-            ppos.recordVersion=record.getVersion();
-            return new OStorageOperationResult<OPhysicalPosition>(ppos);
+    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(clusterId,new OCallable<Object,Callable<Void>>(){
+      @Override public Object call(      Callable<Void> unlockCallback){
+        final OStorageOperationResult<OPhysicalPosition> localResult;
+        try {
+          localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+            @Override public Object call() throws Exception {
+              final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+              final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
+              ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
+              db.save(record);
+              final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
+              ppos.clusterPosition=record.getIdentity().getClusterPosition();
+              ppos.recordVersion=record.getVersion();
+              return new OStorageOperationResult<OPhysicalPosition>(ppos);
+            }
           }
-        }
 );
+        }
+ catch (        RuntimeException e) {
+          throw e;
+        }
+catch (        Exception e) {
+          OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
+          return null;
+        }
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;
         final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
         if (!nodes.isEmpty()) {
-          Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
+          Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
           if (executionModeSynch == null)           executionModeSynch=iMode == 0;
           if (executionModeSynch) {
-            final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,localPlaceholder).getPayload();
+            final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(finalClusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback).getPayload();
             if (masterResult != null) {
               if (masterResult instanceof ONeedRetryException)               throw (ONeedRetryException)masterResult;
  else               if (masterResult instanceof Exception)               throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)masterResult);
@@ -78,18 +87,13 @@
             }
           }
  else {
-            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),null,localPlaceholder));
+            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(finalClusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),null,localPlaceholder,unlockCallback));
           }
         }
-      }
-  finally {
-        clusterLocks[clusterId % clusterLocks.length].unlock();
+        return localResult;
       }
     }
-  finally {
-      sequentialRIDLock.writeLock().unlock();
-    }
-    return localResult;
+);
   }
  catch (  ONeedRetryException e) {
     throw e;

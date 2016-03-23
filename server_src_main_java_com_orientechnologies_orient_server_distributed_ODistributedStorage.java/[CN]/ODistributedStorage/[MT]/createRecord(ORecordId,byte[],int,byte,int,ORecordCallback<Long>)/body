@@ -46,7 +46,10 @@
     final String finalClusterName=clusterName;
     nodes.remove(localNodeName);
     dManager.getAvailableNodes(nodes,getName());
-    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
+    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
+    if (executionModeSynch == null)     executionModeSynch=iMode == 0;
+    final boolean syncMode=executionModeSynch;
+    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final OStorageOperationResult<OPhysicalPosition> localResult;
         try {
@@ -74,9 +77,7 @@ catch (        Exception e) {
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;
         final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
         if (!nodes.isEmpty()) {
-          Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
-          if (executionModeSynch == null)           executionModeSynch=iMode == 0;
-          if (executionModeSynch) {
+          if (syncMode) {
             final Object masterResult=dManager.sendRequest(getName(),Collections.singleton(finalClusterName),nodes,new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback).getPayload();
             if (masterResult != null) {
               if (masterResult instanceof ONeedRetryException)               throw (ONeedRetryException)masterResult;

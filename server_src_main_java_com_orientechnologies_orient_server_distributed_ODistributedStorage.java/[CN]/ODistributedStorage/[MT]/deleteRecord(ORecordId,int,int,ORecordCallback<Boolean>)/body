@@ -20,7 +20,10 @@
     nodes.remove(localNodeName);
     dManager.getAvailableNodes(nodes,getName());
     final int clusterId=iRecordId.clusterId;
-    return (OStorageOperationResult<Boolean>)executeRecordOperationInLock(clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
+    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
+    if (executionModeSynch == null)     executionModeSynch=iMode == 0;
+    final boolean syncMode=executionModeSynch;
+    return (OStorageOperationResult<Boolean>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final ODeleteRecordTask task=new ODeleteRecordTask(iRecordId,iVersion);
         task.prepareUndoOperation();
@@ -48,9 +51,7 @@ catch (        Exception e) {
           return null;
         }
         if (!nodes.isEmpty()) {
-          Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
-          if (executionModeSynch == null)           executionModeSynch=iMode == 0;
-          if (executionModeSynch) {
+          if (syncMode) {
             final Object result=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,task,EXECUTION_MODE.RESPONSE,localResult.getResult(),unlockCallback).getPayload();
             if (result instanceof ONeedRetryException)             throw (ONeedRetryException)result;
  else             if (result instanceof Exception)             throw OException.wrapException(new ODistributedException("Error on execution distributed DELETE_RECORD"),(Exception)result);

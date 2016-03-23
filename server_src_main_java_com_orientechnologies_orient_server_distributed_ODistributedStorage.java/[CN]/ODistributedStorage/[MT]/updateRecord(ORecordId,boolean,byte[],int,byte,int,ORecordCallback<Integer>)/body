@@ -50,10 +50,14 @@ catch (        Exception e) {
         if (!nodes.isEmpty()) {
           if (syncMode) {
             task.prepareUndoOperation();
-            final Object result=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,task,EXECUTION_MODE.RESPONSE,localResult.getResult(),unlockCallback).getPayload();
-            if (result instanceof ONeedRetryException)             throw (ONeedRetryException)result;
- else             if (result instanceof Exception)             throw OException.wrapException(new ODistributedException("Error on execution distributed UPDATE_RECORD"),(Exception)result);
-            return new OStorageOperationResult<Integer>((Integer)result);
+            final ODistributedResponse dResponse=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,task,EXECUTION_MODE.RESPONSE,localResult.getResult(),unlockCallback);
+            final Object payload=dResponse.getPayload();
+            if (payload instanceof Exception) {
+              executeUndoOnLocalServer(dResponse.getRequestId(),task);
+              if (payload instanceof ONeedRetryException)               throw (ONeedRetryException)payload;
+              throw OException.wrapException(new ODistributedException("Error on execution distributed UPDATE_RECORD"),(Exception)payload);
+            }
+            return new OStorageOperationResult<Integer>((Integer)payload);
           }
           asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,task,null,localResult.getResult(),unlockCallback));
         }

@@ -18,18 +18,17 @@
     }
   }
  else {
-    if (pRequest != null) {
-      ODistributedServerLog.info(this,ddb.getManager().getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: fixing transaction %s",requestId);
-      for (      ORemoteTask fixTask : fixTasks) {
-        try {
-          fixTask.execute(requestId,iManager.getServerInstance(),iManager,database);
-        }
- catch (        Exception e) {
-          ODistributedServerLog.error(this,iManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on fixing transaction %s task %s",e,requestId,fixTask);
-        }
+    ODistributedServerLog.info(this,ddb.getManager().getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: fixing transaction %s",requestId);
+    for (    ORemoteTask fixTask : fixTasks) {
+      try {
+        if (fixTask instanceof OAbstractRecordReplicatedTask)         ((OAbstractRecordReplicatedTask)fixTask).setLockRecords(false);
+        fixTask.execute(requestId,iManager.getServerInstance(),iManager,database);
       }
-      pRequest.fix();
+ catch (      Exception e) {
+        ODistributedServerLog.error(this,iManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on fixing transaction %s task %s",e,requestId,fixTask);
+      }
     }
+    if (pRequest != null)     pRequest.fix();
   }
   return Boolean.TRUE;
 }

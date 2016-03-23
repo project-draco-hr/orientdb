@@ -9,14 +9,15 @@
         ODatabaseRecordThreadLocal.INSTANCE.set(db);
         List<Long> res=new ArrayList<Long>(SEQ_RUN_COUNT);
         OSequence seq=db.getMetadata().getSequenceLibrary().getSequence(sequenceName);
+        seq.setMaxRetry(10000);
         for (int j=0; j < SEQ_RUN_COUNT; ++j) {
           try {
             long value=seq.next();
             res.add(value);
-            Thread.sleep(new Random().nextInt(50));
           }
  catch (          OConcurrentModificationException ex) {
             failures.incrementAndGet();
+            Thread.sleep(new Random().nextInt(100));
           }
         }
         return res;
@@ -34,5 +35,5 @@
     set.addAll(singleResults);
   }
   long expectedSize=set.size() - failures.get();
-  Assert.assertEquals("Distributed sequence of type " + sequenceType + " generates duplicate values",totalValues,expectedSize);
+  Assert.assertEquals("Distributed sequence of type " + sequenceType + " generates duplicate values, failures="+ failures.get(),totalValues,expectedSize);
 }

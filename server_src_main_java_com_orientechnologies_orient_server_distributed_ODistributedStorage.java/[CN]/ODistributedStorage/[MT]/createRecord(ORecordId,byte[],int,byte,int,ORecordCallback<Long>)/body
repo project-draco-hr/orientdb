@@ -51,6 +51,7 @@
     final boolean syncMode=executionModeSynch;
     return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
+        final ODistributedDatabase ddb=acquireRecordLock(iRecordId);
         final OStorageOperationResult<OPhysicalPosition> localResult;
         try {
           localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
@@ -73,6 +74,9 @@
 catch (        Exception e) {
           OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
           return null;
+        }
+ finally {
+          ddb.unlockRecord(iRecordId);
         }
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;
         final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);

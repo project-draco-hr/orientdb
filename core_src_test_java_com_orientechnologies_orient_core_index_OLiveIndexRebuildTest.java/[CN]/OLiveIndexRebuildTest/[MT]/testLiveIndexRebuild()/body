@@ -1,0 +1,32 @@
+{
+  final ODatabaseDocumentTx database=new ODatabaseDocumentTx(databaseURL);
+  database.create();
+  final OClass clazz=database.getMetadata().getSchema().createClass(className);
+  clazz.createProperty(propertyName,OType.INTEGER);
+  clazz.createIndex(indexName,OClass.INDEX_TYPE.UNIQUE,propertyName);
+  for (int i=0; i < 1000000; i++) {
+    ODocument document=new ODocument(className);
+    document.field(propertyName,i);
+    document.save();
+  }
+  ExecutorService executorService=Executors.newFixedThreadPool(6);
+  List<Future<?>> futures=new ArrayList<Future<?>>();
+  for (int i=0; i < 5; i++) {
+    futures.add(executorService.submit(new Reader()));
+  }
+  futures.add(executorService.submit(new Writer()));
+  Thread.sleep(60 * 60 * 1000);
+  stop.set(true);
+  executorService.shutdown();
+  long minInterval=Long.MAX_VALUE;
+  long maxInterval=Long.MIN_VALUE;
+  for (  Future<?> future : futures) {
+    Object result=future.get();
+    if (result instanceof long[]) {
+      long[] results=(long[])result;
+      if (results[0] < minInterval)       minInterval=results[0];
+      if (results[1] > maxInterval)       maxInterval=results[1];
+    }
+  }
+  System.out.println("Min interval " + (minInterval / 1000000) + ", max interval "+ (maxInterval / 1000000)+ " ms");
+}

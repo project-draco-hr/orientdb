@@ -1,0 +1,13 @@
+{
+  OSchemaProxy schema=database.getMetadata().getSchema();
+  schema.createClass("TestOutFilterInclude",schema.getClass("V"));
+  database.command(new OCommandSQL("create class linkedToOutFilterInclude extends E")).execute();
+  database.command(new OCommandSQL("insert into TestOutFilterInclude content { \"name\": \"one\" }")).execute();
+  database.command(new OCommandSQL("insert into TestOutFilterInclude content { \"name\": \"two\" }")).execute();
+  database.command(new OCommandSQL("create edge linkedToOutFilterInclude from (select from TestOutFilterInclude where name = 'one') to (select from TestOutFilterInclude where name = 'two')")).execute();
+  final List<OIdentifiable> result=database.query(new OSQLSynchQuery<OIdentifiable>("select expand(out('linkedToOutFilterInclude')[@class='TestOutFilterInclude'].include('@rid')) from TestOutFilterInclude where name = 'one'"));
+  Assert.assertEquals(result.size(),1);
+  for (  OIdentifiable r : result) {
+    Assert.assertEquals(((ODocument)r.getRecord()).field("name"),null);
+  }
+}

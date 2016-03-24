@@ -6,6 +6,8 @@
   final Set<OIndex<?>> indexes=iSchemaClass.getInvolvedIndexes(fieldNames);
   for (  OIndex<?> index : indexes) {
     if (orderByOptimizer.canBeUsedByOrderBy(index,orderedFields)) {
+      final long indexRebuildVersion=index.getRebuildVersion();
+      if (index.isRebuilding())       return null;
       final boolean ascSortOrder=orderedFields.get(0).getValue().equals(KEYWORD_ASC);
       final Object key;
       if (ascSortOrder) {
@@ -17,17 +19,6 @@
       if (index.getKeySize() == 0) {
         return null;
       }
-      fullySortedByIndex=true;
-      if (context.isRecordingMetrics()) {
-        context.setVariable("indexIsUsedInOrderBy",true);
-        context.setVariable("fullySortedByIndex",fullySortedByIndex);
-        Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
-        if (idxNames == null) {
-          idxNames=new HashSet<String>();
-          context.setVariable("involvedIndexes",idxNames);
-        }
-        idxNames.add(index.getName());
-      }
       final List<OIndexCursor> cursors=new ArrayList<OIndexCursor>();
       OIndexCursor cursor=null;
       if (key != null) {
@@ -38,15 +29,31 @@
           cursor=index.iterateEntriesMinor(key,true,false);
         }
       }
-      if (cursor != null)       cursors.add(cursor);
+      if (cursor != null)       cursors.add(OIndexChangesWrapper.wrap(index,cursor,indexRebuildVersion));
       if (index.getMetadata() != null && !index.getDefinition().isNullValuesIgnored()) {
         Object nullValue=index.get(null);
         if (nullValue != null) {
-          if (nullValue instanceof Collection)           cursors.add(new OIndexCursorCollectionValue((Collection)nullValue,null));
- else           cursors.add(new OIndexCursorSingleValue((OIdentifiable)nullValue,null));
+          if (nullValue instanceof Collection)           cursors.add(OIndexChangesWrapper.wrap(index,new OIndexCursorCollectionValue((Collection)nullValue,null),indexRebuildVersion));
+ else           cursors.add(OIndexChangesWrapper.wrap(index,new OIndexCursorSingleValue((OIdentifiable)nullValue,null),indexRebuildVersion));
         }
       }
-      return new OCompositeIndexCursor(cursors);
+      if (indexRebuildVersion == index.getRebuildVersion()) {
+        fullySortedByIndex=true;
+        if (context.isRecordingMetrics()) {
+          context.setVariable("indexIsUsedInOrderBy",true);
+          context.setVariable("fullySortedByIndex",fullySortedByIndex);
+          Set<String> idxNames=(Set<String>)context.getVariable("involvedIndexes");
+          if (idxNames == null) {
+            idxNames=new HashSet<String>();
+            context.setVariable("involvedIndexes",idxNames);
+          }
+          idxNames.add(index.getName());
+        }
+        return new OCompositeIndexCursor(cursors);
+      }
+ else {
+        return null;
+      }
     }
   }
   metricRecorder.recordOrderByOptimizationMetric(false,this.fullySortedByIndex);

@@ -1,0 +1,29 @@
+{
+  try {
+    long rebuildInterval=0;
+    long rebuildCount=0;
+    while (!stop.get()) {
+      for (int i=0; i < 10; i++) {
+        final ODatabaseDocumentTx database=pool.acquire();
+        try {
+          long start=System.nanoTime();
+          database.command(new OCommandSQL("rebuild index " + indexName)).execute();
+          long end=System.nanoTime();
+          rebuildInterval+=(end - start);
+          rebuildCount++;
+        }
+  finally {
+          database.close();
+        }
+        if (stop.get())         break;
+      }
+      Thread.sleep(5 * 60 * 1000);
+    }
+    System.out.println("Average rebuild interval " + ((rebuildInterval / rebuildCount) / 1000000) + ", ms");
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    throw e;
+  }
+  return null;
+}

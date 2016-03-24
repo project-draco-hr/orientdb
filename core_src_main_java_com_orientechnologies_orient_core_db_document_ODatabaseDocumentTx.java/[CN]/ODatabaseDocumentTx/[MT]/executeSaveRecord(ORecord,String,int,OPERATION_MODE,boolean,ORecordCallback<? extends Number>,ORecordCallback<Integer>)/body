@@ -6,26 +6,27 @@
   if (rid == null)   throw new ODatabaseException("Cannot create record because it has no identity. Probably is not a regular record or contains projections of fields rather than a full record");
   record.setInternalStatus(ORecordElement.STATUS.MARSHALLING);
   try {
-    final boolean wasNew=forceCreate || rid.isNew();
-    if (wasNew && rid.clusterId == -1 && (clusterName != null || storage.isAssigningClusterIds())) {
-      if (clusterName != null)       rid.clusterId=getClusterIdByName(clusterName);
- else       if (record instanceof ODocument && ODocumentInternal.getImmutableSchemaClass(((ODocument)record)) != null)       rid.clusterId=ODocumentInternal.getImmutableSchemaClass(((ODocument)record)).getClusterForNewInstance((ODocument)record);
- else       getDefaultClusterId();
-    }
     byte[] stream=null;
     final OStorageOperationResult<Integer> operationResult;
     getMetadata().makeThreadLocalSchemaSnapshot();
     if (record instanceof ODocument)     ODocumentInternal.checkClass((ODocument)record,this);
     ORecordSerializationContext.pushContext();
+    final boolean isNew=forceCreate || rid.isNew();
     try {
+      final ORecordHook.TYPE triggerType;
+      if (isNew) {
+        ORecordInternal.onBeforeIdentityChanged(record);
+        int id=assignAndCheckCluster(record,clusterName);
+        clusterName=getClusterNameById(id);
+        checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_CREATE,clusterName);
+        triggerType=ORecordHook.TYPE.BEFORE_CREATE;
+      }
+ else {
+        clusterName=getClusterNameById(record.getIdentity().getClusterId());
+        checkSecurity(ORule.ResourceGeneric.CLUSTER,ORole.PERMISSION_UPDATE,clusterName);
+        triggerType=ORecordHook.TYPE.BEFORE_UPDATE;
+      }
       stream=record.toStream();
-      final boolean isNew=forceCreate || rid.isNew();
-      if (isNew)       ORecordInternal.onBeforeIdentityChanged(record);
-      if (isNew && rid.clusterId < 0 && storage.isAssigningClusterIds())       rid.clusterId=clusterName != null ? getClusterIdByName(clusterName) : getDefaultClusterId();
-      if (rid.clusterId > -1 && clusterName == null)       clusterName=getClusterNameById(rid.clusterId);
-      if (storage.isAssigningClusterIds())       checkRecordClass(record,clusterName,rid,isNew);
-      checkSecurity(ORule.ResourceGeneric.CLUSTER,wasNew ? ORole.PERMISSION_CREATE : ORole.PERMISSION_UPDATE,clusterName);
-      final ORecordHook.TYPE triggerType=wasNew ? ORecordHook.TYPE.BEFORE_CREATE : ORecordHook.TYPE.BEFORE_UPDATE;
       final ORecordHook.RESULT hookResult=callbackHooks(triggerType,record);
       if (hookResult == ORecordHook.RESULT.RECORD_CHANGED) {
         if (record instanceof ODocument)         ((ODocument)record).validate();
@@ -54,15 +55,15 @@
         }
         if (operationResult.getModifiedRecordContent() != null)         stream=operationResult.getModifiedRecordContent();
         ORecordInternal.fill(record,rid,version,stream,false);
-        callbackHookSuccess(record,wasNew,stream,operationResult);
+        callbackHookSuccess(record,isNew,stream,operationResult);
       }
  catch (      Exception t) {
-        callbackHookFailure(record,wasNew,stream);
+        callbackHookFailure(record,isNew,stream);
         throw t;
       }
     }
   finally {
-      callbackHookFinalize(record,wasNew,stream);
+      callbackHookFinalize(record,isNew,stream);
       ORecordSerializationContext.pullContext();
       getMetadata().clearThreadLocalSchemaSnapshot();
       ORecordSaveThreadLocal.removeLast();

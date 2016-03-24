@@ -1,6 +1,6 @@
 {
   makeActive();
-  final boolean committed;
+  final int committed;
   final ODatabaseDocumentTx raw=getRawGraph();
   if (raw.getTransaction().isActive()) {
     if (isWarnOnForceClosingTx() && OLogManager.instance().isWarnEnabled() && iOperationStrings.length > 0) {
@@ -8,14 +8,14 @@
       for (      String s : iOperationStrings)       msg.append(s);
       OLogManager.instance().warn(this,"Requested command '%s' must be executed outside active transaction: the transaction will be committed and reopen right after it. To avoid this behavior execute it outside a transaction",msg.toString());
     }
+    committed=raw.getTransaction().amountOfNestedTxs();
     raw.commit(true);
-    committed=true;
   }
- else   committed=false;
+ else   committed=0;
   try {
     return iCallable.call(this);
   }
   finally {
-    if (committed)     ((OrientTransactionalGraph)this).begin();
+    for (int i=0; i < committed; ++i)     ((OrientTransactionalGraph)this).begin();
   }
 }

@@ -1,0 +1,43 @@
+{
+synchronized (_AuthenticatorsList) {
+    for (    OSecurityAuthenticator sa : _AuthenticatorsList) {
+      sa.dispose();
+    }
+    _AuthenticatorsList.clear();
+    if (authDoc.containsField("authenticators")) {
+      List<ODocument> authMethodsList=authDoc.field("authenticators");
+      for (      ODocument authMethodDoc : authMethodsList) {
+        try {
+          if (authMethodDoc.containsField("name")) {
+            final String name=authMethodDoc.field("name");
+            boolean enabled=true;
+            if (authMethodDoc.containsField("enabled"))             enabled=authMethodDoc.field("enabled");
+            if (enabled) {
+              Class<?> authClass=getClass(authMethodDoc);
+              if (authClass != null) {
+                if (OSecurityAuthenticator.class.isAssignableFrom(authClass)) {
+                  OSecurityAuthenticator authPlugin=(OSecurityAuthenticator)authClass.newInstance();
+                  authPlugin.config(_Server,_ServerConfig,authMethodDoc);
+                  authPlugin.active();
+                  _AuthenticatorsList.add(authPlugin);
+                }
+ else {
+                  OLogManager.instance().error(this,"ODefaultServerSecurity.loadAuthenticators() class is not an OSecurityAuthenticator");
+                }
+              }
+ else {
+                OLogManager.instance().error(this,"ODefaultServerSecurity.loadAuthenticators() authentication class is null for %s",name);
+              }
+            }
+          }
+ else {
+            OLogManager.instance().error(this,"ODefaultServerSecurity.loadAuthenticators() authentication object is missing name");
+          }
+        }
+ catch (        Throwable ex) {
+          OLogManager.instance().error(this,"ODefaultServerSecurity.loadAuthenticators() Exception: ",ex);
+        }
+      }
+    }
+  }
+}

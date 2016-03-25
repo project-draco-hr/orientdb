@@ -1,0 +1,28 @@
+{
+  OUser user=null;
+  final String dbName=getDatabase().getName();
+  if (!(getDatabase().getStorage() instanceof OStorageProxy)) {
+    if (Orient.instance().getSecurity() == null)     throw new OSecurityAccessException(dbName,"External Security System is null!");
+    String username=Orient.instance().getSecurity().authenticate(iUsername,iUserPassword);
+    if (username != null) {
+      user=getUser(username);
+      if (user == null)       throw new OSecurityAccessException(dbName,"User or password not valid for username: " + username + ", database: '"+ dbName+ "'");
+      if (user.getAccountStatus() != OSecurityUser.STATUSES.ACTIVE)       throw new OSecurityAccessException(dbName,"User '" + username + "' is not active");
+    }
+ else {
+      if (Orient.instance().getSecurity().isDefaultAllowed()) {
+        user=super.authenticate(iUsername,iUserPassword);
+      }
+ else {
+        try {
+          Thread.sleep(200);
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        throw new OSecurityAccessException(dbName,"User or password not valid for username: " + iUsername + ", database: '"+ dbName+ "'");
+      }
+    }
+  }
+  return user;
+}

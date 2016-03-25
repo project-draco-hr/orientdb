@@ -3,6 +3,17 @@
   OLogManager.instance().warn(this,"Shutting down node %s...",nodeName);
   super.shutdown();
   setNodeStatus(NODE_STATUS.SHUTTINGDOWN);
+  final Set<String> databases=new HashSet<String>();
+  for (  Map.Entry<String,Object> entry : getConfigurationMap().entrySet()) {
+    if (entry.getKey().toString().startsWith(CONFIG_DBSTATUS_PREFIX)) {
+      final String nodeDb=entry.getKey().toString().substring(CONFIG_DBSTATUS_PREFIX.length());
+      if (nodeDb.startsWith(nodeName))       databases.add(entry.getKey());
+    }
+  }
+  for (  String k : databases)   getConfigurationMap().put(k,DB_STATUS.OFFLINE);
+  for (  ORemoteServerController server : remoteServers.values())   server.close();
+  remoteServers.clear();
+  if (publishLocalNodeConfigurationTask != null)   publishLocalNodeConfigurationTask.cancel();
   if (messageService != null)   messageService.shutdown();
   activeNodes.clear();
   if (membershipListenerRegistration != null) {

@@ -1,7 +1,12 @@
 {
-synchronized (responseLock) {
-    manageConflicts();
-    if (receivedResponses == 0)     throw new ODistributedException("No response received from any of nodes " + getExpectedNodes() + " for request "+ request);
+  synchronousResponsesLock.lock();
+  try {
+    final RuntimeException failure=manageConflicts();
+    if (failure != null)     return new ODistributedResponse(request.getId(),dManager.getLocalNodeName(),dManager.getLocalNodeName(),failure);
+    if (receivedResponses == 0) {
+      if (quorum > 0)       throw new ODistributedOperationException("No response received from any of nodes " + getExpectedNodes() + " for request "+ request);
+      return null;
+    }
 switch (request.getTask().getResultStrategy()) {
 case ANY:
       break;
@@ -9,7 +14,7 @@ case UNION:
 {
       final Map<String,Object> payloads=new HashMap<String,Object>();
       for (      Map.Entry<String,Object> entry : responses.entrySet())       if (entry.getValue() != NO_RESPONSE)       payloads.put(entry.getKey(),((ODistributedResponse)entry.getValue()).getPayload());
-      final ODistributedResponse response=(ODistributedResponse)getReceivedResponses().iterator().next();
+      final ODistributedResponse response=getReceivedResponses().iterator().next();
       response.setExecutorNodeName(responses.keySet().toString());
       response.setPayload(payloads);
       return response;
@@ -18,5 +23,8 @@ case UNION:
 final int bestResponsesGroupIndex=getBestResponsesGroup();
 final List<ODistributedResponse> bestResponsesGroup=responseGroups.get(bestResponsesGroupIndex);
 return bestResponsesGroup.get(0);
+}
+  finally {
+synchronousResponsesLock.unlock();
 }
 }

@@ -10,6 +10,7 @@
       if (record instanceof ODocument)       ((ODocument)record).validate();
     }
   }
+  final List<ORecordOperation> result=new ArrayList<ORecordOperation>();
   stateLock.acquireReadLock();
   try {
     try {
@@ -22,7 +23,7 @@
         Map<ORecordOperation,OPhysicalPosition> positions=new IdentityHashMap<ORecordOperation,OPhysicalPosition>();
         for (        ORecordOperation txEntry : entries) {
           ORecord rec=txEntry.getRecord();
-          if (rec.getIdentity().isNew() && rec.isDirty()) {
+          if (txEntry.type == ORecordOperation.CREATED && rec.isDirty()) {
             ORecordId rid=(ORecordId)rec.getIdentity().copy();
             ORecordId oldRID=rid.copy();
             int clusterId=rid.clusterId;
@@ -34,13 +35,14 @@
             OPhysicalPosition ppos=cluster.allocatePosition(ORecordInternal.getRecordType(rec));
             positions.put(txEntry,ppos);
             rid.clusterId=cluster.getId();
-            ;
+            if (rid.clusterPosition > -1 && rid.clusterPosition != ppos.clusterPosition)             throw new OTransactionException("New record allocated #" + rid.clusterId + ":"+ ppos.clusterPosition+ " but the expected was "+ rid);
             rid.clusterPosition=ppos.clusterPosition;
             clientTx.updateIdentityAfterCommit(oldRID,rid);
           }
         }
         for (        ORecordOperation txEntry : entries) {
-          commitEntry(clientTx,txEntry,positions.get(txEntry));
+          commitEntry(txEntry,positions.get(txEntry));
+          result.add(txEntry);
         }
         if (callback != null)         callback.run();
         endStorageTx();
@@ -64,4 +66,5 @@ catch (      RuntimeException e) {
   finally {
     stateLock.releaseReadLock();
   }
+  return result;
 }

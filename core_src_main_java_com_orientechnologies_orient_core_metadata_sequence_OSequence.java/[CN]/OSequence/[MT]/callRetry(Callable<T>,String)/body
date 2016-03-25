@@ -1,0 +1,33 @@
+{
+  for (int retry=0; retry < maxRetry; ++retry) {
+    try {
+      return callInTx(callable);
+    }
+ catch (    OConcurrentModificationException ex) {
+      reloadSequence();
+    }
+catch (    OStorageException e) {
+      if (e.getCause() instanceof OConcurrentModificationException) {
+        reloadSequence();
+      }
+ else {
+        throw OException.wrapException(new OSequenceException("Error in transactional processing of " + getName() + "."+ method+ "()"),e);
+      }
+    }
+catch (    OException ex) {
+      reloadSequence();
+    }
+catch (    Exception e) {
+      throw OException.wrapException(new OSequenceException("Error in transactional processing of " + getName() + "."+ method+ "()"),e);
+    }
+  }
+  try {
+    return callInTx(callable);
+  }
+ catch (  Exception e) {
+    if (e.getCause() instanceof OConcurrentModificationException) {
+      throw ((OConcurrentModificationException)e.getCause());
+    }
+    throw OException.wrapException(new OSequenceException("Error in transactional processing of " + getName() + "."+ method+ "()"),e);
+  }
+}

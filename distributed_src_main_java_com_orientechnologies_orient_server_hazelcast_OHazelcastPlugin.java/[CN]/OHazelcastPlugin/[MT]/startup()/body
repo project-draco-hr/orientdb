@@ -3,15 +3,19 @@
   OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD.setValue(Integer.MAX_VALUE);
   OGlobalConfiguration.RID_BAG_SBTREEBONSAI_TO_EMBEDDED_THRESHOLD.setValue(-1);
   OGlobalConfiguration.STORAGE_TRACK_CHANGED_RECORDS_IN_WAL.setValue(true);
+  serverInstance.addTemporaryUser(REPLICATOR_USER,"" + new SecureRandom().nextLong(),"*");
   super.startup();
   status=NODE_STATUS.STARTING;
   final String localNodeName=nodeName;
   activeNodes.clear();
+  for (  ORemoteServerController server : remoteServers.values())   server.close();
+  remoteServers.clear();
+  registeredNodeById=null;
+  registeredNodeByName=null;
   try {
     hazelcastInstance=configureHazelcast();
-    nodeId=hazelcastInstance.getCluster().getLocalMember().getUuid();
+    nodeUuid=hazelcastInstance.getCluster().getLocalMember().getUuid();
     OLogManager.instance().info(this,"Starting distributed server '%s' (hzID=%s)...",localNodeName,nodeId);
-    timeOffset=System.currentTimeMillis() - hazelcastInstance.getCluster().getClusterTime();
     activeNodes.put(localNodeName,hazelcastInstance.getCluster().getLocalMember());
     membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
     OServer.registerServerInstance(localNodeName,serverInstance);
@@ -20,27 +24,70 @@
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
       if (!m.getUuid().equals(getLocalNodeId())) {
         final String memberName=getNodeName(m);
-        if (memberName != null)         activeNodes.put(memberName,m);
+        if (memberName != null) {
+          activeNodes.put(memberName,m);
+        }
  else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
       }
     }
+    final Lock lock=getLock("registeredNodes");
+    lock.lock();
+    try {
+      final ODocument registeredNodesFromCluster=new ODocument();
+      final String registeredNodesFromClusterAsJson=(String)getConfigurationMap().get(CONFIG_REGISTEREDNODES);
+      if (registeredNodesFromClusterAsJson != null) {
+        registeredNodesFromCluster.fromJSON(registeredNodesFromClusterAsJson);
+        registeredNodeById=registeredNodesFromCluster.field("ids",OType.EMBEDDEDLIST);
+        registeredNodeByName=registeredNodesFromCluster.field("names",OType.EMBEDDEDMAP);
+        if (registeredNodeByName.containsKey(nodeName)) {
+          nodeId=registeredNodeByName.get(nodeName);
+        }
+ else {
+          registeredNodeById.add(nodeName);
+          nodeId=registeredNodeById.size() - 1;
+          registeredNodeByName.put(nodeName,nodeId);
+        }
+      }
+ else {
+        nodeId=0;
+        registeredNodeById=new ArrayList<String>();
+        registeredNodeById.add(nodeName);
+        registeredNodesFromCluster.field("ids",registeredNodeById,OType.EMBEDDEDLIST);
+        registeredNodeByName=new HashMap<String,Integer>();
+        registeredNodeByName.put(nodeName,nodeId);
+        registeredNodesFromCluster.field("names",registeredNodeByName,OType.EMBEDDEDMAP);
+      }
+      getConfigurationMap().put(CONFIG_REGISTEREDNODES,registeredNodesFromCluster.toJSON());
+    }
+  finally {
+      lock.unlock();
+    }
     publishLocalNodeConfiguration();
-    if (!configurationMap.containsKey(CONFIG_NODE_PREFIX + nodeId)) {
+    if (!configurationMap.containsKey(CONFIG_NODE_PREFIX + nodeUuid)) {
       ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on registering local node on cluster");
       throw new ODistributedStartupException("Error on registering local node on cluster");
     }
+    for (    String m : activeNodes.keySet())     if (!m.equals(nodeName))     getRemoteServer(m);
     messageService=new OHazelcastDistributedMessageService(this);
     installNewDatabases(true);
     loadDistributedDatabases();
     setNodeStatus(NODE_STATUS.ONLINE);
     publishLocalNodeConfiguration();
     final long delay=OGlobalConfiguration.DISTRIBUTED_PUBLISH_NODE_STATUS_EVERY.getValueAsLong();
-    if (delay > 0)     Orient.instance().scheduleTask(new TimerTask(){
-      @Override public void run(){
-        publishLocalNodeConfiguration();
+    if (delay > 0) {
+      publishLocalNodeConfigurationTask=new TimerTask(){
+        @Override public void run(){
+          try {
+            publishLocalNodeConfiguration();
+          }
+ catch (          Throwable e) {
+            OLogManager.instance().debug(this,"Error on distributed configuration node updater",e);
+          }
+        }
       }
+;
+      Orient.instance().scheduleTask(publishLocalNodeConfigurationTask,delay,delay);
     }
-,delay,delay);
   }
  catch (  Exception e) {
     ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Error on starting distributed plugin",e);

@@ -2,61 +2,10 @@
   this.manager=manager;
   this.responsesByRequestIds=new ConcurrentHashMap<Long,ODistributedResponseManager>();
   for (int i=0; i < responseTimeMetrics.length; ++i)   responseTimeMetrics[i]=-1;
-  final String queueName=getResponseQueueName(manager.getLocalNodeName());
-  nodeResponseQueue=getQueue(queueName);
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,getLocalNodeNameAndThread(),null,DIRECTION.NONE,"listening for incoming responses on queue: %s",queueName);
-  nodeResponseQueue.clear();
   asynchMessageManager=new TimerTask(){
     @Override public void run(){
       purgePendingMessages();
     }
   }
 ;
-  responseThread=new Thread(new Runnable(){
-    @Override public void run(){
-      Thread.currentThread().setName("OrientDB Node Response " + queueName);
-      while (running) {
-        String senderNode=null;
-        ODistributedResponse message=null;
-        try {
-          message=(ODistributedResponse)nodeResponseQueue.take();
-          if (message != null) {
-            senderNode=message.getSenderNodeName();
-            final long reqId=message.getRequestId();
-            if (reqId < 0) {
-              final OAbstractRemoteTask task=(OAbstractRemoteTask)message.getPayload();
-              task.execute(manager.getServerInstance(),manager,null);
-            }
- else {
-              final long responseTime=dispatchResponseToThread(message);
-              if (responseTime > -1)               collectMetric(responseTime);
-            }
-          }
-        }
- catch (        InterruptedException e) {
-          Thread.interrupted();
-          break;
-        }
-catch (        DistributedObjectDestroyedException e) {
-          Thread.interrupted();
-          break;
-        }
-catch (        HazelcastInstanceNotActiveException e) {
-          Thread.interrupted();
-          break;
-        }
-catch (        HazelcastException e) {
-          if (e.getCause() instanceof InterruptedException)           Thread.interrupted();
- else           ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
-        }
-catch (        Throwable e) {
-          ODistributedServerLog.error(this,manager.getLocalNodeName(),senderNode,DIRECTION.IN,"error on reading distributed response",e,message != null ? message.getPayload() : "-");
-        }
-      }
-      ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,DIRECTION.NONE,"end of reading responses");
-    }
-  }
-);
-  responseThread.setDaemon(true);
-  responseThread.start();
 }

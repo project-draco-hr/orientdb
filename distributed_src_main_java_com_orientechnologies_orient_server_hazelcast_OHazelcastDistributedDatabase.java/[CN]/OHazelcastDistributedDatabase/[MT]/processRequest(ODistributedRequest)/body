@@ -1,0 +1,54 @@
+{
+  final ORemoteTask task=request.getTask();
+  final int partitionKey=task.getPartitionKey();
+  if (partitionKey < 0) {
+    processLock.writeLock().lock();
+    try {
+      boolean anyQueueWorkerIsWorking=false;
+      for (      ODistributedWorker w : workerThreads) {
+        if (!w.localQueue.isEmpty()) {
+          anyQueueWorkerIsWorking=true;
+          break;
+        }
+      }
+      if (anyQueueWorkerIsWorking) {
+        ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s waiting for all the previous requests to be completed",request,databaseName);
+        final CountDownLatch emptyQueues=new CountDownLatch(workerThreads.size());
+        for (        ODistributedWorker w : workerThreads) {
+          final ODistributedRequest req=new ODistributedRequest(-1,databaseName,new OSynchronizedTaskWrapper(emptyQueues),ODistributedRequest.EXECUTION_MODE.NO_RESPONSE);
+          req.setId(new ODistributedRequestId(request.getId().getNodeId(),-1l));
+          w.processRequest(req);
+        }
+        try {
+          emptyQueues.await();
+          final CountDownLatch queueLatch=new CountDownLatch(1);
+          final String senderNodeName=manager.getNodeNameById(request.getId().getNodeId());
+          request.setTask(new OSynchronizedTaskWrapper(queueLatch,senderNodeName,task));
+          workerThreads.get(0).processRequest(request);
+          queueLatch.await();
+        }
+ catch (        InterruptedException e) {
+        }
+      }
+ else {
+        ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Synchronous request %s on database %s dispatched to the worker 0",request,databaseName);
+        workerThreads.get(0).processRequest(request);
+      }
+    }
+  finally {
+      processLock.writeLock().unlock();
+    }
+  }
+ else {
+    processLock.readLock().lock();
+    try {
+      final int partition=partitionKey % workerThreads.size();
+      ODistributedServerLog.debug(this,getLocalNodeName(),null,DIRECTION.NONE,"Request %s on database %s dispatched to the worker %d",request,databaseName,partition);
+      final ODistributedWorker worker=workerThreads.get(partition);
+      worker.processRequest(request);
+    }
+  finally {
+      processLock.readLock().unlock();
+    }
+  }
+}

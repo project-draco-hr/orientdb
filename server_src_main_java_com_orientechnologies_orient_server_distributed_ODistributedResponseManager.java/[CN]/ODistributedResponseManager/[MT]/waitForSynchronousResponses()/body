@@ -3,11 +3,11 @@
   synchronousResponsesLock.lock();
   try {
     long currentTimeout=synchTimeout;
-    while (currentTimeout > 0 && !isMinimumQuorumReached(false) && receivedResponses < expectedSynchronousResponses) {
+    while (currentTimeout > 0 && !isMinimumQuorumReached() && receivedResponses < expectedSynchronousResponses) {
       synchronousResponsesArrived.await(currentTimeout,TimeUnit.MILLISECONDS);
-      if (isMinimumQuorumReached(false) || receivedResponses >= expectedSynchronousResponses)       return true;
+      if (isMinimumQuorumReached() || receivedResponses >= expectedSynchronousResponses)       return true;
       if (Thread.currentThread().isInterrupted()) {
-        ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"thread has been interrupted wait for request (%s)",request);
+        ODistributedServerLog.warn(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"Thread has been interrupted wait for request (%s)",request);
         Thread.currentThread().interrupt();
         break;
       }
@@ -16,7 +16,8 @@
       currentTimeout=synchTimeout - elapsed;
       int synchronizingNodes=0;
       int missingActiveNodes=0;
-synchronized (responseLock) {
+      synchronousResponsesLock.lock();
+      try {
         for (Iterator<Map.Entry<String,Object>> iter=responses.entrySet().iterator(); iter.hasNext(); ) {
           final Map.Entry<String,Object> curr=iter.next();
           if (curr.getValue() == NO_RESPONSE) {
@@ -33,6 +34,9 @@ case ONLINE:
 }
 }
 }
+  finally {
+synchronousResponsesLock.unlock();
+}
 if (missingActiveNodes == 0) {
 ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"no more active nodes to wait for request (%s): anticipate timeout (saved %d ms)",request,currentTimeout);
 break;
@@ -48,7 +52,7 @@ currentTimeout=synchTimeout;
 ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"%d nodes are in synchronization mode during request (%s): enlarge timeout +%dms, wait again for %dms",synchronizingNodes,request,synchTimeout,currentTimeout);
 }
 }
-return isMinimumQuorumReached(false) || receivedResponses >= expectedSynchronousResponses;
+return isMinimumQuorumReached() || receivedResponses >= expectedSynchronousResponses;
 }
   finally {
 synchronousResponsesLock.unlock();

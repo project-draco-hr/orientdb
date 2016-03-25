@@ -4,14 +4,15 @@ synchronized (cachedDatabaseConfiguration) {
     Integer oldVersion=oldCfg != null ? (Integer)oldCfg.field("version") : null;
     if (oldVersion == null)     oldVersion=0;
     Integer currVersion=(Integer)cfg.field("version");
-    if (currVersion == null)     currVersion=0;
+    if (currVersion == null)     currVersion=1;
     final boolean modified=currVersion >= oldVersion;
     if (oldCfg != null && oldVersion > currVersion) {
       OLogManager.instance().debug(this,"Skip saving of distributed configuration file for database '%s' because is unchanged (version %d)",iDatabaseName,(Integer)cfg.field("version"));
       return false;
     }
     cachedDatabaseConfiguration.put(iDatabaseName,cfg);
-    ODistributedServerLog.warn(this,getLocalNodeName(),null,DIRECTION.NONE,"updated distributed configuration for database: %s:\n----------\n%s\n----------",iDatabaseName,cfg.toJSON("prettyPrint"));
+    final String cfgOutput=ODistributedOutput.formatClusterTable(new ODistributedConfiguration(cfg),getAvailableNodes(iDatabaseName));
+    ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"New distributed configuration for database: %s (version=%d)%s\n",iDatabaseName,cfg.field("version"),cfgOutput);
     if (iSaveToDisk) {
       FileOutputStream f=null;
       try {

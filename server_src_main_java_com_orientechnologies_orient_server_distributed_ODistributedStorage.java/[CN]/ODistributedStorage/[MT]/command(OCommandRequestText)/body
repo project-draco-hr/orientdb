@@ -51,11 +51,12 @@ case REPLICATE:
  else {
     final OAbstractCommandTask task=iCommand instanceof OCommandScript ? new OScriptTask(iCommand) : new OSQLCommandTask(iCommand,new HashSet<String>());
     task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
-    final Collection<String> nodes=dbCfg.getServers(involvedClusters);
+    final Set<String> nodes=dbCfg.getServers(involvedClusters);
     if (iCommand instanceof ODistributedCommand)     nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
     if (nodes.isEmpty())     return null;
     if (executeLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return wrapped.command(iCommand);
-    result=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE);
+    final ODistributedResponse dResponse=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE,null,null);
+    result=dResponse.getPayload();
     if (exec.involveSchema())     dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
   }
 break;

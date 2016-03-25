@@ -1,24 +1,54 @@
 {
   if (iIndex == 0)   printHeader(iColumns);
-  List<Object> vargs=new ArrayList<Object>();
+  List<String> vargs=new ArrayList<String>();
   try {
     if (iRecord instanceof ODocument)     ((ODocument)iRecord).setLazyLoad(false);
     final StringBuilder format=new StringBuilder(maxWidthSize);
+    if (leftBorder)     format.append('|');
+    int i=0;
     for (    Entry<String,Integer> col : iColumns.entrySet()) {
-      if (format.length() > 0)       format.append('|');
-      format.append("%-" + col.getValue() + "s");
-      Object value=getFieldValue(iIndex,iRecord,col.getKey());
+      final String columnName=col.getKey();
+      final int columnWidth=col.getValue();
+      if (i++ > 0)       format.append('|');
+      format.append("%-" + columnWidth + "s");
+      Object value=getFieldValue(iIndex,iRecord,columnName);
+      String valueAsString=null;
       if (value != null) {
-        value=value.toString();
-        if (((String)value).length() > col.getValue()) {
-          value=((String)value).substring(0,col.getValue() - 3) + MORE;
+        valueAsString=value.toString();
+        if (valueAsString.length() > columnWidth) {
+          valueAsString=valueAsString.substring(0,columnWidth - 3) + MORE;
         }
       }
-      vargs.add(value);
-    }
-    out.message("\n" + format.toString(),vargs.toArray());
+      if (valueAsString == null)       valueAsString=nullValue;
+      final ALIGNMENT alignment=columnAlignment.get(columnName);
+      if (alignment != null) {
+switch (alignment) {
+case LEFT:
+          break;
+case CENTER:
+{
+          final int room=columnWidth - valueAsString.length();
+          if (room > 1) {
+            for (int k=0; k < room / 2; ++k)             valueAsString=" " + valueAsString;
+          }
+          break;
+        }
+case RIGHT:
+{
+        final int room=columnWidth - valueAsString.length();
+        if (room > 1) {
+          for (int k=0; k < room; ++k)           valueAsString=" " + valueAsString;
+        }
+        break;
+      }
   }
- catch (  Throwable t) {
-    out.message("%3d|%9s|%s\n",iIndex,iRecord.getIdentity(),"Error on loading record dued to: " + t);
-  }
+}
+vargs.add(valueAsString);
+}
+if (rightBorder) format.append('|');
+out.onMessage("\n" + format.toString(),vargs.toArray());
+}
+ catch (Throwable t) {
+out.onMessage("%3d|%9s|%s\n",iIndex,iRecord.getIdentity(),"Error on loading record due to: " + t);
+}
 }

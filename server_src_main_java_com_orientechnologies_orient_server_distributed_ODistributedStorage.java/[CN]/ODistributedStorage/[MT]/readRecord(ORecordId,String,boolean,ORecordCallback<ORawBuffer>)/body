@@ -1,10 +1,11 @@
 {
-  if (deletedRecords.get(iRecordId) != null)   throw new ORecordNotFoundException("Record " + iRecordId + " was not found");
+  if (deletedRecords.get(iRecordId) != null)   throw new ORecordNotFoundException(iRecordId);
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
     final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
     final List<String> nodes=dbCfg.getServers(clusterName,null);
-    if (nodes.isEmpty() || nodes.contains(dManager.getLocalNodeName()) && dbCfg.getReadQuorum(clusterName) <= 1) {
+    final int availableNodes=dManager.getAvailableNodes(nodes,getName());
+    if (nodes.isEmpty() || nodes.contains(dManager.getLocalNodeName()) && dbCfg.getReadQuorum(clusterName,availableNodes) <= 1) {
       return (OStorageOperationResult<ORawBuffer>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
         @Override public Object call() throws Exception {
           return wrapped.readRecord(iRecordId,iFetchPlan,iIgnoreCache,iCallback);
@@ -12,10 +13,10 @@
       }
 );
     }
-    final Object result=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OReadRecordTask(iRecordId),EXECUTION_MODE.RESPONSE);
-    if (result instanceof ONeedRetryException)     throw (ONeedRetryException)result;
- else     if (result instanceof Exception)     throw OException.wrapException(new ODistributedException("Error on execution distributed READ_RECORD"),(Exception)result);
-    return new OStorageOperationResult<ORawBuffer>((ORawBuffer)result);
+    final Object dResult=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,new OReadRecordTask(iRecordId),EXECUTION_MODE.RESPONSE,null,null).getPayload();
+    if (dResult instanceof ONeedRetryException)     throw (ONeedRetryException)dResult;
+ else     if (dResult instanceof Exception)     throw OException.wrapException(new ODistributedException("Error on execution distributed READ_RECORD"),(Exception)dResult);
+    return new OStorageOperationResult<ORawBuffer>((ORawBuffer)dResult);
   }
  catch (  ONeedRetryException e) {
     throw e;

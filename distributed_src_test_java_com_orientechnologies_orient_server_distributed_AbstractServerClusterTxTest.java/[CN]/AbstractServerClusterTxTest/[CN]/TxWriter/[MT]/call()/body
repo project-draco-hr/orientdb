@@ -1,5 +1,7 @@
 {
   final String name=Integer.toString(threadId);
+  Set<Integer> clusters=new LinkedHashSet<Integer>();
+  LinkedHashMap<String,Long> clusterNames=new LinkedHashMap<String,Long>();
   for (int i=0; i < count; i++) {
     final ODatabaseDocumentTx database=poolFactory.get(databaseUrl,"admin","admin").acquire();
     try {
@@ -19,6 +21,11 @@
           checkRecord(database,person);
           if (useTransactions)           database.commit();
           if (delayWriter > 0)           Thread.sleep(delayWriter);
+          clusters.add(person.getIdentity().getClusterId());
+          String clusterName=database.getClusterNameById(person.getIdentity().getClusterId());
+          Long counter=clusterNames.get(clusterName);
+          if (counter == null)           counter=0L;
+          clusterNames.put(clusterName,counter + 1);
           break;
         }
  catch (        InterruptedException e) {
@@ -27,6 +34,7 @@
           break;
         }
 catch (        ORecordDuplicatedException e) {
+          e.printStackTrace();
         }
 catch (        OTransactionException e) {
           if (e.getCause() instanceof ORecordDuplicatedException)           ;
@@ -55,6 +63,6 @@ catch (        Throwable e) {
       database.close();
     }
   }
-  System.out.println("\nWriter " + name + " END");
+  System.out.println("\nWriter " + name + " END total:"+ count+ " clusters:"+ clusters+ " names:"+ clusterNames);
   return null;
 }

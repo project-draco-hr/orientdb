@@ -1,0 +1,23 @@
+{
+  final ORemoteTask undoTask=task.getUndoTask(reqId);
+  if (undoTask != null) {
+    ODatabaseDocumentTx database=(ODatabaseDocumentTx)ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+    final boolean databaseAlreadyDefined;
+    if (database == null) {
+      databaseAlreadyDefined=false;
+      database=new ODatabaseDocumentTx(getURL());
+      database.setProperty(ODatabase.OPTIONS.SECURITY.toString(),OSecurityServerUser.class);
+      database.open("system","system");
+    }
+ else     databaseAlreadyDefined=true;
+    try {
+      undoTask.execute(reqId,dManager.getServerInstance(),dManager,database);
+    }
+ catch (    Exception e) {
+      ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on undo operation on local node (req=%s)",reqId);
+    }
+ finally {
+      if (!databaseAlreadyDefined)       database.close();
+    }
+  }
+}

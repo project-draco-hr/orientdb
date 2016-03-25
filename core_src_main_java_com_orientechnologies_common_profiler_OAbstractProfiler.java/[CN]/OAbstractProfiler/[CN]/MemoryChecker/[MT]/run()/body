@@ -1,19 +1,24 @@
 {
-  final long jvmTotMemory=Runtime.getRuntime().totalMemory();
-  final long jvmMaxMemory=Runtime.getRuntime().maxMemory();
-  for (  OStorage s : Orient.instance().getStorages()) {
-    if (s instanceof OLocalPaginatedStorage) {
-      final OReadCache dk=((OLocalPaginatedStorage)s).getReadCache();
-      final OWriteCache wk=((OLocalPaginatedStorage)s).getWriteCache();
-      if (dk == null || wk == null)       continue;
-      final long totalDiskCacheUsedMemory=(dk.getUsedMemory() + wk.getExclusiveWriteCachePagesSize()) / OFileUtils.MEGABYTE;
-      final long maxDiskCacheUsedMemory=OGlobalConfiguration.DISK_CACHE_SIZE.getValueAsLong();
-      if ((jvmTotMemory * 140 / 100) < jvmMaxMemory && (totalDiskCacheUsedMemory * 120 / 100) > maxDiskCacheUsedMemory) {
-        final long suggestedMaxHeap=jvmTotMemory * 120 / 100;
-        final long suggestedDiskCache=OGlobalConfiguration.DISK_CACHE_SIZE.getValueAsLong() + (jvmMaxMemory - suggestedMaxHeap) / OFileUtils.MEGABYTE;
-        OLogManager.instance().info(this,"Database '%s' uses %,dMB/%,dMB of DISKCACHE memory, while Heap is not completely used (usedHeap=%dMB maxHeap=%dMB). To improve performance set maxHeap to %dMB and DISKCACHE to %dMB",s.getName(),totalDiskCacheUsedMemory,maxDiskCacheUsedMemory,jvmTotMemory / OFileUtils.MEGABYTE,jvmMaxMemory / OFileUtils.MEGABYTE,suggestedMaxHeap / OFileUtils.MEGABYTE,suggestedDiskCache);
-        OLogManager.instance().info(this,"-> Open server.sh (or server.bat on Windows) and change the following variables: 1) MAXHEAP=-Xmx%dM 2) MAXDISKCACHE=%d",suggestedMaxHeap / OFileUtils.MEGABYTE,suggestedDiskCache);
+  try {
+    final long jvmTotMemory=Runtime.getRuntime().totalMemory();
+    final long jvmMaxMemory=Runtime.getRuntime().maxMemory();
+    for (    OStorage s : Orient.instance().getStorages()) {
+      if (s instanceof OLocalPaginatedStorage) {
+        final OReadCache dk=((OLocalPaginatedStorage)s).getReadCache();
+        final OWriteCache wk=((OLocalPaginatedStorage)s).getWriteCache();
+        if (dk == null || wk == null)         continue;
+        final long totalDiskCacheUsedMemory=(dk.getUsedMemory() + wk.getExclusiveWriteCachePagesSize()) / OFileUtils.MEGABYTE;
+        final long maxDiskCacheUsedMemory=OGlobalConfiguration.DISK_CACHE_SIZE.getValueAsLong();
+        if ((jvmTotMemory * 140 / 100) < jvmMaxMemory && (totalDiskCacheUsedMemory * 120 / 100) > maxDiskCacheUsedMemory) {
+          final long suggestedMaxHeap=jvmTotMemory * 120 / 100;
+          final long suggestedDiskCache=OGlobalConfiguration.DISK_CACHE_SIZE.getValueAsLong() + (jvmMaxMemory - suggestedMaxHeap) / OFileUtils.MEGABYTE;
+          OLogManager.instance().info(this,"Database '%s' uses %,dMB/%,dMB of DISKCACHE memory, while Heap is not completely used (usedHeap=%dMB maxHeap=%dMB). To improve performance set maxHeap to %dMB and DISKCACHE to %dMB",s.getName(),totalDiskCacheUsedMemory,maxDiskCacheUsedMemory,jvmTotMemory / OFileUtils.MEGABYTE,jvmMaxMemory / OFileUtils.MEGABYTE,suggestedMaxHeap / OFileUtils.MEGABYTE,suggestedDiskCache);
+          OLogManager.instance().info(this,"-> Open server.sh (or server.bat on Windows) and change the following variables: 1) MAXHEAP=-Xmx%dM 2) MAXDISKCACHE=%d",suggestedMaxHeap / OFileUtils.MEGABYTE,suggestedDiskCache);
+        }
       }
     }
+  }
+ catch (  Throwable e) {
+    OLogManager.instance().debug(this,"Error on memory checker task",e);
   }
 }

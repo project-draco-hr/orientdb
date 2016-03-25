@@ -1,0 +1,31 @@
+{
+  Exception lastException=null;
+  for (int retry=1; retry <= maxRetry; ++retry) {
+    try {
+      channel.setWaitResponseTimeout();
+      channel.beginRequest(operationId,sessionId,sessionToken);
+      return operation.execute();
+    }
+ catch (    Exception e) {
+      lastException=e;
+      close();
+      if (!autoReconnect)       break;
+      ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Error on sending message to distributed node (%s) retrying (%d/%d)",lastException.toString(),retry,maxRetry);
+      try {
+        Thread.sleep(100 * (retry * 2));
+      }
+ catch (      InterruptedException e1) {
+        break;
+      }
+      if (!manager.isNodeAvailable(server))       break;
+      try {
+        connect();
+      }
+ catch (      IOException e1) {
+        lastException=e1;
+        ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Error on reconnecting to distributed node (%s)",lastException.toString());
+      }
+    }
+  }
+  throw OException.wrapException(new OStorageException(errorMessage),lastException);
+}

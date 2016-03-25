@@ -3,15 +3,6 @@
     while (active) {
       try {
         final Socket socket=serverSocket.accept();
-        if (server.getDistributedManager() != null) {
-          final ODistributedServerManager.NODE_STATUS nodeStatus=server.getDistributedManager().getNodeStatus();
-          if (nodeStatus != ODistributedServerManager.NODE_STATUS.ONLINE) {
-            OLogManager.instance().warn(this,"Distributed server is not yet ONLINE (status=%s), reject incoming connection from %s. If you are trying to shutdown the server, please kill the process",nodeStatus,socket.getRemoteSocketAddress());
-            socket.close();
-            Thread.sleep(100);
-            continue;
-          }
-        }
         final int max=OGlobalConfiguration.NETWORK_MAX_CONCURRENT_SESSIONS.getValueAsInteger();
         int conns=server.getClientConnectionManager().getTotal();
         if (conns >= max) {
@@ -27,7 +18,7 @@
         socket.setPerformancePreferences(0,2,1);
         socket.setSendBufferSize(socketBufferSize);
         socket.setReceiveBufferSize(socketBufferSize);
-        ONetworkProtocol protocol=protocolType.newInstance();
+        final ONetworkProtocol protocol=protocolType.newInstance();
         protocol.config(this,server,socket,configuration);
       }
  catch (      Throwable e) {

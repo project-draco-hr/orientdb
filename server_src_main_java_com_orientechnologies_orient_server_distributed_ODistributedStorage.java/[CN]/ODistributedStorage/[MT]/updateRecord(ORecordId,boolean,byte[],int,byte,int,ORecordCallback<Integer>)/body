@@ -28,14 +28,12 @@
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final OUpdateRecordTask task=new OUpdateRecordTask(iRecordId,iContent,iVersion,iRecordType);
         final OStorageOperationResult<Integer> localResult;
+        final ODistributedDatabase ddb=acquireRecordLock(iRecordId);
         try {
+          task.prepareUndoOperation();
           localResult=(OStorageOperationResult<Integer>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
             @Override public Object call() throws Exception {
-              final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-              final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
-              ORecordInternal.fill(record,iRecordId,iVersion,iContent,true);
-              db.save(record);
-              return new OStorageOperationResult<Integer>(record.getVersion());
+              return wrapped.updateRecord(iRecordId,updateContent,iContent,iVersion,iRecordType,iMode,iCallback);
             }
           }
 );
@@ -47,9 +45,11 @@ catch (        Exception e) {
           OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
           return null;
         }
+ finally {
+          ddb.unlockRecord(iRecordId);
+        }
         if (!nodes.isEmpty()) {
           if (syncMode) {
-            task.prepareUndoOperation();
             final ODistributedResponse dResponse=dManager.sendRequest(getName(),Collections.singleton(clusterName),nodes,task,EXECUTION_MODE.RESPONSE,localResult.getResult(),unlockCallback);
             final Object payload=dResponse.getPayload();
             if (payload instanceof Exception) {

@@ -51,31 +51,12 @@
     final boolean syncMode=executionModeSynch;
     return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
-        final ODistributedDatabase ddb=acquireRecordLock(iRecordId);
         final OStorageOperationResult<OPhysicalPosition> localResult;
+        final ODistributedDatabase ddb=acquireRecordLock(iRecordId);
         try {
-          localResult=(OStorageOperationResult<OPhysicalPosition>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
-            @Override public Object call() throws Exception {
-              final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-              final ORecord record=Orient.instance().getRecordFactoryManager().newInstance(iRecordType);
-              ORecordInternal.fill(record,iRecordId,iRecordVersion,iContent,true);
-              db.save(record);
-              final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
-              ppos.clusterPosition=record.getIdentity().getClusterPosition();
-              ppos.recordVersion=record.getVersion();
-              return new OStorageOperationResult<OPhysicalPosition>(ppos);
-            }
-          }
-);
+          localResult=wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
         }
- catch (        RuntimeException e) {
-          throw e;
-        }
-catch (        Exception e) {
-          OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
-          return null;
-        }
- finally {
+  finally {
           ddb.unlockRecord(iRecordId);
         }
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;

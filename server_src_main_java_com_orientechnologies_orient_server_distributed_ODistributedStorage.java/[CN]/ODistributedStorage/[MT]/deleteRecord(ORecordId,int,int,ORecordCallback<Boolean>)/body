@@ -25,20 +25,14 @@
     final boolean syncMode=executionModeSynch;
     return (OStorageOperationResult<Boolean>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
-        final ODeleteRecordTask task=new ODeleteRecordTask(iRecordId,iVersion);
-        task.prepareUndoOperation();
         final OStorageOperationResult<Boolean> localResult;
+        final ODeleteRecordTask task=new ODeleteRecordTask(iRecordId,iVersion);
+        final ODistributedDatabase ddb=acquireRecordLock(iRecordId);
         try {
+          task.prepareUndoOperation();
           localResult=(OStorageOperationResult<Boolean>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
             @Override public Object call() throws Exception {
-              final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-              try {
-                db.delete(iRecordId,iVersion);
-                return new OStorageOperationResult<Boolean>(true);
-              }
- catch (              ORecordNotFoundException e) {
-                return new OStorageOperationResult<Boolean>(false);
-              }
+              return wrapped.deleteRecord(iRecordId,iVersion,iMode,iCallback);
             }
           }
 );
@@ -49,6 +43,9 @@
 catch (        Exception e) {
           OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
           return null;
+        }
+ finally {
+          ddb.unlockRecord(iRecordId);
         }
         if (!nodes.isEmpty()) {
           if (syncMode) {

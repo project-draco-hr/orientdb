@@ -1,4 +1,51 @@
 {
-  initiateCommit(force).complete();
+  if (true) {
+    initiateCommit(force).complete();
+    return this;
+  }
+  checkOpeness();
+  checkIfActive();
+  if (!currentTx.isActive())   return this;
+  if (!force && currentTx.amountOfNestedTxs() > 1) {
+    currentTx.commit();
+    return this;
+  }
+  for (  ODatabaseListener listener : browseListeners())   try {
+    listener.onBeforeTxCommit(this);
+  }
+ catch (  Exception e) {
+    rollback(force);
+    OLogManager.instance().error(this,"Cannot commit the transaction: caught exception on execution of %s.onBeforeTxCommit()",listener.getClass().getName(),e);
+    throw OException.wrapException(new OTransactionException("Cannot commit the transaction: caught exception on execution of " + listener.getClass().getName() + "#onBeforeTxCommit()"),e);
+  }
+  try {
+    currentTx.commit(force);
+  }
+ catch (  RuntimeException e) {
+    OLogManager.instance().debug(this,"Error on transaction commit",e);
+    for (    ODatabaseListener listener : browseListeners())     try {
+      listener.onBeforeTxRollback(this);
+    }
+ catch (    Throwable t) {
+      OLogManager.instance().error(this,"Error before transaction rollback",t);
+    }
+    currentTx.rollback(false,0);
+    getLocalCache().clear();
+    for (    ODatabaseListener listener : browseListeners())     try {
+      listener.onAfterTxRollback(this);
+    }
+ catch (    Throwable t) {
+      OLogManager.instance().error(this,"Error after transaction rollback",t);
+    }
+    throw e;
+  }
+  for (  ODatabaseListener listener : browseListeners())   try {
+    listener.onAfterTxCommit(this);
+  }
+ catch (  Exception e) {
+    final String message="Error after the transaction has been committed. The transaction remains valid. The exception caught was on execution of " + listener.getClass() + ".onAfterTxCommit()";
+    OLogManager.instance().error(this,message,e);
+    throw OException.wrapException(new OTransactionBlockedException(message),e);
+  }
   return this;
 }

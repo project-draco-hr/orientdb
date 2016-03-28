@@ -1,0 +1,15 @@
+{
+  final ODistributedRequestId localReqId=new ODistributedRequestId(dManager.getLocalNodeId(),dManager.getNextMessageIdCounter());
+  for (  ORecordOperation op : iTx.getAllRecordEntries()) {
+    boolean recordLocked=false;
+    for (int retry=1; retry <= maxAutoRetry; ++retry) {
+      if (localDistributedDatabase.lockRecord(op.record,localReqId)) {
+        recordLocked=true;
+        break;
+      }
+      if (autoRetryDelay > -1)       Thread.sleep(autoRetryDelay);
+    }
+    if (!recordLocked)     throw new ODistributedRecordLockedException(op.record.getIdentity());
+  }
+  return localDistributedDatabase;
+}

@@ -1,5 +1,12 @@
 {
+  operation.rollback(null);
   nestedCommit.rollback();
+  try {
+    writeAheadLog.logAtomicOperationEndRecord(operation.getOperationUnitId(),true,operation.getStartLSN(),operation.getMetadata());
+  }
+ catch (  IOException e) {
+    throw OException.wrapException(new OStorageException("Error while rollbacking an uncompleted commit."),e);
+  }
   currentOperation.set(null);
   if (trackAtomicOperations)   activeAtomicOperations.remove(operation.getOperationUnitId());
   for (  String lockObject : operation.lockedObjects())   lockManager.releaseLock(this,lockObject,OLockManager.LOCK.EXCLUSIVE);

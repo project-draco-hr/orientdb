@@ -1,33 +1,3 @@
 {
-  final OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic=OSessionStoragePerformanceStatistic.getStatisticInstance();
-  if (sessionStoragePerformanceStatistic != null) {
-    sessionStoragePerformanceStatistic.startCommitTimer();
-    sessionStoragePerformanceStatistic.startComponentOperation("atomic operation");
-  }
-  storagePerformanceStatistic.startCommitTimer();
-  try {
-    for (    long deletedFileId : deletedFiles) {
-      writeAheadLog.log(new OFileDeletedWALRecord(operationUnitId,deletedFileId));
-    }
-    for (    Map.Entry<Long,FileChanges> fileChangesEntry : fileChanges.entrySet()) {
-      final FileChanges fileChanges=fileChangesEntry.getValue();
-      final long fileId=fileChangesEntry.getKey();
-      if (fileChanges.isNew)       writeAheadLog.log(new OFileCreatedWALRecord(operationUnitId,fileChanges.fileName,fileId));
- else       if (fileChanges.truncate)       writeAheadLog.log(new OFileTruncatedWALRecord(operationUnitId,fileId));
-      for (      Map.Entry<Long,FilePageChanges> filePageChangesEntry : fileChanges.pageChangesMap.entrySet()) {
-        final long pageIndex=filePageChangesEntry.getKey();
-        final FilePageChanges filePageChanges=filePageChangesEntry.getValue();
-        filePageChanges.lsn=writeAheadLog.log(new OUpdatePageRecord(pageIndex,fileId,operationUnitId,filePageChanges.changes));
-      }
-    }
-    writeAheadLog.logAtomicOperationEndRecord(operationUnitId,false,startLSN,metadata);
-    return new UncompletedCommit();
-  }
-  finally {
-    if (sessionStoragePerformanceStatistic != null) {
-      sessionStoragePerformanceStatistic.stopCommitTimer();
-      sessionStoragePerformanceStatistic.completeComponentOperation();
-    }
-    storagePerformanceStatistic.stopCommitTimer();
-  }
+  return new UncompletedCommit(writeAheadLog);
 }

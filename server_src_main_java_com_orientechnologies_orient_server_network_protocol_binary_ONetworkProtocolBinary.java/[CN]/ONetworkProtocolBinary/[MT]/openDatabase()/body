@@ -6,7 +6,13 @@
   if (connection.getData().protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_32)   dbType=channel.readString();
   final String user=channel.readString();
   final String passwd=channel.readString();
-  connection.setDatabase((ODatabaseDocumentTx)server.openDatabase(dbURL,user,passwd,connection.getData()));
+  try {
+    connection.setDatabase((ODatabaseDocumentTx)server.openDatabase(dbURL,user,passwd,connection.getData()));
+  }
+ catch (  OException e) {
+    server.getClientConnectionManager().disconnect(connection);
+    throw e;
+  }
   byte[] token=null;
   if (Boolean.TRUE.equals(connection.getTokenBased())) {
     token=server.getTokenHandler().getSignedBinaryToken(connection.getDatabase(),connection.getDatabase().getUser(),connection.getData());

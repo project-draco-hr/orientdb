@@ -1,0 +1,21 @@
+{
+  if (status == TXSTATUS.ROLLED_BACK || status == TXSTATUS.ROLLBACKING)   throw new ORollbackException("Given transaction was rolled back and cannot be used.");
+  status=TXSTATUS.COMMITTING;
+  if (!allEntries.isEmpty() || !indexEntries.isEmpty()) {
+    if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED && !(database.getStorage().getUnderlying() instanceof OAbstractPaginatedStorage))     return new UncompletedCommit(true,database.getStorage().initiateCommit(this,null));
+ else {
+      final Map<String,OIndex<?>> indexes=new HashMap<String,OIndex<?>>();
+      for (      OIndex<?> index : database.getMetadata().getIndexManager().getIndexes())       indexes.put(index.getName(),index);
+      final Runnable callback=new CommitIndexesCallback(indexes);
+      final String storageType=database.getStorage().getUnderlying().getType();
+      if (storageType.equals(OEngineLocalPaginated.NAME) || storageType.equals(OEngineMemory.NAME))       return new UncompletedCommit(true,database.getStorage().initiateCommit(OTransactionOptimistic.this,callback));
+ else       return database.getStorage().callInLock(new Callable<OUncompletedCommit<Void>>(){
+        @Override public OUncompletedCommit<Void> call() throws Exception {
+          return new UncompletedCommit(true,database.getStorage().initiateCommit(OTransactionOptimistic.this,callback));
+        }
+      }
+,true);
+    }
+  }
+  return new UncompletedCommit(true,null);
+}

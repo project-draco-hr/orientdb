@@ -13,7 +13,7 @@
     return (List<ORecordOperation>)storage.executeOperationInLock(exclusiveLock,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      final OCallable<Void,ODistributedRequestId> unlockCallback){
         try {
-          final ODistributedDatabase ddb=acquireMultipleRecordLocks(iTx,maxAutoRetry,autoRetryDelay);
+          final ODistributedRequestId requestId=acquireMultipleRecordLocks(iTx,maxAutoRetry,autoRetryDelay);
           try {
             final List<ORecordOperation> uResult=(List<ORecordOperation>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
               @Override public Object call() throws Exception {
@@ -41,14 +41,15 @@
                 }
                 return null;
               }
-              if (ODistributedServerLog.isDebugEnabled())               ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
+              ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
+              sendTxCompleted(localNodeName,involvedClusters,nodes,lastResult.getRequestId(),false);
               throw (ODistributedRecordLockedException)lastResult.getPayload();
             }
-            executeAsyncTx(nodes,localResult,unlockCallback,involvedClusters,txTask,localNodeName);
+ else             executeAsyncTx(nodes,localResult,unlockCallback,involvedClusters,txTask,localNodeName);
           }
   finally {
             for (            ORecordOperation op : iTx.getAllRecordEntries()) {
-              ddb.unlockRecord(op.record);
+              localDistributedDatabase.unlockRecord(op.record,requestId);
             }
           }
         }

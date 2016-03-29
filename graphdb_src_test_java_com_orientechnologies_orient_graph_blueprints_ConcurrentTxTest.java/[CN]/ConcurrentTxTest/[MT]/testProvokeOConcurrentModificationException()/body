@@ -4,17 +4,24 @@
   final int thirdValue=3;
   OrientGraph tx=graphFactory.getTx();
   tx.begin();
-  OrientVertex firstVertexHandle=tx.addVertex(null,PROPERTY_NAME,firstValue);
+  final OrientVertex firstVertexHandle=tx.addVertex(null,PROPERTY_NAME,firstValue);
   tx.commit();
-  Object recordId=firstVertexHandle.getId();
-  OrientGraph tx2=graphFactory.getTx();
-  tx2.begin();
-  Vertex secondVertexHandle=tx2.getVertex(recordId);
-  secondVertexHandle.setProperty(PROPERTY_NAME,secondValue);
+  final Object recordId=firstVertexHandle.getId();
+  Thread updateThread=new Thread(new Runnable(){
+    @Override public void run(){
+      OrientGraph tx2=graphFactory.getTx();
+      tx2.begin();
+      Vertex secondVertexHandle=tx2.getVertex(recordId);
+      secondVertexHandle.setProperty(PROPERTY_NAME,secondValue);
+      tx2.commit();
+    }
+  }
+);
+  updateThread.start();
+  updateThread.join();
   OrientGraph tx3=graphFactory.getTx();
   tx3.begin();
   Vertex thirdVertexHandle=tx3.getVertex(recordId);
   thirdVertexHandle.setProperty(PROPERTY_NAME,thirdValue);
-  tx2.commit();
   tx3.commit();
 }

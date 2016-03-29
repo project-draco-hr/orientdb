@@ -1,0 +1,40 @@
+{
+  final OAsyncReplicationOk onAsyncReplicationOk=OExecutionThreadLocal.INSTANCE.get().onAsyncReplicationOk;
+  final OAsyncReplicationError onAsyncReplicationError=storage.getAsyncReplicationError();
+  storage.asynchronousExecution(new OAsynchDistributedOperation(storage.getName(),involvedClusters,nodes,txTask,new OCallable<Object,OPair<ODistributedRequestId,Object>>(){
+    @Override public Object call(    final OPair<ODistributedRequestId,Object> iArgument){
+      try {
+        final Object value=iArgument.getValue();
+        final ODistributedRequestId reqId=iArgument.getKey();
+        if (value instanceof OTxTaskResult) {
+          sendTxCompleted(localNodeName,involvedClusters,nodes,reqId,true);
+          if (onAsyncReplicationOk != null)           onAsyncReplicationOk.onAsyncReplicationOk();
+          return null;
+        }
+ else         if (value instanceof Exception) {
+          try {
+            storage.executeUndoOnLocalServer(reqId,txTask);
+            if (ODistributedServerLog.isDebugEnabled())             ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction failed: %s",value);
+            sendTxCompleted(localNodeName,involvedClusters,nodes,reqId,false);
+            if (value instanceof RuntimeException)             throw (RuntimeException)value;
+ else             throw OException.wrapException(new OTransactionException("Error on execution async distributed transaction"),(Exception)value);
+          }
+  finally {
+            if (onAsyncReplicationError != null)             onAsyncReplicationError.onAsyncReplicationError((Throwable)value,0);
+          }
+        }
+        if (ODistributedServerLog.isDebugEnabled())         ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Async distributed transaction error, received unknown response type: %s",iArgument);
+        throw new OTransactionException("Error on committing async distributed transaction, received unknown response type " + iArgument);
+      }
+  finally {
+        try {
+          unlockCallback.call(iArgument.getKey());
+        }
+ catch (        Exception e) {
+          ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Error on unlocking Async distributed transaction",e);
+        }
+      }
+    }
+  }
+,localResult,unlockCallback));
+}

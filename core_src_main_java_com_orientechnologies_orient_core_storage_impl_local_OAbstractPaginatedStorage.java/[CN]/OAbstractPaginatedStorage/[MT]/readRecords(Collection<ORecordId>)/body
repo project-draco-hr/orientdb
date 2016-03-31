@@ -12,24 +12,18 @@
   final Map<Integer,List<ORecordId>> ridsPerCluster=getRidsGroupedByCluster(iRids);
   stateLock.acquireReadLock();
   try {
-    dataLock.acquireSharedLock();
-    try {
-      for (      Map.Entry<Integer,List<ORecordId>> entry : ridsPerCluster.entrySet()) {
-        final int clusterId=entry.getKey();
-        final OCluster clusterSegment=getClusterById(clusterId);
-        for (        ORecordId rid : entry.getValue()) {
-          lockManager.acquireLock(rid,OLockManager.LOCK.SHARED);
-          try {
-            records.add(new OPair<ORecordId,ORawBuffer>(rid,doReadRecord(clusterSegment,rid)));
-          }
+    for (    Map.Entry<Integer,List<ORecordId>> entry : ridsPerCluster.entrySet()) {
+      final int clusterId=entry.getKey();
+      final OCluster clusterSegment=getClusterById(clusterId);
+      for (      ORecordId rid : entry.getValue()) {
+        lockManager.acquireLock(rid,OLockManager.LOCK.SHARED);
+        try {
+          records.add(new OPair<ORecordId,ORawBuffer>(rid,doReadRecord(clusterSegment,rid)));
+        }
   finally {
-            lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
-          }
+          lockManager.releaseLock(this,rid,OLockManager.LOCK.SHARED);
         }
       }
-    }
-  finally {
-      dataLock.releaseSharedLock();
     }
   }
   finally {

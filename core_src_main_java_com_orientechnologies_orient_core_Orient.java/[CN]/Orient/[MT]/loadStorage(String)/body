@@ -29,22 +29,16 @@
       }
     }
  else     dbPath=iURL;
-    final String dbName=registerDatabaseByPath ? dbPath : OIOUtils.getRelativePathIfAny(dbPath,null);
+    final String dbName=registerDatabaseByPath ? dbPath : engine.getNameFromPath(dbPath);
     OStorage storage;
-    if (engine.isShared()) {
-      storage=storages.get(dbName);
-      if (storage == null) {
-        do {
-          storage=engine.createStorage(dbPath,parameters);
-        }
- while ((storage instanceof OIdentifiableStorage) && storageIds.putIfAbsent(((OIdentifiableStorage)storage).getId(),Boolean.TRUE) != null);
-        final OStorage oldStorage=storages.putIfAbsent(dbName,storage);
-        if (oldStorage != null)         storage=oldStorage;
+    storage=storages.get(dbName);
+    if (storage == null) {
+      do {
+        storage=engine.createStorage(dbPath,parameters);
       }
-    }
- else {
-      storage=engine.createStorage(dbPath,parameters);
-      storages.put(dbName + "__" + serialId.incrementAndGet(),storage);
+ while ((storage instanceof OIdentifiableStorage) && storageIds.putIfAbsent(((OIdentifiableStorage)storage).getId(),Boolean.TRUE) != null);
+      final OStorage oldStorage=storages.putIfAbsent(dbName,storage);
+      if (oldStorage != null)       storage=oldStorage;
     }
     for (    OOrientListener l : browseListeners())     l.onStorageRegistered(storage);
     return storage;

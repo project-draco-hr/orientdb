@@ -1,4 +1,20 @@
 {
-  enabled=false;
-  statistics.clear();
+  switchLock.acquireWriteLock();
+  try {
+    enabled=false;
+    final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
+    final Map<String,PerformanceCountersHolder> componentCountersHolder=new HashMap<String,PerformanceCountersHolder>();
+    deadThreadsStatistic.countersHolder.pushData(countersHolder);
+    componentCountersHolder.putAll(deadThreadsStatistic.countersByComponents);
+    deadThreadsStatistic=null;
+    for (    OSessionStoragePerformanceStatistic statistic : statistics.values()) {
+      statistic.pushSystemCounters(countersHolder);
+      statistic.pushComponentCounters(componentCountersHolder);
+    }
+    statistics.clear();
+    postMeasurementStatistic=new ImmutableStatistic(countersHolder,componentCountersHolder);
+  }
+  finally {
+    switchLock.releaseWriteLock();
+  }
 }

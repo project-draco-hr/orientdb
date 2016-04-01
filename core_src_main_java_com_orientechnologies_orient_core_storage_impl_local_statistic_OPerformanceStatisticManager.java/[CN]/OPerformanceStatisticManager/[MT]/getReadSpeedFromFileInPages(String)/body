@@ -1,5 +1,20 @@
 {
-  final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
-  fetchComponentCounters(componentName,countersHolder);
-  return countersHolder.getReadSpeedFromFileInPages();
+  switchLock.acquireReadLock();
+  try {
+    if (enabled) {
+      final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
+      fetchComponentCounters(componentName,countersHolder);
+      return countersHolder.getReadSpeedFromFileInPages();
+    }
+ else {
+      final ImmutableStatistic post=postMeasurementStatistic;
+      if (post == null)       return -1;
+      final PerformanceCountersHolder holder=post.countersByComponents.get(componentName);
+      if (holder == null)       return -1;
+      return holder.getReadSpeedFromFileInPages();
+    }
+  }
+  finally {
+    switchLock.releaseReadLock();
+  }
 }

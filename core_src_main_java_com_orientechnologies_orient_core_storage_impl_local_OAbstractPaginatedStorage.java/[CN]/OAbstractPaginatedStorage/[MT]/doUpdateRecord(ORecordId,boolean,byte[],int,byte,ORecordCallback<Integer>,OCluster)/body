@@ -1,2 +1,47 @@
 {
+  try {
+    final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
+    if (!checkForRecordValidity(ppos)) {
+      final int recordVersion=-1;
+      if (callback != null)       callback.call(rid,recordVersion);
+      return new OStorageOperationResult<Integer>(recordVersion);
+    }
+    boolean contentModified=false;
+    if (updateContent) {
+      final AtomicInteger recVersion=new AtomicInteger(version);
+      final int oldVersion=ppos.recordVersion;
+      final AtomicInteger dbVersion=new AtomicInteger(ppos.recordVersion);
+      final byte[] newContent=checkAndIncrementVersion(cluster,rid,recVersion,dbVersion,content,recordType);
+      ppos.recordVersion=dbVersion.get();
+      if (newContent != null) {
+        contentModified=true;
+        content=newContent;
+      }
+    }
+    makeStorageDirty();
+    atomicOperationsManager.startAtomicOperation((String)null,true);
+    try {
+      if (updateContent)       cluster.updateRecord(rid.clusterPosition,content,ppos.recordVersion,recordType);
+      final ORecordSerializationContext context=ORecordSerializationContext.getContext();
+      if (context != null)       context.executeOperations(this);
+      atomicOperationsManager.endAtomicOperation(false,null);
+    }
+ catch (    Exception e) {
+      atomicOperationsManager.endAtomicOperation(true,e);
+      OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",e);
+      final int recordVersion=-1;
+      if (callback != null)       callback.call(rid,recordVersion);
+      return new OStorageOperationResult<Integer>(recordVersion);
+    }
+    if (callback != null)     callback.call(rid,ppos.recordVersion);
+    if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Updated record %s v.%s size=%d",rid,ppos.recordVersion,content.length);
+    if (contentModified)     return new OStorageOperationResult<Integer>(ppos.recordVersion,content,false);
+ else     return new OStorageOperationResult<Integer>(ppos.recordVersion);
+  }
+ catch (  IOException ioe) {
+    OLogManager.instance().error(this,"Error on updating record " + rid + " (cluster: "+ cluster+ ")",ioe);
+    final int recordVersion=-1;
+    if (callback != null)     callback.call(rid,recordVersion);
+    return new OStorageOperationResult<Integer>(recordVersion);
+  }
 }

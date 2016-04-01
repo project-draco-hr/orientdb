@@ -23,9 +23,19 @@
               final ORecordId rid=new ORecordId(clusterId,clusterPos);
               totalRecords++;
               final ORecord loadedRecord=rid.getRecord();
+              ORecord newRecord=null;
               if (deleted) {
                 ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- deleting " + rid);
                 if (loadedRecord != null)                 db.delete(rid);
+ else {
+                  do {
+                    newRecord=Orient.instance().getRecordFactoryManager().newInstance(ODocument.RECORD_TYPE);
+                    ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),0,EMPTY_CONTENT,true);
+                    newRecord.save();
+                    newRecord.delete();
+                  }
+ while (newRecord.getIdentity().getClusterPosition() < clusterPos);
+                }
                 totalDeleted++;
               }
  else {
@@ -34,7 +44,6 @@
                 final int recordSize=input.readInt();
                 final byte[] recordContent=new byte[recordSize];
                 input.read(recordContent);
-                ORecord newRecord=null;
                 if (loadedRecord == null) {
                   do {
                     newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);

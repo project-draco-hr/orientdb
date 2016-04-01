@@ -1,11 +1,8 @@
 {
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Creating record %s/%s v.%d...",database.getName(),rid.toString(),version);
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Creating record %s/%s v.%d reqId=%s...",database.getName(),rid.toString(),version,requestId);
   if (!rid.isPersistent())   throw new ODistributedException("Record " + rid + " has not been saved on owner node first (temporary rid)");
   final OStorageOperationResult<ORawBuffer> loadedRecord=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().readRecord(rid,null,true,null);
-  if (loadedRecord.getResult() != null) {
-    if (!Arrays.equals(loadedRecord.getResult().getBuffer(),content))     throw new ODistributedException("Record " + rid + " is already present with different content");
-    return new OPlaceholder(rid,loadedRecord.getResult().version);
-  }
+  if (loadedRecord.getResult() != null)   return new OPlaceholder(forceUpdate(requestId,iManager,database,loadedRecord));
   getRecord();
   try {
     if (clusterId > -1)     record.save(database.getClusterNameById(clusterId),true);
@@ -13,7 +10,7 @@
  else     record.save();
   }
  catch (  ORecordDuplicatedException e) {
-    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> duplicated record, assigned new rid %s/%s v.%d",database.getName(),rid.toString(),record.getVersion());
+    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> duplicated record %s (existent=%s), assigned new rid %s/%s v.%d reqId=%s",record,e.getRid(),database.getName(),rid.toString(),record.getVersion(),requestId);
     record.clear();
     if (clusterId > -1)     record.save(database.getClusterNameById(clusterId),true);
  else     if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()),true);
@@ -21,7 +18,10 @@
     throw e;
   }
   final ORecordId newRid=(ORecordId)record.getIdentity();
-  if (!rid.equals(newRid))   throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid+ " on server "+ iManager.getLocalNodeName());
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d",database.getName(),rid.toString(),record.getVersion());
+  if (!rid.equals(newRid)) {
+    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Record %s has been saved with the RID %s instead of the expected %s reqId=%s",record,newRid,rid,requestId);
+    throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid+ " on server "+ iManager.getLocalNodeName());
+  }
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d reqId=%s",database.getName(),rid.toString(),record.getVersion(),requestId);
   return new OPlaceholder(record);
 }

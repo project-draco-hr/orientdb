@@ -36,8 +36,22 @@
             @Override public Object call() throws Exception {
               Assert.assertTrue("Insert was too fast",inserting);
               banner("RESTARTING SERVER " + (SERVERS - 1));
-              ((OHazelcastPlugin)serverInstance.get(0).getServerInstance().getDistributedManager()).restartNode(server.server.getDistributedManager().getLocalNodeName());
-              Thread.sleep(5000);
+              final ODatabaseDocumentTx database=poolFactory.get(getDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+              try {
+                log("Total Person record: " + database.countClass("Person"));
+                OClass person=database.getMetadata().getSchema().getClass("Person");
+                for (                int id : person.getClusterIds()) {
+                  log("- Total record cluster " + database.getClusterNameById(id) + ": "+ database.countClusterElements(id));
+                }
+              }
+  finally {
+                database.close();
+              }
+              final String nodeName=server.server.getDistributedManager().getLocalNodeName();
+              ((OHazelcastPlugin)serverInstance.get(0).getServerInstance().getDistributedManager()).restartNode(nodeName);
+              while (!(serverInstance.get(0).getServerInstance().getDistributedManager()).isNodeOnline(nodeName,getDatabaseName())) {
+                Thread.sleep(1000);
+              }
               return null;
             }
           }

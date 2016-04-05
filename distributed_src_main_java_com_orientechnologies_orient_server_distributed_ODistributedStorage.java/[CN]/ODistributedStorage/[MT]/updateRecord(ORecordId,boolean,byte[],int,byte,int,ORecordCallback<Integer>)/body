@@ -18,18 +18,16 @@
       }
 );
     }
-    final int clusterId=iRecordId.clusterId;
     Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(clusterName);
     if (executionModeSynch == null)     executionModeSynch=iMode == 0;
     final boolean syncMode=executionModeSynch;
-    return (OStorageOperationResult<Integer>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
+    return (OStorageOperationResult<Integer>)executeRecordOperationInLock(syncMode,iRecordId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final OUpdateRecordTask task=new OUpdateRecordTask(iRecordId,iContent,iVersion,iRecordType);
         final OStorageOperationResult<Integer> localResult;
         if (nodes.contains(localNodeName)) {
-          final ODistributedRequestId requestId=acquireRecordLock(iRecordId);
           try {
-            task.prepareUndoOperation();
+            task.checkRecordExists();
             localResult=(OStorageOperationResult<Integer>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
               @Override public Object call() throws Exception {
                 return wrapped.updateRecord(iRecordId,updateContent,iContent,iVersion,iRecordType,iMode,iCallback);
@@ -43,9 +41,6 @@
 catch (          Exception e) {
             OException.wrapException(new ODistributedException("Cannot delete record " + iRecordId),e);
             return null;
-          }
- finally {
-            localDistributedDatabase.unlockRecord(iRecordId,requestId);
           }
           nodes.remove(localNodeName);
         }

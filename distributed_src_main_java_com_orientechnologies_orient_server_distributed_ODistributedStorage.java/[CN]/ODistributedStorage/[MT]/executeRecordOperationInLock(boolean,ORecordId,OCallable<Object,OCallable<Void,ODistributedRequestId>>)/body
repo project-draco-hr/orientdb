@@ -1,0 +1,28 @@
+{
+  final AtomicBoolean acquiredClusterLock=new AtomicBoolean(false);
+  final AtomicBoolean acquiredRecordLock=new AtomicBoolean(false);
+  ODistributedRequestId requestId=null;
+  final int partition=rid.clusterId % clusterLocks.length;
+  messageManagementLock.readLock().lock();
+  try {
+    clusterLocks[partition].acquire();
+    acquiredClusterLock.set(true);
+    requestId=acquireRecordLock(rid);
+    acquiredRecordLock.set(true);
+    final OCallable<Void,ODistributedRequestId> unlockCallback=new OCallable<Void,ODistributedRequestId>(){
+      @Override public Void call(      final ODistributedRequestId req){
+        if (acquiredClusterLock.compareAndSet(true,false))         clusterLocks[partition].release();
+        return null;
+      }
+    }
+;
+    return callback.call(unlockCallback);
+  }
+  finally {
+    if (iUnlockAtTheEnd) {
+      if (acquiredClusterLock.compareAndSet(true,false))       clusterLocks[partition].release();
+      if (acquiredRecordLock.compareAndSet(true,false))       localDistributedDatabase.unlockRecord(rid,requestId);
+    }
+    messageManagementLock.readLock().unlock();
+  }
+}

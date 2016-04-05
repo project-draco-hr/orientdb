@@ -10,6 +10,7 @@
         long totalUpdated=0;
         long totalDeleted=0;
         long totalHoles=0;
+        long totalSkipped=0;
         ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Started import of delta for database '" + db.getName() + "'");
         long lastLap=System.currentTimeMillis();
         try {
@@ -22,90 +23,104 @@
               final boolean deleted=input.readBoolean();
               final ORecordId rid=new ORecordId(clusterId,clusterPos);
               totalRecords++;
-              final ORecord loadedRecord=rid.getRecord();
+              final OPaginatedCluster cluster=(OPaginatedCluster)db.getStorage().getUnderlying().getClusterById(rid.clusterId);
+              final OPaginatedCluster.RECORD_STATUS recordStatus=cluster.getRecordStatus(rid.clusterPosition);
               ORecord newRecord=null;
               if (deleted) {
-                ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- deleting " + rid);
-                if (loadedRecord != null)                 db.delete(rid);
- else {
-                  do {
-                    newRecord=Orient.instance().getRecordFactoryManager().newInstance(ODocument.RECORD_TYPE);
-                    ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),0,EMPTY_CONTENT,true);
-                    newRecord.save();
-                    newRecord.delete();
-                  }
- while (newRecord.getIdentity().getClusterPosition() < clusterPos);
-                }
-                totalDeleted++;
-              }
- else {
-                final int recordVersion=input.readInt();
-                final int recordType=input.readByte();
-                final int recordSize=input.readInt();
-                final byte[] recordContent=new byte[recordSize];
-                input.read(recordContent);
-                if (loadedRecord == null) {
-                  do {
-                    newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
-                    ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),recordVersion - 1,recordContent,true);
-                    try {
-                      newRecord.save();
-                    }
- catch (                    ORecordNotFoundException e) {
-                      ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"DELTA <- error on saving record rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
-                    }
-                    if (newRecord.getIdentity().getClusterPosition() < clusterPos) {
-                      ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- creating hole rid=%s",newRecord.getIdentity());
-                      newRecord.delete();
-                      totalHoles++;
-                    }
-                  }
- while (newRecord.getIdentity().getClusterPosition() < clusterPos);
-                  ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- creating rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
-                  totalCreated++;
-                }
- else {
-                  newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
-                  ORecordInternal.fill(newRecord,rid,ORecordVersionHelper.setRollbackMode(recordVersion),recordContent,true);
-                  if (loadedRecord instanceof ODocument) {
-                    ODocument loadedDocument=(ODocument)loadedRecord;
-                    loadedDocument.merge((ODocument)newRecord,false,false).getVersion();
-                    loadedDocument.setDirty();
-                    newRecord=loadedDocument;
-                  }
-                  newRecord.save();
-                  ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- updating rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
-                  totalUpdated++;
-                }
-                if (!newRecord.getIdentity().equals(rid))                 throw new ODistributedDatabaseDeltaSyncException("Error on synchronization of records, rids are different: saved " + newRecord.getIdentity() + ", but it should be "+ rid);
-              }
-              final long now=System.currentTimeMillis();
-              if (now - lastLap > 2000) {
-                ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"- %,d total entries: %,d created, %,d updated, %,d deleted, %,d holes...",totalRecords,totalCreated,totalUpdated,totalDeleted,totalHoles);
-                lastLap=now;
-              }
-            }
-            db.getMetadata().reload();
-          }
-  finally {
-            input.close();
-          }
-        }
- catch (        Exception e) {
-          ODistributedServerLog.error(this,nodeName,null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
-          throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
-        }
- finally {
-        }
-        ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"Installed database delta for '%s'. %d total entries: %d created, %d updated, %d deleted, %d holes",db.getName(),totalRecords,totalCreated,totalUpdated,totalDeleted,totalHoles);
-        return null;
-      }
+                ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- deleting %s",rid);
+switch (recordStatus) {
+case REMOVED:
+                  totalSkipped++;
+                continue;
+case ALLOCATED:
+case PRESENT:
+              db.delete(rid);
+            break;
+case NOT_EXISTENT:
+          totalSkipped++;
+        break;
     }
+    totalDeleted++;
+  }
+ else {
+    final int recordVersion=input.readInt();
+    final int recordType=input.readByte();
+    final int recordSize=input.readInt();
+    final byte[] recordContent=new byte[recordSize];
+    input.read(recordContent);
+switch (recordStatus) {
+case REMOVED:
+      totalSkipped++;
+    continue;
+case ALLOCATED:
+case PRESENT:
+  newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+ORecordInternal.fill(newRecord,rid,ORecordVersionHelper.setRollbackMode(recordVersion),recordContent,true);
+final ORecord loadedRecord=rid.getRecord();
+if (loadedRecord instanceof ODocument) {
+ODocument loadedDocument=(ODocument)loadedRecord;
+loadedDocument.merge((ODocument)newRecord,false,false).getVersion();
+loadedDocument.setDirty();
+newRecord=loadedDocument;
+}
+newRecord.save();
+ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- updating rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
+totalUpdated++;
+break;
+case NOT_EXISTENT:
+do {
+newRecord=Orient.instance().getRecordFactoryManager().newInstance((byte)recordType);
+ORecordInternal.fill(newRecord,new ORecordId(rid.getClusterId(),-1),recordVersion - 1,recordContent,true);
+try {
+newRecord.save();
+}
+ catch (ORecordNotFoundException e) {
+ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"DELTA <- error on saving record (not found) rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
+}
+catch (ORecordDuplicatedException e) {
+ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"DELTA <- error on saving record (duplicated) rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
+}
+if (newRecord.getIdentity().getClusterPosition() < clusterPos) {
+ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- creating hole rid=%s",newRecord.getIdentity());
+newRecord.delete();
+totalHoles++;
+}
+}
+ while (newRecord.getIdentity().getClusterPosition() < clusterPos);
+ODistributedServerLog.debug(this,nodeName,null,DIRECTION.NONE,"DELTA <- creating rid=%s type=%d size=%d v=%d content=%s",rid,recordType,recordSize,recordVersion,newRecord);
+totalCreated++;
+break;
+}
+if (!newRecord.getIdentity().equals(rid)) throw new ODistributedDatabaseDeltaSyncException("Error on synchronization of records, rids are different: saved " + newRecord.getIdentity() + ", but it should be "+ rid);
+}
+final long now=System.currentTimeMillis();
+if (now - lastLap > 2000) {
+ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"- %,d total entries: %,d created, %,d updated, %,d deleted, %,d holes, %,d skipped...",totalRecords,totalCreated,totalUpdated,totalDeleted,totalHoles,totalSkipped);
+lastLap=now;
+}
+}
+db.getMetadata().reload();
+}
+  finally {
+input.close();
+}
+}
+ catch (Exception e) {
+ODistributedServerLog.error(this,nodeName,null,DIRECTION.IN,"Error on installing database delta '%s' on local server",e,db.getName());
+throw OException.wrapException(new ODistributedException("Error on installing database delta '" + db.getName() + "' on local server"),e);
+}
+ finally {
+}
+ODistributedServerLog.info(this,nodeName,null,DIRECTION.IN,"Installed database delta for '%s'. %d total entries: %d created, %d updated, %d deleted, %d holes, %,d skipped",db.getName(),totalRecords,totalCreated,totalUpdated,totalDeleted,totalHoles,totalSkipped);
+return null;
+}
+}
 );
-    db.activateOnCurrentThread();
-  }
- catch (  Exception e) {
-    ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Error while applying changes of database delta sync on '%s': forcing full database sync...",e,db.getName());
-    throw OException.wrapException(new ODistributedDatabaseDeltaSyncException("Error while applying changes of database delta sync on '" + db.getName() + "': forcing full database sync..."),e);
-  }
+db.activateOnCurrentThread();
+System.out.println("TOTAL PERSON: " + db.countClass("Person"));
+}
+ catch (Exception e) {
+ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Error while applying changes of database delta sync on '%s': forcing full database sync...",e,db.getName());
+throw OException.wrapException(new ODistributedDatabaseDeltaSyncException("Error while applying changes of database delta sync on '" + db.getName() + "': forcing full database sync..."),e);
+}
 }

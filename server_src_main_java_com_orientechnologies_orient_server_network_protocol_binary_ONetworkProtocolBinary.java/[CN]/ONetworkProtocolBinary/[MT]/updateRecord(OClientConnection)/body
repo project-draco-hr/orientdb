@@ -1,0 +1,23 @@
+{
+  setDataCommandInfo(connection,"Update record");
+  if (!isConnectionAlive(connection))   return;
+  final ORecordId rid=channel.readRID();
+  boolean updateContent=true;
+  if (connection.getData().protocolVersion >= 23)   updateContent=channel.readBoolean();
+  final byte[] buffer=channel.readBytes();
+  final int version=channel.readVersion();
+  final byte recordType=channel.readByte();
+  final byte mode=channel.readByte();
+  final int newVersion=updateRecord(connection,rid,buffer,version,recordType,updateContent);
+  if (mode < 2) {
+    beginResponse();
+    try {
+      sendOk(connection,clientTxId);
+      channel.writeVersion(newVersion);
+      if (connection.getData().protocolVersion >= 20)       sendCollectionChanges(connection);
+    }
+  finally {
+      endResponse(connection);
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  setDataCommandInfo(connection,"Load record if version is not latest");
+  if (!isConnectionAlive(connection))   return;
+  final ORecordId rid=channel.readRID();
+  final int recordVersion=channel.readVersion();
+  final String fetchPlanString=channel.readString();
+  boolean ignoreCache=channel.readByte() == 1;
+  if (rid.clusterId == 0 && rid.clusterPosition == 0) {
+    OFetchHelper.checkFetchPlanValid(fetchPlanString);
+    beginResponse();
+    try {
+      sendOk(connection,clientTxId);
+      channel.writeByte((byte)1);
+      if (connection.getData().protocolVersion <= OChannelBinaryProtocol.PROTOCOL_VERSION_27) {
+        channel.writeBytes(connection.getDatabase().getStorage().getConfiguration().toStream(connection.getData().protocolVersion));
+        channel.writeVersion(0);
+        channel.writeByte(OBlob.RECORD_TYPE);
+      }
+ else {
+        channel.writeByte(OBlob.RECORD_TYPE);
+        channel.writeVersion(0);
+        channel.writeBytes(connection.getDatabase().getStorage().getConfiguration().toStream(connection.getData().protocolVersion));
+      }
+      channel.writeByte((byte)0);
+    }
+  finally {
+      endResponse(connection);
+    }
+  }
+ else {
+    final ORecord record=connection.getDatabase().loadIfVersionIsNotLatest(rid,recordVersion,fetchPlanString,ignoreCache);
+    beginResponse();
+    try {
+      sendOk(connection,clientTxId);
+      if (record != null) {
+        channel.writeByte((byte)1);
+        byte[] bytes=getRecordBytes(connection,record);
+        int length=trimCsvSerializedContent(connection,bytes);
+        channel.writeByte(ORecordInternal.getRecordType(record));
+        channel.writeVersion(record.getVersion());
+        channel.writeBytes(bytes,length);
+        if (fetchPlanString.length() > 0) {
+          if (record instanceof ODocument) {
+            final OFetchPlan fetchPlan=OFetchHelper.buildFetchPlan(fetchPlanString);
+            final Set<ORecord> recordsToSend=new HashSet<ORecord>();
+            final ODocument doc=(ODocument)record;
+            final OFetchListener listener=new ORemoteFetchListener(){
+              @Override protected void sendRecord(              ORecord iLinked){
+                recordsToSend.add(iLinked);
+              }
+            }
+;
+            final OFetchContext context=new ORemoteFetchContext();
+            OFetchHelper.fetch(doc,doc,fetchPlan,listener,context,"");
+            for (            ORecord d : recordsToSend) {
+              if (d.getIdentity().isValid()) {
+                channel.writeByte((byte)2);
+                writeIdentifiable(connection,d);
+              }
+            }
+          }
+        }
+      }
+      channel.writeByte((byte)0);
+    }
+  finally {
+      endResponse(connection);
+    }
+  }
+}

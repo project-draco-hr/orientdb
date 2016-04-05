@@ -4,6 +4,18 @@
   try {
     final Serializable result=(Serializable)task.execute(req.getId(),serverInstance,this,database);
     if (result instanceof Throwable && !(result instanceof OException))     ODistributedServerLog.error(this,nodeName,getNodeNameById(req.getId().getNodeId()),DIRECTION.IN,"error on executing request %d (%s) on local node: ",(Throwable)result,req.getId(),req.getTask());
+ else {
+      final String sourceNodeName=task.getNodeSource();
+      Long last=lastLSNWriting.get(sourceNodeName);
+      if (last == null)       last=0l;
+      if (task instanceof OAbstractRecordReplicatedTask && System.currentTimeMillis() - last > 2000) {
+        final ODistributedDatabaseImpl ddb=getMessageService().getDatabase(req.getDatabaseName());
+        final OLogSequenceNumber lastLSN=((OAbstractRecordReplicatedTask)task).getLastLSN();
+        ddb.getSyncConfiguration().setLSN(task.getNodeSource(),lastLSN);
+        ODistributedServerLog.debug(this,nodeName,task.getNodeSource(),DIRECTION.NONE,"Updating LSN table to the value %s",lastLSN);
+        lastLSNWriting.put(sourceNodeName,System.currentTimeMillis());
+      }
+    }
     return result;
   }
  catch (  Throwable e) {

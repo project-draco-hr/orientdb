@@ -1,2 +1,27 @@
 {
+  deadThreadsUpdateLock.lock();
+  try {
+    final ImmutableStatistic oldDS=deadThreadsStatistic;
+    final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
+    final Map<String,PerformanceCountersHolder> countersByComponents=new HashMap<String,PerformanceCountersHolder>();
+    if (oldDS != null) {
+      oldDS.countersHolder.pushData(countersHolder);
+      for (      Map.Entry<String,PerformanceCountersHolder> oldEntry : oldDS.countersByComponents.entrySet()) {
+        final PerformanceCountersHolder holder=new PerformanceCountersHolder();
+        oldEntry.getValue().pushData(holder);
+        countersByComponents.put(oldEntry.getKey(),holder);
+      }
+    }
+    for (    Thread deadThread : threadsToRemove) {
+      final OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic=statistics.remove(deadThread);
+      if (sessionStoragePerformanceStatistic != null) {
+        sessionStoragePerformanceStatistic.pushSystemCounters(countersHolder);
+        sessionStoragePerformanceStatistic.pushComponentCounters(countersByComponents);
+      }
+    }
+    deadThreadsStatistic=new ImmutableStatistic(countersHolder,countersByComponents);
+  }
+  finally {
+    deadThreadsUpdateLock.unlock();
+  }
 }

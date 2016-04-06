@@ -10,19 +10,21 @@
     final ORecordId rid=new ORecordId(clusterId);
     for (    OPhysicalPosition physicalPosition : physicalPositions) {
       rid.clusterPosition=physicalPosition.clusterPosition;
-      ODatabaseRecordThreadLocal.INSTANCE.set(baseDocumentTx);
+      baseDocumentTx.activateOnCurrentThread();
       ODocument baseDocument=baseDocumentTx.load(rid);
       testDocumentTx.activateOnCurrentThread();
       List<ODocument> testDocuments=testDocumentTx.query(new OSQLSynchQuery<ODocument>("select from TestClass where id  = " + baseDocument.field("id")));
       if (testDocuments.size() == 0) {
-        if (((Long)baseDocument.field("timestamp")) < minTs)         minTs=baseDocument.field("timestamp");
+        if (((Long)baseDocument.field("timestamp")) < minTs) {
+          minTs=baseDocument.field("timestamp");
+        }
       }
  else {
         ODocument testDocument=testDocuments.get(0);
-        Assert.assertEquals(testDocument.field("id"),baseDocument.field("id"));
-        Assert.assertEquals(testDocument.field("timestamp"),baseDocument.field("timestamp"));
-        Assert.assertEquals(testDocument.field("stringValue"),baseDocument.field("stringValue"));
-        Assert.assertEquals(testDocument.field("binaryValue"),baseDocument.field("binaryValue"));
+        assertThat(testDocument.field("id")).as("id:: %s",testDocument.field("id")).isEqualTo(baseDocument.field("id"));
+        assertThat(testDocument.field("timestamp")).as("documents:: %s - %s",testDocument,baseDocument).isEqualTo(baseDocument.field("timestamp"));
+        assertThat(testDocument.field("stringValue")).as("id:: %s",testDocument.field("id")).isEqualTo(baseDocument.field("stringValue"));
+        assertThat(testDocument.field("binaryValue")).as("id:: %s",testDocument.field("id")).isEqualTo(baseDocument.field("binaryValue"));
         recordsRestored++;
       }
       recordsTested++;

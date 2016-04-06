@@ -1,0 +1,32 @@
+{
+  startOperation();
+  try {
+    atomicOperationsManager.acquireReadLock(this);
+    try {
+      acquireSharedLock();
+      try {
+        final long pageIndex=clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES;
+        final int index=(int)(clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+        final OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
+        if (pageIndex >= getFilledUpTo(atomicOperation,fileId))         return OClusterPositionMapBucket.NOT_EXISTENT;
+        final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,1);
+        try {
+          final OClusterPositionMapBucket bucket=new OClusterPositionMapBucket(cacheEntry,getChanges(atomicOperation,cacheEntry));
+          return bucket.getStatus(index);
+        }
+  finally {
+          releasePage(atomicOperation,cacheEntry);
+        }
+      }
+  finally {
+        releaseSharedLock();
+      }
+    }
+  finally {
+      atomicOperationsManager.releaseReadLock(this);
+    }
+  }
+  finally {
+    completeOperation();
+  }
+}

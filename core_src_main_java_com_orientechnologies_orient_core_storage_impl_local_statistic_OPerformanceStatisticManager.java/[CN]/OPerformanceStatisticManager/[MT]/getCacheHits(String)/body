@@ -1,5 +1,20 @@
 {
-  final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
-  fetchComponentCounters(componentName,countersHolder);
-  return countersHolder.getCacheHits();
+  switchLock.acquireReadLock();
+  try {
+    if (enabled) {
+      final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
+      fetchComponentCounters(componentName,countersHolder);
+      return countersHolder.getCacheHits();
+    }
+ else {
+      final ImmutableStatistic post=postMeasurementStatistic;
+      if (post == null)       return -1;
+      final PerformanceCountersHolder holder=post.countersByComponents.get(componentName);
+      if (holder != null)       return holder.getCacheHits();
+      return -1;
+    }
+  }
+  finally {
+    switchLock.releaseReadLock();
+  }
 }

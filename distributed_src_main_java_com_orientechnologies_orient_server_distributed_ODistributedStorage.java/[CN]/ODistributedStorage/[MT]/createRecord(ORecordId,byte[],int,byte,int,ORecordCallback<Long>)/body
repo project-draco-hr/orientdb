@@ -49,19 +49,14 @@
     Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
     if (executionModeSynch == null)     executionModeSynch=iMode == 0;
     final boolean syncMode=executionModeSynch;
-    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,clusterId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
+    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,iRecordId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final OStorageOperationResult<OPhysicalPosition> localResult;
-        final ODistributedRequestId requestId=acquireRecordLock(iRecordId);
-        try {
-          localResult=wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
-        }
-  finally {
-          localDistributedDatabase.unlockRecord(iRecordId,requestId);
-        }
+        localResult=wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
         iRecordId.clusterPosition=localResult.getResult().clusterPosition;
         final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
         final OCreateRecordTask task=new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType);
+        task.setLastLSN(wrapped.getLSN());
         if (!nodes.isEmpty()) {
           if (syncMode) {
             final ODistributedResponse dResponse=dManager.sendRequest(getName(),Collections.singleton(finalClusterName),nodes,task,EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);

@@ -1,0 +1,23 @@
+{
+  switchLock.acquireReadLock();
+  try {
+    if (enabled) {
+      final Set<String> result=new HashSet<String>();
+      final ImmutableStatistic ds=deadThreadsStatistic;
+      if (ds != null) {
+        result.addAll(deadThreadsStatistic.countersByComponents.keySet());
+      }
+      for (      final OSessionStoragePerformanceStatistic statistic : statistics.values()) {
+        final Map<String,PerformanceCountersHolder> countersHolderMap=new ConcurrentHashMap<String,PerformanceCountersHolder>();
+        statistic.pushComponentCounters(countersHolderMap);
+        result.addAll(countersHolderMap.keySet());
+      }
+      return result;
+    }
+    if (postMeasurementStatistic == null)     return Collections.emptySet();
+    return Collections.unmodifiableSet(postMeasurementStatistic.countersByComponents.keySet());
+  }
+  finally {
+    switchLock.releaseReadLock();
+  }
+}

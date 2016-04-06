@@ -1,27 +1,43 @@
 {
   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Creating record %s/%s v.%d reqId=%s...",database.getName(),rid.toString(),version,requestId);
   if (!rid.isPersistent())   throw new ODistributedException("Record " + rid + " has not been saved on owner node first (temporary rid)");
+  final OPaginatedCluster cluster=(OPaginatedCluster)ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getClusterById(rid.clusterId);
+  final OPaginatedCluster.RECORD_STATUS recordStatus=cluster.getRecordStatus(rid.clusterPosition);
+switch (recordStatus) {
+case REMOVED:
+    return null;
+case ALLOCATED:
+case PRESENT:
   final OStorageOperationResult<ORawBuffer> loadedRecord=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().readRecord(rid,null,true,null);
-  if (loadedRecord.getResult() != null)   return new OPlaceholder(forceUpdate(requestId,iManager,database,loadedRecord));
+if (loadedRecord.getResult() != null) return new OPlaceholder(forceUpdate(requestId,iManager,database,loadedRecord));
+case NOT_EXISTENT:
+try {
+ORecordId newRid;
+do {
   getRecord();
-  try {
-    if (clusterId > -1)     record.save(database.getClusterNameById(clusterId),true);
- else     if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()),true);
- else     record.save();
-  }
- catch (  ORecordDuplicatedException e) {
-    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> duplicated record %s (existent=%s), assigned new rid %s/%s v.%d reqId=%s",record,e.getRid(),database.getName(),rid.toString(),record.getVersion(),requestId);
-    record.clear();
-    if (clusterId > -1)     record.save(database.getClusterNameById(clusterId),true);
- else     if (rid.getClusterId() != -1)     record.save(database.getClusterNameById(rid.getClusterId()),true);
- else     record.save();
-    throw e;
-  }
-  final ORecordId newRid=(ORecordId)record.getIdentity();
-  if (!rid.equals(newRid)) {
-    ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Record %s has been saved with the RID %s instead of the expected %s reqId=%s",record,newRid,rid,requestId);
-    throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid+ " on server "+ iManager.getLocalNodeName());
-  }
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d reqId=%s",database.getName(),rid.toString(),record.getVersion(),requestId);
-  return new OPlaceholder(record);
+  if (clusterId > -1)   record.save(database.getClusterNameById(clusterId),true);
+ else   if (rid.getClusterId() != -1)   record.save(database.getClusterNameById(rid.getClusterId()),true);
+ else   record.save();
+  newRid=(ORecordId)record.getIdentity();
+  if (newRid.getClusterPosition() >= rid.clusterPosition)   break;
+  record.delete();
+  record=null;
+}
+ while (newRid.getClusterPosition() < rid.clusterPosition);
+if (!rid.equals(newRid)) {
+  ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Record %s has been saved with the RID %s instead of the expected %s reqId=%s",record,newRid,rid,requestId);
+  throw new ODistributedException("Record " + rid + " has been saved with the different RID "+ newRid+ " on server "+ iManager.getLocalNodeName());
+}
+ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> assigned new rid %s/%s v.%d reqId=%s",database.getName(),rid.toString(),record.getVersion(),requestId);
+}
+ catch (ORecordDuplicatedException e) {
+ODistributedServerLog.warn(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> duplicated record %s (existent=%s), assigned new rid %s/%s v.%d reqId=%s",record,e.getRid(),database.getName(),rid.toString(),record.getVersion(),requestId);
+record.clear();
+if (clusterId > -1) record.save(database.getClusterNameById(clusterId),true);
+ else if (rid.getClusterId() != -1) record.save(database.getClusterNameById(rid.getClusterId()),true);
+ else record.save();
+throw e;
+}
+}
+return new OPlaceholder(record);
 }

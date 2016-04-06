@@ -1,14 +1,17 @@
 {
-  if (!enabled && !enabledForCurrentThread.get())   return null;
-  final Thread currentThread=Thread.currentThread();
-  OSessionStoragePerformanceStatistic performanceStatistic=statistics.get(currentThread);
-  if (performanceStatistic != null) {
+  switchLock.acquireReadLock();
+  try {
+    if (!enabled && !enabledForCurrentThread.get())     return null;
+    final Thread currentThread=Thread.currentThread();
+    OSessionStoragePerformanceStatistic performanceStatistic=statistics.get(currentThread);
+    if (performanceStatistic != null) {
+      return performanceStatistic;
+    }
+    performanceStatistic=new OSessionStoragePerformanceStatistic(intervalBetweenSnapshots,enabled);
+    statistics.put(currentThread,performanceStatistic);
     return performanceStatistic;
   }
-  performanceStatistic=new OSessionStoragePerformanceStatistic(intervalBetweenSnapshots);
-  final OSessionStoragePerformanceStatistic oldStatistic=statistics.putIfAbsent(currentThread,performanceStatistic);
-  if (oldStatistic != null) {
-    performanceStatistic=oldStatistic;
+  finally {
+    switchLock.releaseReadLock();
   }
-  return performanceStatistic;
 }

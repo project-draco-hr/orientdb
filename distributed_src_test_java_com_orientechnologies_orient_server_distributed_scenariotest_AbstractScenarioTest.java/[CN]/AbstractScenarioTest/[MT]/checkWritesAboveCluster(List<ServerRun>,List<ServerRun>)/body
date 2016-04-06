@@ -1,0 +1,76 @@
+{
+  String checkOnServer="";
+  for (  ServerRun server : checkConsistencyOnServers) {
+    checkOnServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
+  }
+  checkOnServer=checkOnServer.substring(0,checkOnServer.length() - 1);
+  String writtenServer="";
+  for (  ServerRun server : writerServer) {
+    writtenServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
+  }
+  writtenServer=writtenServer.substring(0,writtenServer.length() - 1);
+  List<ODatabaseDocumentTx> dbs=new LinkedList<ODatabaseDocumentTx>();
+  for (  ServerRun server : checkConsistencyOnServers) {
+    dbs.add(poolFactory.get(getPlocalDatabaseURL(server),"admin","admin").acquire());
+  }
+  Map<Integer,Integer> serverIndex2thresholdThread=new LinkedHashMap<Integer,Integer>();
+  Map<Integer,String> serverIndex2serverName=new LinkedHashMap<Integer,String>();
+  int lastThread=0;
+  int serverIndex=0;
+  for (  ServerRun server : writerServer) {
+    serverIndex2thresholdThread.put(serverIndex,lastThread + 5);
+    serverIndex++;
+    lastThread+=5;
+  }
+  serverIndex=0;
+  for (  ServerRun server : writerServer) {
+    serverIndex2serverName.put(serverIndex,server.getServerInstance().getDistributedManager().getLocalNodeName());
+    serverIndex++;
+  }
+  List<ODocument> docsToCompare=new LinkedList<ODocument>();
+  super.banner("Checking consistency among servers...\nChecking on servers {" + checkOnServer + "} that all the records written on {"+ writtenServer+ "} are consistent.");
+  try {
+    int index=0;
+    String serverName=null;
+    for (    int serverId : serverIndex2thresholdThread.keySet()) {
+      serverName=serverIndex2serverName.get(serverId);
+      System.out.println("Checking records originally inserted on server " + serverName + "...");
+      int i;
+      if (serverId == 0)       i=0;
+ else       i=serverIndex2thresholdThread.get(serverId - 1);
+      while (i < serverIndex2thresholdThread.get(serverId)) {
+        for (int j=0; j < 100; j++) {
+          for (          ODatabaseDocumentTx db : dbs) {
+            docsToCompare.add(loadRecord(db,serverId,i,j + baseCount));
+          }
+          for (          ODocument doc : docsToCompare) {
+            assertTrue(doc != null);
+          }
+          int k=0;
+          while (k <= docsToCompare.size() - 2) {
+            assertEquals(docsToCompare.get(k).field("@version"),docsToCompare.get(k + 1).field("@version"));
+            assertEquals(docsToCompare.get(k).field("name"),docsToCompare.get(k + 1).field("name"));
+            assertEquals(docsToCompare.get(k).field("surname"),docsToCompare.get(k + 1).field("surname"));
+            assertEquals(docsToCompare.get(k).field("birthday"),docsToCompare.get(k + 1).field("birthday"));
+            assertEquals(docsToCompare.get(k).field("children"),docsToCompare.get(k + 1).field("children"));
+            k++;
+          }
+          docsToCompare.clear();
+        }
+        i++;
+      }
+      System.out.println("All records originally inserted on server " + serverName + " are consistent in the cluster.");
+      index++;
+    }
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+  }
+ finally {
+    for (    ODatabaseDocumentTx db : dbs) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(db);
+      db.close();
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
+  }
+}

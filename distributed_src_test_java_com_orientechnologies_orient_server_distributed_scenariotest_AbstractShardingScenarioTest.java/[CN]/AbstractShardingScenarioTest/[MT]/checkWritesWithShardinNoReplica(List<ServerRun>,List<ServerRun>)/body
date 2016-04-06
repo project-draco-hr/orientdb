@@ -1,0 +1,80 @@
+{
+  String checkOnServer="";
+  for (  ServerRun server : checkConsistencyOnServers) {
+    checkOnServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
+  }
+  checkOnServer=checkOnServer.substring(0,checkOnServer.length() - 1);
+  String writtenServer="";
+  for (  ServerRun server : writerServer) {
+    writtenServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
+  }
+  writtenServer=writtenServer.substring(0,writtenServer.length() - 1);
+  List<OrientBaseGraph> dbs=new LinkedList<OrientBaseGraph>();
+  OrientGraphFactory localFactory=null;
+  for (  ServerRun server : checkConsistencyOnServers) {
+    localFactory=new OrientGraphFactory(getPlocalDatabaseURL(server));
+    dbs.add(localFactory.getNoTx());
+  }
+  Map<Integer,Integer> serverIndex2thresholdThread=new LinkedHashMap<Integer,Integer>();
+  Map<Integer,String> serverIndex2serverName=new LinkedHashMap<Integer,String>();
+  int lastThread=0;
+  int serverIndex=0;
+  for (  ServerRun server : writerServer) {
+    serverIndex2thresholdThread.put(serverIndex,lastThread + 5);
+    serverIndex++;
+    lastThread+=5;
+  }
+  serverIndex=0;
+  for (  ServerRun server : writerServer) {
+    serverIndex2serverName.put(serverIndex,server.getServerInstance().getDistributedManager().getLocalNodeName());
+    serverIndex++;
+  }
+  List<OrientVertex> verticesToCheck=new LinkedList<OrientVertex>();
+  super.banner("Checking consistency among servers...\nChecking on servers {" + checkOnServer + "} that all the vertices written on {"+ writtenServer+ "} are consistent.");
+  try {
+    int index=0;
+    String serverName=null;
+    for (    int serverId : serverIndex2thresholdThread.keySet()) {
+      serverName=serverIndex2serverName.get(serverId);
+      System.out.println("Checking records originally inserted on server " + serverName + "...");
+      String clusterName="client_" + serverName;
+      int i;
+      if (serverId == 0)       i=0;
+ else       i=serverIndex2thresholdThread.get(serverId - 1);
+      while (i < serverIndex2thresholdThread.get(serverId)) {
+        for (int j=0; j < 100; j++) {
+          for (          OrientBaseGraph db : dbs) {
+            verticesToCheck.add(loadVertex(db,clusterName,serverId,i,j + baseCount));
+          }
+          OrientVertex currentVertex=null;
+          int k=0;
+          while (k < verticesToCheck.size()) {
+            assertTrue(verticesToCheck.get(k) != null);
+            k++;
+          }
+          k=0;
+          while (k <= verticesToCheck.size() - 2) {
+            assertEquals(verticesToCheck.get(k).getProperty("@version"),verticesToCheck.get(k + 1).getProperty("@version"));
+            assertEquals(verticesToCheck.get(k).getProperty("name"),verticesToCheck.get(k + 1).getProperty("name"));
+            assertEquals(verticesToCheck.get(k).getProperty("updated"),verticesToCheck.get(k + 1).getProperty("updated"));
+            k++;
+          }
+          verticesToCheck.clear();
+        }
+        i++;
+      }
+      System.out.println("All records originally inserted on server " + serverName + " in the cluster "+ clusterName+ " available in the shard.");
+      index++;
+    }
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+  }
+ finally {
+    for (    OrientBaseGraph db : dbs) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(db.getRawGraph());
+      db.getRawGraph().close();
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
+  }
+}

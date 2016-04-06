@@ -1,0 +1,68 @@
+{
+  List<ODocument> result=null;
+  final ODatabaseDocumentTx dbServer1=new ODatabaseDocumentTx(databaseUrl1).open("admin","admin");
+  try {
+    banner("Test with quorum = 3");
+    OCommandSQL sqlCommand=new OCommandSQL("delete from Person");
+    dbServer1.command(sqlCommand).execute();
+    result=dbServer1.query(new OSQLSynchQuery<OIdentifiable>("select from Person"));
+    assertEquals(0,result.size());
+    this.initialCount=0;
+    System.out.print("\nChanging quorum...");
+    ODocument cfg=null;
+    ServerRun server=serverInstance.get(0);
+    OHazelcastPlugin manager=(OHazelcastPlugin)server.getServerInstance().getDistributedManager();
+    ODistributedConfiguration databaseConfiguration=manager.getDatabaseConfiguration("distributed-inserttxha");
+    cfg=databaseConfiguration.serialize();
+    cfg.field("writeQuorum",3);
+    cfg.field("failureAvailableNodesLessQuorum",true);
+    cfg.field("version",(Integer)cfg.field("version") + 1);
+    manager.updateCachedDatabaseConfiguration("distributed-inserttxha",cfg,true,true);
+    System.out.println("\nConfiguration updated.");
+    System.out.println("Network fault on server3.\n");
+    simulateServerFault(this.serverInstances.get(SERVERS - 1),"net-fault");
+    assertFalse(serverInstance.get(2).isActive());
+    System.out.print("Insert operation in the database...");
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+    try {
+      new ODocument("Person").fields("id","L-001","name","John","surname","Black").save();
+      assertTrue("Error: record inserted with 2 server running and writeWuorum=3.",false);
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+      assertTrue("Record not inserted because there are 2 server running and writeWuorum=3.",true);
+    }
+    System.out.println("Done.\n");
+    System.out.print("Checking the last record wasn't inserted in the db because the quorum was not reached...");
+    result=dbServer1.query(new OSQLSynchQuery<OIdentifiable>("select from Person where id='L-001'"));
+    assertEquals(0,result.size());
+    final ODatabaseDocumentTx dbServer2=new ODatabaseDocumentTx(databaseUrl2).open("admin","admin");
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+    result=dbServer2.query(new OSQLSynchQuery<OIdentifiable>("select from Person where id='L-001'"));
+    assertEquals(0,result.size());
+    System.out.println("Done.\n");
+    ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    serverInstance.get(2).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
+    System.out.println("Server 3 restarted.");
+    assertTrue(serverInstance.get(2).isActive());
+    executeMultipleWrites(this.executeWritesOnServers,"plocal");
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+    dbServer1.getMetadata().getSchema().reload();
+    result=dbServer1.query(new OSQLSynchQuery<OIdentifiable>("select from Person"));
+    assertEquals(1500,result.size());
+    checkWritesAboveCluster(serverInstance,executeWritesOnServers);
+    ODatabaseRecordThreadLocal.INSTANCE.set(null);
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(e.getMessage(),false);
+  }
+ finally {
+    if (dbServer1 != null) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+      dbServer1.close();
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
+  }
+  return null;
+}

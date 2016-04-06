@@ -1,0 +1,33 @@
+{
+  String url1="plocal:target/server0/databases/new-distributed-db";
+  String url2="plocal:target/server1/databases/new-distributed-db";
+  String url3="plocal:target/server2/databases/new-distributed-db";
+  ODatabaseDocumentTx dbServer1=new ODatabaseDocumentTx(url1);
+  Thread.sleep(5000);
+  ODatabaseRecordThreadLocal.INSTANCE.set(null);
+  try {
+    ODatabaseDocumentTx dbServer2=poolFactory.get(url2,"admin","admin").acquire();
+    assertNotNull(dbServer2);
+    List<ODocument> result=dbServer2.query(new OSQLSynchQuery<OIdentifiable>("select from Person"));
+    assertEquals(0,result.size());
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(false);
+  }
+  ODatabaseRecordThreadLocal.INSTANCE.set(null);
+  try {
+    ODatabaseDocumentTx dbServer3=poolFactory.get(url3,"admin","admin").acquire();
+    assertNotNull(dbServer3);
+    List<ODocument> result=dbServer3.query(new OSQLSynchQuery<OIdentifiable>("select from Person"));
+    assertEquals(0,result.size());
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(false);
+  }
+  executeWritesOnServers.remove(2);
+  executeWritesOnServers.remove(1);
+  executeMultipleWrites(super.executeWritesOnServers,"plocal");
+  checkWritesAboveCluster(serverInstance,executeWritesOnServers);
+}

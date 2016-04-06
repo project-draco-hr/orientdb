@@ -1,0 +1,25 @@
+{
+  boolean reachedAmountOfInsertedRecords=false;
+  long totalNumberOfRecordsToInsert=count * writerCount;
+  ODatabaseDocumentTx dbServer1=poolFactory.get(dbServerUrl1,"admin","admin").acquire();
+  while (true) {
+    long insertedRecords=dbServer1.countClass("Person");
+    if (insertedRecords > totalNumberOfRecordsToInsert / 3) {
+      System.out.println("Fault on server3: " + faultType);
+      simulateServerFault(server,this.faultType);
+      assertFalse(server.isActive());
+      break;
+    }
+  }
+  while (true) {
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+    long insertedRecords=dbServer1.countClass("Person");
+    if (insertedRecords > 2 * totalNumberOfRecordsToInsert / 3) {
+      server.startServer(getDistributedServerConfiguration(server));
+      System.out.println("Server 3 restarted.");
+      assertTrue(server.isActive());
+      break;
+    }
+  }
+  return null;
+}

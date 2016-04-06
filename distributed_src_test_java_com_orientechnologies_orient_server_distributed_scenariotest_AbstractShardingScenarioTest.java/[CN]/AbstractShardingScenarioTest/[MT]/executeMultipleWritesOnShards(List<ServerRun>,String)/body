@@ -1,0 +1,68 @@
+{
+  System.out.println("Creating Writers threads...");
+  final ExecutorService writerExecutors=Executors.newCachedThreadPool();
+  final ExecutorService readerExecutors=Executors.newCachedThreadPool();
+  runningWriters=new CountDownLatch(executeOnServers.size() * writerCount);
+  String shardName="client_";
+  int serverId=0;
+  int threadId=0;
+  List<Callable<Void>> writerWorkers=new ArrayList<Callable<Void>>();
+  for (  ServerRun server : executeOnServers) {
+    if (server.isActive()) {
+      shardName+=server.getServerInstance().getDistributedManager().getLocalNodeName();
+      for (int j=0; j < writerCount; j++) {
+        Callable writer=null;
+        if (storageType.equals("plocal")) {
+          writer=new ShardWriter(serverId,shardName,threadId++,getPlocalDatabaseURL(server));
+        }
+ else         if (storageType.equals("remote")) {
+          writer=new ShardWriter(serverId,shardName,threadId++,getPlocalDatabaseURL(server));
+        }
+        writerWorkers.add(writer);
+      }
+    }
+    serverId++;
+    shardName="client_";
+  }
+  expected=writerCount * count * serverId + baseCount;
+  List<Future<Void>> futures=writerExecutors.invokeAll(writerWorkers);
+  System.out.println("Threads started, waiting for the end");
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  writerExecutors.shutdown();
+  junit.framework.Assert.assertTrue(writerExecutors.awaitTermination(1,TimeUnit.MINUTES));
+  System.out.println("All writer threads have finished.");
+  OrientBaseGraph graph;
+  OrientGraphFactory graphFactory;
+  graphFactory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
+  graph=graphFactory.getNoTx();
+  try {
+    OResultSet<ODocument> clients=new OCommandSQL("select from Client").execute();
+    final int total=clients.size();
+    junit.framework.Assert.assertEquals(expected,total);
+  }
+  finally {
+    graph.getRawGraph().close();
+  }
+  serverId=0;
+  for (  ServerRun server : serverInstance) {
+    if (server.isActive()) {
+      graphFactory=new OrientGraphFactory("plocal:target/server" + serverId + "/databases/"+ getDatabaseName());
+      graph=graphFactory.getNoTx();
+      try {
+        String sqlCommand="select from cluster:client_" + server.getServerInstance().getDistributedManager().getLocalNodeName();
+        OResultSet<ODocument> clients=new OCommandSQL(sqlCommand).execute();
+        final int total=clients.size();
+        junit.framework.Assert.assertEquals(500,total);
+      }
+ catch (      Exception e) {
+        e.printStackTrace();
+      }
+ finally {
+        graph.getRawGraph().close();
+      }
+    }
+    serverId++;
+  }
+}

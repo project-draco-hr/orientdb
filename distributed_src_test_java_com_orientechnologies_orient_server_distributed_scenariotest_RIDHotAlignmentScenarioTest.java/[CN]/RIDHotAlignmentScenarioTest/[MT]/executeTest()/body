@@ -1,0 +1,126 @@
+{
+  banner("Test with quorum = 1");
+  System.out.print("\nChanging configuration (writeQuorum=1, autoDeploy=false, hotAlignment=true)...");
+  ODocument cfg=null;
+  ServerRun server=serverInstance.get(2);
+  OHazelcastPlugin manager=(OHazelcastPlugin)server.getServerInstance().getDistributedManager();
+  ODistributedConfiguration databaseConfiguration=manager.getDatabaseConfiguration("distributed-inserttxha");
+  cfg=databaseConfiguration.serialize();
+  cfg.field("writeQuorum",1);
+  cfg.field("failureAvailableNodesLessQuorum",true);
+  cfg.field("autoDeploy",true);
+  cfg.field("hotAlignment",true);
+  cfg.field("version",(Integer)cfg.field("version") + 1);
+  manager.updateCachedDatabaseConfiguration("distributed-inserttxha",cfg,true,true);
+  System.out.println("\nConfiguration updated.");
+  ODatabaseDocumentTx dbServer1=poolFactory.get(getPlocalDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+  ODatabaseDocumentTx dbServer2=poolFactory.get(getPlocalDatabaseURL(serverInstance.get(1)),"admin","admin").acquire();
+  ODatabaseDocumentTx dbServer3=poolFactory.get(getPlocalDatabaseURL(serverInstance.get(2)),"admin","admin").acquire();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  dbServer1.getMetadata().getSchema().createClass("Hero");
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  HashSet<String> clustersOnServer1=(HashSet<String>)dbServer1.getClusterNames();
+  assertTrue(clustersOnServer1.contains("hero"));
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+  HashSet<String> clustersOnServer2=(HashSet<String>)dbServer2.getClusterNames();
+  assertTrue(clustersOnServer2.contains("hero"));
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+  HashSet<String> clustersOnServer3=(HashSet<String>)dbServer3.getClusterNames();
+  assertTrue(clustersOnServer3.contains("hero"));
+  System.out.println("Network fault on server3.\n");
+  simulateServerFault(serverInstance.get(2),"net-fault");
+  assertFalse(serverInstance.get(2).isActive());
+  banner("First insert on server3 (isolated from the the cluster)");
+  ODocument firstInsert=null;
+  ORID rid1=null;
+  try {
+    dbServer3=new ODatabaseDocumentTx(getPlocalDatabaseURL(serverInstance.get(2))).open("admin","admin");
+    firstInsert=new ODocument("Hero").fields("id","R001","firstName","Luke","lastName","Skywalker").save();
+    System.out.println("First insert: " + firstInsert.getRecord().toString());
+    rid1=firstInsert.getRecord().getIdentity();
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(false);
+  }
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+  long recordCount=dbServer3.countClass("Hero");
+  assertEquals(1,recordCount);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  recordCount=dbServer1.countClass("Hero");
+  assertEquals(0,recordCount);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+  recordCount=dbServer2.countClass("Hero");
+  assertEquals(0,recordCount);
+  try {
+    serverInstance.get(2).startServer(getDistributedServerConfiguration(server));
+  }
+ catch (  Exception e) {
+    assertTrue(false);
+  }
+  Thread.sleep(1000);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  recordCount=dbServer1.countClass("Hero");
+  assertEquals(1,recordCount);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+  recordCount=dbServer2.countClass("Hero");
+  assertEquals(1,recordCount);
+  banner("Second insert on server1 (server3 joining the cluster)");
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  ODocument secondInsert=null;
+  ORID rid2=null;
+  try {
+    secondInsert=new ODocument("Hero").fields("id","R002","firstName","Han","lastName","Solo").save();
+    System.out.println("Second insert: " + secondInsert.getRecord().toString());
+    rid2=secondInsert.getRecord().getIdentity();
+  }
+ catch (  Exception e) {
+    System.out.println("Insert failed.");
+    e.printStackTrace();
+  }
+  recordCount=dbServer1.countClass("Hero");
+  assertEquals(1,recordCount);
+  System.out.println("The second record was inserted.");
+  Thread.sleep(500);
+  banner("Third insert on server1 (server3 joining the cluster)");
+  ODocument thirdInsert=null;
+  ORID rid3=null;
+  try {
+    thirdInsert=new ODocument("Hero").fields("id","R002","firstName","Han","lastName","Solo").save();
+    System.out.println("Third insert: " + thirdInsert.getRecord().toString());
+    rid3=thirdInsert.getRecord().getIdentity();
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(true);
+  }
+  recordCount=dbServer1.countClass("Hero");
+  assertEquals(2,recordCount);
+  System.out.println("The third record was inserted.");
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer1);
+  List<ODocument> result1=dbServer1.query(new OSQLSynchQuery<ODocument>("select from Hero"));
+  recordCount=dbServer1.countClass("Hero");
+  assertEquals(2,recordCount);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+  List<ODocument> result2=dbServer2.query(new OSQLSynchQuery<ODocument>("select from Hero"));
+  recordCount=dbServer2.countClass("Hero");
+  assertEquals(2,recordCount);
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+  List<ODocument> result3=dbServer3.query(new OSQLSynchQuery<ODocument>("select from Hero"));
+  recordCount=dbServer3.countClass("Hero");
+  assertEquals(2,recordCount);
+  ODocument firstInsertServer1=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(0)),"R001");
+  ODocument firstInsertServer2=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(1)),"R001");
+  ODocument firstInsertServer3=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(2)),"R001");
+  assertEquals(firstInsertServer1.field("firstName"),firstInsertServer2.field("firstName"));
+  assertEquals(firstInsertServer1.field("lastName"),firstInsertServer2.field("lastName"));
+  assertEquals(firstInsertServer2.field("firstName"),firstInsertServer3.field("firstName"));
+  assertEquals(firstInsertServer2.field("lastName"),firstInsertServer3.field("lastName"));
+  ODocument secondInsertServer1=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(0)),"R002");
+  ODocument secondInsertServer2=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(1)),"R002");
+  ODocument secondInsertServer3=retrieveRecord(getPlocalDatabaseURL(serverInstance.get(2)),"R002");
+  assertEquals(secondInsertServer1.field("firstName"),secondInsertServer2.field("firstName"));
+  assertEquals(secondInsertServer1.field("lastName"),secondInsertServer2.field("lastName"));
+  assertEquals(secondInsertServer2.field("firstName"),secondInsertServer3.field("firstName"));
+  assertEquals(secondInsertServer2.field("lastName"),secondInsertServer3.field("lastName"));
+}

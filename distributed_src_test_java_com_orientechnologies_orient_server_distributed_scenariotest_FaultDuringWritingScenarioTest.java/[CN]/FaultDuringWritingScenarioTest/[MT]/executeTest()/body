@@ -1,0 +1,30 @@
+{
+  List<ODocument> result=null;
+  ODatabaseDocumentTx dbServer3=new ODatabaseDocumentTx(getRemoteDatabaseURL(serverInstance.get(2))).open("admin","admin");
+  String dbServerUrl1=getRemoteDatabaseURL(serverInstance.get(0));
+  try {
+    banner("Test with quorum = 2");
+    ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    Callable shutdownAndRestartTask=new ShutdownAndRestartServer(serverInstance.get(2),dbServerUrl1,"net-fault");
+    final ExecutorService executor=Executors.newSingleThreadExecutor();
+    Future f=executor.submit(shutdownAndRestartTask);
+    executeMultipleWrites(this.executeWritesOnServers,"remote");
+    f.get();
+    Thread.sleep(1000);
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+    result=dbServer3.query(new OSQLSynchQuery<OIdentifiable>("select from Person"));
+    assertEquals(500,result.size());
+    checkWritesAboveCluster(serverInstance,executeWritesOnServers);
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(false);
+  }
+ finally {
+    if (!dbServer3.isClosed()) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+      dbServer3.close();
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
+  }
+}

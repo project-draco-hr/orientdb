@@ -1,0 +1,46 @@
+{
+  List<ODocument> result=null;
+  final ODatabaseDocumentTx dbServer3=new ODatabaseDocumentTx(databaseUrlServer3).open("admin","admin");
+  try {
+    banner("Test with quorum = 2");
+    System.out.println("Network fault on server3.\n");
+    simulateServerFault(this.serverInstances.get(SERVERS - 1),"net-fault");
+    assertFalse(serverInstance.get(2).isActive());
+    try {
+      ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+      new ODocument("Person").fields("name","Joe","surname","Black").save();
+      this.initialCount++;
+      result=dbServer3.query(new OSQLSynchQuery<OIdentifiable>("select count(*) from Person"));
+      assertEquals(1,result.size());
+      assertEquals(1,((Number)result.get(0).field("count")).intValue());
+    }
+ catch (    Exception e) {
+      e.printStackTrace();
+      assertTrue(e.getMessage(),false);
+    }
+    ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    this.executeWritesOnServers.remove(2);
+    executeMultipleWrites(this.executeWritesOnServers,"plocal");
+    serverInstance.get(2).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
+    System.out.println("Server 3 restarted.");
+    assertTrue(serverInstance.get(2).isActive());
+    ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+    dbServer3.getMetadata().getSchema().reload();
+    result=dbServer3.query(new OSQLSynchQuery<OIdentifiable>("select count(*) from Person"));
+    assertEquals(1,result.size());
+    assertEquals(1001,((Number)result.get(0).field("count")).intValue());
+    checkWritesAboveCluster(serverInstance,executeWritesOnServers);
+  }
+ catch (  Exception e) {
+    e.printStackTrace();
+    assertTrue(e.getMessage(),false);
+  }
+ finally {
+    if (dbServer3 != null) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(dbServer3);
+      dbServer3.close();
+      ODatabaseRecordThreadLocal.INSTANCE.set(null);
+    }
+  }
+  return null;
+}

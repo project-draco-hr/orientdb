@@ -1,13 +1,24 @@
 {
   listener.onMessage("\nStarting shallow comparison of clusters:");
   listener.onMessage("\nChecking the number of clusters...");
-  if (storage1.getClusterNames().size() != storage1.getClusterNames().size()) {
-    listener.onMessage("ERR: cluster sizes are different: " + storage1.getClusterNames().size() + " <-> "+ storage1.getClusterNames().size());
+  Collection<String> clusterNames1=makeDbCall(databaseOne,new ODbRelatedCall<Collection<String>>(){
+    @Override public Collection<String> call(    ODatabaseDocumentInternal database){
+      return database.getClusterNames();
+    }
+  }
+);
+  Collection<String> clusterNames2=makeDbCall(databaseTwo,new ODbRelatedCall<Collection<String>>(){
+    @Override public Collection<String> call(    ODatabaseDocumentInternal database){
+      return database.getClusterNames();
+    }
+  }
+);
+  if (clusterNames1.size() != clusterNames2.size()) {
+    listener.onMessage("ERR: cluster sizes are different: " + clusterNames1.size() + " <-> "+ clusterNames2.size());
     ++differences;
   }
-  int cluster2Id;
   boolean ok;
-  for (  String clusterName : storage1.getClusterNames()) {
+  for (  final String clusterName : clusterNames1) {
     if (includeClusters != null) {
       if (!includeClusters.contains(clusterName))       continue;
     }
@@ -15,20 +26,43 @@
       if (excludeClusters.contains(clusterName))       continue;
     }
     ok=true;
-    cluster2Id=storage2.getClusterIdByName(clusterName);
+    final int cluster1Id=makeDbCall(databaseTwo,new ODbRelatedCall<Integer>(){
+      @Override public Integer call(      ODatabaseDocumentInternal database){
+        return database.getClusterIdByName(clusterName);
+      }
+    }
+);
     listener.onMessage("\n- Checking cluster " + String.format("%-25s: ","'" + clusterName + "'"));
-    if (cluster2Id == -1) {
-      listener.onMessage("ERR: cluster name '" + clusterName + "' was not found on database "+ storage2);
+    if (cluster1Id == -1) {
+      listener.onMessage("ERR: cluster name '" + clusterName + "' was not found on database "+ databaseTwo.getName());
       ++differences;
       ok=false;
     }
-    if (cluster2Id != storage1.getClusterIdByName(clusterName)) {
-      listener.onMessage("ERR: cluster id is different for cluster " + clusterName + ": "+ storage1.getClusterIdByName(clusterName)+ " <-> "+ cluster2Id);
+    final int cluster2Id=makeDbCall(databaseOne,new ODbRelatedCall<Integer>(){
+      @Override public Integer call(      ODatabaseDocumentInternal database){
+        return database.getClusterIdByName(clusterName);
+      }
+    }
+);
+    if (cluster1Id != cluster2Id) {
+      listener.onMessage("ERR: cluster id is different for cluster " + clusterName + ": "+ cluster2Id+ " <-> "+ cluster1Id);
       ++differences;
       ok=false;
     }
-    if (storage1.count(cluster2Id) != storage2.count(cluster2Id)) {
-      listener.onMessage("ERR: number of records different in cluster '" + clusterName + "' (id="+ cluster2Id+ "): "+ storage1.count(cluster2Id)+ " <-> "+ storage2.count(cluster2Id));
+    long countCluster1=makeDbCall(databaseOne,new ODbRelatedCall<Long>(){
+      @Override public Long call(      ODatabaseDocumentInternal database){
+        return database.getStorage().count(cluster1Id);
+      }
+    }
+);
+    long countCluster2=makeDbCall(databaseOne,new ODbRelatedCall<Long>(){
+      @Override public Long call(      ODatabaseDocumentInternal database){
+        return database.getStorage().count(cluster2Id);
+      }
+    }
+);
+    if (countCluster1 != countCluster2) {
+      listener.onMessage("ERR: number of records different in cluster '" + clusterName + "' (id="+ cluster1Id+ "): "+ countCluster1+ " <-> "+ countCluster2);
       ++differences;
       ok=false;
     }

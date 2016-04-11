@@ -1,28 +1,78 @@
 {
   listener.onMessage("\nStarting deep comparison record by record. This may take a few minutes. Wait please...");
-  int clusterId;
-  for (  String clusterName : storage1.getClusterNames()) {
+  Collection<String> clusterNames1=makeDbCall(databaseOne,new ODbRelatedCall<Collection<String>>(){
+    @Override public Collection<String> call(    ODatabaseDocumentInternal database){
+      return database.getClusterNames();
+    }
+  }
+);
+  for (  final String clusterName : clusterNames1) {
     if (includeClusters != null) {
       if (!includeClusters.contains(clusterName))       continue;
     }
  else     if (excludeClusters != null) {
       if (excludeClusters.contains(clusterName))       continue;
     }
-    clusterId=storage1.getClusterIdByName(clusterName);
-    final long[] db1Range=storage1.getClusterDataRange(clusterId);
-    final long[] db2Range=storage2.getClusterDataRange(clusterId);
+    final int clusterId1=makeDbCall(databaseOne,new ODbRelatedCall<Integer>(){
+      @Override public Integer call(      ODatabaseDocumentInternal database){
+        return database.getClusterIdByName(clusterName);
+      }
+    }
+);
+    final long[] db1Range=makeDbCall(databaseOne,new ODbRelatedCall<long[]>(){
+      @Override public long[] call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getClusterDataRange(clusterId1);
+      }
+    }
+);
+    final long[] db2Range=makeDbCall(databaseTwo,new ODbRelatedCall<long[]>(){
+      @Override public long[] call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getClusterDataRange(clusterId1);
+      }
+    }
+);
     final long db1Max=db1Range[1];
     final long db2Max=db2Range[1];
-    ODatabaseRecordThreadLocal.INSTANCE.set(databaseDocumentTxOne);
+    databaseOne.activateOnCurrentThread();
     final ODocument doc1=new ODocument();
-    ODatabaseRecordThreadLocal.INSTANCE.set(databaseDocumentTxTwo);
+    databaseTwo.activateOnCurrentThread();
     final ODocument doc2=new ODocument();
-    final ORecordId rid=new ORecordId(clusterId);
+    final ORecordId rid=new ORecordId(clusterId1);
     final long clusterMax=Math.max(db1Max,db2Max);
     final OStorage storage;
-    if (clusterMax == db1Max)     storage=storage1;
- else     storage=storage2;
-    OPhysicalPosition[] physicalPositions=storage.ceilingPhysicalPositions(clusterId,new OPhysicalPosition(0));
+    ODatabaseDocumentInternal selectedDatabase;
+    if (clusterMax == db1Max)     selectedDatabase=databaseOne;
+ else     selectedDatabase=databaseTwo;
+    OPhysicalPosition[] physicalPositions=makeDbCall(selectedDatabase,new ODbRelatedCall<OPhysicalPosition[]>(){
+      @Override public OPhysicalPosition[] call(      ODatabaseDocumentInternal database){
+        return database.getStorage().ceilingPhysicalPositions(clusterId1,new OPhysicalPosition(0));
+      }
+    }
+);
+    OStorageConfiguration configuration1=makeDbCall(databaseOne,new ODbRelatedCall<OStorageConfiguration>(){
+      @Override public OStorageConfiguration call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getConfiguration();
+      }
+    }
+);
+    OStorageConfiguration configuration2=makeDbCall(databaseTwo,new ODbRelatedCall<OStorageConfiguration>(){
+      @Override public OStorageConfiguration call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getConfiguration();
+      }
+    }
+);
+    String storageType1=makeDbCall(databaseOne,new ODbRelatedCall<String>(){
+      @Override public String call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getType();
+      }
+    }
+);
+    String storageType2=makeDbCall(databaseTwo,new ODbRelatedCall<String>(){
+      @Override public String call(      ODatabaseDocumentInternal database){
+        return database.getStorage().getType();
+      }
+    }
+);
     long recordsCounter=0;
     while (physicalPositions.length > 0) {
       for (      OPhysicalPosition physicalPosition : physicalPositions) {
@@ -30,79 +80,90 @@
           recordsCounter++;
           final long position=physicalPosition.clusterPosition;
           rid.clusterPosition=position;
-          if (isDocumentDatabases() && rid.equals(new ORecordId(storage1.getConfiguration().indexMgrRecordId)) && rid.equals(new ORecordId(storage2.getConfiguration().indexMgrRecordId)))           continue;
-          if (isDocumentDatabases() && rid.equals(new ORecordId(storage1.getConfiguration().schemaRecordId)) && rid.equals(new ORecordId(storage2.getConfiguration().schemaRecordId)))           continue;
+          if (rid.equals(new ORecordId(configuration1.indexMgrRecordId)) && rid.equals(new ORecordId(configuration2.indexMgrRecordId)))           continue;
+          if (rid.equals(new ORecordId(configuration1.schemaRecordId)) && rid.equals(new ORecordId(configuration2.schemaRecordId)))           continue;
           if (rid.clusterId == 0 && rid.clusterPosition == 0) {
-            if (!storage1.getType().equals(storage2.getType()))             continue;
+            if (!storageType1.equals(storageType2))             continue;
           }
-          final ORawBuffer buffer1=storage1.readRecord(rid,null,true,null).getResult();
-          final ORawBuffer buffer2;
-          if (ridMapper == null)           buffer2=storage2.readRecord(rid,null,true,null).getResult();
+          final ORecordId rid2;
+          if (ridMapper == null)           rid2=rid;
  else {
             final ORID newRid=ridMapper.map(rid);
-            if (newRid == null)             buffer2=storage2.readRecord(rid,null,true,null).getResult();
- else             buffer2=storage2.readRecord(new ORecordId(newRid),null,true,null).getResult();
+            if (newRid == null)             rid2=rid;
+ else             rid2=new ORecordId(newRid);
           }
+          final ORawBuffer buffer1=makeDbCall(databaseOne,new ODbRelatedCall<ORawBuffer>(){
+            @Override public ORawBuffer call(            ODatabaseDocumentInternal database){
+              return database.getStorage().readRecord(rid,null,true,null).getResult();
+            }
+          }
+);
+          final ORawBuffer buffer2=makeDbCall(databaseTwo,new ODbRelatedCall<ORawBuffer>(){
+            @Override public ORawBuffer call(            ODatabaseDocumentInternal database){
+              return database.getStorage().readRecord(rid2,null,true,null).getResult();
+            }
+          }
+);
           if (buffer1 == null && buffer2 == null)           continue;
  else           if (buffer1 == null && buffer2 != null) {
-            listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " is null in DB1");
+            listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " is null in DB1");
             ++differences;
           }
  else           if (buffer1 != null && buffer2 == null) {
-            listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " is null in DB2");
+            listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " is null in DB2");
             ++differences;
           }
  else {
             if (buffer1.recordType != buffer2.recordType) {
-              listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " recordType is different: "+ (char)buffer1.recordType+ " <-> "+ (char)buffer2.recordType);
+              listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " recordType is different: "+ (char)buffer1.recordType+ " <-> "+ (char)buffer2.recordType);
               ++differences;
             }
             if (buffer1.buffer == null && buffer2.buffer == null) {
             }
  else             if (buffer1.buffer == null && buffer2.buffer != null) {
-              listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " content is different: null <-> "+ buffer2.buffer.length);
+              listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " content is different: null <-> "+ buffer2.buffer.length);
               ++differences;
             }
  else             if (buffer1.buffer != null && buffer2.buffer == null) {
-              listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " content is different: "+ buffer1.buffer.length+ " <-> null");
+              listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " content is different: "+ buffer1.buffer.length+ " <-> null");
               ++differences;
             }
  else {
               if (buffer1.recordType == ODocument.RECORD_TYPE) {
-                makeDbCall(databaseDocumentTxOne,new ODocumentHelper.ODbRelatedCall<Object>(){
-                  public Object call(){
+                makeDbCall(databaseOne,new ODocumentHelper.ODbRelatedCall<Object>(){
+                  public Object call(                  ODatabaseDocumentInternal database){
                     doc1.reset();
                     doc1.fromStream(buffer1.buffer);
                     return null;
                   }
                 }
 );
-                makeDbCall(databaseDocumentTxTwo,new ODocumentHelper.ODbRelatedCall<Object>(){
-                  public Object call(){
+                makeDbCall(databaseTwo,new ODocumentHelper.ODbRelatedCall<Object>(){
+                  public Object call(                  ODatabaseDocumentInternal database){
                     doc2.reset();
                     doc2.fromStream(buffer2.buffer);
                     return null;
                   }
                 }
 );
-                if (rid.toString().equals(storage1.getConfiguration().schemaRecordId) && rid.toString().equals(storage2.getConfiguration().schemaRecordId)) {
-                  makeDbCall(databaseDocumentTxOne,new ODocumentHelper.ODbRelatedCall<java.lang.Object>(){
-                    public Object call(){
+                if (rid.toString().equals(configuration1.schemaRecordId) && rid.toString().equals(configuration2.schemaRecordId)) {
+                  makeDbCall(databaseOne,new ODocumentHelper.ODbRelatedCall<java.lang.Object>(){
+                    public Object call(                    ODatabaseDocumentInternal database){
                       convertSchemaDoc(doc1);
                       return null;
                     }
                   }
 );
-                  makeDbCall(databaseDocumentTxTwo,new ODocumentHelper.ODbRelatedCall<java.lang.Object>(){
-                    public Object call(){
+                  makeDbCall(databaseTwo,new ODocumentHelper.ODbRelatedCall<java.lang.Object>(){
+                    public Object call(                    ODatabaseDocumentInternal database){
                       convertSchemaDoc(doc2);
                       return null;
                     }
                   }
 );
                 }
-                if (!ODocumentHelper.hasSameContentOf(doc1,databaseDocumentTxOne,doc2,databaseDocumentTxTwo,ridMapper)) {
-                  listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " document content is different");
+                if (!ODocumentHelper.hasSameContentOf(doc1,databaseOne,doc2,databaseTwo,ridMapper)) {
+                  listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " document content is different");
                   listener.onMessage("\n--- REC1: " + new String(buffer1.buffer));
                   listener.onMessage("\n--- REC2: " + new String(buffer2.buffer));
                   listener.onMessage("\n");
@@ -114,7 +175,7 @@
                   final String rec1=new String(buffer1.buffer).trim();
                   final String rec2=new String(buffer2.buffer).trim();
                   if (rec1.length() != rec2.length()) {
-                    listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " content length is different: "+ buffer1.buffer.length+ " <-> "+ buffer2.buffer.length);
+                    listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " content length is different: "+ buffer1.buffer.length+ " <-> "+ buffer2.buffer.length);
                     if (buffer1.recordType == ODocument.RECORD_TYPE)                     listener.onMessage("\n--- REC1: " + rec1);
                     if (buffer2.recordType == ODocument.RECORD_TYPE)                     listener.onMessage("\n--- REC2: " + rec2);
                     listener.onMessage("\n");
@@ -124,7 +185,7 @@
  else {
                   for (int b=0; b < buffer1.buffer.length; ++b) {
                     if (buffer1.buffer[b] != buffer2.buffer[b]) {
-                      listener.onMessage("\n- ERR: RID=" + clusterId + ":"+ position+ " content is different at byte #"+ b+ ": "+ buffer1.buffer[b]+ " <-> "+ buffer2.buffer[b]);
+                      listener.onMessage("\n- ERR: RID=" + clusterId1 + ":"+ position+ " content is different at byte #"+ b+ ": "+ buffer1.buffer[b]+ " <-> "+ buffer2.buffer[b]);
                       listener.onMessage("\n--- REC1: " + new String(buffer1.buffer));
                       listener.onMessage("\n--- REC2: " + new String(buffer2.buffer));
                       listener.onMessage("\n");
@@ -142,7 +203,13 @@
           throw e;
         }
       }
-      physicalPositions=storage.higherPhysicalPositions(clusterId,physicalPositions[physicalPositions.length - 1]);
+      final OPhysicalPosition[] curPosition=physicalPositions;
+      physicalPositions=makeDbCall(selectedDatabase,new ODbRelatedCall<OPhysicalPosition[]>(){
+        @Override public OPhysicalPosition[] call(        ODatabaseDocumentInternal database){
+          return database.getStorage().higherPhysicalPositions(clusterId1,curPosition[curPosition.length - 1]);
+        }
+      }
+);
       if (recordsCounter % 10000 == 0)       listener.onMessage("\n" + recordsCounter + " records were processed for cluster "+ clusterName+ " ...");
     }
     listener.onMessage("\nCluster comparison was finished, " + recordsCounter + " records were processed for cluster "+ clusterName+ " ...");

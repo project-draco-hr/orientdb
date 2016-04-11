@@ -1,2 +1,61 @@
 {
+  final ByteBuffer buffer=pool.poll();
+  if (buffer != null) {
+    if (clear) {
+      buffer.position(0);
+      buffer.put(zeroPage.duplicate());
+    }
+    buffer.position(0);
+    return buffer;
+  }
+  if (maxPagesPerSingleArea > 1) {
+    final long currentAllocationPosition=nextAllocationPosition.getAndIncrement();
+    final int position=(int)(currentAllocationPosition & (maxPagesPerSingleArea - 1));
+    BufferHolder bfh=lastPreallocatedArea.get();
+    if (bfh == null) {
+      bfh=new BufferHolder();
+      if (lastPreallocatedArea.compareAndSet(null,bfh)) {
+        final int allocationSize=maxPagesPerSingleArea * pageSize;
+        try {
+          bfh.buffer=ByteBuffer.allocateDirect(allocationSize).order(ByteOrder.nativeOrder());
+        }
+  finally {
+          bfh.latch.countDown();
+        }
+      }
+ else {
+        bfh=lastPreallocatedArea.get();
+        try {
+          if (bfh.buffer == null) {
+            bfh.latch.await();
+          }
+        }
+ catch (        InterruptedException e) {
+          throw OException.wrapException(new OInterruptedException("Wait of new preallocated memory area was interrupted"),e);
+        }
+      }
+    }
+ else     if (bfh.buffer == null) {
+      try {
+        bfh.latch.await();
+      }
+ catch (      InterruptedException e) {
+        throw OException.wrapException(new OInterruptedException("Wait of new preallocated memory area was interrupted"),e);
+      }
+    }
+    final int rawPosition=position * pageSize;
+    final ByteBuffer db=bfh.buffer.duplicate();
+    db.position(rawPosition);
+    db.limit(rawPosition + pageSize);
+    ByteBuffer slice=db.slice();
+    slice.order(ByteOrder.nativeOrder());
+    if (clear) {
+      slice.position(0);
+      slice.put(zeroPage.duplicate());
+    }
+    slice.position(0);
+    return slice;
+  }
+  overflowBufferCount.incrementAndGet();
+  return ByteBuffer.allocateDirect(pageSize).order(ByteOrder.nativeOrder());
 }

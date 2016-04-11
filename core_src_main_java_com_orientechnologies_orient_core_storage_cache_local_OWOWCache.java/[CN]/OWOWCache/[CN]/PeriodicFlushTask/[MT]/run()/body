@@ -1,14 +1,15 @@
 {
-  final long start=System.currentTimeMillis();
+  final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
+  if (statistic != null)   statistic.startWriteCacheFlushTimer();
+  int flushedPages=0;
+  boolean iterateByWritePagesFirst=false;
   try {
     if (writeCachePages.isEmpty()) {
-      lastAmountOfFlushedPages.lazySet(0);
       return;
     }
     int writePagesToFlush=0;
     final long wcs=exclusiveWriteCacheSize.get();
     final long cs=writeCacheSize.get();
-    boolean iterateByWritePagesFirst=false;
     boolean forceFlush=false;
     final double writeCacheThreshold=((double)wcs) / writeCacheMaxSize;
     if (writeCacheThreshold > 0.3) {
@@ -23,7 +24,6 @@
       if (cacheThreshold > 0.7)       forceFlush=true;
     }
     writePagesToFlush=Math.max(4,Math.min(MAX_PAGES_PER_FLUSH,writePagesToFlush));
-    int flushedPages=0;
     flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
     if (flushedPages < writePagesToFlush) {
       flushedPages=flushRing(writePagesToFlush,flushedPages,false,iterateByWritePagesFirst);
@@ -40,7 +40,6 @@
         }
       }
     }
-    lastAmountOfFlushedPages.lazySet(flushedPages);
   }
  catch (  IOException e) {
     OLogManager.instance().error(this,"Exception during data flush",e);
@@ -49,7 +48,6 @@ catch (  RuntimeException e) {
     OLogManager.instance().error(this,"Exception during data flush",e);
   }
  finally {
-    final long end=System.currentTimeMillis();
-    durationOfLastFlush.lazySet(end - start);
+    if (statistic != null)     statistic.stopWriteCacheFlushTimer(iterateByWritePagesFirst,flushedPages);
   }
 }

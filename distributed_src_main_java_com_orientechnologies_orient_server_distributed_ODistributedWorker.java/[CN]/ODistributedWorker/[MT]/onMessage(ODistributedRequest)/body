@@ -1,58 +1,52 @@
 {
-  OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
+  final String senderNodeName=manager.getNodeNameById(iRequest.getId().getNodeId());
+  final ORemoteTask task=iRequest.getTask();
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Received request: %s",iRequest);
+  Serializable responsePayload;
+  OSecurityUser origin=null;
   try {
-    final String senderNodeName=manager.getNodeNameById(iRequest.getId().getNodeId());
-    final ORemoteTask task=iRequest.getTask();
-    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Received request: %s",iRequest);
-    Serializable responsePayload;
-    OSecurityUser origin=null;
-    try {
-      task.setNodeSource(senderNodeName);
-      waitNodeIsOnline();
-      initDatabaseInstance();
-      if (database != null) {
-        database.activateOnCurrentThread();
-        origin=database.getUser();
+    task.setNodeSource(senderNodeName);
+    waitNodeIsOnline();
+    initDatabaseInstance();
+    if (database != null) {
+      database.activateOnCurrentThread();
+      origin=database.getUser();
+      try {
+        if (iRequest.getUserRID() != null && iRequest.getUserRID().isValid() && (lastUser == null || !(lastUser.getIdentity()).equals(iRequest.getUserRID()))) {
+          lastUser=database.getMetadata().getSecurity().getUser(iRequest.getUserRID());
+          database.setUser(lastUser);
+        }
+ else         origin=null;
+      }
+ catch (      Throwable ex) {
+        OLogManager.instance().error(this,"Failed on user switching " + ex.getMessage());
+      }
+    }
+    for (int retry=1; ; ++retry) {
+      responsePayload=manager.executeOnLocalNode(iRequest.getId(),iRequest.getTask(),database);
+      if (responsePayload instanceof OModificationOperationProhibitedException) {
         try {
-          if (lastUser == null || !(lastUser.getIdentity()).equals(iRequest.getUserRID())) {
-            lastUser=database.getMetadata().getSecurity().getUser(iRequest.getUserRID());
-            database.setUser(lastUser);
-          }
- else           origin=null;
+          ODistributedServerLog.info(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Database is frozen, waiting and retrying. Request %s (retry=%d, worker=%d)",iRequest,retry,id);
+          Thread.sleep(1000);
         }
- catch (        Throwable ex) {
-          OLogManager.instance().error(this,"Failed on user switching " + ex.getMessage());
+ catch (        InterruptedException e) {
         }
       }
-      for (int retry=1; ; ++retry) {
-        responsePayload=manager.executeOnLocalNode(iRequest,database);
-        if (responsePayload instanceof OModificationOperationProhibitedException) {
-          try {
-            ODistributedServerLog.info(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Database is frozen, waiting and retrying. Request %s (retry=%d, worker=%d)",iRequest,retry,id);
-            Thread.sleep(1000);
-          }
- catch (          InterruptedException e) {
-          }
-        }
  else {
-          if (retry > 1)           ODistributedServerLog.info(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Request %s succeed after retry=%d",iRequest,retry);
-          break;
-        }
+        if (retry > 1)         ODistributedServerLog.info(this,manager.getLocalNodeName(),senderNodeName,DIRECTION.IN,"Request %s succeed after retry=%d",iRequest,retry);
+        break;
       }
     }
+  }
   finally {
-      if (database != null && !database.isClosed()) {
-        database.activateOnCurrentThread();
-        if (!database.isClosed()) {
-          database.rollback();
-          database.getLocalCache().clear();
-          if (origin != null)           database.setUser(origin);
-        }
+    if (database != null && !database.isClosed()) {
+      database.activateOnCurrentThread();
+      if (!database.isClosed()) {
+        database.rollback();
+        database.getLocalCache().clear();
+        if (origin != null)         database.setUser(origin);
       }
     }
-    if (running)     sendResponseBack(iRequest,responsePayload);
   }
-  finally {
-    OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.DEFAULT);
-  }
+  if (running)   sendResponseBack(iRequest,responsePayload);
 }

@@ -26,7 +26,17 @@
   finally {
     if (iUnlockAtTheEnd) {
       if (acquiredClusterLock.compareAndSet(true,false))       clusterLocks[partition].release();
-      if (acquiredRecordLock.compareAndSet(true,false))       localDistributedDatabase.unlockRecord(rid,requestId);
+      if (acquiredRecordLock.compareAndSet(true,false)) {
+        localDistributedDatabase.unlockRecord(rid,requestId);
+        if (eventListener != null) {
+          try {
+            eventListener.onAfterRecordUnlock(rid);
+          }
+ catch (          Throwable t) {
+            ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Caught exception during ODistributedStorageEventListener.onAfterRecordUnlock",t);
+          }
+        }
+      }
     }
     messageManagementLock.readLock().unlock();
   }

@@ -1,48 +1,61 @@
 {
-  connection=server.getClientConnectionManager().getConnection(clientTxId,this);
-  boolean noToken=false;
-  if (connection == null && clientTxId < 0 && requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
-    noToken=true;
-  }
-  if (requestType == OChannelBinaryProtocol.REQUEST_CONNECT || requestType == OChannelBinaryProtocol.REQUEST_DB_OPEN || requestType == OChannelBinaryProtocol.REQUEST_SHUTDOWN) {
-    noToken=true;
-  }
-  if (connection != null && !Boolean.TRUE.equals(connection.getTokenBased())) {
-    noToken=true;
-  }
-  if (noToken) {
-    if (clientTxId < 0) {
-      connection=server.getClientConnectionManager().connect(this);
-      connection.getData().sessionId=clientTxId;
+  OClientConnection connection=server.getClientConnectionManager().getConnection(clientTxId,this);
+  try {
+    boolean noToken=false;
+    if (connection == null && clientTxId < 0 && requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
+      noToken=true;
     }
-    if (connection != null) {
-      connection.setTokenBytes(null);
-      connection.acquire();
+    if (requestType == OChannelBinaryProtocol.REQUEST_CONNECT || requestType == OChannelBinaryProtocol.REQUEST_DB_OPEN || requestType == OChannelBinaryProtocol.REQUEST_SHUTDOWN) {
+      noToken=true;
     }
-  }
- else {
-    byte[] bytes=channel.readBytes();
-    if (connection == null && bytes != null && bytes.length > 0) {
-      connection=server.getClientConnectionManager().connect(this);
+    if (connection != null && !Boolean.TRUE.equals(connection.getTokenBased())) {
+      noToken=true;
     }
-    if (connection == null) {
-      throw new OTokenSecurityException("missing session and token");
-    }
-    if (requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
-      connection.acquire();
-      connection.validateSession(bytes,server.getTokenHandler(),this);
+    if (noToken) {
+      if (clientTxId < 0) {
+        connection=server.getClientConnectionManager().connect(this);
+        connection.getData().sessionId=clientTxId;
+      }
+      if (connection != null) {
+        connection.setTokenBytes(null);
+        connection.acquire();
+      }
     }
  else {
-      connection.validateSession(bytes,server.getTokenHandler(),this);
-      server.getClientConnectionManager().disconnect(clientTxId);
-      connection=server.getClientConnectionManager().reConnect(this,connection.getTokenBytes(),connection.getToken());
-      connection.acquire();
-    }
-    if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE) {
-      connection.init(server);
-    }
-    if (connection.getData().serverUser) {
-      connection.setServerUser(server.getUser(connection.getData().serverUsername));
+      byte[] bytes=channel.readBytes();
+      if (connection == null && bytes != null && bytes.length > 0) {
+        connection=server.getClientConnectionManager().connect(this);
+      }
+      if (connection == null) {
+        throw new OTokenSecurityException("missing session and token");
+      }
+      if (requestType != OChannelBinaryProtocol.REQUEST_DB_REOPEN) {
+        connection.acquire();
+        connection.validateSession(bytes,server.getTokenHandler(),this);
+      }
+ else {
+        connection.validateSession(bytes,server.getTokenHandler(),this);
+        server.getClientConnectionManager().disconnect(server,clientTxId);
+        connection=server.getClientConnectionManager().reConnect(this,connection.getTokenBytes(),connection.getToken());
+        connection.acquire();
+      }
+      if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE) {
+        connection.init(server);
+      }
+      if (connection.getData().serverUser) {
+        connection.setServerUser(server.getUser(connection.getData().serverUsername));
+      }
     }
   }
+ catch (  RuntimeException e) {
+    if (connection != null)     server.getClientConnectionManager().disconnect(this.getServer(),connection);
+    ODatabaseRecordThreadLocal.INSTANCE.remove();
+    throw e;
+  }
+catch (  IOException e) {
+    if (connection != null)     server.getClientConnectionManager().disconnect(this.getServer(),connection);
+    ODatabaseRecordThreadLocal.INSTANCE.remove();
+    throw e;
+  }
+  return connection;
 }

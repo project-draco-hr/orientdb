@@ -1,0 +1,25 @@
+{
+  ODatabaseDocumentInternal database=connection.getDatabase();
+  final ORecord newRecord=Orient.instance().getRecordFactoryManager().newInstance(recordType);
+  fillRecord(connection,rid,buffer,version,newRecord);
+  ORecordInternal.setContentChanged(newRecord,updateContent);
+  ORecordInternal.getDirtyManager(newRecord).clearForSave();
+  ORecord currentRecord=null;
+  if (newRecord instanceof ODocument) {
+    try {
+      currentRecord=database.load(rid);
+    }
+ catch (    ORecordNotFoundException e) {
+      if (e.getCause() instanceof OOfflineClusterException)       throw (OOfflineClusterException)e.getCause();
+    }
+    if (currentRecord == null)     throw new ORecordNotFoundException(rid);
+    ((ODocument)currentRecord).merge((ODocument)newRecord,false,false);
+  }
+ else   currentRecord=newRecord;
+  ORecordInternal.setVersion(currentRecord,version);
+  database.save(currentRecord);
+  if (currentRecord.getIdentity().toString().equals(database.getStorage().getConfiguration().indexMgrRecordId) && !database.getStatus().equals(ODatabase.STATUS.IMPORTING)) {
+    database.getMetadata().getIndexManager().reload();
+  }
+  return currentRecord.getVersion();
+}

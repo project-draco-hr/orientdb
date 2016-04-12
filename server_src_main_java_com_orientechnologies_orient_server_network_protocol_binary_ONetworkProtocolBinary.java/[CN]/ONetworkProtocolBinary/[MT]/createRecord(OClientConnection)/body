@@ -1,0 +1,23 @@
+{
+  setDataCommandInfo(connection,"Create record");
+  if (!isConnectionAlive(connection))   return;
+  final int dataSegmentId=connection.getData().protocolVersion < 24 ? channel.readInt() : 0;
+  final ORecordId rid=new ORecordId(channel.readShort(),ORID.CLUSTER_POS_INVALID);
+  final byte[] buffer=channel.readBytes();
+  final byte recordType=channel.readByte();
+  final byte mode=channel.readByte();
+  final ORecord record=createRecord(connection,rid,buffer,recordType);
+  if (mode < 2) {
+    beginResponse();
+    try {
+      sendOk(connection,clientTxId);
+      if (connection.getData().protocolVersion > OChannelBinaryProtocol.PROTOCOL_VERSION_25)       channel.writeShort((short)record.getIdentity().getClusterId());
+      channel.writeLong(record.getIdentity().getClusterPosition());
+      channel.writeVersion(record.getVersion());
+      if (connection.getData().protocolVersion >= 20)       sendCollectionChanges(connection);
+    }
+  finally {
+      endResponse(connection);
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  setDataCommandInfo(connection,"SB-Tree bonsai get values major");
+  OBonsaiCollectionPointer collectionPointer=OCollectionNetworkSerializer.INSTANCE.readCollectionPointer(channel);
+  byte[] keyStream=channel.readBytes();
+  boolean inclusive=channel.readBoolean();
+  int pageSize=128;
+  if (connection.getData().protocolVersion >= 21)   pageSize=channel.readInt();
+  final OSBTreeCollectionManager sbTreeCollectionManager=connection.getDatabase().getSbTreeCollectionManager();
+  final OSBTreeBonsai<OIdentifiable,Integer> tree=sbTreeCollectionManager.loadSBTree(collectionPointer);
+  try {
+    final OBinarySerializer<OIdentifiable> keySerializer=tree.getKeySerializer();
+    OIdentifiable key=keySerializer.deserialize(keyStream,0);
+    final OBinarySerializer<Integer> valueSerializer=tree.getValueSerializer();
+    OTreeInternal.AccumulativeListener<OIdentifiable,Integer> listener=new OTreeInternal.AccumulativeListener<OIdentifiable,Integer>(pageSize);
+    tree.loadEntriesMajor(key,inclusive,true,listener);
+    List<Entry<OIdentifiable,Integer>> result=listener.getResult();
+    byte[] stream=serializeSBTreeEntryCollection(result,keySerializer,valueSerializer);
+    beginResponse();
+    try {
+      sendOk(connection,clientTxId);
+      channel.writeBytes(stream);
+    }
+  finally {
+      endResponse(connection);
+    }
+  }
+  finally {
+    sbTreeCollectionManager.releaseSBTree(collectionPointer);
+  }
+}

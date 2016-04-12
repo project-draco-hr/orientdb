@@ -1,0 +1,44 @@
+{
+  setDataCommandInfo(connection,"Transaction commit");
+  if (!isConnectionAlive(connection))   return;
+  final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy(connection,this);
+  try {
+    connection.getDatabase().begin(tx);
+    try {
+      connection.getDatabase().commit();
+      beginResponse();
+      try {
+        sendOk(connection,clientTxId);
+        channel.writeInt(tx.getCreatedRecords().size());
+        for (        Entry<ORecordId,ORecord> entry : tx.getCreatedRecords().entrySet()) {
+          channel.writeRID(entry.getKey());
+          channel.writeRID(entry.getValue().getIdentity());
+          if (entry.getValue().getVersion() > 0)           tx.getUpdatedRecords().put((ORecordId)entry.getValue().getIdentity(),entry.getValue());
+        }
+        channel.writeInt(tx.getUpdatedRecords().size());
+        for (        Entry<ORecordId,ORecord> entry : tx.getUpdatedRecords().entrySet()) {
+          channel.writeRID(entry.getKey());
+          channel.writeVersion(entry.getValue().getVersion());
+        }
+        if (connection.getData().protocolVersion >= 20)         sendCollectionChanges(connection);
+      }
+  finally {
+        endResponse(connection);
+      }
+    }
+ catch (    Exception e) {
+      if (connection != null && connection.getDatabase() != null) {
+        if (connection.getDatabase().getTransaction().isActive())         connection.getDatabase().rollback(true);
+        final OSBTreeCollectionManager collectionManager=connection.getDatabase().getSbTreeCollectionManager();
+        if (collectionManager != null)         collectionManager.clearChangedIds();
+      }
+      sendErrorOrDropConnection(connection,clientTxId,e);
+    }
+  }
+ catch (  OTransactionAbortedException e) {
+  }
+catch (  Exception e) {
+    if (tx.isActive())     tx.rollback(true,-1);
+    sendErrorOrDropConnection(connection,clientTxId,e);
+  }
+}

@@ -1,13 +1,11 @@
 {
-  final String dbUrl=OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
-  if (dbUrl.startsWith("plocal:")) {
-    final String dbDirectory=serverInstance.getDatabaseDirectory();
-    if (!dbUrl.substring("plocal:".length()).startsWith(dbDirectory))     return;
-  }
- else   if (dbUrl.startsWith("remote:"))   return;
+  if (!isRelatedToLocalServer(iDatabase))   return;
   final ODatabaseDocumentInternal currDb=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   try {
     if (getConfigurationMap().containsKey(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + iDatabase.getName()))     throw new ODistributedException("Cannot create a new database with the same name of one available distributed");
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
+    cfg.addNewNodeInServerList(nodeName);
+    updateCachedDatabaseConfiguration(iDatabase.getName(),cfg.serialize(),true,true);
     final ODistributedDatabaseImpl distribDatabase=messageService.registerDatabase(iDatabase.getName());
     distribDatabase.setOnline();
     onOpen(iDatabase);

@@ -1,0 +1,57 @@
+{
+  ODistributedServerLog.info(this,nodeName,iNode,DIRECTION.IN,"Installing database '%s' to: %s...",databaseName,dbPath);
+  try {
+    final File f=new File(iDatabaseCompressedFile);
+    final File fCompleted=new File(iDatabaseCompressedFile + ".completed");
+    new File(dbPath).mkdirs();
+    final ODatabaseDocumentTx db=new ODatabaseDocumentTx("plocal:" + dbPath);
+    final FileInputStream in=new FileInputStream(f){
+      @Override public int read(      final byte[] b,      final int off,      final int len) throws IOException {
+        while (true) {
+          final int read=super.read(b,off,len);
+          if (read > 0)           return read;
+          if (fCompleted.exists())           return 0;
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+      @Override public int available() throws IOException {
+        while (true) {
+          final int avail=super.available();
+          if (avail > 0)           return avail;
+          if (fCompleted.exists())           return 0;
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
+    }
+;
+    final Lock lock=getLock(databaseName + ".cfg");
+    lock.lock();
+    try {
+      if (delta) {
+        new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
+      }
+ else {
+        db.restore(in,null,null,this);
+      }
+    }
+  finally {
+      in.close();
+      lock.unlock();
+    }
+    db.close();
+    ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Installed database '%s'",databaseName);
+    return db;
+  }
+ catch (  IOException e) {
+    ODistributedServerLog.warn(this,nodeName,null,DIRECTION.IN,"Error on copying database '%s' on local server",e,databaseName);
+  }
+  return null;
+}

@@ -7,17 +7,15 @@ switch (op.type) {
 case ORecordOperation.CREATED:
       break;
 case ORecordOperation.UPDATED:
-{
-      final ORecord currentRecord=record.getIdentity().getRecord();
-      if (currentRecord != null)       undoTask=new OUpdateRecordTask(currentRecord,ORecordVersionHelper.clearRollbackMode(currentRecord.getVersion()));
-      break;
-    }
 case ORecordOperation.DELETED:
-{
-    final ORecord currentRecord=record.getIdentity().getRecord();
-    if (currentRecord != null)     undoTask=new OResurrectRecordTask(currentRecord,ORecordVersionHelper.clearRollbackMode(currentRecord.getVersion()));
-    break;
-  }
+    final ORecordId rid=(ORecordId)record.getIdentity();
+  final OStorageOperationResult<ORawBuffer> loaded=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying().readRecord(rid,null,true,null);
+if (loaded == null || loaded.getResult() == null) throw new ORecordNotFoundException(rid);
+final ORecord previousRecord=Orient.instance().getRecordFactoryManager().newInstance(loaded.getResult().recordType);
+ORecordInternal.fill(previousRecord,rid,loaded.getResult().version,loaded.getResult().getBuffer(),false);
+if (op.type == ORecordOperation.UPDATED) undoTask=new OUpdateRecordTask(previousRecord,ORecordVersionHelper.clearRollbackMode(previousRecord.getVersion()));
+ else undoTask=new OResurrectRecordTask(previousRecord,ORecordVersionHelper.clearRollbackMode(previousRecord.getVersion()));
+break;
 default :
 continue;
 }

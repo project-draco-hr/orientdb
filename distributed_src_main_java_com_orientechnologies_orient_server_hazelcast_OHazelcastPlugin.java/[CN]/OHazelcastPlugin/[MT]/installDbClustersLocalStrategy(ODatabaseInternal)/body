@@ -1,7 +1,16 @@
 {
-  if (iDatabase.isClosed())   getServerInstance().openDatabase(iDatabase);
-  final OSchema schema=((ODatabaseInternal<?>)iDatabase).getDatabaseOwner().getMetadata().getSchema();
-  for (  OClass c : schema.getClasses()) {
-    ((OClassImpl)c).setClusterSelectionInternal(new OLocalClusterStrategy(this,iDatabase.getName(),c));
+  final boolean useASuperUserDb=iDatabase.isClosed() || iDatabase.getUser() != null;
+  final ODatabaseInternal db=useASuperUserDb ? messageService.getDatabase(iDatabase.getName()).getDatabaseInstance() : iDatabase;
+  try {
+    final OSchema schema=db.getDatabaseOwner().getMetadata().getSchema();
+    for (    OClass c : schema.getClasses()) {
+      ((OClassImpl)c).setClusterSelectionInternal(new OLocalClusterStrategy(this,db.getName(),c));
+    }
+  }
+  finally {
+    if (useASuperUserDb) {
+      db.close();
+      iDatabase.activateOnCurrentThread();
+    }
   }
 }

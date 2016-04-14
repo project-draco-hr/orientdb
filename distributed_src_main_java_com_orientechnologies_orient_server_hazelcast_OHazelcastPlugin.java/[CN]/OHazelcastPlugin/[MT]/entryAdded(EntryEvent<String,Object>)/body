@@ -24,18 +24,20 @@
  catch (        IOException e) {
           ODistributedServerLog.error(this,nodeName,joinedNodeName,DIRECTION.OUT,"Error on connecting to node %s",joinedNodeName);
         }
-        ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
-        installNewDatabases(false);
+        ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"Added node configuration id=%s name=%s, now %d nodes are configured",iEvent.getMember(),getNodeName(iEvent.getMember()),activeNodes.size());
         for (        ODistributedLifecycleListener l : listeners)         l.onNodeJoined(joinedNodeName);
       }
     }
  else     if (key.startsWith(CONFIG_DATABASE_PREFIX)) {
       final String databaseName=key.substring(CONFIG_DATABASE_PREFIX.length());
-      checkDatabaseEvent(iEvent,databaseName);
-      if (!iEvent.getMember().equals(hazelcastInstance.getCluster().getLocalMember()))       installNewDatabases(false);
+      onDatabaseEvent((ODocument)iEvent.getValue(),databaseName);
     }
  else     if (key.startsWith(CONFIG_DBSTATUS_PREFIX)) {
-      ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"received new status %s=%s",key.substring(CONFIG_DBSTATUS_PREFIX.length()),iEvent.getValue());
+      ODistributedServerLog.info(this,nodeName,getNodeName(iEvent.getMember()),DIRECTION.IN,"Received new status %s=%s",key.substring(CONFIG_DBSTATUS_PREFIX.length()),iEvent.getValue());
+      final String dbNode=key.substring(CONFIG_DBSTATUS_PREFIX.length());
+      final String nodeName=dbNode.substring(0,dbNode.indexOf("."));
+      final String databaseName=dbNode.substring(dbNode.indexOf(".") + 1);
+      onDatabaseEvent(nodeName,databaseName,(DB_STATUS)iEvent.getValue());
     }
   }
  catch (  HazelcastInstanceNotActiveException e) {

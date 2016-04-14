@@ -1,25 +1,18 @@
 {
-  final String dbUrl=OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
-  if (dbUrl.startsWith("plocal:")) {
-    final String dbDirectory=serverInstance.getDatabaseDirectory();
-    if (!dbUrl.substring("plocal:".length()).startsWith(dbDirectory))     return;
-  }
- else   if (dbUrl.startsWith("remote:"))   return;
+  if (!isRelatedToLocalServer(iDatabase))   return;
   final ODatabaseDocumentInternal currDb=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   try {
-synchronized (cachedDatabaseConfiguration) {
-      final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
-      if (cfg == null)       return;
-      if (!(iDatabase.getStorage() instanceof ODistributedStorage) || ((ODistributedStorage)iDatabase.getStorage()).getDistributedManager().isOffline()) {
-        ODistributedStorage storage=storages.get(iDatabase.getURL());
-        if (storage == null) {
-          storage=new ODistributedStorage(serverInstance,(OAbstractPaginatedStorage)iDatabase.getStorage().getUnderlying());
-          final ODistributedStorage oldStorage=storages.putIfAbsent(iDatabase.getURL(),storage);
-          if (oldStorage != null)           storage=oldStorage;
-        }
-        iDatabase.replaceStorage(storage);
-        if (isNodeOnline(getLocalNodeName(),iDatabase.getName()))         installDbClustersLocalStrategy(iDatabase);
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
+    if (cfg == null)     return;
+    if (!(iDatabase.getStorage() instanceof ODistributedStorage) || ((ODistributedStorage)iDatabase.getStorage()).getDistributedManager().isOffline()) {
+      ODistributedStorage storage=storages.get(iDatabase.getURL());
+      if (storage == null) {
+        storage=new ODistributedStorage(serverInstance,(OAbstractPaginatedStorage)iDatabase.getStorage().getUnderlying());
+        final ODistributedStorage oldStorage=storages.putIfAbsent(iDatabase.getURL(),storage);
+        if (oldStorage != null)         storage=oldStorage;
       }
+      iDatabase.replaceStorage(storage);
+      if (isNodeOnline(nodeName,iDatabase.getName()))       installDbClustersLocalStrategy(iDatabase);
     }
   }
   finally {

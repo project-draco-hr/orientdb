@@ -1,0 +1,14 @@
+{
+  final ODistributedConfiguration.ROLES role=cfg.getServerRole(iNode);
+  if (role != ODistributedConfiguration.ROLES.MASTER)   return false;
+  if (iDatabase.isClosed())   getServerInstance().openDatabase(iDatabase);
+  ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Reassigning cluster ownership for database %s",iDatabase.getName());
+  boolean distributedCfgDirty=false;
+  final Set<String> availableNodes=getAvailableNodeNames(iDatabase.getName());
+  final OSchema schema=((ODatabaseInternal<?>)iDatabase).getDatabaseOwner().getMetadata().getSchema();
+  for (  final OClass clazz : schema.getClasses()) {
+    if (clusterAssignmentStrategy.assignClusterOwnershipOfClass(iDatabase,cfg,clazz,availableNodes,clustersWithNotAvailableOwner,rebalance))     distributedCfgDirty=true;
+    if (!rebalance && clustersWithNotAvailableOwner.isEmpty())     break;
+  }
+  return distributedCfgDirty;
+}

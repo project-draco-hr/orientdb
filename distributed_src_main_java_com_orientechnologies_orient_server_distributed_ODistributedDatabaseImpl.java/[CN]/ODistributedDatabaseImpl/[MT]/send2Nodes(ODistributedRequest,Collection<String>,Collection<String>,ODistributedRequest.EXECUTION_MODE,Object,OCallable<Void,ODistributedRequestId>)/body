@@ -8,18 +8,20 @@
       throw new ODistributedException("No nodes configured for partition '" + databaseName + "' request: "+ iRequest);
     }
     final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-    final int availableNodes=manager.getAvailableNodes(iNodes,databaseName);
-    int expectedSynchronousResponses=localResult != null ? availableNodes + 1 : availableNodes;
-    final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,expectedSynchronousResponses);
+    final ORemoteTask task=iRequest.getTask();
+    final boolean checkNodesAreOnline=task.isNodeOnlineRequired();
+    final int availableNodes=checkNodesAreOnline ? manager.getAvailableNodes(iNodes,databaseName) : iNodes.size();
+    final int expectedSynchronousResponses=localResult != null ? availableNodes + 1 : availableNodes;
+    final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,expectedSynchronousResponses,checkNodesAreOnline);
     final boolean groupByResponse;
-    if (iRequest.getTask().getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
+    if (task.getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
       groupByResponse=false;
     }
  else {
       groupByResponse=true;
     }
     final boolean waitLocalNode=waitForLocalNode(cfg,iClusterNames,iNodes);
-    final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,iRequest.getTask().getSynchronousTimeout(expectedSynchronousResponses),iRequest.getTask().getTotalTimeout(availableNodes),groupByResponse);
+    final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,task.getSynchronousTimeout(expectedSynchronousResponses),task.getTotalTimeout(availableNodes),groupByResponse);
     if (localResult != null)     currentResponseMgr.collectResponse(new ODistributedResponse(iRequest.getId(),manager.getLocalNodeName(),manager.getLocalNodeName(),(Serializable)localResult));
     if (!(iNodes instanceof List))     iNodes=new ArrayList<String>(iNodes);
     Collections.sort((List<String>)iNodes);

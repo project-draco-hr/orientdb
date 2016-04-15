@@ -1,9 +1,24 @@
 {
-  if (isWaitForLocalNode() && !isReceivedCurrentNode()) {
-    return false;
-  }
+  if (isWaitForLocalNode() && !isReceivedCurrentNode())   return false;
   if (quorum == 0)   return true;
-  if (!groupResponsesByResult)   return receivedResponses >= quorum;
-  for (  List<ODistributedResponse> group : responseGroups)   if (group.size() >= quorum)   return true;
+  if (groupResponsesByResult) {
+    for (    List<ODistributedResponse> group : responseGroups)     if (group.size() >= quorum) {
+      int responsesForQuorum=0;
+      for (      ODistributedResponse r : group) {
+        if (nodesConcurInQuorum.contains(r.getExecutorNodeName()))         if (++responsesForQuorum >= quorum)         break;
+      }
+      return responsesForQuorum >= quorum;
+    }
+  }
+ else {
+    if (receivedResponses >= quorum) {
+      int responsesForQuorum=0;
+      for (      Map.Entry<String,Object> response : responses.entrySet()) {
+        if (response.getValue() != NO_RESPONSE && nodesConcurInQuorum.contains(response.getKey()))         if (++responsesForQuorum >= quorum)         break;
+      }
+      return responsesForQuorum >= quorum;
+    }
+    return receivedResponses >= quorum;
+  }
   return false;
 }

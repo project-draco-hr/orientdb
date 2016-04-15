@@ -11,8 +11,19 @@
     final ORemoteTask task=iRequest.getTask();
     final boolean checkNodesAreOnline=task.isNodeOnlineRequired();
     final int availableNodes=checkNodesAreOnline ? manager.getAvailableNodes(iNodes,databaseName) : iNodes.size();
-    final int expectedSynchronousResponses=localResult != null ? availableNodes + 1 : availableNodes;
-    final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,expectedSynchronousResponses,checkNodesAreOnline);
+    final Set<String> nodesConcurToTheQuorum=new HashSet<String>();
+    if (iRequest.getTask().getQuorumType() == OCommandDistributedReplicateRequest.QUORUM_TYPE.WRITE) {
+      for (      String node : iNodes) {
+        if (cfg.getServerRole(node) == ODistributedConfiguration.ROLES.MASTER)         nodesConcurToTheQuorum.add(node);
+      }
+      if (localResult != null && cfg.getServerRole(getLocalNodeName()) == ODistributedConfiguration.ROLES.MASTER)       nodesConcurToTheQuorum.add(getLocalNodeName());
+    }
+ else {
+      nodesConcurToTheQuorum.addAll(iNodes);
+      if (localResult != null)       nodesConcurToTheQuorum.add(getLocalNodeName());
+    }
+    final int expectedResponses=localResult != null ? availableNodes + 1 : availableNodes;
+    final int quorum=calculateQuorum(iRequest,iClusterNames,cfg,expectedResponses,nodesConcurToTheQuorum.size(),checkNodesAreOnline);
     final boolean groupByResponse;
     if (task.getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
       groupByResponse=false;
@@ -21,7 +32,7 @@
       groupByResponse=true;
     }
     final boolean waitLocalNode=waitForLocalNode(cfg,iClusterNames,iNodes);
-    final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,expectedSynchronousResponses,quorum,waitLocalNode,task.getSynchronousTimeout(expectedSynchronousResponses),task.getTotalTimeout(availableNodes),groupByResponse);
+    final ODistributedResponseManager currentResponseMgr=new ODistributedResponseManager(manager,iRequest,iNodes,nodesConcurToTheQuorum,expectedResponses,quorum,waitLocalNode,task.getSynchronousTimeout(expectedResponses),task.getTotalTimeout(availableNodes),groupByResponse);
     if (localResult != null)     currentResponseMgr.collectResponse(new ODistributedResponse(iRequest.getId(),manager.getLocalNodeName(),manager.getLocalNodeName(),(Serializable)localResult));
     if (!(iNodes instanceof List))     iNodes=new ArrayList<String>(iNodes);
     Collections.sort((List<String>)iNodes);

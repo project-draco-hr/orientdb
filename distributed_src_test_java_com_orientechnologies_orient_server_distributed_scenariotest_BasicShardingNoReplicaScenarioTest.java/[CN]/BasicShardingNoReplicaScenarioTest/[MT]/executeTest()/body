@@ -5,42 +5,22 @@
   cfg.field("autoDeploy",false);
   cfg.field("version",(Integer)cfg.field("version") + 1);
   manager1.updateCachedDatabaseConfiguration(this.getDatabaseName(),cfg,true,true);
-  OHazelcastPlugin manager2=(OHazelcastPlugin)serverInstance.get(1).getServerInstance().getDistributedManager();
-  databaseConfiguration=manager2.getDatabaseConfiguration(this.getDatabaseName());
-  cfg=databaseConfiguration.serialize();
-  cfg.field("autoDeploy",false);
-  cfg.field("version",(Integer)cfg.field("version") + 1);
-  manager2.updateCachedDatabaseConfiguration(this.getDatabaseName(),cfg,true,true);
-  OHazelcastPlugin manager3=(OHazelcastPlugin)serverInstance.get(2).getServerInstance().getDistributedManager();
-  databaseConfiguration=manager3.getDatabaseConfiguration(this.getDatabaseName());
-  cfg=databaseConfiguration.serialize();
-  cfg.field("autoDeploy",false);
-  cfg.field("version",(Integer)cfg.field("version") + 1);
-  manager3.updateCachedDatabaseConfiguration(this.getDatabaseName(),cfg,true,true);
   OrientGraphFactory localFactory=new OrientGraphFactory("plocal:target/server0/databases/" + getDatabaseName());
   OrientGraphNoTx graphNoTx=null;
   try {
     graphNoTx=localFactory.getNoTx();
-    final OrientVertexType clientType=graphNoTx.createVertexType("Client");
-    final OrientVertexType.OrientVertexProperty prop=clientType.createProperty("name",OType.STRING);
-    prop.createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
-    assertTrue(graphNoTx.getRawGraph().getMetadata().getIndexManager().existsIndex("Client.name"));
+    final OrientVertexType clientType=graphNoTx.createVertexType("Client",1);
+    ODistributedConfiguration dCfg=new ODistributedConfiguration(cfg);
     for (int i=0; i < serverInstance.size(); ++i) {
       final String serverName=serverInstance.get(i).getServerInstance().getDistributedManager().getLocalNodeName();
       clientType.addCluster("client_" + serverName);
+      dCfg.setServerOwner("client_" + serverName,serverName);
     }
+    manager1.updateCachedDatabaseConfiguration(this.getDatabaseName(),dCfg.serialize(),true,true);
+    final OrientVertexType.OrientVertexProperty prop=clientType.createProperty("name",OType.STRING);
+    prop.createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
+    assertTrue(graphNoTx.getRawGraph().getMetadata().getIndexManager().existsIndex("Client.name"));
     Thread.sleep(500);
-    int[] clusterIds=clientType.getClusterIds();
-    int defaultId=clientType.getDefaultClusterId();
-    Map<Integer,String> id2clusterName=new HashMap<Integer,String>();
-    for (int i=0; i < clusterIds.length; i++) {
-      id2clusterName.put(clusterIds[i],graphNoTx.getRawGraph().getClusterNameById(clusterIds[i]));
-    }
-    assertEquals(4,id2clusterName.size());
-    assertEquals("client",id2clusterName.get(clusterIds[0]));
-    assertEquals("client_usa",id2clusterName.get(clusterIds[1]));
-    assertEquals("client_europe",id2clusterName.get(clusterIds[2]));
-    assertEquals("client_asia",id2clusterName.get(clusterIds[3]));
     graphNoTx.getRawGraph().close();
     executeMultipleWritesOnShards(executeWritesOnServers,"plocal");
     checkWritesWithShardinNoReplica(serverInstance,executeWritesOnServers);
@@ -87,14 +67,14 @@
     }
  catch (    Exception e) {
       e.printStackTrace();
-      fail();
+      fail(e.toString());
     }
     executeWritesOnServers.add(serverInstance.get(2));
     checkWritesWithShardinNoReplica(serverInstance,executeWritesOnServers);
   }
  catch (  Exception e) {
     e.printStackTrace();
-    fail();
+    fail(e.toString());
   }
  finally {
     if (!graphNoTx.getRawGraph().isClosed()) {

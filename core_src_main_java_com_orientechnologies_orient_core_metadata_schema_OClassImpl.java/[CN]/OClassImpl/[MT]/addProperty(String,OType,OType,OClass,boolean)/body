@@ -9,7 +9,6 @@
   database.checkSecurity(ORule.ResourceGeneric.SCHEMA,ORole.PERMISSION_UPDATE);
   if (linkedType != null)   OPropertyImpl.checkLinkTypeSupport(type);
   if (linkedClass != null)   OPropertyImpl.checkSupportLinkedClass(type);
-  OProperty property=null;
   acquireSchemaWriteLock();
   try {
     final StringBuilder cmd=new StringBuilder("create property ");
@@ -43,12 +42,21 @@
       final OCommandSQL commandSQL=new OCommandSQL(cmd.toString());
       commandSQL.addExcludedNode(((OAutoshardedStorage)storage).getNodeId());
       database.command(commandSQL).execute();
-      property=addPropertyInternal(propertyName,type,linkedType,linkedClass,unsafe);
+      return (OProperty)OScenarioThreadLocal.executeAsDistributed(new Callable<OProperty>(){
+        @Override public OProperty call() throws Exception {
+          return addPropertyInternal(propertyName,type,linkedType,linkedClass,unsafe);
+        }
+      }
+);
     }
- else     property=addPropertyInternal(propertyName,type,linkedType,linkedClass,unsafe);
+ else     return (OProperty)OScenarioThreadLocal.executeAsDistributed(new Callable<OProperty>(){
+      @Override public OProperty call() throws Exception {
+        return addPropertyInternal(propertyName,type,linkedType,linkedClass,unsafe);
+      }
+    }
+);
   }
   finally {
     releaseSchemaWriteLock();
   }
-  return property;
 }

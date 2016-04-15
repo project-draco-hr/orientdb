@@ -1,14 +1,21 @@
 {
-  OAtomicUnitStartRecord record=new OAtomicUnitStartRecord(isRollbackSupported,unitId);
-  byte[] content=OWALRecordsFactory.INSTANCE.toStream(record);
-  syncObject.lock();
+  final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
+  if (statistic != null)   statistic.startWALLogRecordTimer();
   try {
-    checkForClose();
-    final OLogSequenceNumber lsn=internalLog(record,content);
-    activeOperations.add(unitId);
-    return lsn;
+    OAtomicUnitStartRecord record=new OAtomicUnitStartRecord(isRollbackSupported,unitId);
+    byte[] content=OWALRecordsFactory.INSTANCE.toStream(record);
+    syncObject.lock();
+    try {
+      checkForClose();
+      final OLogSequenceNumber lsn=internalLog(record,content);
+      activeOperations.add(unitId);
+      return lsn;
+    }
+  finally {
+      syncObject.unlock();
+    }
   }
   finally {
-    syncObject.unlock();
+    if (statistic != null)     statistic.stopWALRecordTimer(true,false);
   }
 }

@@ -3,12 +3,13 @@
   this.commitDelay=commitDelay;
   this.maxSegmentSize=maxSegmentSize;
   this.storage=storage;
+  this.performanceStatisticManager=storage.getPerformanceStatisticManager();
   try {
     this.walLocation=new File(calculateWalPath(this.storage,walPath));
     File[] walFiles=this.walLocation.listFiles(new FilenameFilter(storage));
     if (walFiles == null)     throw new IllegalStateException("Location passed in WAL does not exist, or IO error was happened. DB cannot work in durable mode in such case");
     if (walFiles.length == 0) {
-      OLogSegment logSegment=new OLogSegment(this,new File(this.walLocation,getSegmentName(0)),maxPagesCacheSize);
+      OLogSegment logSegment=new OLogSegment(this,new File(this.walLocation,getSegmentName(0)),maxPagesCacheSize,performanceStatisticManager);
       logSegment.init();
       logSegment.startFlush();
       logSegments.add(logSegment);
@@ -18,7 +19,7 @@
  else {
       logSize=0;
       for (      File walFile : walFiles) {
-        OLogSegment logSegment=new OLogSegment(this,walFile,maxPagesCacheSize);
+        OLogSegment logSegment=new OLogSegment(this,walFile,maxPagesCacheSize,performanceStatisticManager);
         logSegment.init();
         logSegments.add(logSegment);
         logSize+=logSegment.filledUpTo();

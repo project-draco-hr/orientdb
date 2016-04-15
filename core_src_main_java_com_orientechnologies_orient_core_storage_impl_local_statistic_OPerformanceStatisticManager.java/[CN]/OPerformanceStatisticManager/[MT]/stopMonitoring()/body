@@ -4,15 +4,21 @@
     enabled=false;
     final PerformanceCountersHolder countersHolder=new PerformanceCountersHolder();
     final Map<String,PerformanceCountersHolder> componentCountersHolder=new HashMap<String,PerformanceCountersHolder>();
+    WritCacheCountersHolder writCacheCountersHolder=deadThreadsStatistic.writCacheCountersHolder;
+    StorageCountersHolder storageCountersHolder=deadThreadsStatistic.storageCountersHolder;
+    WALCountersHolder walCountersHolder=deadThreadsStatistic.walCountersHolder;
     deadThreadsStatistic.countersHolder.pushData(countersHolder);
     componentCountersHolder.putAll(deadThreadsStatistic.countersByComponents);
     deadThreadsStatistic=null;
     for (    OSessionStoragePerformanceStatistic statistic : statistics.values()) {
       statistic.pushSystemCounters(countersHolder);
       statistic.pushComponentCounters(componentCountersHolder);
+      writCacheCountersHolder=statistic.pushWriteCacheCounters(writCacheCountersHolder);
+      storageCountersHolder=statistic.pushStorageCounters(storageCountersHolder);
+      walCountersHolder=statistic.pushWALCounters(walCountersHolder);
     }
     statistics.clear();
-    postMeasurementStatistic=new ImmutableStatistic(countersHolder,componentCountersHolder);
+    postMeasurementStatistic=new ImmutableStatistic(countersHolder,componentCountersHolder,writCacheCountersHolder,storageCountersHolder,walCountersHolder);
   }
   finally {
     switchLock.releaseWriteLock();

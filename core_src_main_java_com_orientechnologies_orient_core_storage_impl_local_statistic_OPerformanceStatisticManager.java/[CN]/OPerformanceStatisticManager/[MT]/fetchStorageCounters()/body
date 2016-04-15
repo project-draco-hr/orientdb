@@ -1,0 +1,35 @@
+{
+  final Collection<ORawPair<Thread,PerformanceSnapshot>> snapshots=new ArrayList<ORawPair<Thread,PerformanceSnapshot>>(statistics.size());
+  final Collection<Thread> threadsToRemove=new ArrayList<Thread>();
+  for (  Map.Entry<Thread,OSessionStoragePerformanceStatistic> entry : statistics.entrySet()) {
+    final Thread thread=entry.getKey();
+    final OSessionStoragePerformanceStatistic statistic=entry.getValue();
+    snapshots.add(new ORawPair<Thread,PerformanceSnapshot>(thread,statistic.getSnapshot()));
+  }
+  StorageCountersHolder holder=null;
+  for (  ORawPair<Thread,PerformanceSnapshot> pair : snapshots) {
+    final Thread thread=pair.getFirst();
+    if (thread.isAlive()) {
+      final PerformanceSnapshot snapshot=pair.getSecond();
+      if (snapshot.storageCountersHolder != null) {
+        if (holder == null)         holder=new StorageCountersHolder();
+        snapshot.storageCountersHolder.pushData(holder);
+      }
+    }
+ else {
+      threadsToRemove.add(thread);
+    }
+  }
+  if (!threadsToRemove.isEmpty()) {
+    updateDeadThreadsStatistic(threadsToRemove);
+  }
+  final ImmutableStatistic ds=deadThreadsStatistic;
+  if (ds != null) {
+    final StorageCountersHolder sch=ds.storageCountersHolder;
+    if (sch != null) {
+      if (holder == null)       holder=new StorageCountersHolder();
+      sch.pushData(holder);
+    }
+  }
+  return holder;
+}

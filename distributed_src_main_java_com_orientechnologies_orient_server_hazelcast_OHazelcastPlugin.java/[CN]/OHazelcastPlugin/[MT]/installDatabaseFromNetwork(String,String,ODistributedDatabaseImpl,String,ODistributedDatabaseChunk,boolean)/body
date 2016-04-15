@@ -19,7 +19,7 @@
       @Override public void run(){
         try {
           Thread.currentThread().setName("OrientDB installDatabase node=" + nodeName + " db="+ databaseName);
-          ODistributedDatabaseChunk chunk=value;
+          ODistributedDatabaseChunk chunk=firstChunk;
           lsn.set(chunk.lsn);
           final OutputStream fOut=new FileOutputStream(fileName,false);
           try {
@@ -74,6 +74,11 @@
   final ODatabaseDocumentTx db=installDatabaseOnLocalNode(databaseName,dbPath,iNode,fileName,delta);
   if (db != null) {
     db.activateOnCurrentThread();
+    if (firstChunk.schema != null) {
+      final ORecord schemaRecord=new ORecordId(db.getStorage().getConfiguration().schemaRecordId).getRecord();
+      schemaRecord.fromStream(firstChunk.schema);
+      schemaRecord.save();
+    }
     db.close();
     final OStorage stg=Orient.instance().getStorage(databaseName);
     if (stg != null)     stg.close();

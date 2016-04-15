@@ -1,0 +1,26 @@
+{
+  banner("Test with quorum = 1");
+  System.out.print("\nChanging configuration (writeQuorum=1, autoDeploy=false)...");
+  ODocument cfg=null;
+  ServerRun server=serverInstance.get(2);
+  OHazelcastPlugin manager=(OHazelcastPlugin)server.getServerInstance().getDistributedManager();
+  ODistributedConfiguration databaseConfiguration=manager.getDatabaseConfiguration(getDatabaseName());
+  cfg=databaseConfiguration.serialize();
+  cfg.field("writeQuorum",1);
+  cfg.field("autoDeploy",true);
+  cfg.field("version",(Integer)cfg.field("version") + 1);
+  manager.updateCachedDatabaseConfiguration(getDatabaseName(),cfg,true,true);
+  System.out.println("\nConfiguration updated.");
+  System.out.println("Network fault on server3.\n");
+  simulateServerFault(serverInstance.get(2),"net-fault");
+  assertFalse(serverInstance.get(2).isActive());
+  executeMultipleWrites(super.executeWritesOnServers,"plocal");
+  try {
+    serverInstance.get(2).startServer(getDistributedServerConfiguration(server));
+  }
+ catch (  Exception e) {
+    fail();
+  }
+  Thread.sleep(1000);
+  super.checkWritesAboveCluster(serverInstance,executeWritesOnServers);
+}

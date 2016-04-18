@@ -1,33 +1,60 @@
 {
   final StringBuilder columnRow=new StringBuilder("\n");
-  final StringBuilder noteRow=new StringBuilder(columnNotes.isEmpty() ? "" : "\n");
+  final Map<String,StringBuilder> metadataRows=new HashMap<String,StringBuilder>();
+  final LinkedHashSet<String> allMetadataNames=new LinkedHashSet<String>();
+  final Set<String> metadataColumns=new HashSet<String>();
+  for (  Entry<String,Map<String,String>> entry : columnMetadata.entrySet()) {
+    metadataColumns.add(entry.getKey());
+    for (    Entry<String,String> entry2 : entry.getValue().entrySet()) {
+      allMetadataNames.add(entry2.getKey());
+      StringBuilder metadataRow=metadataRows.get(entry2.getKey());
+      if (metadataRow == null) {
+        metadataRow=new StringBuilder("\n");
+        metadataRows.put(entry2.getKey(),metadataRow);
+      }
+    }
+  }
   printHeaderLine(iColumns);
   int i=0;
   if (leftBorder) {
     columnRow.append('|');
-    if (!columnNotes.isEmpty())     noteRow.append('|');
+    if (!metadataRows.isEmpty()) {
+      for (      StringBuilder buffer : metadataRows.values())       buffer.append('|');
+    }
   }
   for (  Entry<String,Integer> column : iColumns.entrySet()) {
     String colName=column.getKey();
     if (columnHidden.contains(colName))     continue;
-    if (i++ > 0) {
+    if (i > 0) {
       columnRow.append('|');
-      if (!columnNotes.isEmpty())       noteRow.append('|');
+      if (!metadataRows.isEmpty()) {
+        for (        StringBuilder buffer : metadataRows.values())         buffer.append('|');
+      }
     }
     if (colName.length() > column.getValue())     colName=colName.substring(0,column.getValue());
-    columnRow.append(String.format("%-" + column.getValue() + "s",colName));
-    if (!columnNotes.isEmpty()) {
-      String note=columnNotes.get(column.getKey());
-      if (note == null)       note="";
-      if (note.length() > column.getValue())       note=note.substring(0,column.getValue());
-      noteRow.append(String.format("%-" + column.getValue() + "s",note));
+    columnRow.append(String.format("%-" + column.getValue() + "s",formatCell(colName,column.getValue(),colName)));
+    if (!metadataRows.isEmpty()) {
+      for (      String metadataName : allMetadataNames) {
+        final StringBuilder buffer=metadataRows.get(metadataName);
+        final Map<String,String> metadataColumn=columnMetadata.get(column.getKey());
+        String metadataValue=metadataColumn != null ? metadataColumn.get(metadataName) : null;
+        if (metadataValue == null)         metadataValue="";
+        if (metadataValue.length() > column.getValue())         metadataValue=metadataValue.substring(0,column.getValue());
+        buffer.append(String.format("%-" + column.getValue() + "s",formatCell(colName,column.getValue(),metadataValue)));
+      }
     }
+    ++i;
   }
   if (rightBorder) {
     columnRow.append('|');
-    if (!columnNotes.isEmpty())     noteRow.append('|');
+    if (!metadataRows.isEmpty()) {
+      for (      StringBuilder buffer : metadataRows.values())       buffer.append('|');
+    }
+  }
+  if (!metadataRows.isEmpty()) {
+    for (    StringBuilder buffer : metadataRows.values())     out.onMessage(buffer.toString());
+    printHeaderLine(iColumns);
   }
   out.onMessage(columnRow.toString());
-  if (!columnNotes.isEmpty())   out.onMessage(noteRow.toString());
   printHeaderLine(iColumns);
 }

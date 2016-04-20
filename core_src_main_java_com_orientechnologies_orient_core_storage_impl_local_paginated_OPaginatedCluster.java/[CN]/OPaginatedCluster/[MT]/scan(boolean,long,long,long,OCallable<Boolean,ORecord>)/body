@@ -1,4 +1,5 @@
 {
+  final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
   atomicOperationsManager.acquireReadLock(this);
   try {
     acquireSharedLock();
@@ -12,6 +13,7 @@
       long browsed=0;
       for (; ascendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(ascendingOrder ? 1 : -1)) {
         startOperation();
+        if (statistic != null)         statistic.startRecordReadTimer();
         try {
           final ORawBuffer buffer=readRecordNoLock(clusterPosition,Math.max(prefetchPages,1));
           if (buffer == null)           continue;
@@ -31,6 +33,7 @@
           if (limit > 0 && browsed++ > limit)           return clusterPosition;
         }
   finally {
+          if (statistic != null)           statistic.stopRecordReadTimer();
           completeOperation();
         }
       }

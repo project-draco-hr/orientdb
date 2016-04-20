@@ -55,11 +55,36 @@ case REPLICATE:
     dManager.getAvailableNodes(nodes,getName());
     if (iCommand instanceof ODistributedCommand)     nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
     if (nodes.isEmpty())     return null;
-    if (executeLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return wrapped.command(iCommand);
-    final ODistributedResponse dResponse=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE,null,null);
-    result=dResponse.getPayload();
-    if (exec.involveSchema())     dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
+    if (executeOnlyLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return wrapped.command(iCommand);
+    final Object localResult;
+    if (nodes.contains(localNodeName)) {
+      try {
+        localResult=ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+          @Override public Object call() throws Exception {
+            return wrapped.command(iCommand);
+          }
+        }
+);
+      }
+ catch (      RuntimeException e) {
+        throw e;
+      }
+catch (      Exception e) {
+        OException.wrapException(new ODistributedException("Cannot execute command " + iCommand),e);
+        return null;
+      }
+      nodes.remove(localNodeName);
+    }
+ else     localResult=null;
+    if (nodes.isEmpty()) {
+      if (localResult == null)       throw new ODistributedException("Cannot execute distributed command '" + iCommand + "' because no nodes are available");
+    }
+ else {
+      final ODistributedResponse dResponse=dManager.sendRequest(getName(),involvedClusters,nodes,task,EXECUTION_MODE.RESPONSE,localResult,null);
+      result=dResponse.getPayload();
+    }
   }
+if (exec.involveSchema()) dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
 break;
 }
 if (result instanceof ONeedRetryException) throw (ONeedRetryException)result;

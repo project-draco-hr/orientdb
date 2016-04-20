@@ -1,0 +1,24 @@
+{
+  ODatabaseDocumentTx dbServer1=poolFactory.get(getDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+  ODatabaseDocumentTx dbServer2=poolFactory.get(getDatabaseURL(serverInstance.get(1)),"admin","admin").acquire();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer2);
+  ODocument record1Server1=new ODocument("Person").fields("id",RECORD_ID,"firstName","Han","lastName","Solo");
+  record1Server1.save();
+  waitForInsertedRecordPropagation(RECORD_ID);
+  int actualVersion=record1Server1.getVersion();
+  ((ODistributedStorage)dbServer2.getStorage()).setEventListener(new AfterRecordLockDelayer(1000));
+  ((ODistributedStorage)dbServer1.getStorage()).setEventListener(new AfterRecordLockDelayer(250));
+  ODocument record1Server2=retrieveRecord(getDatabaseURL(serverInstance.get(1)),RECORD_ID);
+  List<Callable<Void>> clients=new LinkedList<Callable<Void>>();
+  clients.add(new RecordUpdater(getDatabaseURL(serverInstance.get(0)),record1Server1,lukeFields,true));
+  clients.add(new RecordUpdater(getDatabaseURL(serverInstance.get(1)),record1Server2,darthFields,true));
+  List<Future<Void>> futures=Executors.newCachedThreadPool().invokeAll(clients);
+  executeFutures(futures);
+  waitForUpdatedRecordPropagation(RECORD_ID,"firstName","Darth");
+  record1Server1=retrieveRecord(getDatabaseURL(serverInstance.get(0)),RECORD_ID);
+  record1Server2=retrieveRecord(getDatabaseURL(serverInstance.get(1)),RECORD_ID);
+  int finalVersionServer1=record1Server1.field("@version");
+  int finalVersionServer2=record1Server2.field("@version");
+  assertEquals(finalVersionServer1,actualVersion + 1);
+  assertEquals(finalVersionServer2,actualVersion + 1);
+}

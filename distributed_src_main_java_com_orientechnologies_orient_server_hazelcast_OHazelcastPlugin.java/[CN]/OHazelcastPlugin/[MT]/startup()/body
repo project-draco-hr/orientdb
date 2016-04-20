@@ -3,11 +3,16 @@
   OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD.setValue(Integer.MAX_VALUE);
   OGlobalConfiguration.RID_BAG_SBTREEBONSAI_TO_EMBEDDED_THRESHOLD.setValue(-1);
   OGlobalConfiguration.STORAGE_TRACK_CHANGED_RECORDS_IN_WAL.setValue(true);
+  System.setProperty("hazelcast.operation.thread.count","1");
+  System.setProperty("hazelcast.operation.generic.thread.count","1");
+  System.setProperty("hazelcast.event.thread.count","1");
+  System.setProperty("hazelcast.client.event.thread.count","1");
   serverInstance.addTemporaryUser(REPLICATOR_USER,"" + new SecureRandom().nextLong(),"*");
   super.startup();
   status=NODE_STATUS.STARTING;
   final String localNodeName=nodeName;
   activeNodes.clear();
+  activeNodesNamesByMemberId.clear();
   for (  ORemoteServerController server : remoteServers.values())   server.close();
   remoteServers.clear();
   registeredNodeById=null;
@@ -17,15 +22,17 @@
     nodeUuid=hazelcastInstance.getCluster().getLocalMember().getUuid();
     OLogManager.instance().info(this,"Starting distributed server '%s' (hzID=%s)...",localNodeName,nodeId);
     activeNodes.put(localNodeName,hazelcastInstance.getCluster().getLocalMember());
+    activeNodesNamesByMemberId.put(hazelcastInstance.getCluster().getLocalMember().getUuid(),localNodeName);
     membershipListenerRegistration=hazelcastInstance.getCluster().addMembershipListener(this);
     OServer.registerServerInstance(localNodeName,serverInstance);
-    final IMap<String,Object> configurationMap=(IMap<String,Object>)getConfigurationMap();
-    configurationMap.addEntryListener(this,true);
+    configurationMap=new OHazelcastDistributedMap(hazelcastInstance);
+    configurationMap.getHazelcastMap().addEntryListener(this,true);
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
       if (!m.getUuid().equals(getLocalNodeId())) {
         final String memberName=getNodeName(m);
         if (memberName != null) {
           activeNodes.put(memberName,m);
+          activeNodesNamesByMemberId.put(m.getUuid(),memberName);
         }
  else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
       }
@@ -34,7 +41,7 @@
     lock.lock();
     try {
       final ODocument registeredNodesFromCluster=new ODocument();
-      final String registeredNodesFromClusterAsJson=(String)getConfigurationMap().get(CONFIG_REGISTEREDNODES);
+      final String registeredNodesFromClusterAsJson=(String)configurationMap.get(CONFIG_REGISTEREDNODES);
       if (registeredNodesFromClusterAsJson != null) {
         registeredNodesFromCluster.fromJSON(registeredNodesFromClusterAsJson);
         registeredNodeById=registeredNodesFromCluster.field("ids",OType.EMBEDDEDLIST);
@@ -57,7 +64,7 @@
         registeredNodeByName.put(nodeName,nodeId);
         registeredNodesFromCluster.field("names",registeredNodeByName,OType.EMBEDDEDMAP);
       }
-      getConfigurationMap().put(CONFIG_REGISTEREDNODES,registeredNodesFromCluster.toJSON());
+      configurationMap.put(CONFIG_REGISTEREDNODES,registeredNodesFromCluster.toJSON());
     }
   finally {
       lock.unlock();

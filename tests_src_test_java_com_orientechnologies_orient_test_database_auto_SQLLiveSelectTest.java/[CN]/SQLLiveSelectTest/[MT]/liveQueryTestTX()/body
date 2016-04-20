@@ -1,0 +1,41 @@
+{
+  int TOTAL_OPS=6;
+  final CountDownLatch latch=new CountDownLatch(TOTAL_OPS);
+  final List<ORecordOperation> ops=Collections.synchronizedList(new ArrayList());
+  OResultSet<ODocument> tokens=database.query(new OLiveQuery<Object>("live select from LiveClassTx",new OLiveResultListener(){
+    @Override public void onLiveResult(    int iLiveToken,    ORecordOperation iOp) throws OException {
+      ops.add(iOp);
+      latch.countDown();
+    }
+    @Override public void onError(    int iLiveToken){
+    }
+    @Override public void onUnsubscribe(    int iLiveToken){
+    }
+  }
+));
+  Assert.assertEquals(tokens.size(),1);
+  ODocument tokenDoc=tokens.get(0);
+  Integer token=tokenDoc.field("token");
+  Assert.assertNotNull(token);
+  database.begin();
+  database.command(new OCommandSQL("insert into LiveClassTx set name = 'foo', surname = 'bar'")).execute();
+  database.command(new OCommandSQL("insert into LiveClassTx set name = 'foo', surname = 'baz'")).execute();
+  database.command(new OCommandSQL("insert into LiveClassTx set name = 'foo'")).execute();
+  database.commit();
+  database.begin();
+  database.command(new OCommandSQL("update LiveClassTx set name = 'updated'")).execute();
+  database.commit();
+  latch.await();
+  Assert.assertEquals(ops.size(),TOTAL_OPS);
+  for (  ORecordOperation doc : ops) {
+    if (doc.type == ORecordOperation.CREATED) {
+      Assert.assertEquals(((ODocument)doc.record).field("name"),"foo");
+    }
+ else     if (doc.type == ORecordOperation.UPDATED) {
+      Assert.assertEquals(((ODocument)doc.record).field("name"),"updated");
+    }
+ else {
+      Assert.fail();
+    }
+  }
+}

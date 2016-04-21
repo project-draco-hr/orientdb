@@ -1,5 +1,8 @@
 {
+  final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
+  int readEntries=0;
   startOperation();
+  if (statistic != null)   statistic.startRidBagEntryReadTimer();
   try {
     if (!ascSortOrder)     throw new IllegalStateException("Descending sort order is not supported.");
     atomicOperationsManager.acquireReadLock(this);
@@ -22,7 +25,10 @@
             OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChanges(atomicOperation,cacheEntry),this);
             int bucketSize=bucket.size();
             for (int i=index; i < bucketSize; i++) {
-              if (!listener.addResult(bucket.getEntry(i)))               return;
+              if (!listener.addResult(bucket.getEntry(i))) {
+                readEntries++;
+                return;
+              }
             }
             bucketPointer=bucket.getRightSibling();
             index=0;
@@ -45,6 +51,7 @@
     }
   }
   finally {
+    if (statistic != null)     statistic.stopRidBagEntryReadTimer(readEntries);
     completeOperation();
   }
 }

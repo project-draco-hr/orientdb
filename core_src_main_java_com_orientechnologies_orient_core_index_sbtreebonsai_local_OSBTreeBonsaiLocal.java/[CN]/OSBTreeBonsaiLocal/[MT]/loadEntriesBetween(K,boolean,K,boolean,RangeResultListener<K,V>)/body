@@ -1,5 +1,8 @@
 {
+  final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
+  int readEntries=0;
   startOperation();
+  if (statistic != null)   statistic.startRidBagEntryReadTimer();
   try {
     atomicOperationsManager.acquireReadLock(this);
     try {
@@ -34,7 +37,10 @@
             if (!bucketPointer.equals(bucketPointerTo))             endIndex=bucket.size() - 1;
  else             endIndex=indexTo;
             for (int i=startIndex; i <= endIndex; i++) {
-              if (!listener.addResult(bucket.getEntry(i)))               break resultsLoop;
+              if (!listener.addResult(bucket.getEntry(i))) {
+                readEntries++;
+                break resultsLoop;
+              }
             }
             if (bucketPointer.equals(bucketPointerTo))             break;
             bucketPointer=bucket.getRightSibling();
@@ -58,6 +64,7 @@
     }
   }
   finally {
+    if (statistic != null)     statistic.stopRidBagEntryReadTimer(readEntries);
     completeOperation();
   }
 }

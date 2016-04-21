@@ -1,10 +1,10 @@
 {
   makeActive();
   try {
-    if (!database.isClosed() && commitTx) {
-      final OStorage storage=database.getStorage().getUnderlying();
+    if (!getDatabase().isClosed() && commitTx) {
+      final OStorage storage=getDatabase().getStorage().getUnderlying();
       if (storage instanceof OAbstractPaginatedStorage) {
-        if (((OAbstractPaginatedStorage)storage).getWALInstance() != null)         database.commit();
+        if (((OAbstractPaginatedStorage)storage).getWALInstance() != null)         getDatabase().commit();
       }
     }
   }
@@ -18,7 +18,12 @@ catch (  Exception e) {
   }
  finally {
     try {
-      if (closeDb)       database.close();
+      if (closeDb) {
+        getDatabase().close();
+        if (getDatabase().isPooled()) {
+          database=null;
+        }
+      }
     }
  catch (    Exception e) {
       OLogManager.instance().error(this,"Error during context close for db " + url,e);
@@ -28,5 +33,5 @@ catch (  Exception e) {
   username=null;
   password=null;
   pollGraphFromStack(closeDb);
-  if (!closeDb)   database.activateOnCurrentThread();
+  if (!closeDb)   getDatabase().activateOnCurrentThread();
 }

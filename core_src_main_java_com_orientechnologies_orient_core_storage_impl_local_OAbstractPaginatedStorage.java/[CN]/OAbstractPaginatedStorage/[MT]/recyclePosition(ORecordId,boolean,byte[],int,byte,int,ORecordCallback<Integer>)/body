@@ -1,0 +1,30 @@
+{
+  checkOpeness();
+  checkLowDiskSpaceAndFullCheckpointRequests();
+  final OCluster cluster=getClusterById(rid.clusterId);
+  if (transaction.get() != null) {
+    final long timer=Orient.instance().getProfiler().startChrono();
+    try {
+      return doRecycleRecord(rid,updateContent,content,version,recordType,callback,cluster);
+    }
+  finally {
+      Orient.instance().getProfiler().stopChrono(PROFILER_RECYCLE_RECORD,"Recycled a record position in database",timer,"db.*.recyclePosition");
+    }
+  }
+  final long timer=Orient.instance().getProfiler().startChrono();
+  stateLock.acquireReadLock();
+  try {
+    final Lock lock=recordVersionManager.acquireExclusiveLock(rid);
+    try {
+      checkOpeness();
+      return doRecycleRecord(rid,updateContent,content,version,recordType,callback,cluster);
+    }
+  finally {
+      lock.unlock();
+    }
+  }
+  finally {
+    stateLock.releaseReadLock();
+    Orient.instance().getProfiler().stopChrono(PROFILER_RECYCLE_RECORD,"Recycled a record to database",timer,"db.*.recyclePosition");
+  }
+}

@@ -1,11 +1,12 @@
 {
   stateLock.acquireWriteLock();
   try {
+    OStorageRemoteSession session=getCurrentSession();
+    OStorageRemoteNodeSession nodeSession=session.getOrCreate(network.getServerURL());
     try {
       network.writeByte(OChannelBinaryProtocol.REQUEST_DB_OPEN);
-      network.writeInt(getSessionId());
+      network.writeInt(nodeSession.getSessionId());
       sendClientInfo(network,DRIVER_NAME,true,true);
-      OStorageRemoteSession session=getCurrentSession();
       network.writeString(name);
       network.writeString(session.connectionUserName);
       network.writeString(session.connectionUserPassword);
@@ -15,13 +16,13 @@
     }
     final int sessionId;
     try {
-      network.beginResponse(getSessionId(),false);
+      network.beginResponse(nodeSession.getSessionId(),false);
       sessionId=network.readInt();
       byte[] token=network.readBytes();
       if (token.length == 0) {
         token=null;
       }
-      setSessionId(network.getServerURL(),sessionId,token);
+      nodeSession.setSession(sessionId,token);
       OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
       readDatabaseInformation(network);
       updateClusterConfiguration(network.getServerURL(),network.readBytes());

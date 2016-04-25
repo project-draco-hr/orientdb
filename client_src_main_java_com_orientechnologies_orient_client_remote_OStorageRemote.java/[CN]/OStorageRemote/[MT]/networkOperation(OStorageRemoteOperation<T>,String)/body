@@ -1,4 +1,5 @@
 {
+  int retry=connectionRetry;
   do {
     OChannelBinaryAsynchClient network=null;
     try {
@@ -19,8 +20,27 @@
  catch (    OModificationOperationProhibitedException mope) {
       handleDBFreeze();
     }
+catch (    OTokenException e) {
+      OStorageRemoteSession session=getCurrentSession();
+      session.remove(network.getServerURL());
+    }
+catch (    OTokenSecurityException e) {
+      OStorageRemoteSession session=getCurrentSession();
+      session.remove(network.getServerURL());
+    }
+catch (    OOfflineNodeException e) {
+    }
+catch (    IOException e) {
+      retry=handleIOException(retry,network,e);
+    }
+catch (    OIOException e) {
+      retry=handleIOException(retry,network,e);
+    }
+catch (    OException e) {
+      throw e;
+    }
 catch (    Exception e) {
-      handleException(network,errorMessage,e);
+      throw OException.wrapException(new OStorageException(errorMessage),e);
     }
   }
  while (true);

@@ -5,29 +5,29 @@
       final OChannelBinaryAsynchClient network=getAvailableNetwork(currentURL);
       try {
         OStorageRemoteSession session=getCurrentSession();
-        final byte[] curToken=session.tokens.get(network.getServerURL());
-        if (curToken == null || curToken.length == 0) {
+        OStorageRemoteNodeSession nodeSession=session.getOrCreate(network.getServerURL());
+        if (nodeSession == null) {
           openRemoteDatabase(network);
           return network.getServerURL();
         }
  else {
           try {
             network.writeByte(OChannelBinaryProtocol.REQUEST_DB_REOPEN);
-            network.writeInt(getSessionId());
-            network.writeBytes(curToken);
+            network.writeInt(nodeSession.getSessionId());
+            network.writeBytes(nodeSession.getToken());
           }
   finally {
             endRequest(network);
           }
           final int sessionId;
           try {
-            byte[] newToken=network.beginResponse(getSessionId(),true);
+            byte[] newToken=network.beginResponse(nodeSession.getSessionId(),true);
             sessionId=network.readInt();
             if (newToken != null && newToken.length > 0) {
-              setSessionId(currentURL,sessionId,newToken);
+              nodeSession.setSession(sessionId,newToken);
             }
  else {
-              setSessionId(currentURL,sessionId,curToken);
+              nodeSession.setSession(sessionId,nodeSession.getToken());
             }
             OLogManager.instance().debug(this,"Client connected to %s with session id=%d",network.getServerURL(),sessionId);
             return currentURL;
@@ -52,7 +52,7 @@ catch (      OOfflineNodeException e) {
 catch (      OSecurityException ex) {
         OLogManager.instance().debug(this,"Invalidate token for url=%s",ex,currentURL);
         OStorageRemoteSession session=getCurrentSession();
-        session.tokens.remove(currentURL);
+        session.remove(currentURL);
         if (network != null) {
           try {
             engine.getConnectionManager().remove(network);

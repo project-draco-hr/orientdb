@@ -16,5 +16,14 @@
   final Object goodResponsePayload=bestResponsesGroup.isEmpty() ? null : bestResponsesGroup.get(0).getPayload();
   if (goodResponsePayload instanceof RuntimeException)   return (RuntimeException)goodResponsePayload;
  else   if (goodResponsePayload instanceof Throwable)   return OException.wrapException(new ODistributedException(composeConflictMessage()),(Throwable)goodResponsePayload);
- else   return new ODistributedOperationException(composeConflictMessage());
+ else {
+    if (responseGroups.size() <= 2) {
+      for (int i=0; i < responseGroups.size(); ++i) {
+        if (i == bestResponsesGroupIndex)         continue;
+        final List<ODistributedResponse> badResponses=responseGroups.get(i);
+        if (badResponses.get(0).getPayload() instanceof RuntimeException)         return (RuntimeException)badResponses.get(0).getPayload();
+      }
+    }
+    return new ODistributedOperationException(composeConflictMessage());
+  }
 }

@@ -8,6 +8,33 @@
     updateCachedDatabaseConfiguration(iDatabase.getName(),cfg.serialize(),true,true);
     final ODistributedDatabaseImpl distribDatabase=messageService.registerDatabase(iDatabase.getName());
     distribDatabase.setOnline();
+    try {
+      Thread.sleep(1000);
+    }
+ catch (    InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ODistributedException("Error on creating database '" + iDatabase.getName() + "' on distributed nodes");
+    }
+    final Set<String> servers=cfg.getAllConfiguredServers();
+    if (servers.size() > 1) {
+      boolean allServersAreOnline=true;
+      while (true) {
+        for (        String server : servers) {
+          if (!isNodeOnline(server,iDatabase.getName())) {
+            allServersAreOnline=false;
+            break;
+          }
+        }
+        if (allServersAreOnline)         break;
+        try {
+          Thread.sleep(200);
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new ODistributedException("Error on creating database '" + iDatabase.getName() + "' on distributed nodes");
+        }
+      }
+    }
     onOpen(iDatabase);
   }
   finally {

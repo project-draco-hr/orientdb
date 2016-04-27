@@ -1,0 +1,32 @@
+{
+  final List<ORecordId> recordsToLock=new ArrayList<ORecordId>();
+  for (  ORecordOperation op : iTx.getAllRecordEntries()) {
+    recordsToLock.add((ORecordId)op.record.getIdentity());
+  }
+  ORecordId lastRecordCannotLock=null;
+  for (int retry=1; retry <= maxAutoRetry; ++retry) {
+    lastRecordCannotLock=null;
+    for (    ORecordId rid : recordsToLock) {
+      try {
+        reqContext.lock(rid);
+        if (eventListener != null) {
+          try {
+            eventListener.onAfterRecordLock(rid);
+          }
+ catch (          Throwable t) {
+            ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Caught exception during ODistributedStorageEventListener.onAfterRecordLock",t);
+          }
+        }
+      }
+ catch (      ODistributedRecordLockedException e) {
+        lastRecordCannotLock=rid;
+        reqContext.unlock();
+        if (autoRetryDelay > -1 && retry + 1 <= maxAutoRetry)         Thread.sleep(autoRetryDelay / 2 + new Random().nextInt(autoRetryDelay));
+        ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: cannot lock records %s (retry %d/%d)",recordsToLock,retry,maxAutoRetry);
+        break;
+      }
+    }
+    if (lastRecordCannotLock == null)     break;
+  }
+  if (lastRecordCannotLock != null)   throw new ODistributedRecordLockedException(lastRecordCannotLock);
+}

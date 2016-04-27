@@ -1,29 +1,7 @@
 {
-  actualStorageConfiguration.clusters=new ArrayList<OStorageClusterConfiguration>();
-  actualStorageConfiguration.fileTemplate=new OStorageSegmentConfiguration();
-  actualStorageConfiguration.binaryFormatVersion=Integer.MAX_VALUE;
-  actualStorageDir=buildDirectory + "/sbtreeWithBigValuesWALTestActual";
-  when(actualStorage.getStoragePath()).thenReturn(actualStorageDir);
-  when(actualStorage.getName()).thenReturn("sbtreeBigValuesWithWALTesActual");
-  File buildDir=new File(buildDirectory);
-  if (!buildDir.exists())   buildDir.mkdirs();
-  File actualStorageDirFile=new File(actualStorageDir);
-  if (!actualStorageDirFile.exists())   actualStorageDirFile.mkdirs();
-  OStorageVariableParser variableParser=new OStorageVariableParser(actualStorageDir);
-  when(actualStorage.getVariableParser()).thenReturn(variableParser);
-  when(actualStorage.getComponentsFactory()).thenReturn(new OCurrentStorageComponentsFactory(actualStorageConfiguration));
-  writeAheadLog=new ODiskWriteAheadLog(6000,-1,10 * 1024L * OWALPage.PAGE_SIZE,null,actualStorage);
-  when(actualStorage.getWALInstance()).thenReturn(writeAheadLog);
-  actualAtomicOperationsManager=new OAtomicOperationsManager(actualStorage);
-  actualWriteCache=new OWOWCache(false,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,new OByteBufferPool(OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024),100000,writeAheadLog,100,1648L * 1024 * 1024,400L * 1024 * 1024* 1024 + 1648L * 1024 * 1024,actualStorage,true,1);
-  actualReadCache=new O2QCache(400L * 1024 * 1024* 1024,OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024,true,20);
-  when(actualStorage.getStorageTransaction()).thenReturn(null);
-  when(actualStorage.getReadCache()).thenReturn(actualReadCache);
-  when(actualStorage.getWALInstance()).thenReturn(writeAheadLog);
-  when(actualStorage.getConfiguration()).thenReturn(actualStorageConfiguration);
-  when(actualStorage.getAtomicOperationsManager()).thenReturn(actualAtomicOperationsManager);
-  when(actualStorage.getMode()).thenReturn("rw");
-  when(actualStorageConfiguration.getDirectory()).thenReturn(actualStorageDir);
-  sbTree=new OSBTree<Integer,byte[]>("actualSBTree",".sbt",true,".nbt",actualStorage);
+  writeAheadLog=(ODiskWriteAheadLog)((OLocalPaginatedStorage)databaseDocumentTx.getStorage()).getWALInstance();
+  writeAheadLog.preventCutTill(writeAheadLog.getFlushedLsn());
+  actualReadCache=((OLocalPaginatedStorage)databaseDocumentTx.getStorage()).getReadCache();
+  sbTree=new OSBTree<Integer,byte[]>("actualSBTree",".sbt",true,".nbt",(OLocalPaginatedStorage)databaseDocumentTx.getStorage());
   sbTree.create(OIntegerSerializer.INSTANCE,OBinaryTypeSerializer.INSTANCE,null,1,false);
 }

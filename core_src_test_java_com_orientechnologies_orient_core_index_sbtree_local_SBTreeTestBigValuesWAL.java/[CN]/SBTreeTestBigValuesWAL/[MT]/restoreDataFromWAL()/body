@@ -1,50 +1,23 @@
 {
-  ODiskWriteAheadLog log=new ODiskWriteAheadLog(4,-1,10 * 1024L * OWALPage.PAGE_SIZE,null,actualStorage);
+  OWriteAheadLog log=((OAbstractPaginatedStorage)databaseDocumentTx.getStorage()).getWALInstance();
   OLogSequenceNumber lsn=log.begin();
   List<OWALRecord> atomicUnit=new ArrayList<OWALRecord>();
+  List<OWALRecord> batch=new ArrayList<OWALRecord>();
   boolean atomicChangeIsProcessed=false;
   while (lsn != null) {
     OWALRecord walRecord=log.read(lsn);
-    atomicUnit.add(walRecord);
-    if (!atomicChangeIsProcessed) {
-      Assert.assertTrue(walRecord instanceof OAtomicUnitStartRecord);
-      atomicChangeIsProcessed=true;
-    }
- else     if (walRecord instanceof OAtomicUnitEndRecord) {
-      atomicChangeIsProcessed=false;
-      for (      OWALRecord restoreRecord : atomicUnit) {
-        if (restoreRecord instanceof OAtomicUnitStartRecord || restoreRecord instanceof OAtomicUnitEndRecord || restoreRecord instanceof ONonTxOperationPerformedWALRecord|| restoreRecord instanceof OFileCreatedWALRecord)         continue;
-        final OUpdatePageRecord updatePageRecord=(OUpdatePageRecord)restoreRecord;
-        final long fileId=updatePageRecord.getFileId();
-        final long pageIndex=updatePageRecord.getPageIndex();
-        if (!expectedWriteCache.isOpen(fileId))         expectedReadCache.openFile(fileId,expectedWriteCache);
-        OCacheEntry cacheEntry=expectedReadCache.load(fileId,pageIndex,true,expectedWriteCache,0);
-        if (cacheEntry == null) {
-          do {
-            if (cacheEntry != null)             expectedReadCache.release(cacheEntry,expectedWriteCache);
-            cacheEntry=expectedReadCache.allocateNewPage(fileId,expectedWriteCache);
-          }
- while (cacheEntry.getPageIndex() != pageIndex);
-        }
-        cacheEntry.acquireExclusiveLock();
-        try {
-          ODurablePage durablePage=new ODurablePage(cacheEntry,null);
-          durablePage.restoreChanges(updatePageRecord.getChanges());
-          durablePage.setLsn(updatePageRecord.getLsn());
-          cacheEntry.markDirty();
-        }
-  finally {
-          cacheEntry.releaseExclusiveLock();
-          expectedReadCache.release(cacheEntry,expectedWriteCache);
-        }
-      }
-      atomicUnit.clear();
-    }
- else {
-      Assert.assertTrue(walRecord instanceof OUpdatePageRecord || walRecord instanceof ONonTxOperationPerformedWALRecord || walRecord instanceof OFileCreatedWALRecord);
+    batch.add(walRecord);
+    if (batch.size() >= 1000) {
+      atomicChangeIsProcessed=restoreDataFromBatch(atomicChangeIsProcessed,atomicUnit,batch);
+      batch=new ArrayList<OWALRecord>();
     }
     lsn=log.next(lsn);
   }
+  if (batch.size() > 0) {
+    restoreDataFromBatch(atomicChangeIsProcessed,atomicUnit,batch);
+    batch=null;
+  }
   Assert.assertTrue(atomicUnit.isEmpty());
-  log.close();
+  OWriteCache writeCache=((OAbstractPaginatedStorage)expectedDatabaseDocumentTx.getStorage()).getWriteCache();
+  writeCache.flush();
 }

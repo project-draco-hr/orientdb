@@ -73,24 +73,28 @@
   }
   final ODatabaseDocumentTx db=installDatabaseOnLocalNode(databaseName,dbPath,iNode,fileName,delta);
   if (db != null) {
-    final Lock lock=getLock(databaseName + ".cfg");
-    lock.lock();
     try {
-      final ODistributedConfiguration cfg=getDatabaseConfiguration(db.getName());
-      final boolean distribCfgDirty=rebalanceClusterOwnership(nodeName,db,cfg,new HashSet<String>(),true);
-      if (distribCfgDirty) {
-        ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Distributed configuration modified");
-        updateCachedDatabaseConfiguration(db.getName(),cfg.serialize(),true,true);
+      final Lock lock=getLock(databaseName + ".cfg");
+      lock.lock();
+      try {
+        final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
+        final boolean distribCfgDirty=rebalanceClusterOwnership(nodeName,db,cfg,new HashSet<String>(),true);
+        if (distribCfgDirty) {
+          ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Distributed configuration modified");
+          updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+        }
+        distrDatabase.setOnline();
       }
-      distrDatabase.setOnline();
+  finally {
+        lock.unlock();
+      }
     }
   finally {
-      lock.unlock();
+      db.activateOnCurrentThread();
+      db.close();
     }
-    db.activateOnCurrentThread();
-    db.close();
   }
-  final ODistributedConfiguration cfg=getDatabaseConfiguration(db.getName());
+  final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
   final Set<String> localManagedClusters=cfg.getClustersOnServer(localNodeName);
   final Set<String> sourceNodeClusters=cfg.getClustersOnServer(iNode);
   localManagedClusters.removeAll(sourceNodeClusters);

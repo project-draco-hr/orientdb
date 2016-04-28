@@ -17,9 +17,22 @@
   ODistributedServerLog.debug(this,manager.getLocalNodeName(),manager.getNodeNameById(req.getId().getNodeId()),ODistributedServerLog.DIRECTION.IN,"Received request %s (%d bytes)",req,serializedReq.length);
   final String dbName=req.getDatabaseName();
   if (dbName != null) {
+    if (distributedRequests == 0) {
+      if (req.getTask().isNodeOnlineRequired()) {
+        try {
+          manager.waitUntilNodeOnline(manager.getLocalNodeName(),dbName);
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+          ODistributedServerLog.error(this,manager.getLocalNodeName(),manager.getNodeNameById(req.getId().getNodeId()),ODistributedServerLog.DIRECTION.IN,"Distributed request %s interrupted waiting for the database to be online",req);
+          throw new ODistributedException("Distributed request " + req.getId() + " interrupted waiting for the database to be online");
+        }
+      }
+    }
     ODistributedDatabase ddb=manager.getMessageService().getDatabase(dbName);
     if (ddb == null)     throw new ODistributedException("Database configuration not found for database '" + req.getDatabaseName() + "'");
     ddb.processRequest(req);
   }
  else   manager.executeOnLocalNode(req.getId(),req.getTask(),null);
+  distributedRequests++;
 }

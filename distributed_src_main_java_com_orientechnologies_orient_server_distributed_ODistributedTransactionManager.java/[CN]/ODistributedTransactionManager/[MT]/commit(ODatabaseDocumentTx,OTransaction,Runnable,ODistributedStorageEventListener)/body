@@ -40,13 +40,15 @@
           if (finalExecutionModeSynch) {
             ODistributedResponse lastResult=null;
             for (int retry=1; retry <= maxAutoRetry; ++retry) {
+              boolean isLastRetry=maxAutoRetry == retry;
               lastResult=dManager.sendRequest(storage.getName(),involvedClusters,nodes,txTask,requestId.getMessageId(),EXECUTION_MODE.RESPONSE,localResult,null);
-              if (!processCommitResult(localNodeName,iTx,txTask,involvedClusters,uResult,nodes,autoRetryDelay,maxAutoRetry,lastResult.getRequestId(),lastResult,ctx,eventListener)) {
+              if (!processCommitResult(localNodeName,iTx,txTask,involvedClusters,uResult,nodes,autoRetryDelay,lastResult.getRequestId(),lastResult,isLastRetry)) {
                 continue;
               }
+              ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction succeeded. Tasks: %s",txTask.getTasks());
               return null;
             }
-            ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d)",maxAutoRetry);
+            ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d). Task: %s - Payload: %s - Tasks: %s",maxAutoRetry,txTask,txTask.getPayload(),txTask.getTasks());
             storage.executeUndoOnLocalServer(requestId,txTask);
             sendTxCompleted(localNodeName,involvedClusters,nodes,lastResult.getRequestId(),false);
             throw (ODistributedRecordLockedException)lastResult.getPayload();

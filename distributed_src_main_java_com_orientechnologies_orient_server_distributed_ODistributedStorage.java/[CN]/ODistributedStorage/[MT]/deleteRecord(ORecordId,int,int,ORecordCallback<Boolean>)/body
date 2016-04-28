@@ -25,7 +25,8 @@
       @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
         final ODeleteRecordTask task=new ODeleteRecordTask(iRecordId,iVersion);
         final OStorageOperationResult<Boolean> localResult;
-        if (nodes.contains(localNodeName)) {
+        final boolean executedLocally=nodes.contains(localNodeName);
+        if (executedLocally) {
           try {
             task.checkRecordExists();
             localResult=(OStorageOperationResult<Boolean>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
@@ -49,7 +50,7 @@ catch (          Exception e) {
         dManager.getAvailableNodes(nodes,getName());
         if (nodes.isEmpty()) {
           unlockCallback.call(null);
-          if (localResult == null)           throw new ODistributedException("Cannot execute distributed update on record " + iRecordId + " because no nodes are available");
+          if (!executedLocally)           throw new ODistributedException("Cannot execute distributed update on record " + iRecordId + " because no nodes are available");
         }
  else {
           final Boolean localResultPayload=localResult != null ? localResult.getResult() : null;

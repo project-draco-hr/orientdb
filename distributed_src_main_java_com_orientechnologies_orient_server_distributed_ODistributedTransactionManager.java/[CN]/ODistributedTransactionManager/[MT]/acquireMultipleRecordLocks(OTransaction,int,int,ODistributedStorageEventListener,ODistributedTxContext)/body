@@ -4,8 +4,10 @@
     recordsToLock.add((ORecordId)op.record.getIdentity());
   }
   ORecordId lastRecordCannotLock=null;
+  ODistributedRequestId lockHolder=null;
   for (int retry=1; retry <= maxAutoRetry; ++retry) {
     lastRecordCannotLock=null;
+    lockHolder=null;
     for (    ORecordId rid : recordsToLock) {
       try {
         reqContext.lock(rid);
@@ -20,6 +22,7 @@
       }
  catch (      ODistributedRecordLockedException e) {
         lastRecordCannotLock=rid;
+        lockHolder=e.getLockHolder();
         reqContext.unlock();
         if (autoRetryDelay > -1 && retry + 1 <= maxAutoRetry)         Thread.sleep(autoRetryDelay / 2 + new Random().nextInt(autoRetryDelay));
         ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: cannot lock records %s (retry %d/%d)",recordsToLock,retry,maxAutoRetry);
@@ -28,5 +31,5 @@
     }
     if (lastRecordCannotLock == null)     break;
   }
-  if (lastRecordCannotLock != null)   throw new ODistributedRecordLockedException(lastRecordCannotLock);
+  if (lastRecordCannotLock != null)   throw new ODistributedRecordLockedException(lastRecordCannotLock,lockHolder);
 }

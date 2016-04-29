@@ -3,6 +3,8 @@
   checkLowDiskSpaceAndFullCheckpointRequests();
   final ODatabaseDocumentInternal databaseRecord=(ODatabaseDocumentInternal)clientTx.getDatabase();
   ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  final Map<String,OIndex<?>> indexes=new HashMap<String,OIndex<?>>();
+  for (  OIndex<?> index : databaseRecord.getMetadata().getIndexManager().getIndexes())   indexes.put(index.getName(),index);
   final Iterable<ORecordOperation> entries=(Iterable<ORecordOperation>)clientTx.getAllRecordEntries();
   for (  ORecordOperation txEntry : entries) {
     if (txEntry.type == ORecordOperation.CREATED || txEntry.type == ORecordOperation.UPDATED) {
@@ -44,7 +46,7 @@
           commitEntry(txEntry,positions.get(txEntry));
           result.add(txEntry);
         }
-        if (callback != null)         callback.run();
+        commitIndexes(clientTx,indexes);
         endStorageTx();
         OTransactionAbstract.updateCacheFromEntries(clientTx,entries,true);
       }

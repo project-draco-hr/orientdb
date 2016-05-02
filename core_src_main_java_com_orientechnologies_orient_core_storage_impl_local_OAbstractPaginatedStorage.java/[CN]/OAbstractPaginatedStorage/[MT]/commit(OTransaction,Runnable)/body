@@ -2,9 +2,8 @@
   checkOpeness();
   checkLowDiskSpaceAndFullCheckpointRequests();
   final ODatabaseDocumentInternal databaseRecord=(ODatabaseDocumentInternal)clientTx.getDatabase();
+  final Map<String,OIndexInternal<?>> indexesToCommit=getChangedIndexes(clientTx,databaseRecord.getMetadata().getIndexManager());
   ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
-  final Map<String,OIndex<?>> indexes=new HashMap<String,OIndex<?>>();
-  for (  OIndex<?> index : databaseRecord.getMetadata().getIndexManager().getIndexes())   indexes.put(index.getName(),index);
   final Iterable<ORecordOperation> entries=(Iterable<ORecordOperation>)clientTx.getAllRecordEntries();
   for (  ORecordOperation txEntry : entries) {
     if (txEntry.type == ORecordOperation.CREATED || txEntry.type == ORecordOperation.UPDATED) {
@@ -46,7 +45,7 @@
           commitEntry(txEntry,positions.get(txEntry));
           result.add(txEntry);
         }
-        commitIndexes(clientTx,indexes);
+        commitIndexes(clientTx,indexesToCommit);
         endStorageTx();
         OTransactionAbstract.updateCacheFromEntries(clientTx,entries,true);
       }

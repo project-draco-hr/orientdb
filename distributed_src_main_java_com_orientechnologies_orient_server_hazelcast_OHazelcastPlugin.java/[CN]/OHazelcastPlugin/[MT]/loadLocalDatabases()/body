@@ -3,25 +3,22 @@
     final String databaseName=storageEntry.getKey();
     if (messageService.getDatabase(databaseName) == null) {
       ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Opening database '%s'...",databaseName);
-      ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
-      ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Current node started as %s for database '%s'",cfg.getServerRole(nodeName),databaseName);
-      final boolean publishCfg=!configurationMap.containsKey(CONFIG_DATABASE_PREFIX + databaseName);
-      if (publishCfg) {
-        ODocument cfgDoc=cfg.getDocument();
-        ORecordInternal.setRecordSerializer(cfgDoc,ODatabaseDocumentTx.getDefaultSerializer());
-        configurationMap.put(CONFIG_DATABASE_PREFIX + databaseName,cfgDoc);
+      executeInDistributedDatabaseLock(databaseName,new OCallable<Object,ODistributedConfiguration>(){
+        @Override public Object call(        ODistributedConfiguration cfg){
+          ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Current node started as %s for database '%s'",cfg.getServerRole(nodeName),databaseName);
+          if (!configurationMap.containsKey(CONFIG_DATABASE_PREFIX + databaseName))           updateCachedDatabaseConfiguration(databaseName,cfg.getDocument(),false,true);
+          final ODistributedDatabaseImpl ddb=messageService.registerDatabase(databaseName);
+          cfg.addNewNodeInServerList(nodeName);
+          final String coordinator=getCoordinatorServer(cfg);
+          if (!nodeName.equals(coordinator)) {
+            ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"First load of database '%s' in the cluster, set local node as coordinator (was '%s')",databaseName,coordinator);
+            electCurrentNodeAsNewCoordinator(cfg,coordinator,databaseName);
+          }
+          ddb.setOnline();
+          return null;
+        }
       }
-      final ODistributedDatabaseImpl ddb=messageService.registerDatabase(databaseName);
-      cfg=getDatabaseConfiguration(databaseName);
-      cfg.addNewNodeInServerList(nodeName);
-      final String coordinator=getCoordinatorServer(cfg);
-      if (!nodeName.equals(coordinator)) {
-        ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"First load of database '%s' in the cluster, set local node as coordinator (was '%s')",databaseName,coordinator);
-        electCurrentNodeAsNewCoordinator(cfg,coordinator,databaseName);
-      }
-      ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Distributed configuration modified");
-      updateCachedDatabaseConfiguration(databaseName,cfg.getDocument(),true,true);
-      ddb.setOnline();
+);
     }
   }
 }

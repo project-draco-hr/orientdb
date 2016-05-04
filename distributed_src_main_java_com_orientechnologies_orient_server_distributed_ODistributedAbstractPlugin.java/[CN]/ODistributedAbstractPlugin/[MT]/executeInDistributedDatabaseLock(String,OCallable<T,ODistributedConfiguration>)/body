@@ -1,0 +1,29 @@
+{
+  if (OScenarioThreadLocal.INSTANCE.isInDatabaseLock()) {
+    final ODistributedConfiguration lastCfg=getDatabaseConfiguration(databaseName);
+    return (T)iCallback.call(lastCfg);
+  }
+  final Lock lock=getLock(databaseName + ".cfg");
+  lock.lock();
+  try {
+    OScenarioThreadLocal.INSTANCE.setInDatabaseLock(true);
+    final ODistributedConfiguration lastCfg=getDatabaseConfiguration(databaseName);
+    final int cfgVersion=lastCfg.getVersion();
+    try {
+      return (T)iCallback.call(lastCfg);
+    }
+  finally {
+      if (lastCfg.getVersion() > cfgVersion)       updateCachedDatabaseConfiguration(databaseName,lastCfg.getDocument(),true,true);
+      OScenarioThreadLocal.INSTANCE.setInDatabaseLock(false);
+    }
+  }
+ catch (  RuntimeException e) {
+    throw e;
+  }
+catch (  Exception e) {
+    throw new RuntimeException(e);
+  }
+ finally {
+    lock.unlock();
+  }
+}

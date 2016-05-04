@@ -1,17 +1,17 @@
 {
   resetLastValidBackup();
-  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED) {
+  if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed()) {
     return wrapped.updateRecord(iRecordId,updateContent,iContent,iVersion,iRecordType,iMode,iCallback);
   }
   try {
     final String clusterName=getClusterNameByRID(iRecordId);
-    final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+    final ODistributedConfiguration dbCfg=distributedConfiguration;
     final String localNodeName=dManager.getLocalNodeName();
     checkNodeIsMaster(localNodeName,dbCfg);
     final List<String> nodes=dbCfg.getServers(clusterName,null);
     dManager.getAvailableNodes(nodes,getName());
     if (nodes.isEmpty()) {
-      return (OStorageOperationResult<Integer>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+      return (OStorageOperationResult<Integer>)OScenarioThreadLocal.executeAsDistributed(new Callable(){
         @Override public Object call() throws Exception {
           return wrapped.updateRecord(iRecordId,updateContent,iContent,iVersion,iRecordType,iMode,iCallback);
         }
@@ -29,7 +29,7 @@
         if (executedLocally) {
           try {
             task.checkRecordExists();
-            localResult=(OStorageOperationResult<Integer>)ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+            localResult=(OStorageOperationResult<Integer>)OScenarioThreadLocal.executeAsDistributed(new Callable(){
               @Override public Object call() throws Exception {
                 task.setLastLSN(wrapped.getLSN());
                 return wrapped.updateRecord(iRecordId,updateContent,iContent,iVersion,iRecordType,iMode,iCallback);

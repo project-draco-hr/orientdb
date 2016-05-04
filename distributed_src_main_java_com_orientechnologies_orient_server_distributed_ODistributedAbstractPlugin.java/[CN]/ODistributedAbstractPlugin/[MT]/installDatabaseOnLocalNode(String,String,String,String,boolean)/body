@@ -34,15 +34,20 @@
 ;
     try {
       final ODistributedAbstractPlugin me=this;
-      executeInDatabaseLock(databaseName,new Callable<Void>(){
-        @Override public Void call() throws Exception {
-          if (delta) {
-            new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
-          }
+      executeInDistributedDatabaseLock(databaseName,new OCallable<Void,ODistributedConfiguration>(){
+        @Override public Void call(        final ODistributedConfiguration cfg){
+          try {
+            if (delta) {
+              new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
+            }
  else {
-            db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? me : null);
+              db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? me : null);
+            }
+            return null;
           }
-          return null;
+ catch (          IOException e) {
+            throw OException.wrapException(new OIOException("Error on distributed sync of database"),e);
+          }
         }
       }
 );

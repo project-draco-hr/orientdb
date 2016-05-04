@@ -1,0 +1,21 @@
+{
+  getStorage(databaseName);
+  final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
+  ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Current node started as %s for database '%s'",cfg.getServerRole(nodeName),databaseName);
+  final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
+  if (!iStartup && configuredDatabases.contains(databaseName))   return false;
+  final ODistributedDatabaseImpl distrDatabase=messageService.registerDatabase(databaseName);
+  boolean databaseInstalled;
+  if (!distrDatabase.exists() || distrDatabase.getSyncConfiguration().isEmpty()) {
+    databaseInstalled=requestFullDatabase(distrDatabase,databaseName,iStartup);
+  }
+ else {
+    try {
+      databaseInstalled=requestDatabaseDelta(distrDatabase,databaseName);
+    }
+ catch (    ODistributedDatabaseDeltaSyncException e) {
+      databaseInstalled=requestFullDatabase(distrDatabase,databaseName,iStartup);
+    }
+  }
+  return databaseInstalled;
+}

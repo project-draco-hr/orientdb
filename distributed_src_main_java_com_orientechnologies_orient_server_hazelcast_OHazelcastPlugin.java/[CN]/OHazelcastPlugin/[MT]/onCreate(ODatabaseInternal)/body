@@ -2,23 +2,25 @@
   if (!isRelatedToLocalServer(iDatabase))   return;
   final ODatabaseDocumentInternal currDb=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   try {
-    if (configurationMap.containsKey(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + iDatabase.getName()))     throw new ODistributedException("Cannot create a new database with the same name of one available distributed");
-    final ODistributedDatabaseImpl distribDatabase=messageService.registerDatabase(iDatabase.getName());
+    final String dbName=iDatabase.getName();
+    if (configurationMap.containsKey(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + dbName))     throw new ODistributedException("Cannot create a new database with the same name of one available distributed");
+    getStorage(dbName);
+    final ODistributedDatabaseImpl distribDatabase=messageService.registerDatabase(dbName);
     distribDatabase.setOnline();
     try {
       Thread.sleep(1000);
     }
  catch (    InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new ODistributedException("Error on creating database '" + iDatabase.getName() + "' on distributed nodes");
+      throw new ODistributedException("Error on creating database '" + dbName + "' on distributed nodes");
     }
-    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(dbName);
     final Set<String> servers=cfg.getAllConfiguredServers();
     if (servers.size() > 1) {
       while (true) {
         boolean allServersAreOnline=true;
         for (        String server : servers) {
-          if (!isNodeOnline(server,iDatabase.getName())) {
+          if (!isNodeOnline(server,dbName)) {
             allServersAreOnline=false;
             break;
           }
@@ -29,7 +31,7 @@
         }
  catch (        InterruptedException e) {
           Thread.currentThread().interrupt();
-          throw new ODistributedException("Error on creating database '" + iDatabase.getName() + "' on distributed nodes");
+          throw new ODistributedException("Error on creating database '" + dbName + "' on distributed nodes");
         }
       }
     }

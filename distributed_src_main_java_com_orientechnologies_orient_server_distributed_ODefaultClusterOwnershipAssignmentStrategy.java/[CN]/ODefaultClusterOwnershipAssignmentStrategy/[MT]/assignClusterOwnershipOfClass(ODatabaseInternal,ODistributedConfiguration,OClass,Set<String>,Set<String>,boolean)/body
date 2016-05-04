@@ -19,7 +19,7 @@
     assignClusterOwnership(iDatabase,cfg,iClass,cluster,node);
   }
   clustersToReassign.addAll(clustersOfClassToReassign);
-  final Collection<String> allClusterNames=iDatabase.getClusterNames();
+  Collection<String> allClusterNames=iDatabase.getClusterNames();
   for (  String server : availableNodes) {
     final List<String> ownedClusters=cfg.getOwnedClustersByServer(clusterNames,server);
     if (ownedClusters.isEmpty()) {
@@ -35,17 +35,17 @@
           try {
             iClass.addCluster(finalNewClusterName);
           }
- catch (          OCommandSQLParsingException e) {
-            if (!e.getMessage().endsWith("already exists"))             throw e;
-          }
-catch (          Exception e) {
-            ODistributedServerLog.error(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on creating cluster '%s' in class '%s': ",finalNewClusterName,iClass,e);
-            throw OException.wrapException(new ODistributedException("Error on creating cluster '" + finalNewClusterName + "' in class '"+ iClass+ "'"),e);
+ catch (          Exception e) {
+            if (!iDatabase.getClusterNames().contains(finalNewClusterName)) {
+              ODistributedServerLog.error(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on creating cluster '%s' in class '%s': ",finalNewClusterName,iClass,e);
+              throw OException.wrapException(new ODistributedException("Error on creating cluster '" + finalNewClusterName + "' in class '"+ iClass+ "'"),e);
+            }
           }
           return null;
         }
       }
 );
+      allClusterNames=iDatabase.getClusterNames();
       assignClusterOwnership(iDatabase,cfg,iClass,newClusterName,server);
       cfgChanged=true;
     }

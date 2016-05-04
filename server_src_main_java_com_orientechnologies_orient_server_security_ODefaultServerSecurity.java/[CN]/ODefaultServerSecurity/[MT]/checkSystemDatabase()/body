@@ -1,4 +1,5 @@
 {
+  ODatabaseDocumentInternal oldDbInThread=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
   try {
     final String path=getSystemDbPath();
     ODatabaseDocumentTx sysDB=new ODatabaseDocumentTx(path);
@@ -6,12 +7,20 @@
       OLogManager.instance().info(this,"Creating the System Database");
       Map<OGlobalConfiguration,Object> settings=new ConcurrentHashMap<OGlobalConfiguration,Object>();
       settings.put(OGlobalConfiguration.CREATE_DEFAULT_USERS,false);
+      settings.put(OGlobalConfiguration.CLASS_MINIMUM_CLUSTERS,1);
       sysDB.create(settings);
-      createSystemDBSchema(sysDB);
       sysDB.close();
     }
   }
  catch (  Exception ex) {
     OLogManager.instance().error(this,"checkSystemDatabase() Exception: %s",ex.getMessage());
+  }
+ finally {
+    if (oldDbInThread != null) {
+      ODatabaseRecordThreadLocal.INSTANCE.set(oldDbInThread);
+    }
+ else {
+      ODatabaseRecordThreadLocal.INSTANCE.remove();
+    }
   }
 }

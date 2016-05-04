@@ -32,19 +32,23 @@
       }
     }
 ;
-    final Lock lock=getLock(databaseName + ".cfg");
-    lock.lock();
     try {
-      if (delta) {
-        new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
-      }
+      final ODistributedAbstractPlugin me=this;
+      executeInDatabaseLock(databaseName,new Callable<Void>(){
+        @Override public Void call() throws Exception {
+          if (delta) {
+            new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
+          }
  else {
-        db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? this : null);
+            db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? me : null);
+          }
+          return null;
+        }
       }
+);
     }
   finally {
       in.close();
-      lock.unlock();
     }
     ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Installed database '%s'",databaseName);
     return db;

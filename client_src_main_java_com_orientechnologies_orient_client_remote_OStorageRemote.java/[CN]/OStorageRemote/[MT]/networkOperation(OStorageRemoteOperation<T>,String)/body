@@ -1,10 +1,17 @@
 {
   int retry=connectionRetry;
+  OStorageRemoteSession session=getCurrentSession();
   do {
     OChannelBinaryAsynchClient network=null;
-    network=getNetwork(getNextAvailableServerURL(false));
+    String serverUrl=getNextAvailableServerURL(false,session);
     try {
-      OStorageRemoteSession session=getCurrentSession();
+      network=getNetwork(serverUrl);
+    }
+ catch (    OException e) {
+      serverUrl=useNewServerURL(serverUrl);
+      if (serverUrl == null)       throw e;
+    }
+    try {
       OStorageRemoteNodeSession nodeSession=session.get(network.getServerURL());
       if (nodeSession == null) {
         openRemoteDatabase(network);
@@ -16,11 +23,9 @@
       handleDBFreeze();
     }
 catch (    OTokenException e) {
-      OStorageRemoteSession session=getCurrentSession();
       session.remove(network.getServerURL());
     }
 catch (    OTokenSecurityException e) {
-      OStorageRemoteSession session=getCurrentSession();
       session.remove(network.getServerURL());
     }
 catch (    OOfflineNodeException e) {

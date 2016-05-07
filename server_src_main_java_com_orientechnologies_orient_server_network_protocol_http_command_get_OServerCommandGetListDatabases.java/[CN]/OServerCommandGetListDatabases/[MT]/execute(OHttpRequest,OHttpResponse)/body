@@ -1,12 +1,14 @@
 {
   checkSyntax(iRequest.url,1,"Syntax error: server");
   iRequest.data.commandInfo="Server status";
-  try {
-    final ODocument result=new ODocument();
-    result.field("databases",server.getAvailableStorageNames().keySet());
-    iResponse.writeRecord(result);
+  final ODocument result=new ODocument();
+  java.util.Set<String> storageNames=new java.util.LinkedHashSet(server.getAvailableStorageNames().keySet());
+  if (server.getSecurity() != null && server.getSecurity().isAuthorized(OServerConfiguration.GUEST_USER,"server.listDatabases.system")) {
+    if (server.getSecurity().systemDbExists()) {
+      storageNames.add(server.getSecurity().getSystemDbName());
+    }
   }
-  finally {
-  }
+  result.field("databases",storageNames);
+  iResponse.writeRecord(result);
   return false;
 }

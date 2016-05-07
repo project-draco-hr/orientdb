@@ -74,20 +74,17 @@
   final ODatabaseDocumentTx db=installDatabaseOnLocalNode(databaseName,dbPath,iNode,fileName,delta);
   if (db != null) {
     try {
-      final Lock lock=getLock(databaseName + ".cfg");
-      lock.lock();
-      try {
-        final ODistributedConfiguration cfg=getDatabaseConfiguration(databaseName);
-        final boolean distribCfgDirty=rebalanceClusterOwnership(nodeName,db,cfg,new HashSet<String>(),true);
-        if (distribCfgDirty) {
-          ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Distributed configuration modified");
-          updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+      executeInDistributedDatabaseLock(databaseName,new OCallable<Void,ODistributedConfiguration>(){
+        @Override public Void call(        final ODistributedConfiguration cfg){
+          if (db.isClosed())           getServerInstance().openDatabase(db);
+          db.reload();
+          db.getMetadata().reload();
+          rebalanceClusterOwnership(nodeName,db,cfg,new HashSet<String>(),true);
+          distrDatabase.setOnline();
+          return null;
         }
-        distrDatabase.setOnline();
       }
-  finally {
-        lock.unlock();
-      }
+);
     }
   finally {
       db.activateOnCurrentThread();

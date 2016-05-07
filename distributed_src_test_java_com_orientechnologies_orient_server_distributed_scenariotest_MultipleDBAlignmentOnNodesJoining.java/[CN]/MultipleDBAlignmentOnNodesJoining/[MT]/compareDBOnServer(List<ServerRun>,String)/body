@@ -1,13 +1,17 @@
 {
+  String checkOnServer="";
   List<ODatabaseDocumentTx> dbs=new LinkedList<ODatabaseDocumentTx>();
   for (  ServerRun server : checkConsistencyOnServers) {
     try {
-      dbs.add(poolFactory.get("plocal:" + server.getDatabasePath(databaseName),"admin","admin").acquire());
+      dbs.add(poolFactory.get(getPlocalDatabaseURL(server,databaseName),"admin","admin").acquire());
+      checkOnServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
     }
  catch (    Exception e) {
       fail(databaseName + " is not present on server" + server.getServerId());
     }
   }
+  checkOnServer=checkOnServer.substring(0,checkOnServer.length() - 1);
+  super.banner("Checking " + databaseName + " consistency among servers...\nChecking on servers {"+ checkOnServer+ "}.");
   for (  ODatabaseDocumentTx db : dbs) {
     assertTrue(db.getMetadata().getSchema().existsClass("Person"));
   }
@@ -16,12 +20,8 @@
     long count1=dbs.get(j).getMetadata().getSchema().getClass("Person").count();
     long count2=dbs.get(j + 1).getMetadata().getSchema().getClass("Person").count();
     assertEquals(count1,count2);
+    j++;
   }
-  String checkOnServer="";
-  for (  ServerRun server : checkConsistencyOnServers) {
-    checkOnServer+=server.getServerInstance().getDistributedManager().getLocalNodeName() + ",";
-  }
-  checkOnServer=checkOnServer.substring(0,checkOnServer.length() - 1);
   List<ODocument> docsToCompare=new LinkedList<ODocument>();
   super.banner("Checking " + databaseName + " consistency among servers...\nChecking on servers {"+ checkOnServer+ "}.");
   try {

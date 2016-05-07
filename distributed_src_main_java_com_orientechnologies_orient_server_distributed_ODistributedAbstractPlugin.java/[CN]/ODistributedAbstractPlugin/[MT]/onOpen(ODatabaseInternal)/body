@@ -1,21 +1,28 @@
 {
-  final String dbUrl=OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
-  if (dbUrl.startsWith("plocal:")) {
-    final String dbDirectory=serverInstance.getDatabaseDirectory();
-    if (!dbUrl.substring("plocal:".length()).startsWith(dbDirectory))     return;
-  }
-synchronized (cachedDatabaseConfiguration) {
-    final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
-    if (cfg == null)     return;
-    final OStorage dbStorage=iDatabase.getStorage();
-    if (iDatabase instanceof ODatabase<?> && dbStorage instanceof OAbstractPaginatedStorage) {
-      ODistributedStorage storage=storages.get(iDatabase.getURL());
-      if (storage == null) {
-        storage=new ODistributedStorage(serverInstance,(OAbstractPaginatedStorage)dbStorage);
-        final ODistributedStorage oldStorage=storages.putIfAbsent(iDatabase.getURL(),storage);
-        if (oldStorage != null)         storage=oldStorage;
-      }
-      iDatabase.replaceStorage(storage);
+  if (!isRelatedToLocalServer(iDatabase))   return;
+  final ODatabaseDocumentInternal currDb=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  try {
+    final String dbName=iDatabase.getName();
+    if (getMessageService().getDatabase(dbName) == null) {
+      final ODistributedDatabaseImpl distribDatabase=messageService.registerDatabase(dbName);
+      distribDatabase.setOnline();
     }
+    final ODistributedConfiguration cfg=getDatabaseConfiguration(dbName);
+    if (cfg == null)     return;
+    if (!(iDatabase.getStorage() instanceof ODistributedStorage) || ((ODistributedStorage)iDatabase.getStorage()).getDistributedManager().isOffline()) {
+      final ODistributedStorage storage=getStorage(dbName);
+      storage.wrap((OAbstractPaginatedStorage)iDatabase.getStorage().getUnderlying());
+      iDatabase.replaceStorage(storage);
+      if (isNodeOnline(nodeName,dbName))       installDbClustersLocalStrategy(iDatabase);
+    }
+  }
+ catch (  HazelcastException e) {
+    throw new OOfflineNodeException("Hazelcast instance is not available");
+  }
+catch (  HazelcastInstanceNotActiveException e) {
+    throw new OOfflineNodeException("Hazelcast instance is not available");
+  }
+ finally {
+    ODatabaseRecordThreadLocal.INSTANCE.set(currDb);
   }
 }

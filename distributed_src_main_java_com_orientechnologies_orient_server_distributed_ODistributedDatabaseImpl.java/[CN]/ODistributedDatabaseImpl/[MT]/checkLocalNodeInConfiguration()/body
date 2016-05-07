@@ -1,16 +1,13 @@
 {
-  final Lock lock=manager.getLock(databaseName + ".cfg");
-  lock.lock();
-  try {
-    final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-    final List<String> foundPartition=cfg.addNewNodeInServerList(getLocalNodeName());
-    if (foundPartition != null) {
-      manager.setDatabaseStatus(getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.ONLINE);
-      ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"adding node '%s' in partition: db=%s %s",getLocalNodeName(),databaseName,foundPartition);
-      manager.updateCachedDatabaseConfiguration(databaseName,cfg.serialize(),true,true);
+  manager.executeInDistributedDatabaseLock(databaseName,new OCallable<Void,ODistributedConfiguration>(){
+    @Override public Void call(    final ODistributedConfiguration cfg){
+      final List<String> foundPartition=cfg.addNewNodeInServerList(getLocalNodeName());
+      if (foundPartition != null) {
+        manager.setDatabaseStatus(getLocalNodeName(),databaseName,ODistributedServerManager.DB_STATUS.SYNCHRONIZING);
+        ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"Adding node '%s' in partition: db=%s %s",getLocalNodeName(),databaseName,foundPartition);
+      }
+      return null;
     }
   }
-  finally {
-    lock.unlock();
-  }
+);
 }

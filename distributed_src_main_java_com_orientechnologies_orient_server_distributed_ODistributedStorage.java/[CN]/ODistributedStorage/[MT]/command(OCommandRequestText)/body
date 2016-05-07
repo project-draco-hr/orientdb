@@ -6,8 +6,8 @@
   }
   final String localNodeName=dManager.getLocalNodeName();
   servers.add(localNodeName);
-  if (OScenarioThreadLocal.INSTANCE.get() == RUN_MODE.RUNNING_DISTRIBUTED)   return wrapped.command(iCommand);
-  final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(getName());
+  if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed())   return wrapped.command(iCommand);
+  final ODistributedConfiguration dbCfg=distributedConfiguration;
   if (!dbCfg.isReplicationActive(null,localNodeName))   return wrapped.command(iCommand);
   final OCommandExecutor executor=OCommandManager.instance().getExecutor(iCommand);
   executor.setProgressListener(iCommand.getProgressListener());
@@ -18,7 +18,7 @@
     Object result=null;
     OCommandDistributedReplicateRequest.DISTRIBUTED_EXECUTION_MODE executionMode=OCommandDistributedReplicateRequest.DISTRIBUTED_EXECUTION_MODE.LOCAL;
     OCommandDistributedReplicateRequest.DISTRIBUTED_RESULT_MGMT resultMgmt=OCommandDistributedReplicateRequest.DISTRIBUTED_RESULT_MGMT.CHECK_FOR_EQUALS;
-    if (OScenarioThreadLocal.INSTANCE.get() != RUN_MODE.RUNNING_DISTRIBUTED) {
+    if (OScenarioThreadLocal.INSTANCE.getRunMode() != RUN_MODE.RUNNING_DISTRIBUTED) {
       if (exec instanceof OCommandDistributedReplicateRequest) {
         executionMode=((OCommandDistributedReplicateRequest)exec).getDistributedExecutionMode();
         resultMgmt=((OCommandDistributedReplicateRequest)exec).getDistributedResultManagement();
@@ -60,7 +60,7 @@ case REPLICATE:
     final boolean executedLocally=nodes.contains(localNodeName);
     if (executedLocally) {
       try {
-        localResult=ODistributedAbstractPlugin.runInDistributedMode(new Callable(){
+        localResult=OScenarioThreadLocal.executeAsDistributed(new Callable(){
           @Override public Object call() throws Exception {
             return wrapped.command(iCommand);
           }
@@ -89,6 +89,7 @@ if (exec.involveSchema()) dManager.propagateSchemaChanges(ODatabaseRecordThreadL
 break;
 }
 if (result instanceof ONeedRetryException) throw (ONeedRetryException)result;
+ else if (result instanceof RuntimeException) throw (RuntimeException)result;
  else if (result instanceof Exception) throw OException.wrapException(new ODistributedException("Error on execution distributed COMMAND"),(Exception)result);
 return result;
 }

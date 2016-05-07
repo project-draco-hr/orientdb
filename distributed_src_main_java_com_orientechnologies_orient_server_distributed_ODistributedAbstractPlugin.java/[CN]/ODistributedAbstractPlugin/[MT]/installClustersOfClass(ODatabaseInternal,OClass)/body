@@ -1,19 +1,15 @@
 {
   final String databaseName=iDatabase.getName();
   if (!(iClass.getClusterSelection() instanceof OLocalClusterStrategy))   ((OClassImpl)iClass).setClusterSelectionInternal(new OLocalClusterStrategy(this,databaseName,iClass));
-  ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabase.getName());
   if (iClass.isAbstract())   return false;
   final int[] clusterIds=iClass.getClusterIds();
   final List<String> clusterNames=new ArrayList<String>(clusterIds.length);
   for (  int clusterId : clusterIds)   clusterNames.add(iDatabase.getClusterNameById(clusterId));
-  final Lock lock=getLock(databaseName + ".cfg");
-  lock.lock();
-  try {
-    cfg=getDatabaseConfiguration(iDatabase.getName());
-    final Set<String> availableNodes=getAvailableNodeNames(iDatabase.getName());
-    return clusterAssignmentStrategy.assignClusterOwnershipOfClass(iDatabase,cfg,iClass,availableNodes,new HashSet<String>(),true);
+  return executeInDistributedDatabaseLock(databaseName,new OCallable<Boolean,ODistributedConfiguration>(){
+    @Override public Boolean call(    final ODistributedConfiguration lastCfg){
+      final Set<String> availableNodes=getAvailableNodeNames(iDatabase.getName());
+      return clusterAssignmentStrategy.assignClusterOwnershipOfClass(iDatabase,lastCfg,iClass,availableNodes,new HashSet<String>(),true);
+    }
   }
-  finally {
-    lock.unlock();
-  }
+);
 }

@@ -32,19 +32,28 @@
       }
     }
 ;
-    final Lock lock=getLock(databaseName + ".cfg");
-    lock.lock();
     try {
-      if (delta) {
-        new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
-      }
+      final ODistributedAbstractPlugin me=this;
+      executeInDistributedDatabaseLock(databaseName,new OCallable<Void,ODistributedConfiguration>(){
+        @Override public Void call(        final ODistributedConfiguration cfg){
+          try {
+            if (delta) {
+              new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
+            }
  else {
-        db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? this : null);
+              db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? me : null);
+            }
+            return null;
+          }
+ catch (          IOException e) {
+            throw OException.wrapException(new OIOException("Error on distributed sync of database"),e);
+          }
+        }
       }
+);
     }
   finally {
       in.close();
-      lock.unlock();
     }
     ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Installed database '%s'",databaseName);
     return db;

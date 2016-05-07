@@ -1,42 +1,48 @@
 {
-synchronized (cachedDatabaseConfiguration) {
-    ODocument oldCfg=cachedDatabaseConfiguration.get(iDatabaseName);
-    Integer oldVersion=oldCfg != null ? (Integer)oldCfg.field("version") : null;
-    if (oldVersion == null)     oldVersion=0;
-    Integer currVersion=(Integer)cfg.field("version");
-    if (currVersion == null)     currVersion=1;
-    final boolean modified=currVersion >= oldVersion;
-    if (oldCfg != null && oldVersion > currVersion) {
-      OLogManager.instance().debug(this,"Skip saving of distributed configuration file for database '%s' because is unchanged (version %d)",iDatabaseName,(Integer)cfg.field("version"));
-      return false;
-    }
-    cachedDatabaseConfiguration.put(iDatabaseName,cfg);
-    final String cfgOutput=ODistributedOutput.formatClusterTable(this,iDatabaseName,new ODistributedConfiguration(cfg),getAvailableNodes(iDatabaseName));
-    ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"New distributed configuration for database: %s (version=%d)%s\n",iDatabaseName,cfg.field("version"),cfgOutput);
-    if (iSaveToDisk) {
-      FileOutputStream f=null;
-      try {
-        File file=getDistributedConfigFile(iDatabaseName);
-        ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"Saving distributed configuration file for database '%s' to: %s",iDatabaseName,file);
-        if (!file.exists()) {
-          file.getParentFile().mkdirs();
-          file.createNewFile();
-        }
-        f=new FileOutputStream(file);
-        f.write(cfg.toJSON().getBytes());
-        f.flush();
-      }
- catch (      Exception e) {
-        ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"Error on saving distributed configuration file",e);
-      }
- finally {
-        if (f != null)         try {
-          f.close();
-        }
- catch (        IOException e) {
-        }
-      }
-    }
-    return modified;
+  final ODistributedStorage stg=storages.get(iDatabaseName);
+  if (stg == null)   return false;
+  final ODistributedConfiguration dCfg=stg.getDistributedConfiguration();
+  ODocument oldCfg=dCfg != null ? dCfg.getDocument() : null;
+  Integer oldVersion=oldCfg != null ? (Integer)oldCfg.field("version") : null;
+  if (oldVersion == null)   oldVersion=0;
+  Integer currVersion=(Integer)cfg.field("version");
+  if (currVersion == null)   currVersion=1;
+  final boolean modified=currVersion >= oldVersion;
+  if (oldCfg != null && oldVersion > currVersion) {
+    OLogManager.instance().debug(this,"Skip saving of distributed configuration file for database '%s' because is unchanged (version %d)",iDatabaseName,(Integer)cfg.field("version"));
+    return false;
   }
+  final ODistributedConfiguration newCfg=new ODistributedConfiguration(cfg);
+  stg.setDistributedConfiguration(newCfg);
+  final String cfgOutput=ODistributedOutput.formatClusterTable(this,iDatabaseName,newCfg,getAvailableNodes(iDatabaseName));
+  ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"New distributed configuration for database: %s (version=%d)%s\n",iDatabaseName,cfg.field("version"),cfgOutput);
+  if (iSaveToDisk) {
+    FileOutputStream f=null;
+    try {
+      File file=getDistributedConfigFile(iDatabaseName);
+      ODistributedServerLog.info(this,getLocalNodeName(),null,DIRECTION.NONE,"Saving distributed configuration file for database '%s' to: %s",iDatabaseName,file);
+      if (!file.exists()) {
+        file.getParentFile().mkdirs();
+        file.createNewFile();
+      }
+      f=new FileOutputStream(file);
+      f.write(cfg.toJSON().getBytes());
+      f.flush();
+    }
+ catch (    Exception e) {
+      ODistributedServerLog.error(this,getLocalNodeName(),null,DIRECTION.NONE,"Error on saving distributed configuration file",e);
+    }
+ finally {
+      if (f != null)       try {
+        f.close();
+      }
+ catch (      IOException e) {
+      }
+    }
+  }
+  if (modified) {
+    serverInstance.getClientConnectionManager().pushDistribCfg2Clients(getClusterConfiguration());
+    dumpServersStatus();
+  }
+  return modified;
 }

@@ -1,0 +1,95 @@
+{
+  final Map<String,String> commandOptions=parseCommandOptions(options);
+  if (currentDatabaseName != null) {
+    message("\n\nCLUSTERS (collections)");
+    final List<ODocument> resultSet=new ArrayList<ODocument>();
+    int clusterId;
+    long totalElements=0;
+    long totalSpaceUsed=0;
+    long totalTombstones=0;
+    long count;
+    final List<String> clusters=new ArrayList<String>(currentDatabase.getClusterNames());
+    Collections.sort(clusters);
+    ODocument dClusters=null;
+    final ODocument dCfg=getDistributedConfiguration();
+    if (dCfg != null) {
+      final ODocument dDatabaseCfg=dCfg.field("database");
+      if (dDatabaseCfg != null) {
+        dClusters=dDatabaseCfg.field("clusters");
+      }
+    }
+    final boolean isRemote=currentDatabase.getStorage().isRemote();
+    for (    String clusterName : clusters) {
+      try {
+        final ODocument row=new ODocument();
+        resultSet.add(row);
+        clusterId=currentDatabase.getClusterIdByName(clusterName);
+        final OCluster cluster=currentDatabase.getStorage().getClusterById(clusterId);
+        final String conflictStrategy=cluster.getRecordConflictStrategy() != null ? cluster.getRecordConflictStrategy().getName() : "";
+        count=currentDatabase.countClusterElements(clusterName);
+        totalElements+=count;
+        final long spaceUsed=!isRemote ? cluster.getRecordsSize() : 0;
+        totalSpaceUsed+=spaceUsed;
+        final long tombstones=!isRemote ? cluster.getTombstonesCount() : 0;
+        totalTombstones+=tombstones;
+        final OClass cls=currentDatabase.getMetadata().getSchema().getClassByClusterId(clusterId);
+        final String className=cls != null ? cls.getName() : null;
+        row.field("NAME",clusterName);
+        row.field("ID",clusterId);
+        row.field("CLASS",className);
+        row.field("CONFLICT-STRATEGY",conflictStrategy);
+        row.field("COUNT",count);
+        if (!isRemote) {
+          row.field("SPACE-USED",OFileUtils.getSizeAsString(spaceUsed));
+          if (commandOptions.containsKey("-v")) {
+            row.field("TOMBSTONES",tombstones);
+          }
+        }
+        if (dClusters != null) {
+          ODocument dClusterCfg=dClusters.field(clusterName);
+          if (dClusterCfg == null)           dClusterCfg=dClusters.field("*");
+          if (dClusterCfg != null) {
+            final List<String> servers=new ArrayList<String>((Collection<? extends String>)dClusterCfg.field("servers"));
+            final boolean newNode=servers.remove("<NEW_NODE>");
+            if (!servers.isEmpty()) {
+              row.field("OWNER_SERVER",servers.get(0));
+              if (servers.size() > 1) {
+                servers.remove(0);
+                row.field("OTHER_SERVERS",servers);
+              }
+            }
+            row.field("AUTO_DEPLOY_NEW_NODE",newNode);
+          }
+        }
+      }
+ catch (      Exception e) {
+        if (e instanceof OIOException)         break;
+      }
+    }
+    final OTableFormatter formatter=new OTableFormatter(this);
+    formatter.setColumnAlignment("ID",OTableFormatter.ALIGNMENT.RIGHT);
+    formatter.setColumnAlignment("COUNT",OTableFormatter.ALIGNMENT.RIGHT);
+    formatter.setColumnAlignment("OWNER_SERVER",OTableFormatter.ALIGNMENT.CENTER);
+    formatter.setColumnAlignment("OTHER_SERVERS",OTableFormatter.ALIGNMENT.CENTER);
+    formatter.setColumnAlignment("AUTO_DEPLOY_NEW_NODE",OTableFormatter.ALIGNMENT.CENTER);
+    if (!isRemote) {
+      formatter.setColumnAlignment("SPACE-USED",OTableFormatter.ALIGNMENT.RIGHT);
+      if (commandOptions.containsKey("-v")) {
+        formatter.setColumnAlignment("TOMBSTONES",OTableFormatter.ALIGNMENT.RIGHT);
+      }
+    }
+    final ODocument footer=new ODocument();
+    footer.field("NAME","TOTAL");
+    footer.field("COUNT",totalElements);
+    if (!isRemote) {
+      footer.field("SPACE-USED",OFileUtils.getSizeAsString(totalSpaceUsed));
+      if (commandOptions.containsKey("-v")) {
+        footer.field("TOMBSTONES",totalTombstones);
+      }
+    }
+    formatter.setFooter(footer);
+    formatter.writeRecords(resultSet,-1);
+    message("\n");
+  }
+ else   message("\nNo database selected yet.");
+}

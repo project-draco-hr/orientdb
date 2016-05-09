@@ -1,9 +1,7 @@
 {
   if (currentDatabaseName != null) {
     message("\n\nCLASSES");
-    message("\n----------------------------------------------+------------------------------------+------------+----------------+");
-    message("\n NAME                                         | SUPERCLASS                         | CLUSTERS   | RECORDS        |");
-    message("\n----------------------------------------------+------------------------------------+------------+----------------+");
+    final List<ODocument> resultSet=new ArrayList<ODocument>();
     long totalElements=0;
     long count;
     final List<OClass> classes=new ArrayList<OClass>(currentDatabase.getMetadata().getImmutableSchemaSnapshot().getClasses());
@@ -15,23 +13,39 @@
 );
     for (    OClass cls : classes) {
       try {
+        final ODocument row=new ODocument();
+        resultSet.add(row);
         final StringBuilder clusters=new StringBuilder(1024);
         if (cls.isAbstract())         clusters.append("-");
- else         for (int i=0; i < cls.getClusterIds().length; ++i) {
-          if (i > 0)           clusters.append(",");
-          clusters.append(cls.getClusterIds()[i]);
+ else {
+          int[] clusterIds=cls.getClusterIds();
+          for (int i=0; i < clusterIds.length; ++i) {
+            if (i > 0)             clusters.append(",");
+            clusters.append(currentDatabase.getClusterNameById(clusterIds[i]));
+            clusters.append("(");
+            clusters.append(clusterIds[i]);
+            clusters.append(")");
+          }
         }
         count=currentDatabase.countClass(cls.getName(),false);
         totalElements+=count;
         final String superClasses=cls.hasSuperClasses() ? Arrays.toString(cls.getSuperClassesNames().toArray()) : "";
-        message("\n %-45s| %-35s| %-11s|%15d |",format(cls.getName(),45),format(superClasses,35),clusters.toString(),count);
+        row.field("NAME",cls.getName());
+        row.field("SUPER-CLASSES",superClasses);
+        row.field("CLUSTERS",clusters);
+        row.field("COUNT",count);
       }
  catch (      Exception ignored) {
       }
     }
-    message("\n----------------------------------------------+------------------------------------+------------+----------------+");
-    message("\n TOTAL = %-3d                                                                                     %15d |",classes.size(),totalElements);
-    message("\n----------------------------------------------+------------------------------------+------------+----------------+");
+    final OTableFormatter formatter=new OTableFormatter(this);
+    formatter.setColumnAlignment("COUNT",OTableFormatter.ALIGNMENT.RIGHT);
+    final ODocument footer=new ODocument();
+    footer.field("NAME","TOTAL");
+    footer.field("COUNT",totalElements);
+    formatter.setFooter(footer);
+    formatter.writeRecords(resultSet,-1);
+    message("\n");
   }
  else   message("\nNo database selected yet.");
 }

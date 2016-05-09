@@ -1,9 +1,7 @@
 {
   if (currentDatabaseName != null) {
     message("\n\nINDEXES");
-    message("\n----------------------------------------------+------------+-----------------------+----------------+------------+");
-    message("\n NAME                                         | TYPE       |         CLASS         |     FIELDS     | RECORDS    |");
-    message("\n----------------------------------------------+------------+-----------------------+----------------+------------+");
+    final List<ODocument> resultSet=new ArrayList<ODocument>();
     int totalIndexes=0;
     long totalRecords=0;
     final List<OIndex<?>> indexes=new ArrayList<OIndex<?>>(currentDatabase.getMetadata().getIndexManager().getIndexes());
@@ -13,24 +11,31 @@
       }
     }
 );
+    long totalIndexedRecords=0;
     for (    final OIndex<?> index : indexes) {
+      final ODocument row=new ODocument();
+      resultSet.add(row);
+      final long indexSize=index.getKeySize();
+      totalIndexedRecords+=indexSize;
+      row.field("NAME",index.getName());
+      row.field("TYPE",index.getType());
+      row.field("RECORDS",indexSize);
       try {
         final OIndexDefinition indexDefinition=index.getDefinition();
         final long size=index.getKeySize();
-        if (indexDefinition == null || indexDefinition.getClassName() == null) {
-          message("\n %-45s| %-10s | %-22s| %-15s|%11d |",format(index.getName(),45),format(index.getType(),10),"","",size);
-        }
- else {
+        if (indexDefinition != null) {
+          row.field("CLASS",indexDefinition.getClassName());
+          row.field("COLLATE",indexDefinition.getCollate().getName());
           final List<String> fields=indexDefinition.getFields();
-          if (fields.size() == 1) {
-            message("\n %-45s| %-10s | %-22s| %-15s|%11d |",format(index.getName(),45),format(index.getType(),10),format(indexDefinition.getClassName(),22),format(fields.get(0),10),size);
+          final StringBuilder buffer=new StringBuilder();
+          for (int i=0; i < fields.size(); ++i) {
+            if (buffer.length() > 0)             buffer.append(",");
+            buffer.append(fields.get(i));
+            buffer.append("(");
+            buffer.append(indexDefinition.getTypes()[i]);
+            buffer.append(")");
           }
- else {
-            message("\n %-45s| %-10s | %-22s| %-15s|%11d |",format(index.getName(),45),format(index.getType(),10),format(indexDefinition.getClassName(),22),format(fields.get(0),10),size);
-            for (int i=1; i < fields.size(); i++) {
-              message("\n %-45s| %-10s | %-22s| %-15s|%11s |","","","",fields.get(i),"");
-            }
-          }
+          row.field("FIELDS",buffer.toString());
         }
         totalIndexes++;
         totalRecords+=size;
@@ -38,9 +43,12 @@
  catch (      Exception ignored) {
       }
     }
-    message("\n----------------------------------------------+------------+-----------------------+----------------+------------+");
-    message("\n TOTAL = %-3d                                                                                     %15d |",totalIndexes,totalRecords);
-    message("\n-----------------------------------------------------------------------------------------------------------------+");
+    final OTableFormatter formatter=new OTableFormatter(this);
+    final ODocument footer=new ODocument();
+    footer.field("NAME","TOTAL");
+    footer.field("RECORDS",totalIndexedRecords);
+    formatter.setFooter(footer);
+    formatter.writeRecords(resultSet,-1);
   }
  else   message("\nNo database selected yet.");
 }

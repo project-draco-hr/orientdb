@@ -52,10 +52,9 @@ case REPLICATE:
     final OAbstractCommandTask task=iCommand instanceof OCommandScript ? new OScriptTask(iCommand) : new OSQLCommandTask(iCommand,new HashSet<String>());
     task.setResultStrategy(OAbstractRemoteTask.RESULT_STRATEGY.ANY);
     final Set<String> nodes=dbCfg.getServers(involvedClusters);
-    dManager.getAvailableNodes(nodes,getName());
     if (iCommand instanceof ODistributedCommand)     nodes.removeAll(((ODistributedCommand)iCommand).nodesToExclude());
-    if (nodes.isEmpty())     return null;
     if (executeOnlyLocally(localNodeName,dbCfg,exec,involvedClusters,nodes))     return wrapped.command(iCommand);
+    localDistributedDatabase.checkQuorumBeforeReplicate(task.getQuorumType(),involvedClusters,nodes,dbCfg);
     final Object localResult;
     final boolean executedLocally=nodes.contains(localNodeName);
     if (executedLocally) {
@@ -77,13 +76,11 @@ catch (      Exception e) {
       nodes.remove(localNodeName);
     }
  else     localResult=null;
-    if (nodes.isEmpty()) {
-      if (!executedLocally)       throw new ODistributedException("Cannot execute distributed command '" + iCommand + "' because no nodes are available");
-    }
- else {
+    if (!nodes.isEmpty()) {
       final ODistributedResponse dResponse=dManager.sendRequest(getName(),involvedClusters,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localResult,null);
       result=dResponse.getPayload();
     }
+ else     result=localResult;
   }
 if (exec.involveSchema()) dManager.propagateSchemaChanges(ODatabaseRecordThreadLocal.INSTANCE.get());
 break;

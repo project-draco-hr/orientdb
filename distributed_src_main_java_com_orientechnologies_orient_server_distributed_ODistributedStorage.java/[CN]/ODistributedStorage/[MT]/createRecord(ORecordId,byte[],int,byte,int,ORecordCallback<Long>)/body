@@ -3,6 +3,7 @@
   if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed()) {
     return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
   }
+  checkLocalNodeIsAvailable();
   try {
     String clusterName=getClusterNameByRID(iRecordId);
     final int clusterId=iRecordId.getClusterId();
@@ -11,15 +12,7 @@
     final ODistributedConfiguration dbCfg=distributedConfiguration;
     checkNodeIsMaster(localNodeName,dbCfg);
     final List<String> nodes=dbCfg.getServers(clusterName,null);
-    dManager.getAvailableNodes(nodes,getName());
-    if (nodes.isEmpty()) {
-      return (OStorageOperationResult<OPhysicalPosition>)OScenarioThreadLocal.executeAsDistributed(new Callable(){
-        @Override public Object call() throws Exception {
-          return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
-        }
-      }
-);
-    }
+    if (nodes.isEmpty())     throw new ODistributedException("Cannot execute distributed create record " + iRecordId + " because no nodes are available");
     String masterNode=nodes.get(0);
     if (!masterNode.equals(localNodeName)) {
       final OCluster cl=getClusterByName(clusterName);
@@ -47,8 +40,9 @@
       iRecordId.clusterId=db.getClusterIdByName(newClusterName);
     }
     final String finalClusterName=clusterName;
+    final Set<String> clusterNames=Collections.singleton(finalClusterName);
+    localDistributedDatabase.checkQuorumBeforeReplicate(OCommandDistributedReplicateRequest.QUORUM_TYPE.WRITE,clusterNames,nodes,dbCfg);
     nodes.remove(localNodeName);
-    dManager.getAvailableNodes(nodes,getName());
     Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
     if (executionModeSynch == null)     executionModeSynch=iMode == 0;
     final boolean syncMode=executionModeSynch;
@@ -62,7 +56,7 @@
         task.setLastLSN(wrapped.getLSN());
         if (!nodes.isEmpty()) {
           if (syncMode) {
-            final ODistributedResponse dResponse=dManager.sendRequest(getName(),Collections.singleton(finalClusterName),nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
+            final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
             final Object payload=dResponse.getPayload();
             if (payload != null) {
               if (payload instanceof Exception) {

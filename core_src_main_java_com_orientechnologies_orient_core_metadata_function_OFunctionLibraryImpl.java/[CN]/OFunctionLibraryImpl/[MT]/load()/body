@@ -1,11 +1,17 @@
 {
+  final Map<String,OCallable<Object,Map<Object,Object>>> callbacks=new HashMap<String,OCallable<Object,Map<Object,Object>>>();
+  for (  Map.Entry<String,OFunction> entry : functions.entrySet()) {
+    if (entry.getValue().getCallback() != null)     callbacks.put(entry.getKey(),entry.getValue().getCallback());
+  }
   functions.clear();
   final ODatabaseDocument db=ODatabaseRecordThreadLocal.INSTANCE.get();
   if (((OMetadataInternal)db.getMetadata()).getImmutableSchemaSnapshot().existsClass("OFunction")) {
     List<ODocument> result=db.query(new OSQLSynchQuery<ODocument>("select from OFunction order by name"));
     for (    ODocument d : result) {
       d.reload();
-      functions.put(d.field("name").toString().toUpperCase(),new OFunction(d));
+      final OFunction f=new OFunction(d);
+      f.setCallback(callbacks.get(f.getName()));
+      functions.put(d.field("name").toString().toUpperCase(),f);
     }
   }
 }

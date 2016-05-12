@@ -1,0 +1,28 @@
+{
+  final ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:scheduler");
+  db.create();
+  final AtomicInteger counter=new AtomicInteger(0);
+  try {
+    final OFunction f=db.getMetadata().getFunctionLibrary().createFunction("testFunction");
+    f.setCallback(new OCallable<Object,Map<Object,Object>>(){
+      @Override public Object call(      Map<Object,Object> args){
+        return counter.incrementAndGet();
+      }
+    }
+);
+    db.getMetadata().getScheduler().scheduleEvent(new OScheduledEventBuilder().setName("test").setRule("0/1 * * * * ?").setFunction(f).build());
+  }
+  finally {
+    db.close();
+  }
+  Thread.sleep(1000);
+  final ODatabaseDocumentTx db2=new ODatabaseDocumentTx("memory:scheduler");
+  db2.open("admin","admin");
+  try {
+    Thread.sleep(4000);
+  }
+  finally {
+    db2.drop();
+  }
+  Assert.assertTrue(counter.get() >= 4);
+}

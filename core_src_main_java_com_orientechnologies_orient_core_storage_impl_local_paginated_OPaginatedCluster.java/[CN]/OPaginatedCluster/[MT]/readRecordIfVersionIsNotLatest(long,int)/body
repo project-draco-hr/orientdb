@@ -13,12 +13,14 @@
         if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)         throw new ORecordNotFoundException(new ORecordId(id,clusterPosition),"Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
         int loadedRecordVersion=0;
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireSharedLock();
         try {
           final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChanges(atomicOperation,cacheEntry));
           if (localPage.isDeleted(recordPosition))           throw new ORecordNotFoundException(new ORecordId(id,clusterPosition),"Record for cluster with id " + id + " and position "+ clusterPosition+ " is absent.");
           loadedRecordVersion=localPage.getRecordVersion(recordPosition);
         }
   finally {
+          cacheEntry.releaseSharedLock();
           releasePage(atomicOperation,cacheEntry);
         }
         if (loadedRecordVersion > recordVersion)         return readRecord(clusterPosition);

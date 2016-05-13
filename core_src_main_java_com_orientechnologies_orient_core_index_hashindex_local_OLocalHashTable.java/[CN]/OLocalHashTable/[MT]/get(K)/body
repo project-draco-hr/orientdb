@@ -13,11 +13,13 @@
           if (getFilledUpTo(atomicOperation,nullBucketFileId) == 0)           return null;
           V result=null;
           OCacheEntry cacheEntry=loadPage(atomicOperation,nullBucketFileId,0,false);
+          cacheEntry.acquireSharedLock();
           try {
             ONullBucket<V> nullBucket=new ONullBucket<V>(cacheEntry,getChanges(atomicOperation,cacheEntry),valueSerializer,false);
             result=nullBucket.getValue();
           }
   finally {
+            cacheEntry.releaseSharedLock();
             releasePage(atomicOperation,cacheEntry);
           }
           return result;
@@ -30,6 +32,7 @@
           if (bucketPointer == 0)           return null;
           final long pageIndex=getPageIndex(bucketPointer);
           OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+          cacheEntry.acquireSharedLock();
           try {
             final OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChanges(atomicOperation,cacheEntry));
             OHashIndexBucket.Entry<K,V> entry=bucket.find(key,hashCode);
@@ -37,6 +40,7 @@
             return entry.value;
           }
   finally {
+            cacheEntry.releaseSharedLock();
             releasePage(atomicOperation,cacheEntry);
           }
         }

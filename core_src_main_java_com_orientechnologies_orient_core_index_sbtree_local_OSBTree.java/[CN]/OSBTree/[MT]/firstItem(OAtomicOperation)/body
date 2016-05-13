@@ -3,8 +3,9 @@
   long bucketIndex=ROOT_INDEX;
   OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketIndex,false);
   int itemIndex=0;
-  OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChanges(atomicOperation,cacheEntry));
+  cacheEntry.acquireSharedLock();
   try {
+    OSBTreeBucket<K,V> bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChanges(atomicOperation,cacheEntry));
     while (true) {
       if (!bucket.isLeaf()) {
         if (bucket.isEmpty() || itemIndex > bucket.size()) {
@@ -44,12 +45,15 @@
           return new BucketSearchResult(0,resultPath);
         }
       }
+      cacheEntry.releaseSharedLock();
       releasePage(atomicOperation,cacheEntry);
       cacheEntry=loadPage(atomicOperation,fileId,bucketIndex,false);
+      cacheEntry.acquireSharedLock();
       bucket=new OSBTreeBucket<K,V>(cacheEntry,keySerializer,keyTypes,valueSerializer,getChanges(atomicOperation,cacheEntry));
     }
   }
   finally {
+    cacheEntry.releaseSharedLock();
     releasePage(atomicOperation,cacheEntry);
   }
 }

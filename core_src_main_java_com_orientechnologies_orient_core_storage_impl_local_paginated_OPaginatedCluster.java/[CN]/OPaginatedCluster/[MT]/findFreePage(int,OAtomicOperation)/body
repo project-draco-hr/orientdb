@@ -1,5 +1,6 @@
 {
   final OCacheEntry pinnedStateEntry=loadPage(atomicOperation,fileId,pinnedStateEntryIndex,true);
+  pinnedStateEntry.acquireSharedLock();
   try {
     while (true) {
       int freePageIndex=contentSize / ONE_KB;
@@ -16,12 +17,14 @@
  else       freePageIndex--;
       if (freePageIndex < FREE_LIST_SIZE) {
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireSharedLock();
         int realFreePageIndex;
         try {
           OClusterPage localPage=new OClusterPage(cacheEntry,false,getChanges(atomicOperation,cacheEntry));
           realFreePageIndex=calculateFreePageIndex(localPage);
         }
   finally {
+          cacheEntry.releaseSharedLock();
           releasePage(atomicOperation,cacheEntry);
         }
         if (realFreePageIndex != freePageIndex) {
@@ -34,6 +37,7 @@
     }
   }
   finally {
+    pinnedStateEntry.releaseSharedLock();
     releasePage(atomicOperation,pinnedStateEntry);
   }
 }

@@ -1,0 +1,15 @@
+{
+  final ODatabaseDocumentTx db=new ODatabaseDocumentTx(getDatabaseURL(serverInstance.get(0)));
+  db.open("admin","admin");
+  db.getMetadata().getSchema().createClass("scheduler_log");
+  func=db.getMetadata().getFunctionLibrary().createFunction("testFunction");
+  func.setLanguage("SQL");
+  func.setCode("insert into scheduler_log set timestamp = sysdate()");
+  func.save();
+  db.getMetadata().getScheduler().scheduleEvent(new OScheduledEventBuilder().setName("test").setRule("0/1 * * * * ?").setFunction(func).build());
+  Thread.sleep(5000);
+  List<ODocument> result=(List<ODocument>)db.command(new OCommandSQL("select count(*) from scheduler_log")).execute();
+  Long count=result.get(0).field("count");
+  Assert.assertTrue(count >= 4 && count <= 5);
+  db.close();
+}

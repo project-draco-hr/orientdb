@@ -1,28 +1,21 @@
 {
   try {
-    boolean isStart=iDocument.field(OScheduledEvent.PROP_STARTED) == null ? false : ((Boolean)iDocument.field(OScheduledEvent.PROP_STARTED));
     final String schedulerName=iDocument.field(OScheduledEvent.PROP_NAME);
-    OScheduledEvent event=database.getMetadata().getScheduler().getEvent(schedulerName);
-    if (isStart) {
-      if (event == null) {
-        event=new OScheduledEvent(iDocument);
-        database.getMetadata().getScheduler().scheduleEvent(event);
+    final OScheduledEvent event=database.getMetadata().getScheduler().getEvent(schedulerName);
+    if (event != null) {
+      final Set<String> dirtyFields=new HashSet<String>(Arrays.asList(iDocument.getDirtyFields()));
+      if (dirtyFields.contains(OScheduledEvent.PROP_NAME))       throw new OValidationException("Scheduled event cannot change name");
+      if (dirtyFields.contains(OScheduledEvent.PROP_RULE)) {
+        database.getMetadata().getScheduler().removeEvent(event.getName());
+        database.getMetadata().getScheduler().scheduleEvent(new OScheduledEvent(iDocument));
       }
-      String currentStatus=iDocument.field(OScheduledEvent.PROP_STATUS);
-      if (currentStatus.equals(STATUS.STOPPED.name())) {
-        iDocument.field(OScheduledEvent.PROP_STATUS,STATUS.WAITING.name());
-      }
+      iDocument.field(OScheduledEvent.PROP_STATUS,STATUS.STOPPED.name());
+      event.fromStream(iDocument);
+      return RESULT.RECORD_CHANGED;
     }
- else {
-      if (event != null) {
-        iDocument.field(OScheduledEvent.PROP_STATUS,STATUS.STOPPED.name());
-      }
-    }
-    if (event != null)     event.fromStream(iDocument);
   }
  catch (  Exception ex) {
-    OLogManager.instance().error(this,"Error when updating scheduler - " + ex.getMessage());
-    return RESULT.RECORD_NOT_CHANGED;
+    OLogManager.instance().error(this,"Error on updating scheduled event",ex);
   }
-  return RESULT.RECORD_CHANGED;
+  return RESULT.RECORD_NOT_CHANGED;
 }

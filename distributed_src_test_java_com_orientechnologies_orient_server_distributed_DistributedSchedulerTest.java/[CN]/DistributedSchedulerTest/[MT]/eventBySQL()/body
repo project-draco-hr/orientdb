@@ -1,0 +1,24 @@
+{
+  final ODatabaseDocumentTx db=new ODatabaseDocumentTx(getDatabaseURL(serverInstance.get(0)));
+  db.open("admin","admin");
+  try {
+    OFunction func=createFunction(db);
+    db.command(new OCommandSQL("insert into oschedule set name = 'test', function = ?, rule = \"0/1 * * * * ?\"")).execute(func.getId());
+    Thread.sleep(4000);
+    long count=getLogCounter(db);
+    Assert.assertTrue(count >= 4);
+    db.getLocalCache().invalidate();
+    db.command(new OCommandSQL("update oschedule set rule = \"0/2 * * * * ?\" where name = 'test'")).execute(func.getId());
+    Thread.sleep(4000);
+    long newCount=getLogCounter(db);
+    Assert.assertTrue(newCount - count > 1 && newCount - count <= 2);
+    db.command(new OCommandSQL("delete from oschedule where name = 'test'")).execute(func.getId());
+    Thread.sleep(3000);
+    count=newCount;
+    newCount=getLogCounter(db);
+    Assert.assertTrue(newCount - count <= 1);
+  }
+  finally {
+    db.drop();
+  }
+}

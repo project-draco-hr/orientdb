@@ -1,13 +1,24 @@
 {
-  final OIdentifiable value=iOp.getRecord();
-  if (!matchesTarget(value)) {
-    return;
+  ODatabaseDocumentInternal oldThreadLocal=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+  if (oldThreadLocal == null) {
+    execDb.activateOnCurrentThread();
   }
-  if (!matchesFilters(value)) {
-    return;
+  try {
+    final OIdentifiable value=iOp.getRecord();
+    if (!matchesTarget(value)) {
+      return;
+    }
+    if (!matchesFilters(value)) {
+      return;
+    }
+    if (!checkSecurity(value)) {
+      return;
+    }
   }
-  if (!checkSecurity(value)) {
-    return;
+  finally {
+    if (oldThreadLocal == null) {
+      ODatabaseRecordThreadLocal.INSTANCE.remove();
+    }
   }
   final OCommandResultListener listener=request.getResultListener();
   if (listener instanceof OLiveResultListener) {

@@ -8,13 +8,14 @@
       executor.parse(cmd);
       final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
       if (exec instanceof OCommandExecutorSQLSelect && clusters.size() > 0) {
-        final Iterator<? extends OIdentifiable> target=((OCommandExecutorSQLSelect)exec).getTarget();
-        final int[] clusterIds=new int[clusters.size()];
+        final StringBuilder buffer=new StringBuilder("cluster:[");
         int i=0;
-        for (        String c : clusters)         clusterIds[i++]=database.getClusterIdByName(c);
-        final ORecordIteratorClusters<ORecord> filteredTarget=new ORecordIteratorClusters<ORecord>(database,database,clusterIds);
-        if (target instanceof ORecordIteratorClusters)         filteredTarget.setRange(((ORecordIteratorClusters)target).getBeginRange(),((ORecordIteratorClusters)target).getEndRange());
-        ((OCommandExecutorSQLSelect)exec).setTarget(filteredTarget);
+        for (        String c : clusters) {
+          if (i++ > 0)           buffer.append(',');
+          buffer.append(c);
+        }
+        buffer.append("]");
+        ((OCommandExecutorSQLSelect)exec).setParsedTarget(new OSQLTarget(buffer.toString(),exec.getContext()));
       }
       if (params != null)       res=executor.execute(params);
  else       res=executor.execute(null);

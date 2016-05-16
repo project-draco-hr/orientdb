@@ -1,38 +1,33 @@
 {
   makeActive();
   if (iKey.equals("@class"))   return getVerticesOfClass(iValue.toString());
-  String indexName;
-  final String key;
+  String indexName=null;
   int pos=iKey.indexOf('.');
-  OClass clazz=null;
-  if (pos > -1) {
-    indexName=iKey;
-    final String className=iKey.substring(0,pos);
-    key=iKey.substring(iKey.indexOf('.') + 1);
-    clazz=getDatabase().getMetadata().getImmutableSchemaSnapshot().getClass(className);
-    final Collection<? extends OIndex<?>> indexes=clazz.getIndexes();
-    for (    OIndex<?> index : indexes) {
-      final String oInName=index.getName();
-      final int point=oInName.indexOf(".");
-      final String okey=oInName.substring(point + 1);
-      if (okey.equals(key)) {
-        indexName=oInName;
-        break;
-      }
+  final String className=pos > -1 ? iKey.substring(0,pos) : OrientVertexType.CLASS_NAME;
+  final String key=pos > -1 ? iKey.substring(pos + 1) : iKey;
+  OClass clazz=getDatabase().getMetadata().getImmutableSchemaSnapshot().getClass(className);
+  if (clazz == null) {
+    throw new IllegalArgumentException("OClass not found in the schema: " + className);
+  }
+  OIndex<?> idx=null;
+  final Collection<? extends OIndex<?>> indexes=clazz.getIndexes();
+  for (  OIndex<?> index : indexes) {
+    OIndexDefinition indexDef=index.getDefinition();
+    List<String> indexedFields=indexDef.getFields();
+    if (indexedFields != null && indexedFields.size() > 0 && indexedFields.get(0).equals(key)) {
+      idx=index;
+      break;
     }
   }
- else {
-    indexName=OrientVertexType.CLASS_NAME + "." + iKey;
-    key=iKey;
-  }
-  final OIndex<?> idx=getDatabase().getMetadata().getIndexManager().getIndex(indexName);
   if (idx != null) {
     iValue=convertKey(idx,iValue);
     Object indexValue=idx.get(iValue);
     if (indexValue != null && !(indexValue instanceof Iterable<?>))     indexValue=Arrays.asList(indexValue);
     return new OrientElementIterable<Vertex>(this,(Iterable<?>)indexValue);
   }
-  OrientGraphQuery query=(OrientGraphQuery)query();
-  if (clazz != null)   query.labels(clazz.getName());
-  return query.has(key,iValue).vertices();
+ else {
+    OrientGraphQuery query=(OrientGraphQuery)query();
+    query.labels(clazz.getName());
+    return query.has(key,iValue).vertices();
+  }
 }

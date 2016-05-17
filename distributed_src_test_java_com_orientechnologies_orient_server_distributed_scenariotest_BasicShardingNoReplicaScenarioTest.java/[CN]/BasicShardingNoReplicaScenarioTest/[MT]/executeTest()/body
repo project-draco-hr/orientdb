@@ -23,13 +23,13 @@
     Thread.sleep(500);
     graphNoTx.getRawGraph().close();
     executeMultipleWritesOnShards(executeWritesOnServers,"plocal");
-    checkWritesWithShardinNoReplica(serverInstance,executeWritesOnServers);
+    checkAvailabilityOnShardsNoReplica(serverInstance,executeWritesOnServers);
     System.out.println("Shutdown on server3.\n");
     simulateServerFault(serverInstance.get(2),"shutdown");
     assertFalse(serverInstance.get(2).isActive());
     waitForDatabaseIsOffline(executeWritesOnServers.get(2).getServerInstance().getDistributedManager().getLocalNodeName(),getDatabaseName(),10000);
     executeWritesOnServers.remove(2);
-    checkWritesWithShardinNoReplica(executeWritesOnServers,executeWritesOnServers);
+    checkAvailabilityOnShardsNoReplica(executeWritesOnServers,executeWritesOnServers);
     try {
       System.out.print("Checking that records on server3 are not available in the cluster...");
       graphNoTx=localFactory.getNoTx();
@@ -49,7 +49,7 @@
     serverInstance.get(2).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
     System.out.println("Server 3 restarted.");
     assertTrue(serverInstance.get(2).isActive());
-    Thread.sleep(500);
+    waitForDatabaseIsOnline(serverInstance.get(2).getServerInstance().getDistributedManager().getLocalNodeName(),getDatabaseName(),10000);
     try {
       System.out.print("Checking server3 status by querying a record inserted on it...");
       localFactory=new OrientGraphFactory("plocal:target/server2/databases/" + getDatabaseName());
@@ -70,7 +70,7 @@
       fail(e.toString());
     }
     executeWritesOnServers.add(serverInstance.get(2));
-    checkWritesWithShardinNoReplica(serverInstance,executeWritesOnServers);
+    checkAvailabilityOnShardsNoReplica(serverInstance,executeWritesOnServers);
   }
  catch (  Exception e) {
     e.printStackTrace();

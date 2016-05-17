@@ -1,0 +1,48 @@
+{
+  isRunning=true;
+  OLogManager.instance().info(this,"Checking for the execution of the scheduled event '%s' executionId=%d...",getName(),nextExecutionId);
+  Object result=null;
+  try {
+    if (db != null)     ODatabaseRecordThreadLocal.INSTANCE.set(db);
+    boolean executeEvent=false;
+    for (int retry=0; retry < 10; ++retry) {
+      try {
+        if (isEventAlreadyExecuted())         break;
+        document.field(PROP_STATUS,STATUS.RUNNING);
+        document.field(PROP_STARTTIME,System.currentTimeMillis());
+        document.field(PROP_EXEC_ID,nextExecutionId);
+        document.save();
+        executeEvent=true;
+        break;
+      }
+ catch (      ONeedRetryException e) {
+        if (isEventAlreadyExecuted())         break;
+        OLogManager.instance().info(this,"Cannot change the status of the scheduled event '%s' executionId=%d, retry %d",getName(),nextExecutionId,retry);
+      }
+catch (      ORecordNotFoundException e) {
+        OLogManager.instance().info(this,"Scheduled event '%s' executionId=%d not found on database, removing event",getName(),nextExecutionId);
+        timer=null;
+        break;
+      }
+catch (      Throwable e) {
+        OLogManager.instance().error(this,"Error during starting of scheduled event '%s' executionId=%d",e,getName(),nextExecutionId);
+        timer=null;
+        break;
+      }
+    }
+    if (!executeEvent)     return null;
+    OLogManager.instance().info(this,"Executing scheduled event '%s' executionId=%d...",getName(),nextExecutionId);
+    try {
+      result=function.execute(getArguments());
+    }
+  finally {
+      OLogManager.instance().info(this,"Scheduled event '%s' executionId=%d completed with result: %s",getName(),nextExecutionId,result);
+      document.field(PROP_STATUS,STATUS.WAITING);
+      document.save();
+    }
+  }
+  finally {
+    isRunning=false;
+  }
+  return result;
+}

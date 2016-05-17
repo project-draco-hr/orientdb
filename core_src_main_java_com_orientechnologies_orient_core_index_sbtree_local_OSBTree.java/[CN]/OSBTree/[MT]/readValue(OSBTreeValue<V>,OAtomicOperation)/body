@@ -1,6 +1,7 @@
 {
   if (!sbTreeValue.isLink())   return sbTreeValue.getValue();
   OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,sbTreeValue.getLink(),false);
+  cacheEntry.acquireSharedLock();
   OSBTreeValuePage valuePage=new OSBTreeValuePage(cacheEntry,getChanges(atomicOperation,cacheEntry),false);
   int totalSize=valuePage.getSize();
   int currentSize=0;
@@ -9,11 +10,14 @@
     currentSize=valuePage.readBinaryContent(value,currentSize);
     long nextPage=valuePage.getNextPage();
     if (nextPage >= 0) {
+      cacheEntry.releaseSharedLock();
       releasePage(atomicOperation,cacheEntry);
       cacheEntry=loadPage(atomicOperation,fileId,nextPage,false);
+      cacheEntry.acquireSharedLock();
       valuePage=new OSBTreeValuePage(cacheEntry,getChanges(atomicOperation,cacheEntry),false);
     }
   }
+  cacheEntry.releaseSharedLock();
   releasePage(atomicOperation,cacheEntry);
   return valueSerializer.deserializeNativeObject(value,0);
 }

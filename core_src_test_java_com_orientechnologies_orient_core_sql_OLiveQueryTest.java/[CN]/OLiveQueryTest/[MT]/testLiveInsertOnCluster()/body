@@ -1,0 +1,27 @@
+{
+  ODatabaseDocumentTx db=new ODatabaseDocumentTx("memory:OLiveQueryTest");
+  db.activateOnCurrentThread();
+  db.create();
+  try {
+    OClass clazz=db.getMetadata().getSchema().createClass("test");
+    int defaultCluster=clazz.getDefaultClusterId();
+    OCluster cluster=db.getStorage().getClusterById(defaultCluster);
+    MyLiveQueryListener listener=new MyLiveQueryListener();
+    db.query(new OLiveQuery<ODocument>("live select from cluster:" + cluster.getName(),listener));
+    db.command(new OCommandSQL("insert into cluster:" + cluster.getName() + " set name = 'foo', surname = 'bar'")).execute();
+    try {
+      Thread.sleep(3000);
+    }
+ catch (    InterruptedException e) {
+      e.printStackTrace();
+    }
+    Assert.assertEquals(listener.ops.size(),1);
+    for (    ORecordOperation doc : listener.ops) {
+      Assert.assertEquals(doc.type,ORecordOperation.CREATED);
+      Assert.assertEquals(((ODocument)doc.record).field("name"),"foo");
+    }
+  }
+  finally {
+    db.drop();
+  }
+}

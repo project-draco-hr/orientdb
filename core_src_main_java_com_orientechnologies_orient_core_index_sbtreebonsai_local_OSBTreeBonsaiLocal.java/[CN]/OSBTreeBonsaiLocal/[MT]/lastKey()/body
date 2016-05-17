@@ -11,6 +11,7 @@
         OBonsaiBucketPointer bucketPointer=rootBucketPointer;
         OAtomicOperation atomicOperation=atomicOperationsManager.getCurrentOperation();
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
+        cacheEntry.acquireSharedLock();
         OSBTreeBonsaiBucket<K,V> bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChanges(atomicOperation,cacheEntry),this);
         int itemIndex=bucket.size() - 1;
         try {
@@ -52,13 +53,16 @@
                 itemIndex=OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1;
               }
             }
+            cacheEntry.releaseSharedLock();
             releasePage(atomicOperation,cacheEntry);
             cacheEntry=loadPage(atomicOperation,fileId,bucketPointer.getPageIndex(),false);
+            cacheEntry.acquireSharedLock();
             bucket=new OSBTreeBonsaiBucket<K,V>(cacheEntry,bucketPointer.getPageOffset(),keySerializer,valueSerializer,getChanges(atomicOperation,cacheEntry),this);
             if (itemIndex == OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES + 1)             itemIndex=bucket.size() - 1;
           }
         }
   finally {
+          cacheEntry.releaseSharedLock();
           releasePage(atomicOperation,cacheEntry);
         }
       }

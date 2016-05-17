@@ -12,15 +12,18 @@
         long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
         long pageIndex=getPageIndex(bucketPointer);
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireSharedLock();
         try {
           OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChanges(atomicOperation,cacheEntry));
           while (bucket.size() == 0) {
             final OHashTable.BucketPath prevBucketPath=prevBucketToFind(bucketPath,bucket.getDepth());
             if (prevBucketPath == null)             return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+            cacheEntry.releaseSharedLock();
             releasePage(atomicOperation,cacheEntry);
             final long prevPointer=directory.getNodePointer(prevBucketPath.nodeIndex,prevBucketPath.itemIndex + prevBucketPath.hashMapOffset);
             pageIndex=getPageIndex(prevPointer);
             cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+            cacheEntry.acquireSharedLock();
             bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChanges(atomicOperation,cacheEntry));
             bucketPath=prevBucketPath;
           }
@@ -32,6 +35,7 @@
           return convertBucketToEntries(bucket,startIndex,endIndex);
         }
   finally {
+          cacheEntry.releaseSharedLock();
           releasePage(atomicOperation,cacheEntry);
         }
       }

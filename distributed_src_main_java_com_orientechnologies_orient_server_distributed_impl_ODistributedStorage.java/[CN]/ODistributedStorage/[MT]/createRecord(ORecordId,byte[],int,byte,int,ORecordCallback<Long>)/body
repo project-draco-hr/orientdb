@@ -1,0 +1,95 @@
+{
+  resetLastValidBackup();
+  if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed()) {
+    return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+  }
+  checkLocalNodeIsAvailable();
+  try {
+    String clusterName=getClusterNameByRID(iRecordId);
+    final int clusterId=iRecordId.getClusterId();
+    if (clusterId == ORID.CLUSTER_ID_INVALID)     throw new IllegalArgumentException("Cluster not valid");
+    final String localNodeName=dManager.getLocalNodeName();
+    final ODistributedConfiguration dbCfg=distributedConfiguration;
+    checkNodeIsMaster(localNodeName,dbCfg);
+    final List<String> nodes=dbCfg.getServers(clusterName,null);
+    if (nodes.isEmpty())     throw new ODistributedException("Cannot execute distributed create record " + iRecordId + " because no nodes are available");
+    String masterNode=nodes.get(0);
+    if (!masterNode.equals(localNodeName)) {
+      final OCluster cl=getClusterByName(clusterName);
+      final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+      final OClass cls=db.getMetadata().getSchema().getClassByClusterId(cl.getId());
+      String newClusterName=null;
+      if (cls != null) {
+        OClusterSelectionStrategy clSel=cls.getClusterSelection();
+        if (!(clSel instanceof OLocalClusterStrategy)) {
+          dManager.propagateSchemaChanges(db);
+          clSel=cls.getClusterSelection();
+        }
+        if (!(clSel instanceof OLocalClusterStrategy))         throw new ODistributedException("Cannot install local cluster strategy on class '" + cls.getName() + "'");
+        OLogManager.instance().warn(this,"Local node '" + localNodeName + "' is not the master for cluster '"+ clusterName+ "' (it is '"+ masterNode+ "'). Reloading distributed configuration for database '"+ getName()+ "'");
+        ((OLocalClusterStrategy)clSel).readConfiguration();
+        newClusterName=getPhysicalClusterNameById(clSel.getCluster(cls,null));
+        nodes.clear();
+        nodes.addAll(dbCfg.getServers(newClusterName,null));
+        dManager.getAvailableNodes(nodes,getName());
+        masterNode=nodes.get(0);
+      }
+      if (!masterNode.equals(localNodeName))       throw new ODistributedException("Error on inserting into cluster '" + clusterName + "' where local node '"+ localNodeName+ "' is not the master of it, but it is '"+ masterNode+ "'");
+      OLogManager.instance().warn(this,"Local node '" + localNodeName + "' is not the master for cluster '"+ clusterName+ "' (it is '"+ masterNode+ "'). Switching to a valid cluster of the same class: '"+ newClusterName+ "'");
+      clusterName=newClusterName;
+      iRecordId.clusterId=db.getClusterIdByName(newClusterName);
+    }
+    final String finalClusterName=clusterName;
+    final Set<String> clusterNames=Collections.singleton(finalClusterName);
+    localDistributedDatabase.checkQuorumBeforeReplicate(OCommandDistributedReplicateRequest.QUORUM_TYPE.WRITE,clusterNames,nodes,dbCfg);
+    nodes.remove(localNodeName);
+    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
+    if (executionModeSynch == null)     executionModeSynch=iMode == 0;
+    final boolean syncMode=executionModeSynch;
+    return (OStorageOperationResult<OPhysicalPosition>)executeRecordOperationInLock(syncMode,iRecordId,new OCallable<Object,OCallable<Void,ODistributedRequestId>>(){
+      @Override public Object call(      OCallable<Void,ODistributedRequestId> unlockCallback){
+        final OStorageOperationResult<OPhysicalPosition> localResult;
+        localResult=wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
+        iRecordId.clusterPosition=localResult.getResult().clusterPosition;
+        final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
+        final OCreateRecordTask task=new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType);
+        task.setLastLSN(wrapped.getLSN());
+        if (!nodes.isEmpty()) {
+          if (syncMode) {
+            final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
+            final Object payload=dResponse.getPayload();
+            if (payload != null) {
+              if (payload instanceof Exception) {
+                executeUndoOnLocalServer(dResponse.getRequestId(),task);
+                if (payload instanceof ONeedRetryException)                 throw (ONeedRetryException)payload;
+                throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)payload);
+              }
+              final OPlaceholder masterPlaceholder=(OPlaceholder)payload;
+              iRecordId.copyFrom(masterPlaceholder.getIdentity());
+              return new OStorageOperationResult<OPhysicalPosition>(new OPhysicalPosition(masterPlaceholder.getIdentity().getClusterPosition(),masterPlaceholder.getVersion()));
+            }
+          }
+ else {
+            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(finalClusterName),nodes,task,dManager.getNextMessageIdCounter(),localPlaceholder,unlockCallback,null));
+          }
+        }
+ else         unlockCallback.call(null);
+        return localResult;
+      }
+    }
+);
+  }
+ catch (  ONeedRetryException e) {
+    throw e;
+  }
+catch (  HazelcastInstanceNotActiveException e) {
+    throw new OOfflineNodeException("Hazelcast instance is not available");
+  }
+catch (  HazelcastException e) {
+    throw new OOfflineNodeException("Hazelcast instance is not available");
+  }
+catch (  Exception e) {
+    handleDistributedException("Cannot route CREATE_RECORD operation for %s to the distributed node",e,iRecordId);
+    return null;
+  }
+}

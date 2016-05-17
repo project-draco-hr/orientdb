@@ -5,6 +5,7 @@
     if (path.size() > MAX_PATH_LENGTH)     throw new OSBTreeException("We reached max level of depth of SBTree but still found nothing, seems like tree is in corrupted state. You should rebuild index related to given query.",this);
     path.add(pageIndex);
     final OCacheEntry bucketEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+    bucketEntry.acquireSharedLock();
     final OSBTreeBucket.SBTreeEntry<K,V> entry;
     try {
       final OSBTreeBucket<K,V> keyBucket=new OSBTreeBucket<K,V>(bucketEntry,keySerializer,keyTypes,valueSerializer,getChanges(atomicOperation,bucketEntry));
@@ -18,6 +19,7 @@
       }
     }
   finally {
+      bucketEntry.releaseSharedLock();
       releasePage(atomicOperation,bucketEntry);
     }
     if (comparator.compare(key,entry.key) >= 0)     pageIndex=entry.rightChild;

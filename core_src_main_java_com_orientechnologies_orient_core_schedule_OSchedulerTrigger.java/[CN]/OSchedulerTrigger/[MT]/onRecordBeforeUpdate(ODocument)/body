@@ -1,28 +1,21 @@
 {
   try {
-    boolean isStart=iDocument.field(OScheduler.PROP_STARTED) == null ? false : ((Boolean)iDocument.field(OScheduler.PROP_STARTED));
-    String schedulerName=iDocument.field(OScheduler.PROP_NAME);
-    OScheduler scheduler=database.getMetadata().getSchedulerListener().getScheduler(schedulerName);
-    if (isStart) {
-      if (scheduler == null) {
-        scheduler=new OScheduler(iDocument);
-        database.getMetadata().getSchedulerListener().addScheduler(scheduler);
+    final String schedulerName=iDocument.field(OScheduledEvent.PROP_NAME);
+    final OScheduledEvent event=database.getMetadata().getScheduler().getEvent(schedulerName);
+    if (event != null) {
+      final Set<String> dirtyFields=new HashSet<String>(Arrays.asList(iDocument.getDirtyFields()));
+      if (dirtyFields.contains(OScheduledEvent.PROP_NAME))       throw new OValidationException("Scheduled event cannot change name");
+      if (dirtyFields.contains(OScheduledEvent.PROP_RULE)) {
+        database.getMetadata().getScheduler().removeEvent(event.getName());
+        database.getMetadata().getScheduler().scheduleEvent(new OScheduledEvent(iDocument));
       }
-      String currentStatus=iDocument.field(OScheduler.PROP_STATUS);
-      if (currentStatus.equals(SCHEDULER_STATUS.STOPPED.name())) {
-        iDocument.field(OScheduler.PROP_STATUS,SCHEDULER_STATUS.WAITING.name());
-      }
+      iDocument.field(OScheduledEvent.PROP_STATUS,STATUS.STOPPED.name());
+      event.fromStream(iDocument);
+      return RESULT.RECORD_CHANGED;
     }
- else {
-      if (scheduler != null) {
-        iDocument.field(OScheduler.PROP_STATUS,SCHEDULER_STATUS.STOPPED.name());
-      }
-    }
-    scheduler.fromStream(iDocument);
   }
  catch (  Exception ex) {
-    OLogManager.instance().error(this,"Error when updating scheduler - " + ex.getMessage());
-    return RESULT.RECORD_NOT_CHANGED;
+    OLogManager.instance().error(this,"Error on updating scheduled event",ex);
   }
-  return RESULT.RECORD_CHANGED;
+  return RESULT.RECORD_NOT_CHANGED;
 }

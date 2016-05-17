@@ -7,12 +7,14 @@
   if (getFilledUpTo(atomicOperation,fileId) <= pageIndex)   return null;
   int recordVersion=0;
   final OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false,pageCount);
+  cacheEntry.acquireSharedLock();
   try {
     final OClusterPage localPage=new OClusterPage(cacheEntry,false,getChanges(atomicOperation,cacheEntry));
     if (localPage.isDeleted(recordPosition))     return null;
     recordVersion=localPage.getRecordVersion(recordPosition);
   }
   finally {
+    cacheEntry.releaseSharedLock();
     releasePage(atomicOperation,cacheEntry);
   }
   final byte[] fullContent=readFullEntry(clusterPosition,pageIndex,recordPosition,atomicOperation,pageCount);

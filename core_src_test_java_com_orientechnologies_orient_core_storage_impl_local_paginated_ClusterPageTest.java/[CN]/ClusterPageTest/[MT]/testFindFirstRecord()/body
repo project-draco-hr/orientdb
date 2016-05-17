@@ -4,10 +4,12 @@
   OCachePointer cachePointer=new OCachePointer(buffer,bufferPool,new OLogSequenceNumber(0,0),0,0);
   cachePointer.incrementReferrer();
   OCacheEntry cacheEntry=new OCacheEntry(0,0,cachePointer,false);
+  cacheEntry.acquireExclusiveLock();
   ByteBuffer directBuffer=bufferPool.acquireDirect(true);
   OCachePointer directCachePointer=new OCachePointer(directBuffer,bufferPool,new OLogSequenceNumber(0,0),0,0);
   directCachePointer.incrementReferrer();
   OCacheEntry directCacheEntry=new OCacheEntry(0,0,directCachePointer,false);
+  directCacheEntry.acquireExclusiveLock();
   final long seed=System.currentTimeMillis();
   try {
     OClusterPage localPage=new OClusterPage(cacheEntry,true,new OWALChangesTree());
@@ -17,6 +19,8 @@
     assertChangesTracking(localPage,directBuffer,bufferPool);
   }
   finally {
+    cacheEntry.releaseExclusiveLock();
+    directCacheEntry.releaseExclusiveLock();
     cachePointer.decrementReferrer();
     directCachePointer.decrementReferrer();
   }

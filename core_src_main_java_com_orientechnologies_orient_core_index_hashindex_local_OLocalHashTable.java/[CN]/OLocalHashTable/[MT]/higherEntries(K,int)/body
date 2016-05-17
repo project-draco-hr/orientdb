@@ -12,15 +12,18 @@
         long bucketPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
         long pageIndex=getPageIndex(bucketPointer);
         OCacheEntry cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+        cacheEntry.acquireSharedLock();
         try {
           OHashIndexBucket<K,V> bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChanges(atomicOperation,cacheEntry));
           while (bucket.size() == 0 || comparator.compare(bucket.getKey(bucket.size() - 1),key) <= 0) {
             bucketPath=nextBucketToFind(bucketPath,bucket.getDepth());
             if (bucketPath == null)             return OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+            cacheEntry.releaseSharedLock();
             releasePage(atomicOperation,cacheEntry);
             final long nextPointer=directory.getNodePointer(bucketPath.nodeIndex,bucketPath.itemIndex + bucketPath.hashMapOffset);
             pageIndex=getPageIndex(nextPointer);
             cacheEntry=loadPage(atomicOperation,fileId,pageIndex,false);
+            cacheEntry.acquireSharedLock();
             bucket=new OHashIndexBucket<K,V>(cacheEntry,keySerializer,valueSerializer,keyTypes,getChanges(atomicOperation,cacheEntry));
           }
           final int index=bucket.getIndex(hashCode,key);
@@ -33,6 +36,7 @@
           return convertBucketToEntries(bucket,startIndex,endIndex);
         }
   finally {
+          cacheEntry.releaseSharedLock();
           releasePage(atomicOperation,cacheEntry);
         }
       }

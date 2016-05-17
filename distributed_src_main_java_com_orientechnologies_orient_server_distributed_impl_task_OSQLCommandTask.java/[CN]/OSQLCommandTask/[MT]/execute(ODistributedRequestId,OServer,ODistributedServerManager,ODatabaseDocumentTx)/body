@@ -1,0 +1,29 @@
+{
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Execute command=%s db=%s",text.toString(),database.getName());
+  Object res;
+  while (true) {
+    try {
+      final OCommandRequest cmd=database.command(new OCommandSQL(text));
+      OCommandExecutor executor=OCommandManager.instance().getExecutor((OCommandRequestInternal)cmd);
+      executor.parse(cmd);
+      final OCommandExecutor exec=executor instanceof OCommandExecutorSQLDelegate ? ((OCommandExecutorSQLDelegate)executor).getDelegate() : executor;
+      if (exec instanceof OCommandExecutorSQLSelect && clusters.size() > 0) {
+        final StringBuilder buffer=new StringBuilder("cluster:[");
+        int i=0;
+        for (        String c : clusters) {
+          if (i++ > 0)           buffer.append(',');
+          buffer.append(c);
+        }
+        buffer.append("]");
+        ((OCommandExecutorSQLSelect)exec).setParsedTarget(new OSQLTarget(buffer.toString(),exec.getContext()));
+      }
+      if (params != null)       res=executor.execute(params);
+ else       res=executor.execute(null);
+      break;
+    }
+ catch (    ORetryQueryException e) {
+      continue;
+    }
+  }
+  return res;
+}

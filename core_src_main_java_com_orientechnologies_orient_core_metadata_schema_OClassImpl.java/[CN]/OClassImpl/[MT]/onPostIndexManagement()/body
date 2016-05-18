@@ -1,7 +1,23 @@
 {
   final OIndex<?> autoShardingIndex=getAutoShardingIndex();
   if (autoShardingIndex != null) {
-    if (!getDatabase().getStorage().isRemote())     this.clusterSelection=new OAutoShardingClusterSelectionStrategy(this,autoShardingIndex);
+    if (!getDatabase().getStorage().isRemote()) {
+      acquireSchemaWriteLock();
+      try {
+        this.clusterSelection=new OAutoShardingClusterSelectionStrategy(this,autoShardingIndex);
+      }
+  finally {
+        releaseSchemaWriteLock();
+      }
+    }
   }
- else   if (clusterSelection instanceof OAutoShardingClusterSelectionStrategy)   this.clusterSelection=new ORoundRobinClusterSelectionStrategy();
+ else   if (clusterSelection instanceof OAutoShardingClusterSelectionStrategy) {
+    acquireSchemaWriteLock();
+    try {
+      this.clusterSelection=new ORoundRobinClusterSelectionStrategy();
+    }
+  finally {
+      releaseSchemaWriteLock();
+    }
+  }
 }

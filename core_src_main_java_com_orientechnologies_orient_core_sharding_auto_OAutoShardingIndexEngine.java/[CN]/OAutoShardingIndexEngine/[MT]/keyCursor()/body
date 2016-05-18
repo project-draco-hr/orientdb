@@ -1,3 +1,36 @@
 {
-  throw new UnsupportedOperationException("keyCursor");
+  return new OIndexKeyCursor(){
+    private int nextPartition=1;
+    private OHashTable<Object,Object> hashTable;
+    private int nextEntriesIndex;
+    private OHashIndexBucket.Entry<Object,Object>[] entries;
+{
+      if (partitions == null || partitions.isEmpty())       entries=OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+ else {
+        hashTable=partitions.get(0);
+        OHashIndexBucket.Entry<Object,Object> firstEntry=hashTable.firstEntry();
+        if (firstEntry == null)         entries=OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+ else         entries=hashTable.ceilingEntries(firstEntry.key);
+      }
+    }
+    @Override public Object next(    final int prefetchSize){
+      if (entries.length == 0) {
+        return null;
+      }
+      final OHashIndexBucket.Entry<Object,Object> bucketEntry=entries[nextEntriesIndex];
+      nextEntriesIndex++;
+      if (nextEntriesIndex >= entries.length) {
+        entries=hashTable.higherEntries(entries[entries.length - 1].key);
+        nextEntriesIndex=0;
+        if (entries.length == 0 && nextPartition < partitions.size()) {
+          hashTable=partitions.get(nextPartition++);
+          OHashIndexBucket.Entry<Object,Object> firstEntry=hashTable.firstEntry();
+          if (firstEntry == null)           entries=OCommonConst.EMPTY_BUCKET_ENTRY_ARRAY;
+ else           entries=hashTable.ceilingEntries(firstEntry.key);
+        }
+      }
+      return bucketEntry.key;
+    }
+  }
+;
 }

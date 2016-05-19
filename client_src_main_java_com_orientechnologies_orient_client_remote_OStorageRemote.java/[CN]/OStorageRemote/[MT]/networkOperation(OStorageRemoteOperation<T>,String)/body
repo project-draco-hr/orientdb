@@ -13,7 +13,7 @@
     }
     try {
       OStorageRemoteNodeSession nodeSession=session.get(network.getServerURL());
-      if (nodeSession == null) {
+      if (nodeSession == null || !nodeSession.isValid()) {
         openRemoteDatabase(network);
         if (!network.tryLock())         continue;
       }
@@ -24,11 +24,16 @@
     }
 catch (    OTokenException e) {
       session.remove(network.getServerURL());
+      if (--retry <= 0)       throw OException.wrapException(new OStorageException(errorMessage),e);
     }
 catch (    OTokenSecurityException e) {
       session.remove(network.getServerURL());
+      if (--retry <= 0)       throw OException.wrapException(new OStorageException(errorMessage),e);
     }
 catch (    OOfflineNodeException e) {
+synchronized (serverURLs) {
+        serverURLs.remove(serverUrl);
+      }
     }
 catch (    IOException e) {
       retry=handleIOException(retry,network,e);

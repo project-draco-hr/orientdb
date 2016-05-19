@@ -4,16 +4,12 @@
   if (fields.length == 0) {
     throw new OIndexException("List of fields to index cannot be empty.");
   }
-  acquireSchemaReadLock();
-  try {
-    for (    final String fieldToIndex : fields) {
-      final String fieldName=decodeClassName(OIndexDefinitionFactory.extractFieldName(fieldToIndex));
-      if (!fieldName.equals("@rid") && !existsProperty(fieldName))       throw new OIndexException("Index with name : '" + name + "' cannot be created on class : '"+ this.name+ "' because field: '"+ fieldName+ "' is absent in class definition.");
-    }
-    final OIndexDefinition indexDefinition=OIndexDefinitionFactory.createIndexDefinition(this,Arrays.asList(fields),extractFieldTypes(fields),null,type,algorithm);
-    return getDatabase().getMetadata().getIndexManager().createIndex(name,type,indexDefinition,polymorphicClusterIds,progressListener,metadata,algorithm);
+  final String localName=this.name;
+  final int[] localPolymorphicClusterIds=polymorphicClusterIds;
+  for (  final String fieldToIndex : fields) {
+    final String fieldName=decodeClassName(OIndexDefinitionFactory.extractFieldName(fieldToIndex));
+    if (!fieldName.equals("@rid") && !existsProperty(fieldName))     throw new OIndexException("Index with name '" + name + "' cannot be created on class '"+ localName+ "' because the field '"+ fieldName+ "' is absent in class definition");
   }
-  finally {
-    releaseSchemaReadLock();
-  }
+  final OIndexDefinition indexDefinition=OIndexDefinitionFactory.createIndexDefinition(this,Arrays.asList(fields),extractFieldTypes(fields),null,type,algorithm);
+  return getDatabase().getMetadata().getIndexManager().createIndex(name,type,indexDefinition,localPolymorphicClusterIds,progressListener,metadata,algorithm);
 }

@@ -1,0 +1,32 @@
+{
+  ODatabaseDocumentTx dbServer0=poolFactory.get(getDatabaseURL(serverInstance.get(0)),"admin","admin").acquire();
+  ODatabaseDocumentTx dbServer1=poolFactory.get(getDatabaseURL(serverInstance.get(1)),"admin","admin").acquire();
+  ODatabaseRecordThreadLocal.INSTANCE.set(dbServer0);
+  ODocument recordServer0=new ODocument("Person").fromMap(hanFields);
+  recordServer0.save();
+  waitForInsertedRecordPropagation(RECORD_ID);
+  ODocument recordServer1=retrieveRecord(getDatabaseURL(serverInstance.get(1)),RECORD_ID);
+  ODocument recordServer2=retrieveRecord(getDatabaseURL(serverInstance.get(2)),RECORD_ID);
+  assertTrue(compareRecords(recordServer0,recordServer1));
+  assertTrue(compareRecords(recordServer0,recordServer2));
+  int actualVersion=recordServer0.getVersion();
+  OLogManager.instance().error(this,"Actual version: " + actualVersion);
+  ((ODistributedStorage)dbServer0.getStorage()).setEventListener(new AfterRecordLockDelayer("server0",DOCUMENT_WRITE_TIMEOUT / 4));
+  ((ODistributedStorage)dbServer1.getStorage()).setEventListener(new AfterRecordLockDelayer("server1",DOCUMENT_WRITE_TIMEOUT / 2));
+  List<Callable<Void>> clients=new LinkedList<Callable<Void>>();
+  clients.add(new RecordUpdater(getDatabaseURL(serverInstance.get(0)),recordServer0,darthFields,true));
+  clients.add(new RecordUpdater(getDatabaseURL(serverInstance.get(1)),recordServer1,leiaFields,true));
+  List<Future<Void>> futures=Executors.newCachedThreadPool().invokeAll(clients);
+  executeFutures(futures);
+  System.out.println("serverInstance: " + serverInstance);
+  waitForUpdatedRecordPropagation(RECORD_ID,"firstName",darthFields.get("firstName").toString());
+  recordServer0=retrieveRecord(getDatabaseURL(serverInstance.get(0)),RECORD_ID);
+  recordServer1=retrieveRecord(getDatabaseURL(serverInstance.get(1)),RECORD_ID);
+  recordServer2=retrieveRecord(getDatabaseURL(serverInstance.get(2)),RECORD_ID);
+  int finalVersionServer0=recordServer0.getVersion();
+  int finalVersionServer1=recordServer1.getVersion();
+  int finalVersionServer2=recordServer2.getVersion();
+  assertEquals(actualVersion + 1,finalVersionServer0);
+  assertEquals(actualVersion + 1,finalVersionServer1);
+  assertEquals(actualVersion + 1,finalVersionServer2);
+}

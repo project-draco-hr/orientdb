@@ -1,16 +1,22 @@
 {
+  int retry=connectionRetry;
+  OStorageRemoteSession session=getCurrentSession();
   do {
     OChannelBinaryAsynchClient network=null;
-    try {
-      network=getAvailableNetwork(getNextAvailableServerURL(false));
+    String serverUrl=getNextAvailableServerURL(false,session);
+    do {
+      try {
+        network=getNetwork(serverUrl);
+      }
+ catch (      OException e) {
+        serverUrl=useNewServerURL(serverUrl);
+        if (serverUrl == null)         throw e;
+      }
     }
- catch (    IOException exception) {
-      throw OException.wrapException(new OStorageException(errorMessage),exception);
-    }
+ while (network == null);
     try {
-      OStorageRemoteSession session=getCurrentSession();
       OStorageRemoteNodeSession nodeSession=session.get(network.getServerURL());
-      if (nodeSession == null) {
+      if (nodeSession == null || !nodeSession.isValid()) {
         openRemoteDatabase(network);
         if (!network.tryLock())         continue;
       }
@@ -19,8 +25,30 @@
  catch (    OModificationOperationProhibitedException mope) {
       handleDBFreeze();
     }
+catch (    OTokenException e) {
+      session.remove(network.getServerURL());
+      if (--retry <= 0)       throw OException.wrapException(new OStorageException(errorMessage),e);
+    }
+catch (    OTokenSecurityException e) {
+      session.remove(network.getServerURL());
+      if (--retry <= 0)       throw OException.wrapException(new OStorageException(errorMessage),e);
+    }
+catch (    OOfflineNodeException e) {
+synchronized (serverURLs) {
+        serverURLs.remove(serverUrl);
+      }
+    }
+catch (    IOException e) {
+      retry=handleIOException(retry,network,e);
+    }
+catch (    OIOException e) {
+      retry=handleIOException(retry,network,e);
+    }
+catch (    OException e) {
+      throw e;
+    }
 catch (    Exception e) {
-      handleException(network,errorMessage,e);
+      throw OException.wrapException(new OStorageException(errorMessage),e);
     }
   }
  while (true);

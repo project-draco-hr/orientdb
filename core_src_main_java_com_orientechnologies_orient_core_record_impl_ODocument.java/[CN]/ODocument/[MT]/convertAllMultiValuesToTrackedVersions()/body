@@ -43,7 +43,7 @@ fillTrackedMap((Map<Object,Object>)newValue,(Map<Object,Object>)fieldValue);
 }
 break;
 case LINKLIST:
-if (fieldValue instanceof List<?>) newValue=new ORecordLazyList(this,(List<OIdentifiable>)fieldValue);
+if (fieldValue instanceof List<?>) newValue=new ORecordLazyList(this,(Collection<OIdentifiable>)fieldValue);
 break;
 case LINKSET:
 if (fieldValue instanceof Set<?>) newValue=new ORecordLazySet(this,(Collection<OIdentifiable>)fieldValue);
@@ -65,6 +65,22 @@ break;
 if (newValue != null) {
 addCollectionChangeListener(fieldEntry.getValue());
 fieldEntry.getValue().value=newValue;
+if (fieldType == OType.LINKSET || fieldType == OType.LINKLIST) {
+boolean pre=((OAutoConvertToRecord)newValue).isAutoConvertToRecord();
+((OAutoConvertToRecord)newValue).setAutoConvertToRecord(false);
+for (OIdentifiable rec : (Collection<OIdentifiable>)newValue) {
+if (rec instanceof ODocument) ((ODocument)rec).convertAllMultiValuesToTrackedVersions();
+}
+((OAutoConvertToRecord)newValue).setAutoConvertToRecord(pre);
+}
+ else if (fieldType == OType.LINKMAP) {
+boolean pre=((OAutoConvertToRecord)newValue).isAutoConvertToRecord();
+((OAutoConvertToRecord)newValue).setAutoConvertToRecord(false);
+for (OIdentifiable rec : (Collection<OIdentifiable>)((Map<?,?>)newValue).values()) {
+if (rec instanceof ODocument) ((ODocument)rec).convertAllMultiValuesToTrackedVersions();
+}
+((OAutoConvertToRecord)newValue).setAutoConvertToRecord(pre);
+}
 }
 }
 }

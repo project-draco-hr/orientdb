@@ -6,6 +6,17 @@
     final long freezeId;
     if (throwException)     freezeId=atomicOperationsManager.freezeAtomicOperations(OModificationOperationProhibitedException.class,"Modification requests are prohibited");
  else     freezeId=atomicOperationsManager.freezeAtomicOperations(null,null);
+    final List<OFreezableStorage> frozenIndexes=new ArrayList<OFreezableStorage>(indexEngines.size());
+    try {
+      for (      OIndexEngine indexEngine : indexEngines)       if (indexEngine != null && indexEngine instanceof OFreezableStorage) {
+        ((OFreezableStorage)indexEngine).freeze(false);
+        frozenIndexes.add((OFreezableStorage)indexEngine);
+      }
+    }
+ catch (    Exception e) {
+      for (      OFreezableStorage indexEngine : frozenIndexes)       indexEngine.release();
+      throw OException.wrapException(new OStorageException("Error on freeze of storage '" + name + "'"),e);
+    }
     synch();
     try {
       unlock();

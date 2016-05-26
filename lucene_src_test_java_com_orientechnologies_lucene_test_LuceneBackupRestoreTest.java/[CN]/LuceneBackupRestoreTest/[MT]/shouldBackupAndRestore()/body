@@ -1,0 +1,17 @@
+{
+  File backupFile=tempFolder.newFile("backupRestore.gz");
+  List<?> query=databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from City where name lucene 'Rome'"));
+  Assert.assertEquals(query.size(),1);
+  databaseDocumentTx.backup(new FileOutputStream(backupFile),null,null,null,9,1048576);
+  databaseDocumentTx.drop();
+  databaseDocumentTx.create();
+  FileInputStream stream=new FileInputStream(backupFile);
+  databaseDocumentTx.restore(stream,null,null,null);
+  databaseDocumentTx.close();
+  databaseDocumentTx.open("admin","admin");
+  assertThat(databaseDocumentTx.countClass("City")).isEqualTo(1);
+  OIndex<?> index=databaseDocumentTx.getMetadata().getIndexManager().getIndex("City.name");
+  assertThat(index).isNotNull();
+  assertThat(index.getType()).isEqualTo(OClass.INDEX_TYPE.FULLTEXT.name());
+  assertThat(databaseDocumentTx.query(new OSQLSynchQuery<Object>("select from City where name lucene 'Rome'"))).hasSize(1);
+}

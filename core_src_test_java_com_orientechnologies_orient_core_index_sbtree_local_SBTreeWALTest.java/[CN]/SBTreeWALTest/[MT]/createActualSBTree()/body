@@ -1,0 +1,19 @@
+{
+  actualStorageDir=buildDirectory + "/sbtreeWithWALTestActual";
+  File actualStorageDirFile=new File(actualStorageDir);
+  if (!actualStorageDirFile.exists())   actualStorageDirFile.mkdirs();
+  databaseDocumentTx=new ODatabaseDocumentTx("plocal:" + actualStorageDir);
+  if (databaseDocumentTx.exists()) {
+    databaseDocumentTx.open("admin","admin");
+    databaseDocumentTx.drop();
+  }
+ else {
+    databaseDocumentTx.create();
+  }
+  actualStorage=(OLocalPaginatedStorage)databaseDocumentTx.getStorage();
+  writeAheadLog=(ODiskWriteAheadLog)actualStorage.getWALInstance();
+  writeAheadLog.preventCutTill(writeAheadLog.getFlushedLsn());
+  actualReadCache=((OAbstractPaginatedStorage)databaseDocumentTx.getStorage()).getReadCache();
+  sbTree=new OSBTree<Integer,OIdentifiable>("actualSBTree",".sbt",true,".nbt",actualStorage);
+  sbTree.create(OIntegerSerializer.INSTANCE,OLinkSerializer.INSTANCE,null,1,false);
+}

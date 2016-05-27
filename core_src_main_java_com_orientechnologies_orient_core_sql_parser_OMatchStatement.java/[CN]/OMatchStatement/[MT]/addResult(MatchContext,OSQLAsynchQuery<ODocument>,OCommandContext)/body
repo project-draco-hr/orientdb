@@ -1,6 +1,26 @@
 {
   ODocument doc=null;
-  if (returnsMatches()) {
+  if (returnsElements()) {
+    for (    Map.Entry<String,OIdentifiable> entry : matchContext.matched.entrySet()) {
+      if (isExplicitAlias(entry.getKey()) && entry.getValue() != null) {
+        ORecord record=entry.getValue().getRecord();
+        if (request.getResultListener() != null && record != null) {
+          if (!addSingleResult(request,(OBasicCommandContext)ctx,record))           return false;
+        }
+      }
+    }
+  }
+ else   if (returnsPathElements()) {
+    for (    Map.Entry<String,OIdentifiable> entry : matchContext.matched.entrySet()) {
+      if (entry.getValue() != null) {
+        ORecord record=entry.getValue().getRecord();
+        if (request.getResultListener() != null && record != null) {
+          if (!addSingleResult(request,(OBasicCommandContext)ctx,record))           return false;
+        }
+      }
+    }
+  }
+ else   if (returnsMatches()) {
     doc=getDatabase().newInstance();
     for (    Map.Entry<String,OIdentifiable> entry : matchContext.matched.entrySet()) {
       if (isExplicitAlias(entry.getKey())) {
@@ -36,17 +56,7 @@
     }
   }
   if (request.getResultListener() != null && doc != null) {
-    if (((OBasicCommandContext)context).addToUniqueResult(doc)) {
-      request.getResultListener().result(doc);
-      long currentCount=((OBasicCommandContext)ctx).getResultsProcessed().incrementAndGet();
-      long limitValue=limitFromProtocol;
-      if (limit != null) {
-        limitValue=limit.num.getValue().longValue();
-      }
-      if (limitValue > -1 && limitValue <= currentCount) {
-        return false;
-      }
-    }
+    if (!addSingleResult(request,(OBasicCommandContext)ctx,doc))     return false;
   }
   return true;
 }

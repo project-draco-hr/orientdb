@@ -1,0 +1,20 @@
+{
+  PageKey result=lastWritePageKey;
+  OLogSequenceNumber minimumLsn=new OLogSequenceNumber(Long.MAX_VALUE,Long.MAX_VALUE);
+  for (  PageKey pageKey : exclusiveWritePages) {
+    final Lock lock=lockManager.acquireExclusiveLock(pageKey);
+    try {
+      final PageGroup pageGroup=writeCachePages.get(pageKey);
+      if (pageGroup == null)       continue;
+      final OLogSequenceNumber lsn=pageGroup.page.getLastFlushedLsn();
+      if (lsn != null && lsn.compareTo(minimumLsn) < 0) {
+        minimumLsn=lsn;
+        result=pageKey;
+      }
+    }
+  finally {
+      lockManager.releaseLock(lock);
+    }
+  }
+  return result;
+}

@@ -1,6 +1,7 @@
 {
   final Iterator<PageKey> entriesIterator=subSet.iterator();
   final long currentTime=System.currentTimeMillis();
+  final long maxSegmentDistance=writeAheadLog == null ? -1 : (long)(writeAheadLog.getPreferredSegmentCount() * MAX_LSN_SEGMENT_DISTANCE_FACTOR);
   int flushedRegions=0;
   long lastPageIndex=-1;
   while (entriesIterator.hasNext()) {
@@ -18,12 +19,18 @@
         entriesIterator.remove();
         continue;
       }
-      final boolean weakLockMode=group.creationTime - currentTime < groupTTL && !forceFlush;
-      if (group.recencyBit && weakLockMode)       group.recencyBit=false;
+      final OCachePointer pagePointer=group.page;
+      final boolean weakLockMode=currentTime - group.creationTime < groupTTL && !forceFlush && !tooOldLsn(pagePointer.getLastFlushedLsn(),maxSegmentDistance);
+      if (group.recencyBit && weakLockMode) {
+        group.recencyBit=false;
+        continue;
+      }
  else {
         group.recencyBit=false;
-        final OCachePointer pagePointer=group.page;
-        if (!pagePointer.tryAcquireSharedLock())         continue;
+        if (weakLockMode) {
+          if (!pagePointer.tryAcquireSharedLock())           continue;
+        }
+ else         pagePointer.acquireSharedLock();
         try {
           final ByteBuffer buffer=pagePointer.getSharedBuffer();
           flushPage(entry.fileId,entry.pageIndex,buffer);

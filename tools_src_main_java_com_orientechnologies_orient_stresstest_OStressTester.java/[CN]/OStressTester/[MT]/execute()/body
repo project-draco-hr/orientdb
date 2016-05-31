@@ -5,14 +5,18 @@
   OLogManager.instance().setConsoleLevel("SEVERE");
   String dbName=OConstants.TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
   ODatabaseUtils.createDatabase(dbName,mode,password);
-  try (ODatabase database=ODatabaseUtils.openDatabase(dbName,password)){
+  ODatabase database=ODatabaseUtils.openDatabase(dbName,password);
+  try {
     final OSchema schema=database.getMetadata().getSchema();
     final OClass oClass=schema.createClass(OConstants.CLASS_NAME);
     oClass.createProperty("name",OType.STRING);
     OIndexManager indexManager=database.getMetadata().getIndexManager();
     indexManager.createIndex(OConstants.INDEX_NAME,OClass.INDEX_TYPE.UNIQUE.toString(),new OPropertyIndexDefinition(OConstants.CLASS_NAME,"name",OType.STRING),oClass.getClusterIds(),null,null);
   }
-   try {
+  finally {
+    database.close();
+  }
+  try {
     for (int i=0; i < iterationsNumber; i++) {
       List<Callable<OOperationsExecutorResults>> operationsExecutors=new ArrayList<>();
       for (int j=0; j < threadsNumber; j++) {

@@ -1,0 +1,24 @@
+{
+  database.registerHook(new ORecordHook(){
+    @Override public void onUnregister(){
+    }
+    @Override public RESULT onTrigger(    TYPE iType,    ORecord iRecord){
+      if (iType != TYPE.BEFORE_CREATE)       return RESULT.RECORD_NOT_CHANGED;
+      ODocument doc=(ODocument)iRecord;
+      if (doc.containsField("test"))       return RESULT.RECORD_NOT_CHANGED;
+      ODocument doc1=new ODocument();
+      doc1.field("test","value");
+      doc.field("testNewLinkedRecord",doc1);
+      doc1.field("backLink",doc);
+      return RESULT.RECORD_CHANGED;
+    }
+    @Override public DISTRIBUTED_EXECUTION_MODE getDistributedExecutionMode(){
+      return null;
+    }
+  }
+);
+  ODocument doc=database.save(new ODocument("test"));
+  ODocument newRef=doc.field("testNewLinkedRecord");
+  assertNotNull(newRef);
+  assertNotNull(newRef.getIdentity().isPersistent());
+}

@@ -1,7 +1,7 @@
 {
   String consoleInput="";
   StringBuffer buffer=new StringBuffer();
-  currentPos=0;
+  cursorPosition=0;
   historyBuffer=null;
   int historyNum=history.size();
   boolean hintedHistory=false;
@@ -25,41 +25,24 @@
       }
       if (ctrl) {
         if (next == RIGHT_CHAR) {
-          currentPos=buffer.indexOf(" ",currentPos) + 1;
-          if (currentPos == 0)           currentPos=buffer.length();
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
+          cursorPosition=buffer.indexOf(" ",cursorPosition) + 1;
+          if (cursorPosition == 0)           cursorPosition=buffer.length();
+          updatePrompt(buffer);
         }
  else         if (next == LEFT_CHAR) {
-          if (currentPos > 1 && currentPos < buffer.length() && buffer.charAt(currentPos - 1) == ' ') {
-            currentPos=buffer.lastIndexOf(" ",(currentPos - 2)) + 1;
+          if (cursorPosition > 1 && cursorPosition < buffer.length() && buffer.charAt(cursorPosition - 1) == ' ') {
+            cursorPosition=buffer.lastIndexOf(" ",(cursorPosition - 2)) + 1;
           }
  else {
-            currentPos=buffer.lastIndexOf(" ",currentPos) + 1;
+            cursorPosition=buffer.lastIndexOf(" ",cursorPosition) + 1;
           }
-          if (currentPos < 0)           currentPos=0;
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
-        }
- else {
+          if (cursorPosition < 0)           cursorPosition=0;
+          updatePrompt(buffer);
         }
       }
  else {
         if (next == UP_CHAR && !history.isEmpty()) {
           if (history.size() > 0) {
-            StringBuffer cleaner=new StringBuffer();
-            for (int i=0; i < buffer.length(); i++) {
-              cleaner.append(" ");
-            }
-            rewriteConsole(cleaner,true);
             if (!hintedHistory && (historyNum == history.size() || !buffer.toString().equals(history.get(historyNum)))) {
               if (buffer.length() > 0) {
                 hintedHistory=true;
@@ -76,17 +59,12 @@
  else {
               buffer=new StringBuffer(historyBuffer);
             }
-            currentPos=buffer.length();
-            rewriteConsole(buffer,false);
+            cursorPosition=buffer.length();
+            updatePrompt(buffer);
           }
         }
  else         if (next == DOWN_CHAR && !history.isEmpty()) {
           if (history.size() > 0) {
-            StringBuffer cleaner=new StringBuffer();
-            for (int i=0; i < buffer.length(); i++) {
-              cleaner.append(" ");
-            }
-            rewriteConsole(cleaner,true);
             historyNum=getHintedHistoryIndexDown(historyNum);
             if (historyNum == history.size()) {
               if (historyBuffer != null) {
@@ -99,107 +77,69 @@
  else {
               buffer=new StringBuffer(history.get(historyNum));
             }
-            currentPos=buffer.length();
-            rewriteConsole(buffer,false);
+            cursorPosition=buffer.length();
+            updatePrompt(buffer);
           }
         }
  else         if (next == RIGHT_CHAR) {
-          if (currentPos < buffer.length()) {
-            currentPos++;
-            StringBuffer cleaner=new StringBuffer();
-            for (int i=0; i < buffer.length(); i++) {
-              cleaner.append(" ");
-            }
-            rewriteConsole(cleaner,true);
-            rewriteConsole(buffer,false);
+          if (cursorPosition < buffer.length()) {
+            cursorPosition++;
+            updatePrompt(buffer);
           }
         }
  else         if (next == LEFT_CHAR) {
-          if (currentPos > 0) {
-            currentPos--;
-            StringBuffer cleaner=new StringBuffer();
-            for (int i=0; i < buffer.length(); i++) {
-              cleaner.append(" ");
-            }
-            rewriteConsole(cleaner,true);
-            rewriteConsole(buffer,false);
+          if (cursorPosition > 0) {
+            cursorPosition--;
+            updatePrompt(buffer);
           }
         }
  else         if (next == END_CHAR) {
-          currentPos=buffer.length();
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
+          cursorPosition=buffer.length();
+          updatePrompt(buffer);
         }
  else         if (next == BEGIN_CHAR) {
-          currentPos=0;
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
-        }
- else {
+          cursorPosition=0;
+          updatePrompt(buffer);
         }
       }
     }
  else {
       if (next == NEW_LINE_CHAR) {
         outStream.println();
+        oldPromptLength=0;
+        oldTextLength=0;
+        oldCursorPosition=0;
+        maxTotalLength=0;
         break;
       }
  else       if (next == BACKSPACE_CHAR) {
-        if (buffer.length() > 0 && currentPos > 0) {
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          buffer.deleteCharAt(currentPos - 1);
-          currentPos--;
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
+        if (buffer.length() > 0 && cursorPosition > 0) {
+          buffer.deleteCharAt(cursorPosition - 1);
+          cursorPosition--;
+          updatePrompt(buffer);
         }
       }
  else       if (next == DEL_CHAR) {
-        if (buffer.length() > 0 && currentPos >= 0 && currentPos < buffer.length()) {
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          buffer.deleteCharAt(currentPos);
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
+        if (buffer.length() > 0 && cursorPosition >= 0 && cursorPosition < buffer.length()) {
+          buffer.deleteCharAt(cursorPosition);
+          updatePrompt(buffer);
         }
       }
  else       if (next == HORIZONTAL_TAB_CHAR) {
-        StringBuffer cleaner=new StringBuffer();
-        for (int i=0; i < buffer.length(); i++) {
-          cleaner.append(" ");
-        }
         buffer=writeHint(buffer);
-        rewriteConsole(cleaner,true);
-        rewriteConsole(buffer,false);
-        currentPos=buffer.length();
+        cursorPosition=buffer.length();
+        updatePrompt(buffer);
       }
  else {
         if ((next > UNIT_SEPARATOR_CHAR && next < BACKSPACE_CHAR) || next > BACKSPACE_CHAR) {
-          StringBuffer cleaner=new StringBuffer();
-          for (int i=0; i < buffer.length(); i++) {
-            cleaner.append(" ");
-          }
-          if (currentPos == buffer.length()) {
+          if (cursorPosition == buffer.length()) {
             buffer.append((char)next);
           }
  else {
-            buffer.insert(currentPos,(char)next);
+            buffer.insert(cursorPosition,(char)next);
           }
-          currentPos++;
-          rewriteConsole(cleaner,true);
-          rewriteConsole(buffer,false);
+          cursorPosition++;
+          updatePrompt(buffer);
         }
  else {
           outStream.println();

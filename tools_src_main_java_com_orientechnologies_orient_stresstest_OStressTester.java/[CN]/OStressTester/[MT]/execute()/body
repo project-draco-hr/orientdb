@@ -1,0 +1,44 @@
+{
+  long startTime;
+  long totalTime=0;
+  int returnCode=0;
+  OLogManager.instance().setConsoleLevel("SEVERE");
+  String dbName=OConstants.TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+  ODatabaseUtils.createDatabase(dbName,mode,password);
+  ODatabase database=ODatabaseUtils.openDatabase(dbName,password);
+  try {
+    final OSchema schema=database.getMetadata().getSchema();
+    final OClass oClass=schema.createClass(OConstants.CLASS_NAME);
+    oClass.createProperty("name",OType.STRING);
+    OIndexManager indexManager=database.getMetadata().getIndexManager();
+    indexManager.createIndex(OConstants.INDEX_NAME,OClass.INDEX_TYPE.UNIQUE.toString(),new OPropertyIndexDefinition(OConstants.CLASS_NAME,"name",OType.STRING),oClass.getClusterIds(),null,null);
+  }
+  finally {
+    database.close();
+  }
+  try {
+    for (int i=0; i < iterationsNumber; i++) {
+      List<Callable<OOperationsExecutorResults>> operationsExecutors=new ArrayList<Callable<OOperationsExecutorResults>>();
+      for (int j=0; j < threadsNumber; j++) {
+        operationsExecutors.add(new OOperationsExecutor(dbName,password,operationsSet,consoleProgressWriter));
+      }
+      startTime=System.currentTimeMillis();
+      List<Future<OOperationsExecutorResults>> threadsResults=Executors.newFixedThreadPool(threadsNumber).invokeAll(operationsExecutors);
+      totalTime+=System.currentTimeMillis() - startTime;
+      for (      Future<OOperationsExecutorResults> threadResults : threadsResults) {
+        stressTestResults.addThreadResults(threadResults.get());
+      }
+    }
+    stressTestResults.addTotalExecutionTime(totalTime);
+    System.out.println("\r                                                                                             ");
+    System.out.println(stressTestResults.toString());
+  }
+ catch (  Exception ex) {
+    System.err.println("\nAn error has occurred while running the stress test: " + ex.getMessage());
+    returnCode=1;
+  }
+ finally {
+    ODatabaseUtils.dropDatabase(dbName,mode,password);
+  }
+  return returnCode;
+}

@@ -3,11 +3,10 @@
   long totalTime=0;
   int returnCode=0;
   OLogManager.instance().setConsoleLevel("SEVERE");
-  String dbName=OConstants.TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-  ODatabaseUtils.createDatabase(dbName,mode,password);
-  ODatabase database=ODatabaseUtils.openDatabase(mode,dbName,password);
+  ODatabaseUtils.createDatabase(databaseIdentifier);
+  ODatabase database=ODatabaseUtils.openDatabase(databaseIdentifier);
   if (database == null) {
-    throw new Exception("Couldn't open database " + dbName + ".");
+    throw new Exception("Couldn't open database " + databaseIdentifier.getName() + ".");
   }
   try {
     final OSchema schema=database.getMetadata().getSchema();
@@ -23,7 +22,7 @@
     for (int i=0; i < iterationsNumber; i++) {
       List<Callable<OOperationsExecutorResults>> operationsExecutors=new ArrayList<Callable<OOperationsExecutorResults>>();
       for (int j=0; j < threadsNumber; j++) {
-        operationsExecutors.add(new OOperationsExecutor(dbName,password,mode,operationsSet,consoleProgressWriter));
+        operationsExecutors.add(new OOperationsExecutor(databaseIdentifier,operationsSet,consoleProgressWriter));
       }
       startTime=System.currentTimeMillis();
       List<Future<OOperationsExecutorResults>> threadsResults=Executors.newFixedThreadPool(threadsNumber).invokeAll(operationsExecutors);
@@ -41,8 +40,8 @@
     returnCode=1;
   }
  finally {
-    if (mode != OMode.MEMORY) {
-      ODatabaseUtils.dropDatabase(dbName,mode,password);
+    if (databaseIdentifier.getMode() != OMode.MEMORY) {
+      ODatabaseUtils.dropDatabase(databaseIdentifier);
     }
   }
   return returnCode;

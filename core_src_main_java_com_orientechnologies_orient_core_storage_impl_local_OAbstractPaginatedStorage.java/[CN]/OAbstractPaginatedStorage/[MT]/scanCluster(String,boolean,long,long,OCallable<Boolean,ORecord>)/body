@@ -3,34 +3,50 @@
   final OCluster cluster=getClusterByName(iClusterName);
   if (cluster instanceof OOfflineCluster)   return;
   if (!(cluster instanceof OPaginatedCluster))   throw new IllegalArgumentException("Cluster '" + iClusterName + "' (type="+ cluster.getClass()+ ") does not support scan");
+  final long scanBatchSize=OGlobalConfiguration.QUERY_SCAN_BATCH_SIZE.getValueAsLong();
   if (transaction.get() != null) {
     final long timer=Orient.instance().getProfiler().startChrono();
     try {
-      ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,0,iCallback);
+      if (scanBatchSize > 0) {
+        long lastPos;
+        if (iAscendingOrder) {
+          do {
+            lastPos=((OPaginatedCluster)cluster).scan(true,iFrom,iTo,scanBatchSize,iCallback);
+            iFrom=lastPos;
+          }
+ while (lastPos > 0);
+        }
+ else {
+          do {
+            lastPos=((OPaginatedCluster)cluster).scan(false,iFrom,iTo,scanBatchSize,iCallback);
+            iTo=lastPos;
+          }
+ while (lastPos > 0);
+        }
+      }
+ else       ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,0,iCallback);
+      return;
     }
   finally {
       Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
     }
   }
-  final long scanBatchSize=OGlobalConfiguration.QUERY_SCAN_BATCH_SIZE.getValueAsLong();
   if (scanBatchSize > 0) {
-    long lastPos=-1;
+    long lastPos;
     if (iAscendingOrder) {
       do {
-        lastPos=scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,scanBatchSize,iCallback);
+        lastPos=scanClusterInLock(true,(OPaginatedCluster)cluster,iFrom,iTo,scanBatchSize,iCallback);
         iFrom=lastPos;
       }
  while (lastPos > 0);
     }
  else {
       do {
-        lastPos=scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,scanBatchSize,iCallback);
+        lastPos=scanClusterInLock(false,(OPaginatedCluster)cluster,iFrom,iTo,scanBatchSize,iCallback);
         iTo=lastPos;
       }
  while (lastPos > 0);
     }
   }
- else {
-    scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,0,iCallback);
-  }
+ else   scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,0,iCallback);
 }

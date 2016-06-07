@@ -1,11 +1,11 @@
 {
   return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<Integer>>(){
-    @Override public OStorageOperationResult<Integer> execute(    final OChannelBinaryAsynchClient network) throws IOException {
+    @Override public OStorageOperationResult<Integer> execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session) throws IOException {
       int mode;
       if (iMode == 1 && iCallback == null)       mode=2;
  else       mode=iMode;
       try {
-        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_UPDATE,session);
         network.writeRID(iRid);
         if (network.getSrvProtocolVersion() >= 23) {
           network.writeBoolean(updateContent);
@@ -21,7 +21,7 @@
 switch (mode) {
 case 0:
         try {
-          beginResponse(network);
+          beginResponse(network,session);
           OStorageOperationResult<Integer> r=new OStorageOperationResult<Integer>(network.readVersion());
           readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
           return r;
@@ -30,25 +30,24 @@ case 0:
           endResponse(network);
         }
 case 1:
-      final OStorageRemoteSession session=getCurrentSession();
-    final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
-  Callable<Object> response=new Callable<Object>(){
-    public Object call() throws Exception {
-      int result;
-      try {
-        beginResponse(network,session);
-        result=network.readVersion();
-        if (network.getSrvProtocolVersion() >= 20)         readCollectionChanges(network,collectionManager);
-      }
+      final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
+    Callable<Object> response=new Callable<Object>(){
+      public Object call() throws Exception {
+        int result;
+        try {
+          beginResponse(network,session);
+          result=network.readVersion();
+          if (network.getSrvProtocolVersion() >= 20)           readCollectionChanges(network,collectionManager);
+        }
   finally {
-        endResponse(network);
+          endResponse(network);
+        }
+        iCallback.call(iRid,result);
+        return null;
       }
-      iCallback.call(iRid,result);
-      return null;
     }
-  }
 ;
-asynchExecutor.submit(new FutureTask<Object>(response));
+  asynchExecutor.submit(new FutureTask<Object>(response));
 }
 return new OStorageOperationResult<Integer>(iVersion);
 }

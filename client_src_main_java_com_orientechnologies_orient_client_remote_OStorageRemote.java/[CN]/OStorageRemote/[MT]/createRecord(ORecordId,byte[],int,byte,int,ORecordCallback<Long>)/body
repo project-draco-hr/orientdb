@@ -1,12 +1,12 @@
 {
   return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<OPhysicalPosition>>(){
-    @Override public OStorageOperationResult<OPhysicalPosition> execute(    final OChannelBinaryAsynchClient network) throws IOException {
+    @Override public OStorageOperationResult<OPhysicalPosition> execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session) throws IOException {
       int mode;
       if (iMode == 1 && iCallback == null)       mode=2;
  else       mode=iMode;
       final OPhysicalPosition ppos=new OPhysicalPosition(iRecordType);
       try {
-        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_CREATE);
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_CREATE,session);
         network.writeShort((short)iRid.clusterId);
         network.writeBytes(iContent);
         network.writeByte(iRecordType);
@@ -18,7 +18,7 @@
 switch (mode) {
 case 0:
         try {
-          beginResponse(network);
+          beginResponse(network,session);
           if (network.getSrvProtocolVersion() > OChannelBinaryProtocol.PROTOCOL_VERSION_25)           iRid.clusterId=network.readShort();
           iRid.clusterPosition=network.readLong();
           ppos.clusterPosition=iRid.clusterPosition;
@@ -34,7 +34,6 @@ case 0:
         }
 case 1:
       if (iCallback != null) {
-        final OStorageRemoteSession session=getCurrentSession();
         final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
         Callable<Object> response=new Callable<Object>(){
           public Object call() throws Exception {

@@ -1,48 +1,27 @@
 {
-  return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<Boolean>>(){
-    @Override public OStorageOperationResult<Boolean> execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session) throws IOException {
-      int pMode;
-      if (mode == 1 && callback == null)       pMode=2;
- else       pMode=mode;
+  Boolean resHide=asyncNetworkOperation(new OStorageRemoteOperationWrite(){
+    @Override public void execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session,    int mode) throws IOException {
       try {
         beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_HIDE,session);
         network.writeRID(recordId);
-        network.writeByte((byte)pMode);
+        network.writeByte((byte)mode);
       }
   finally {
         endRequest(network);
       }
-switch (pMode) {
-case 0:
-        try {
-          beginResponse(network,session);
-          return new OStorageOperationResult<Boolean>(network.readByte() == 1);
-        }
-  finally {
-          endResponse(network);
-        }
-case 1:
-      if (callback != null) {
-        Callable<Object> response=new Callable<Object>(){
-          public Object call() throws Exception {
-            Boolean result;
-            try {
-              beginResponse(network,session);
-              result=network.readByte() == 1;
-            }
-  finally {
-              endResponse(network);
-            }
-            callback.call(recordId,result);
-            return null;
-          }
-        }
-;
-        asynchExecutor.submit(new FutureTask<Object>(response));
-      }
+    }
   }
-  return new OStorageOperationResult<Boolean>(false);
-}
-}
-,"Error on hide record " + recordId);
+,new OStorageRemoteOperationRead<Boolean>(){
+    @Override public Boolean execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session) throws IOException {
+      try {
+        beginResponse(network,session);
+        return network.readByte() == 1;
+      }
+  finally {
+        endResponse(network);
+      }
+    }
+  }
+,mode,recordId,callback,"Error on hide record " + recordId);
+  return new OStorageOperationResult<Boolean>(resHide);
 }

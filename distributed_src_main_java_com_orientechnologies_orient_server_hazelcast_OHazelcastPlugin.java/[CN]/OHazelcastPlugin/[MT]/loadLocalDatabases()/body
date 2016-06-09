@@ -9,11 +9,14 @@
           if (!configurationMap.containsKey(CONFIG_DATABASE_PREFIX + databaseName))           updateCachedDatabaseConfiguration(databaseName,cfg.getDocument(),false,true);
           final ODistributedDatabaseImpl ddb=messageService.registerDatabase(databaseName);
           cfg.addNewNodeInServerList(nodeName);
-          final String coordinator=getCoordinatorServer(cfg);
-          if (!nodeName.equals(coordinator)) {
-            ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"First load of database '%s' in the cluster, set local node as coordinator (was '%s')",databaseName,coordinator);
-            electCurrentNodeAsNewCoordinator(cfg,coordinator,databaseName);
+          final Set<String> clustersWithNotAvailableOwner=new HashSet<String>();
+          final Set<String> servers=cfg.getAllConfiguredServers();
+          for (          String server : servers) {
+            if (!nodeName.equals(server)) {
+              clustersWithNotAvailableOwner.addAll(cfg.getClustersOwnedByServer(server));
+            }
           }
+          if (reassignClustersOwnership(nodeName,cfg,databaseName,clustersWithNotAvailableOwner,false))           updateCachedDatabaseConfiguration(databaseName,cfg.getDocument(),true,true);
           ddb.setOnline();
           return null;
         }

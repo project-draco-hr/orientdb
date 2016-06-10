@@ -49,11 +49,19 @@
     final File tempDirectory=new File(tempDirectoryPath);
     tempDirectory.mkdirs();
     OZIPCompressionUtil.uncompressDirectory(new FileInputStream(tempFile),tempDirectory.getAbsolutePath(),null);
-    final OAbstractPaginatedStorage stg=(OAbstractPaginatedStorage)getDatabase().getStorage().getUnderlying();
-    final OPaginatedCluster cluster=(OPaginatedCluster)stg.getClusterByName(clusterName);
-    final File tempClusterFile=new File(tempDirectoryPath + "/" + clusterName+ OPaginatedCluster.DEF_EXTENSION);
-    cluster.replaceFile(tempClusterFile);
-    getDatabase().getLocalCache().invalidate();
+    ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+    final boolean openDatabaseHere=db == null;
+    if (db == null)     db=serverInstance.openDatabase("plocal:" + dbPath,"","",null,true);
+    try {
+      final OAbstractPaginatedStorage stg=(OAbstractPaginatedStorage)db.getStorage().getUnderlying();
+      final OPaginatedCluster cluster=(OPaginatedCluster)stg.getClusterByName(clusterName);
+      final File tempClusterFile=new File(tempDirectoryPath + "/" + clusterName+ OPaginatedCluster.DEF_EXTENSION);
+      cluster.replaceFile(tempClusterFile);
+      db.getLocalCache().invalidate();
+    }
+  finally {
+      if (openDatabaseHere)       db.close();
+    }
     return String.format("Cluster correctly replaced, transferred %d bytes",fileSize);
   }
  catch (  Exception e) {

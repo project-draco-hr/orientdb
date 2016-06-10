@@ -28,17 +28,16 @@
       final Object value=r.getValue();
       if (value instanceof Boolean)       continue;
  else       if (value instanceof ODistributedDatabaseDeltaSyncException) {
-        ODistributedServerLog.error(this,nodeName,r.getKey(),DIRECTION.IN,"Error on installing database delta %s, requesting full database sync...",databaseName,dbPath);
+        ODistributedServerLog.error(this,nodeName,r.getKey(),DIRECTION.IN,"Error on installing database delta %s, requesting full database sync...",(ODistributedDatabaseDeltaSyncException)value,databaseName,dbPath);
         throw (ODistributedDatabaseDeltaSyncException)value;
       }
  else       if (value instanceof Throwable) {
         ODistributedServerLog.error(this,nodeName,r.getKey(),DIRECTION.IN,"Error on installing database delta %s in %s (%s)",(Exception)value,databaseName,dbPath,value);
       }
  else       if (value instanceof ODistributedDatabaseChunk) {
-        final Set<String> toSyncClusters=installDatabaseFromNetwork(dbPath,databaseName,distrDatabase,r.getKey(),(ODistributedDatabaseChunk)value,true);
-        for (        String cl : toSyncClusters) {
-          OCommandExecutorSQLHASyncCluster.replaceCluster(this,serverInstance,databaseName,cl);
-        }
+        final File uniqueClustersBackupDirectory=getClusterOwnedExclusivelyByCurrentNode(dbPath,databaseName);
+        backupCurrentDatabase(databaseName);
+        installDatabaseFromNetwork(dbPath,databaseName,distrDatabase,r.getKey(),(ODistributedDatabaseChunk)value,true,uniqueClustersBackupDirectory);
         ODistributedServerLog.info(this,nodeName,entry.getKey(),DIRECTION.IN,"Installed delta of database '%s'...",databaseName);
       }
  else       throw new IllegalArgumentException("Type " + value + " not supported");

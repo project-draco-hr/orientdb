@@ -1,0 +1,42 @@
+{
+  final ODistributedConfiguration cfg=getDatabaseConfiguration(iDatabaseName);
+  final HashSet<String> clusters=new HashSet<String>();
+  for (  String clName : cfg.getClusterNames()) {
+    final List<String> servers=cfg.getServers(clName);
+    if (servers != null) {
+      servers.remove(ODistributedConfiguration.NEW_NODE_TAG);
+      if (servers.size() == 1 && servers.get(0).equals(getLocalNodeName()))       clusters.add(clName);
+    }
+  }
+  if (!clusters.isEmpty()) {
+    final String backupDirectory=Orient.instance().getHomePath() + "/temp/db_" + iDatabaseName;
+    final File backupFullPath=new File(backupDirectory);
+    if (backupFullPath.exists())     OFileUtils.deleteRecursively(backupFullPath);
+ else     backupFullPath.mkdirs();
+    ODistributedServerLog.warn(this,nodeName,null,DIRECTION.NONE,"Saving clusters %s to directory '%s' to be replaced after distributed full backup...",clusters,backupFullPath);
+    for (    String clName : clusters) {
+{
+        final File oldFile=new File(dbPath + "/" + clName+ OPaginatedCluster.DEF_EXTENSION);
+        final File newFile=new File(backupFullPath + "/" + clName+ OPaginatedCluster.DEF_EXTENSION);
+        if (oldFile.exists()) {
+          if (!oldFile.renameTo(newFile)) {
+            ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Cannot make a safe copy of exclusive clusters. Error on moving file %s -> %s: restore of database '%s' has been aborted because unsafe",oldFile,newFile,iDatabaseName);
+            throw new ODistributedException("Cannot make a safe copy of exclusive clusters");
+          }
+        }
+      }
+{
+        final File oldFile=new File(dbPath + "/" + clName+ OClusterPositionMap.DEF_EXTENSION);
+        final File newFile=new File(backupFullPath + "/" + clName+ OClusterPositionMap.DEF_EXTENSION);
+        if (oldFile.exists()) {
+          if (!oldFile.renameTo(newFile)) {
+            ODistributedServerLog.error(this,nodeName,null,DIRECTION.NONE,"Cannot make a safe copy of exclusive clusters. Error on moving file %s -> %s: restore of database '%s' has been aborted because unsafe",oldFile,newFile,iDatabaseName);
+            throw new ODistributedException("Cannot make a safe copy of exclusive clusters");
+          }
+        }
+      }
+    }
+    return backupFullPath;
+  }
+  return null;
+}

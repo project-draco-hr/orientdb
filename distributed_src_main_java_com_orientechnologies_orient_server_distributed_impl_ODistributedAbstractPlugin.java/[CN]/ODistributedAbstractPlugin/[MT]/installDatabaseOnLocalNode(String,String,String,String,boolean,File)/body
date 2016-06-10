@@ -41,7 +41,20 @@
               new OIncrementalServerSync().importDelta(serverInstance,db,in,iNode);
             }
  else {
-              db.restore(in,null,null,ODistributedServerLog.isDebugEnabled() ? me : null);
+              db.restore(in,null,new Callable<Object>(){
+                @Override public Object call() throws Exception {
+                  if (uniqueClustersBackupDirectory != null && uniqueClustersBackupDirectory.exists()) {
+                    for (                    File f : uniqueClustersBackupDirectory.listFiles()) {
+                      final File oldFile=new File(dbPath + "/" + f.getName());
+                      if (oldFile.exists())                       oldFile.delete();
+                      if (!f.renameTo(oldFile))                       throw new ODistributedException("Cannot restore exclusive cluster file '" + f.getAbsolutePath() + "' into "+ oldFile.getAbsolutePath());
+                    }
+                    uniqueClustersBackupDirectory.delete();
+                  }
+                  return null;
+                }
+              }
+,ODistributedServerLog.isDebugEnabled() ? me : null);
             }
             return null;
           }

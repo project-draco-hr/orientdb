@@ -1,17 +1,18 @@
 {
+  Map<OOperationType,Long> times=new HashMap<OOperationType,Long>();
   ODatabase database=ODatabaseUtils.openDatabase(databaseIdentifier);
   long start=System.currentTimeMillis();
-  List<ODocument> insertedDocs=executeCreates(operationsSet.getNumberOfCreates(),txNumber,database);
-  long createsTime=(System.currentTimeMillis() - start);
+  List<ODocument> insertedDocs=executeCreates(operationsSet.getNumber(OOperationType.CREATE) / threads,txNumber,database);
+  times.put(OOperationType.CREATE,System.currentTimeMillis() - start);
   start=System.currentTimeMillis();
-  executeReads(operationsSet.getNumberOfReads(),database);
-  long insertsTime=(System.currentTimeMillis() - start);
+  executeReads(operationsSet.getNumber(OOperationType.READ) / threads,database);
+  times.put(OOperationType.READ,System.currentTimeMillis() - start);
   start=System.currentTimeMillis();
-  executeUpdates(operationsSet.getNumberOfUpdates(),txNumber,database,insertedDocs);
-  long updatesTime=(System.currentTimeMillis() - start);
+  executeUpdates(operationsSet.getNumber(OOperationType.UPDATE) / threads,txNumber,database,insertedDocs);
+  times.put(OOperationType.UPDATE,System.currentTimeMillis() - start);
   start=System.currentTimeMillis();
-  executeDeletes(operationsSet.getNumberOfDeletes(),txNumber,database,insertedDocs);
-  long deletesTime=(System.currentTimeMillis() - start);
-  consoleWriter.updateConsole();
-  return new OOperationsExecutorResults(createsTime,insertsTime,updatesTime,deletesTime);
+  executeDeletes(operationsSet.getNumber(OOperationType.DELETE) / threads,txNumber,database,insertedDocs);
+  times.put(OOperationType.DELETE,System.currentTimeMillis() - start);
+  consoleProgressWriter.stopProgress();
+  return times;
 }

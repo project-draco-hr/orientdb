@@ -6,7 +6,15 @@
     checkLowDiskSpaceAndFullCheckpointRequests();
     final String originalName=engineName;
     engineName=engineName.toLowerCase(configuration.getLocaleInstance());
-    if (indexEngineNameMap.containsKey(engineName))     throw new OIndexException("Index with name " + engineName + " already exists");
+    if (indexEngineNameMap.containsKey(engineName)) {
+      OLogManager.instance().warn(this,"Index with name '%s' already exists, removing it and re-create the index",engineName);
+      final OIndexEngine engine=indexEngineNameMap.remove(engineName);
+      if (engine != null) {
+        indexEngines.remove(engine);
+        configuration.deleteIndexEngine(engineName);
+        engine.delete();
+      }
+    }
     makeStorageDirty();
     final OBinarySerializer keySerializer=determineKeySerializer(indexDefinition);
     final int keySize=determineKeySize(indexDefinition);

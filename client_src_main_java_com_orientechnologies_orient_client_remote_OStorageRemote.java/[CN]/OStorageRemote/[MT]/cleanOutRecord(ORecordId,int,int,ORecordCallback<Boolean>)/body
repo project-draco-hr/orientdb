@@ -1,11 +1,27 @@
 {
-  return networkOperation(new OStorageRemoteOperation<Boolean>(){
-    @Override public Boolean execute(    final OChannelBinaryAsynchClient network) throws IOException {
-      int mode;
-      if (iMode == 1 && callback == null)       mode=2;
- else       mode=iMode;
-      return deleteRecord(OChannelBinaryProtocol.REQUEST_RECORD_CLEAN_OUT,recordId,recordVersion,mode,callback,network);
+  return asyncNetworkOperation(new OStorageRemoteOperationWrite(){
+    @Override public void execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session,    int mode) throws IOException {
+      try {
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_CLEAN_OUT,session);
+        network.writeRID(recordId);
+        network.writeVersion(recordVersion);
+        network.writeByte((byte)mode);
+      }
+  finally {
+        endRequest(network);
+      }
     }
   }
-,"Error on clean out record " + recordId);
+,new OStorageRemoteOperationRead<Boolean>(){
+    @Override public Boolean execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session) throws IOException {
+      try {
+        beginResponse(network,session);
+        return network.readByte() == 1;
+      }
+  finally {
+        endResponse(network);
+      }
+    }
+  }
+,iMode,recordId,callback,"Error on delete record " + recordId);
 }

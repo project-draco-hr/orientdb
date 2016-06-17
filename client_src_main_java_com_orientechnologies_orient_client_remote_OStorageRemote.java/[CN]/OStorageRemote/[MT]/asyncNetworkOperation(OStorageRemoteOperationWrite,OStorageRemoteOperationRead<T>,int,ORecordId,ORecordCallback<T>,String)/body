@@ -1,0 +1,38 @@
+{
+  final int pMode;
+  if (mode == 1 && callback == null)   pMode=2;
+ else   pMode=mode;
+  return baseNetworkOperation(new OStorageRemoteOperation<T>(){
+    @Override public T execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session) throws IOException {
+      write.execute(network,session,pMode);
+      final T res;
+      if (pMode == 0) {
+        res=read.execute(network,session);
+        connectionManager.release(network);
+      }
+ else       if (pMode == 1) {
+        res=null;
+        OStorageRemote.this.asynchExecutor.submit(new Runnable(){
+          @Override public void run(){
+            try {
+              T inRes=read.execute(network,session);
+              callback.call(recordId,inRes);
+              connectionManager.release(network);
+            }
+ catch (            Throwable e) {
+              connectionManager.remove(network);
+              OLogManager.instance().error(this,"Exception on async query",e);
+            }
+          }
+        }
+);
+      }
+ else {
+        connectionManager.release(network);
+        res=null;
+      }
+      return res;
+    }
+  }
+,errorMessage);
+}

@@ -1,43 +1,33 @@
 {
   key=getCollatingValue(key);
-  final ODatabase database=getDatabase();
-  final boolean txIsActive=database.getTransaction().isActive();
-  if (!txIsActive) {
-    keyLockManager.acquireExclusiveLock(key);
-  }
+  acquireSharedLock();
   try {
-    acquireSharedLock();
-    try {
-      if (!singleValue.getIdentity().isValid())       (singleValue.getRecord()).save();
-      final ORID identity=singleValue.getIdentity();
-      final boolean durable;
-      if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))       durable=true;
- else       durable=false;
-      final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
-      final Callable<Object> creator=new Callable<Object>(){
-        @Override public Object call() throws Exception {
-          Set<OIdentifiable> result=values;
-          if (result == null) {
-            if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
-              result=new OIndexRIDContainer(getName(),durable);
-            }
- else {
-              throw new IllegalStateException("MVRBTree is not supported any more");
-            }
+    if (!singleValue.getIdentity().isValid())     (singleValue.getRecord()).save();
+    final ORID identity=singleValue.getIdentity();
+    final boolean durable;
+    if (metadata != null && Boolean.TRUE.equals(metadata.field("durableInNonTxMode")))     durable=true;
+ else     durable=false;
+    final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
+    final Callable<Object> creator=new Callable<Object>(){
+      @Override public Object call() throws Exception {
+        Set<OIdentifiable> result=values;
+        if (result == null) {
+          if (ODefaultIndexFactory.SBTREEBONSAI_VALUE_CONTAINER.equals(valueContainerAlgorithm)) {
+            result=new OIndexRIDContainer(getName(),durable);
           }
-          result.add(identity);
-          return result;
+ else {
+            throw new IllegalStateException("MVRBTree is not supported any more");
+          }
         }
+        result.add(identity);
+        return result;
       }
+    }
 ;
-      storage.updateIndexEntry(indexId,key,creator);
-      return this;
-    }
-  finally {
-      releaseSharedLock();
-    }
+    storage.updateIndexEntry(indexId,key,creator);
+    return this;
   }
   finally {
-    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
+    releaseSharedLock();
   }
 }

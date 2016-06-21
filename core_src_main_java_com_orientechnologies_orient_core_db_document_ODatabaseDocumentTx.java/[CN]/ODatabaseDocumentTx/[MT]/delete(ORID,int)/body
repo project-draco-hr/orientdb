@@ -1,4 +1,21 @@
 {
-  executeDeleteRecord(iRecord,iVersion,true,OPERATION_MODE.SYNCHRONOUS,false);
+  checkIfActive();
+  final ORecordId rid=(ORecordId)iRecord.getIdentity();
+  if (rid == null)   throw new ODatabaseException("Cannot delete record because it has no identity. Probably was created from scratch or contains projections of fields " + "rather than a full record");
+  if (!rid.isValid())   return this;
+  final OTransaction originalTx=wrapInImplicitTxIfRequired();
+  try {
+    ORecord record=iRecord.getRecord();
+    if (record != null && record.getVersion() != iVersion) {
+      record=load(iRecord,null,true);
+      if (record != null)       ORecordInternal.setVersion(record,iVersion);
+    }
+    if (record != null)     currentTx.deleteRecord(record,OPERATION_MODE.SYNCHRONOUS);
+  }
+ catch (  final Exception e) {
+    unwrapIfWasWrappedInImplicitTx(originalTx,false);
+    throw OException.wrapException(new ODatabaseException("Error while deleting record."),e);
+  }
+  unwrapIfWasWrappedInImplicitTx(originalTx,true);
   return this;
 }

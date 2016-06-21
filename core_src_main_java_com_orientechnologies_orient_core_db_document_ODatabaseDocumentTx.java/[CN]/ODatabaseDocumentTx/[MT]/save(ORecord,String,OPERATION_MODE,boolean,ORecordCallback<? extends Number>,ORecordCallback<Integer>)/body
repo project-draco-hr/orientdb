@@ -2,7 +2,17 @@
   checkOpeness();
   if (!(iRecord instanceof ODocument)) {
     assignAndCheckCluster(iRecord,iClusterName);
-    return (RET)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+    final OTransaction originalTx=wrapInImplicitTxIfRequired();
+    final RET ret;
+    try {
+      ret=(RET)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+    }
+ catch (    final Exception e) {
+      unwrapIfWasWrappedInImplicitTx(originalTx,false);
+      throw OException.wrapException(new ODatabaseException("Error while updating record."),e);
+    }
+    unwrapIfWasWrappedInImplicitTx(originalTx,true);
+    return ret;
   }
   ODocument doc=(ODocument)iRecord;
   ODocumentInternal.checkClass(doc,this);
@@ -15,6 +25,14 @@
  else {
     if (doc.getClassName() != null)     checkSecurity(ORule.ResourceGeneric.CLASS,ORole.PERMISSION_UPDATE,doc.getClassName());
   }
-  doc=(ODocument)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  final OTransaction originalTx=wrapInImplicitTxIfRequired();
+  try {
+    doc=(ODocument)currentTx.saveRecord(iRecord,iClusterName,iMode,iForceCreate,iRecordCreatedCallback,iRecordUpdatedCallback);
+  }
+ catch (  final Exception e) {
+    unwrapIfWasWrappedInImplicitTx(originalTx,false);
+    throw OException.wrapException(new ODatabaseException("Error while updating record."),e);
+  }
+  unwrapIfWasWrappedInImplicitTx(originalTx,true);
   return (RET)doc;
 }

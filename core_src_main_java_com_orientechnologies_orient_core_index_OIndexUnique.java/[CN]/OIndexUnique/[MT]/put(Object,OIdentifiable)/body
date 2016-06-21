@@ -1,30 +1,20 @@
 {
   key=getCollatingValue(key);
-  final ODatabase database=getDatabase();
-  final boolean txIsActive=database.getTransaction().isActive();
-  if (!txIsActive) {
-    keyLockManager.acquireExclusiveLock(key);
-  }
+  acquireSharedLock();
   try {
-    acquireSharedLock();
-    try {
-      final OIdentifiable value=(OIdentifiable)storage.getIndexValue(indexId,key);
-      if (value != null) {
-        if (!value.equals(iSingleValue)) {
-          final Boolean mergeSameKey=metadata != null ? (Boolean)metadata.field(OIndex.MERGE_KEYS) : Boolean.FALSE;
-          if (mergeSameKey == null || !mergeSameKey)           throw new ORecordDuplicatedException(String.format("Cannot index record %s: found duplicated key '%s' in index '%s' previously assigned to the record %s",iSingleValue.getIdentity(),key,getName(),value.getIdentity()),getName(),value.getIdentity());
-        }
- else         return this;
+    final OIdentifiable value=(OIdentifiable)storage.getIndexValue(indexId,key);
+    if (value != null) {
+      if (!value.equals(iSingleValue)) {
+        final Boolean mergeSameKey=metadata != null ? (Boolean)metadata.field(OIndex.MERGE_KEYS) : Boolean.FALSE;
+        if (mergeSameKey == null || !mergeSameKey)         throw new ORecordDuplicatedException(String.format("Cannot index record %s: found duplicated key '%s' in index '%s' previously assigned to the record %s",iSingleValue.getIdentity(),key,getName(),value.getIdentity()),getName(),value.getIdentity());
       }
-      if (!iSingleValue.getIdentity().isPersistent())       iSingleValue.getRecord().save();
-      storage.putIndexValue(indexId,key,iSingleValue.getIdentity());
-      return this;
+ else       return this;
     }
-  finally {
-      releaseSharedLock();
-    }
+    if (!iSingleValue.getIdentity().isPersistent())     iSingleValue.getRecord().save();
+    storage.putIndexValue(indexId,key,iSingleValue.getIdentity());
+    return this;
   }
   finally {
-    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
+    releaseSharedLock();
   }
 }

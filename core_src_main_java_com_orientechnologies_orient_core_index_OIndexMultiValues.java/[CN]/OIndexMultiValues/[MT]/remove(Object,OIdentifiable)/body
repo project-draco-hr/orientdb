@@ -1,25 +1,17 @@
 {
   key=getCollatingValue(key);
-  final ODatabase database=getDatabase();
-  final boolean txIsActive=database.getTransaction().isActive();
-  if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
+  acquireSharedLock();
   try {
-    acquireSharedLock();
-    try {
-      final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
-      if (values == null) {
-        return false;
-      }
-      final OModifiableBoolean removed=new OModifiableBoolean(false);
-      final Callable<Object> creator=new EntityRemover(value,removed,values);
-      storage.updateIndexEntry(indexId,key,creator);
-      return removed.getValue();
+    final Set<OIdentifiable> values=(Set<OIdentifiable>)storage.getIndexValue(indexId,key);
+    if (values == null) {
+      return false;
     }
-  finally {
-      releaseSharedLock();
-    }
+    final OModifiableBoolean removed=new OModifiableBoolean(false);
+    final Callable<Object> creator=new EntityRemover(value,removed,values);
+    storage.updateIndexEntry(indexId,key,creator);
+    return removed.getValue();
   }
   finally {
-    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
+    releaseSharedLock();
   }
 }

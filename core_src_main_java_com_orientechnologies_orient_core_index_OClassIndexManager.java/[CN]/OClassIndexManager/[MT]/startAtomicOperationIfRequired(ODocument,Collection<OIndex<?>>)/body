@@ -1,0 +1,21 @@
+{
+  boolean atomicOperation=!indexes.isEmpty() && !document.getDatabase().getTransaction().isActive() && document.getDatabase().getStorage().getUnderlying() instanceof OAbstractPaginatedStorage;
+  final OAbstractPaginatedStorage storage=atomicOperation ? (OAbstractPaginatedStorage)document.getDatabase().getStorage().getUnderlying() : null;
+  final OAtomicOperationsManager atomicOperationsManager=atomicOperation ? storage.getAtomicOperationsManager() : null;
+  if (atomicOperation)   try {
+    atomicOperation=atomicOperationsManager.startAtomicOperation((String)null,true) != null;
+  }
+ catch (  IOException e) {
+    threadAtomicOperation.set(false);
+    throw OException.wrapException(new OIOException("Failed to start atomic operation."),e);
+  }
+  threadAtomicOperation.set(atomicOperation);
+  if (atomicOperation) {
+    storage.getClusterById(document.getIdentity().getClusterId()).acquireAtomicExclusiveLock();
+    final OIndexInternal[] sortedIndexes=new OIndexInternal[indexes.size()];
+    int i=0;
+    for (    OIndex<?> index : indexes)     sortedIndexes[i++]=index.getInternal();
+    Arrays.sort(sortedIndexes,OIndexInternal.ID_COMPARATOR);
+    for (    OIndexInternal<?> index : sortedIndexes)     index.acquireAtomicExclusiveLock();
+  }
+}

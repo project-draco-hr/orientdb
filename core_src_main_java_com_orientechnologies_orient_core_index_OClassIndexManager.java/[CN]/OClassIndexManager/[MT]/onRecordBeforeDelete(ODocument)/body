@@ -1,9 +1,17 @@
 {
-  final int version=iDocument.getVersion();
-  if (iDocument.fields() == 0 && iDocument.getIdentity().isPersistent()) {
-    iDocument.reload();
-    if (version > -1 && iDocument.getVersion() != version)     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
- else     throw new OConcurrentModificationException(iDocument.getIdentity(),iDocument.getVersion(),version,ORecordOperation.DELETED);
+  final OClass class_=ODocumentInternal.getImmutableSchemaClass(iDocument);
+  try {
+    startAtomicOperationIfRequired(iDocument,class_ == null ? Collections.<OIndex<?>>emptyList() : class_.getIndexes());
+    final int version=iDocument.getVersion();
+    if (iDocument.fields() == 0 && iDocument.getIdentity().isPersistent()) {
+      iDocument.reload();
+      if (version > -1 && iDocument.getVersion() != version)       if (OFastConcurrentModificationException.enabled())       throw OFastConcurrentModificationException.instance();
+ else       throw new OConcurrentModificationException(iDocument.getIdentity(),iDocument.getVersion(),version,ORecordOperation.DELETED);
+    }
+  }
+ catch (  RuntimeException e) {
+    endFailedAtomicOperationIfAny(iDocument);
+    throw e;
   }
   return RESULT.RECORD_NOT_CHANGED;
 }

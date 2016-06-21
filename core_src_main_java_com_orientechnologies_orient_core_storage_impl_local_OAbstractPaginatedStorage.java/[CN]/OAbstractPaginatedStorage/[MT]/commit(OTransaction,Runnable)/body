@@ -5,6 +5,7 @@
   final Map<String,OIndexInternal<?>> indexesToCommit=getChangedIndexes(clientTx,databaseRecord.getMetadata().getIndexManager());
   ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
   final Iterable<ORecordOperation> entries=(Iterable<ORecordOperation>)clientTx.getAllRecordEntries();
+  final TreeMap<Integer,OCluster> clusters=new TreeMap<Integer,OCluster>();
   final Set<ORecordOperation> newRecords=new TreeSet<ORecordOperation>(new Comparator<ORecordOperation>(){
     @Override public int compare(    ORecordOperation o1,    ORecordOperation o2){
       long diff=(o1.getRecord().getIdentity().getClusterPosition() - o2.getRecord().getIdentity().getClusterPosition());
@@ -22,17 +23,20 @@
     if (txEntry.type == ORecordOperation.CREATED) {
       newRecords.add(txEntry);
     }
+    final int clusterId=txEntry.getRecord().getIdentity().getClusterId();
+    clusters.put(clusterId,getClusterById(clusterId));
   }
   final List<ORecordOperation> result=new ArrayList<ORecordOperation>();
   stateLock.acquireReadLock();
   try {
     try {
-      dataLock.acquireExclusiveLock();
       try {
         checkOpeness();
         if (writeAheadLog == null && clientTx.isUsingLog())         throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
         makeStorageDirty();
         startStorageTx(clientTx);
+        for (        OCluster cluster : clusters.values())         cluster.acquireAtomicExclusiveLock();
+        for (        OIndexInternal<?> index : getSortedIndexes(indexesToCommit))         index.acquireAtomicExclusiveLock();
         Map<ORecordOperation,OPhysicalPosition> positions=new IdentityHashMap<ORecordOperation,OPhysicalPosition>();
         for (        ORecordOperation txEntry : newRecords) {
           ORecord rec=txEntry.getRecord();
@@ -69,7 +73,6 @@ catch (      RuntimeException e) {
       }
  finally {
         transaction.set(null);
-        dataLock.releaseExclusiveLock();
       }
     }
   finally {

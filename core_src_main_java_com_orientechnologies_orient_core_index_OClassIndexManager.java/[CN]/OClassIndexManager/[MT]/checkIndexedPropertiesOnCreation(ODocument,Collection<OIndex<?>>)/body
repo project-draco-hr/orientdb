@@ -1,27 +1,13 @@
 {
   ODocument replaced=null;
-  Deque<TreeMap<OIndex<?>,List<Object>>> indexKeysMapQueue=lockedKeys;
-  final TreeMap<OIndex<?>,List<Object>> indexKeysMap=new TreeMap<OIndex<?>,List<Object>>();
   for (  final OIndex<?> index : indexes) {
-    if (index.getInternal() instanceof OIndexUnique) {
-      OIndexRecorder indexRecorder=new OIndexRecorder((OIndexUnique)index.getInternal());
-      addIndexEntry(record,record.getIdentity(),indexRecorder);
-      indexKeysMap.put(index,indexRecorder.getAffectedKeys());
-    }
-  }
-  for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
-    final OIndexInternal<?> index=entry.getKey().getInternal();
-    index.lockKeysForUpdateNoTx(entry.getValue());
-  }
-  indexKeysMapQueue.push(indexKeysMap);
-  for (  Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
-    final OIndex<?> index=entry.getKey();
-    for (    Object keyItem : entry.getValue()) {
+    if (!(index.getInternal() instanceof OIndexUnique))     continue;
+    final OIndexRecorder indexRecorder=new OIndexRecorder((OIndexUnique)index.getInternal());
+    addIndexEntry(record,record.getIdentity(),indexRecorder);
+    for (    Object keyItem : indexRecorder.getAffectedKeys()) {
       final ODocument r=index.checkEntry(record,keyItem);
       if (r != null)       if (replaced == null)       replaced=r;
- else {
-        throw new OIndexException("Cannot merge record from multiple indexes. Use this strategy when you have only one index");
-      }
+ else       throw new OIndexException("Cannot merge record from multiple indexes. Use this strategy when you have only one index");
     }
   }
   return replaced;

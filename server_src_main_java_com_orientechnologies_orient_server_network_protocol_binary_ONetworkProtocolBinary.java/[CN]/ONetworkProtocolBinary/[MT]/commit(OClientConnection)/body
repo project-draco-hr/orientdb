@@ -3,9 +3,19 @@
   if (!isConnectionAlive(connection))   return;
   final OTransactionOptimisticProxy tx=new OTransactionOptimisticProxy(connection,this);
   try {
-    connection.getDatabase().begin(tx);
     try {
-      connection.getDatabase().commit();
+      connection.getDatabase().begin(tx);
+    }
+ catch (    final ORecordNotFoundException e) {
+      throw e.getCause() instanceof OOfflineClusterException ? (OOfflineClusterException)e.getCause() : e;
+    }
+    try {
+      try {
+        connection.getDatabase().commit();
+      }
+ catch (      final ORecordNotFoundException e) {
+        throw e.getCause() instanceof OOfflineClusterException ? (OOfflineClusterException)e.getCause() : e;
+      }
       beginResponse();
       try {
         sendOk(connection,clientTxId);

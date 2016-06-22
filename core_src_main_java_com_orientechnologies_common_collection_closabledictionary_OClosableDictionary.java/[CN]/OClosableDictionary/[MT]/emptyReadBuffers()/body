@@ -1,0 +1,17 @@
+{
+  for (int n=0; n < NUMBER_OF_READ_BUFFERS; n++) {
+    AtomicReference<OClosableEntry<K,V>>[] buffer=readBuffers[n];
+    long writeCount=readBufferDrainAtWriteCount[n].get();
+    long counter=readBufferReadCount[n];
+    while (true) {
+      final int bufferIndex=(int)(counter & READ_BUFFER_INDEX_MASK);
+      final AtomicReference<OClosableEntry<K,V>> eref=buffer[bufferIndex];
+      final OClosableEntry<K,V> entry=eref.get();
+      if (entry == null)       break;
+      applyRead(entry);
+      counter++;
+    }
+    readBufferReadCount[n]=counter;
+    readBufferDrainAtWriteCount[n].lazySet(writeCount);
+  }
+}

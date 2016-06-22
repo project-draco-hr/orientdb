@@ -1,0 +1,21 @@
+{
+  ExecutorService executor=Executors.newFixedThreadPool(8);
+  List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  CountDownLatch latch=new CountDownLatch(1);
+  int limit=60000;
+  OClosableDictionary<Long,CItem> dictionary=new OClosableDictionary<Long,CItem>(500);
+  futures.add(executor.submit(new Adder(dictionary,latch,limit / 3)));
+  AtomicBoolean stop=new AtomicBoolean();
+  for (int i=0; i < 1; i++) {
+    futures.add(executor.submit(new Acquier(dictionary,latch,limit,stop)));
+  }
+  latch.countDown();
+  Thread.sleep(10000);
+  stop.set(true);
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  dictionary.emptyBuffers();
+  Assert.assertTrue(dictionary.checkAllLRUListItemsInMap());
+  Assert.assertTrue(dictionary.checkAllOpenItemsInLRUList());
+}

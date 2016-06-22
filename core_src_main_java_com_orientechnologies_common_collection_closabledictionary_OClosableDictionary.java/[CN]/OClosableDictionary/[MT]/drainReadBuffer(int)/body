@@ -1,0 +1,16 @@
+{
+  final long bufferWriteCount=readBufferWriteCount[bufferIndex].get();
+  final AtomicReference<OClosableEntry<K,V>>[] buffer=readBuffers[bufferIndex];
+  long bufferCounter=readBufferReadCount[bufferIndex];
+  for (int n=0; n < READ_BUFFER_DRAIN_THRESHOLD; n++) {
+    final int entryIndex=(int)(bufferCounter & READ_BUFFER_INDEX_MASK);
+    final AtomicReference<OClosableEntry<K,V>> bufferEntry=buffer[entryIndex];
+    final OClosableEntry<K,V> entry=bufferEntry.get();
+    if (entry == null)     break;
+    bufferCounter++;
+    applyRead(entry);
+    bufferEntry.lazySet(null);
+  }
+  readBufferReadCount[bufferIndex]=bufferCounter;
+  readBufferDrainAtWriteCount[bufferIndex].lazySet(bufferWriteCount);
+}

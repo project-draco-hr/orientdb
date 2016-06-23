@@ -55,15 +55,10 @@
  else {
     if (iFormat == null)     iFormat=JSON_FORMAT;
  else     iFormat=JSON_FORMAT + "," + iFormat;
-    if (size <= streamingThreshold) {
-      final StringWriter buffer=new StringWriter();
-      writeRecordsOnStream(iFetchPlan,iFormat,iAdditionalProperties,it,buffer);
-      send(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,buffer.toString(),null);
-    }
- else {
-      final String sendFormat=iFormat;
-      sendStreamed(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,new OCallable<Void,OutputStream>(){
-        @Override public Void call(        OutputStream iArgument){
+    final String sendFormat=iFormat;
+    if (streaming) {
+      sendStream(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,null,new OCallable<Void,OChunkedResponse>(){
+        @Override public Void call(        OChunkedResponse iArgument){
           try {
             OutputStreamWriter writer=new OutputStreamWriter(iArgument);
             writeRecordsOnStream(iFetchPlan,sendFormat,iAdditionalProperties,it,writer);
@@ -75,7 +70,12 @@
           return null;
         }
       }
-,null);
+);
+    }
+ else {
+      final StringWriter buffer=new StringWriter();
+      writeRecordsOnStream(iFetchPlan,iFormat,iAdditionalProperties,it,buffer);
+      send(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,buffer.toString(),null);
     }
   }
 }

@@ -1,13 +1,16 @@
 {
   latch.await();
+  long counter=0;
+  long start=System.nanoTime();
   try {
     Random random=new Random();
     while (!stop.get()) {
       int index=random.nextInt(limit);
-      final OClosableHolder<CItem> holder=dictionary.acquire((long)index);
-      if (holder != null) {
-        holder.get().open();
-        dictionary.release(holder);
+      final OClosableEntry<Long,CItem> entry=dictionary.acquire((long)index);
+      if (entry != null) {
+        Assert.assertTrue(entry.get().isOpen());
+        counter++;
+        dictionary.release(entry);
       }
     }
   }
@@ -15,5 +18,7 @@
     e.printStackTrace();
     throw e;
   }
+  long end=System.nanoTime();
+  System.out.println("Files processed " + counter + " nanos per item "+ (end - start) / counter);
   return null;
 }

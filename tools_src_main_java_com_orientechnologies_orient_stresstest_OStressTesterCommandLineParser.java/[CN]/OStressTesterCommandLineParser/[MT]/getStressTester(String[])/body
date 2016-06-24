@@ -1,14 +1,14 @@
 {
-  Map<String,String> options=checkOptions(readOptions(args));
-  String dbName=OConstants.TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-  OMode mode=OMode.valueOf(options.get(OConstants.OPTION_MODE).toUpperCase());
-  String rootPassword=options.get(OConstants.OPTION_ROOT_PASSWORD);
-  String resultOutputFile=options.get(OConstants.OPTION_OUTPUT_FILE);
-  String plocalPath=options.get(OConstants.OPTION_PLOCAL_PATH);
-  int operationsPerTransaction=getNumber(options.get(OConstants.OPTION_TRANSACTIONS),"transactions");
-  int threadsNumber=getNumber(options.get(OConstants.OPTION_THREADS),"threads");
-  OOperationsSet operationsSet=new OOperationsSet(options.get(OConstants.OPTION_OPERATIONS));
-  String remoteIp=options.get(OConstants.OPTION_REMOTE_IP);
+  final Map<String,String> options=checkOptions(readOptions(args));
+  String dbName=TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+  OStressTester.OMode mode=OStressTester.OMode.valueOf(options.get(OPTION_MODE).toUpperCase());
+  String rootPassword=options.get(OPTION_ROOT_PASSWORD);
+  String resultOutputFile=options.get(OPTION_OUTPUT_FILE);
+  String plocalPath=options.get(OPTION_PLOCAL_PATH);
+  int operationsPerTransaction=getNumber(options.get(OPTION_TRANSACTIONS),"transactions");
+  int threadsNumber=getNumber(options.get(OPTION_CONCURRENCY),"concurrency");
+  String remoteIp=options.get(OPTION_REMOTE_IP);
+  String workloadCfg=options.get(OPTION_WORKLOAD);
   int remotePort=2424;
   if (plocalPath != null) {
     if (plocalPath.endsWith(File.separator)) {
@@ -16,55 +16,53 @@
     }
     File plocalFile=new File(plocalPath);
     if (!plocalFile.exists()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_NOT_EXISTING_PLOCAL_PATH,plocalPath));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_NOT_EXISTING_PLOCAL_PATH,plocalPath));
     }
     if (!plocalFile.canWrite()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_NO_WRITE_PERMISSION_PLOCAL_PATH,plocalPath));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_NO_WRITE_PERMISSION_PLOCAL_PATH,plocalPath));
     }
     if (!plocalFile.isDirectory()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_PLOCAL_PATH_IS_NOT_DIRECTORY,plocalPath));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_PLOCAL_PATH_IS_NOT_DIRECTORY,plocalPath));
     }
   }
   if (resultOutputFile != null) {
     File outputFile=new File(resultOutputFile);
     if (outputFile.exists()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_EXISTING_OUTPUT_FILE,resultOutputFile));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_EXISTING_OUTPUT_FILE,resultOutputFile));
     }
     File parentFile=outputFile.getParentFile();
     if (parentFile == null) {
       parentFile=new File(".");
     }
     if (!parentFile.exists()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_NOT_EXISTING_OUTPUT_DIRECTORY,parentFile.getAbsoluteFile()));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_NOT_EXISTING_OUTPUT_DIRECTORY,parentFile.getAbsoluteFile()));
     }
     if (!parentFile.canWrite()) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_NO_WRITE_PERMISSION_OUTPUT_FILE,parentFile.getAbsoluteFile()));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_NO_WRITE_PERMISSION_OUTPUT_FILE,parentFile.getAbsoluteFile()));
     }
   }
-  if (operationsPerTransaction > operationsSet.getNumber(OOperationType.CREATE) / threadsNumber) {
-    throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_TX_GREATER_THAN_CREATES,operationsPerTransaction,operationsSet.getNumber(OOperationType.CREATE)));
-  }
-  if (options.get(OConstants.OPTION_REMOTE_PORT) != null) {
-    remotePort=getNumber(options.get(OConstants.OPTION_REMOTE_PORT),"remotePort");
+  if (options.get(OPTION_REMOTE_PORT) != null) {
+    remotePort=getNumber(options.get(OPTION_REMOTE_PORT),"remotePort");
     if (remotePort > 65535) {
-      throw new OInitException(String.format(OErrorMessages.COMMAND_LINE_PARSER_INVALID_REMOTE_PORT_NUMBER,remotePort));
+      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_INVALID_REMOTE_PORT_NUMBER,remotePort));
     }
   }
-  if (mode == OMode.DISTRIBUTED) {
-    throw new OInitException(String.format("OMode [%s] not yet supported.",mode));
+  if (mode == OStressTester.OMode.DISTRIBUTED) {
+    throw new IllegalArgumentException(String.format("OMode [%s] not yet supported.",mode));
   }
-  if (mode == OMode.REMOTE && remoteIp == null) {
-    throw new OInitException(OErrorMessages.COMMAND_LINE_PARSER_MISSING_REMOTE_IP);
+  if (mode == OStressTester.OMode.REMOTE && remoteIp == null) {
+    throw new IllegalArgumentException(COMMAND_LINE_PARSER_MISSING_REMOTE_IP);
   }
-  if (rootPassword == null && mode == OMode.REMOTE) {
+  if (rootPassword == null && mode == OStressTester.OMode.REMOTE) {
     Console console=System.console();
     if (console != null) {
-      rootPassword=String.valueOf(console.readPassword(String.format(OConstants.CONSOLE_REMOTE_PASSWORD_PROMPT,remoteIp,remotePort)));
+      rootPassword=String.valueOf(console.readPassword(String.format(CONSOLE_REMOTE_PASSWORD_PROMPT,remoteIp,remotePort)));
     }
  else {
-      throw new Exception(OErrorMessages.ERROR_OPENING_CONSOLE);
+      throw new Exception(ERROR_OPENING_CONSOLE);
     }
   }
-  ODatabaseIdentifier databaseIdentifier=new ODatabaseIdentifier(mode,dbName,rootPassword,remoteIp,remotePort,plocalPath);
-  return new OStressTester(databaseIdentifier,operationsSet,threadsNumber,operationsPerTransaction,resultOutputFile);
+  final OWorkload workload=parseWorkload(workloadCfg);
+  final ODatabaseIdentifier databaseIdentifier=new ODatabaseIdentifier(mode,dbName,rootPassword,remoteIp,remotePort,plocalPath);
+  return new OStressTester(workload,databaseIdentifier,threadsNumber,operationsPerTransaction,resultOutputFile);
 }

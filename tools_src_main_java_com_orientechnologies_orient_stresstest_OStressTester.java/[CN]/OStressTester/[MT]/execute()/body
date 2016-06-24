@@ -1,39 +1,18 @@
 {
-  long startTime;
   int returnCode=0;
   OLogManager.instance().setConsoleLevel("SEVERE");
   ODatabaseUtils.createDatabase(databaseIdentifier);
   consoleProgressWriter.printMessage(String.format("Created database [%s].",databaseIdentifier.getUrl()));
-  ODatabase database=ODatabaseUtils.openDatabase(databaseIdentifier);
-  if (database == null) {
-    throw new Exception("Couldn't open database " + databaseIdentifier.getName() + ".");
-  }
   try {
-    final OSchema schema=database.getMetadata().getSchema();
-    final OClass oClass=schema.createClass(OConstants.CLASS_NAME);
-    oClass.createProperty("name",OType.STRING);
-    OIndexManager indexManager=database.getMetadata().getIndexManager();
-    indexManager.createIndex(OConstants.INDEX_NAME,OClass.INDEX_TYPE.UNIQUE.toString(),new OPropertyIndexDefinition(OConstants.CLASS_NAME,"name",OType.STRING),oClass.getClusterIds(),null,null);
-  }
-  finally {
-    database.close();
-  }
-  try {
-    List<Callable<Map<OOperationType,Long>>> operationsExecutors=new ArrayList<Callable<Map<OOperationType,Long>>>();
-    for (int j=0; j < threadsNumber; j++) {
-      operationsExecutors.add(new OOperationsExecutor(databaseIdentifier,operationsSet,opsInTx,threadsNumber,consoleProgressWriter,stressTestResults));
-    }
     new Thread(consoleProgressWriter).start();
-    startTime=System.currentTimeMillis();
-    List<Future<Map<OOperationType,Long>>> threadsResults=Executors.newFixedThreadPool(threadsNumber).invokeAll(operationsExecutors);
-    stressTestResults.addTotalExecutionTime(System.currentTimeMillis() - startTime);
-    for (    Future<Map<OOperationType,Long>> threadResults : threadsResults) {
-      stressTestResults.addThreadResults(threadResults.get());
-    }
-    System.out.println("\r                                                                                             ");
-    System.out.println(stressTestResults.toString());
+    consoleProgressWriter.printMessage(String.format("Starting workload %s - concurrencyLevel=%d...",workload.getName(),threadsNumber));
+    final long startTime=System.currentTimeMillis();
+    workload.execute(threadsNumber,databaseIdentifier);
+    final long endTime=System.currentTimeMillis();
+    consoleProgressWriter.sendShutdown();
+    System.out.println(String.format("\nTotal execution time: %.3f secs",((float)(endTime - startTime) / 1000f)));
+    System.out.println(workload.getFinalResult());
     if (outputResultFile != null) {
-      OIOUtils.writeFile(new File(outputResultFile),OJsonResultsFormatter.format(stressTestResults));
     }
   }
  catch (  Exception ex) {

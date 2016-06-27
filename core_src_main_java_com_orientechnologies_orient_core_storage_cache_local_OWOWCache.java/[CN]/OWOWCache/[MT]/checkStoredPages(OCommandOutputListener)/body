@@ -3,10 +3,11 @@
   final List<OPageDataVerificationError> errors=new ArrayList<OPageDataVerificationError>();
   filesLock.acquireWriteLock();
   try {
-    for (    Map.Entry<Integer,OFileClassic> entry : files.entrySet()) {
-      final int fileId=entry.getKey();
-      final OFileClassic fileClassic=entry.getValue();
+    for (    Long fid : files.keySet()) {
+      final int fileId=extractFileId(fid);
       boolean fileIsCorrect;
+      final OClosableEntry<Long,OFileClassic> entry=files.acquire(fid);
+      final OFileClassic fileClassic=entry.get();
       try {
         if (commandOutputListener != null)         commandOutputListener.onMessage("Flashing file " + fileClassic.getName() + "... ");
         flush(fileId);
@@ -42,6 +43,9 @@
  catch (      IOException ioe) {
         if (commandOutputListener != null)         commandOutputListener.onMessage("Error: Error during processing of file " + fileClassic.getName() + ". "+ ioe.getMessage());
         fileIsCorrect=false;
+      }
+ finally {
+        files.release(entry);
       }
       if (!fileIsCorrect) {
         if (commandOutputListener != null)         commandOutputListener.onMessage("Verification of file " + fileClassic.getName() + " is finished with errors.");

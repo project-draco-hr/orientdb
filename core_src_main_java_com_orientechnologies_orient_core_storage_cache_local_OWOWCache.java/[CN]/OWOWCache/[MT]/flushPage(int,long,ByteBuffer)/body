@@ -10,7 +10,14 @@
   OLongSerializer.INSTANCE.serializeNative(MAGIC_NUMBER,content,0);
   final int crc32=calculatePageCrc(content);
   OIntegerSerializer.INSTANCE.serializeNative(crc32,content,OLongSerializer.LONG_SIZE);
-  final OFileClassic fileClassic=files.get(fileId);
-  fileClassic.write(pageIndex * pageSize,content);
-  if (syncOnPageFlush)   fileClassic.synch();
+  final long externalId=composeFileId(id,fileId);
+  final OClosableEntry<Long,OFileClassic> entry=files.acquire(externalId);
+  try {
+    final OFileClassic fileClassic=entry.get();
+    fileClassic.write(pageIndex * pageSize,content);
+    if (syncOnPageFlush)     fileClassic.synch();
+  }
+  finally {
+    files.release(entry);
+  }
 }

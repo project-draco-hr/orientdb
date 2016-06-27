@@ -13,12 +13,11 @@
   }
   filesLock.acquireWriteLock();
   try {
-    long[] result=new long[files.size()];
-    int counter=0;
-    for (    Map.Entry<Integer,OFileClassic> fileEntry : files.entrySet()) {
-      OFileClassic fileClassic=fileEntry.getValue();
-      if (fileClassic.isOpen())       fileClassic.close();
-      result[counter++]=composeFileId(id,fileEntry.getKey());
+    final Collection<Integer> fileIds=nameIdMap.values();
+    for (    Integer intId : fileIds) {
+      if (intId >= 0) {
+        files.close(composeFileId(id,intId));
+      }
     }
     if (nameIdMapHolder != null) {
       nameIdMapHolder.setLength(0);
@@ -28,7 +27,14 @@
       nameIdMapHolder.getFD().sync();
       nameIdMapHolder.close();
     }
-    return result;
+    nameIdMap.clear();
+    final long[] ids=new long[fileIds.size()];
+    int n=0;
+    for (    long id : fileIds) {
+      ids[n]=id;
+      n++;
+    }
+    return ids;
   }
   finally {
     filesLock.releaseWriteLock();

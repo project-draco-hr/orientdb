@@ -6,8 +6,15 @@
     OLogManager.instance().debug(this,"Start fuzzy checkpoint flushed LSN is %s",minLsn);
     try {
       writeAheadLog.logFuzzyCheckPointStart(minLsn);
-      for (      OFileClassic fileClassic : files.values()) {
-        fileClassic.synch();
+      for (      Long fileId : files.keySet()) {
+        final OClosableEntry<Long,OFileClassic> entry=files.acquire(fileId);
+        try {
+          final OFileClassic fileClassic=entry.get();
+          fileClassic.synch();
+        }
+  finally {
+          files.release(entry);
+        }
       }
       writeAheadLog.logFuzzyCheckPointEnd();
       writeAheadLog.flush();

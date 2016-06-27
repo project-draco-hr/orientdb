@@ -1,0 +1,41 @@
+{
+  try {
+    beginRequest(network,command,session);
+    network.writeRID(iRid);
+    network.writeVersion(iVersion);
+    network.writeByte((byte)iMode);
+  }
+  finally {
+    endRequest(network);
+  }
+switch (iMode) {
+case 0:
+    try {
+      beginResponse(network,session);
+      return network.readByte() == 1;
+    }
+  finally {
+      endResponse(network);
+    }
+case 1:
+  if (iCallback != null) {
+    Callable<Object> response=new Callable<Object>(){
+      public Object call() throws Exception {
+        Boolean result;
+        try {
+          beginResponse(network,session);
+          result=network.readByte() == 1;
+        }
+  finally {
+          endResponse(network);
+        }
+        iCallback.call(iRid,result);
+        return null;
+      }
+    }
+;
+    asynchExecutor.submit(new FutureTask<Object>(response));
+  }
+}
+return false;
+}

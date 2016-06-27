@@ -1,5 +1,6 @@
 {
   if (iRecords == null)   return;
+  final int size=OMultiValue.getSize(iRecords);
   final Iterator<Object> it=OMultiValue.getMultiValueIterator(iRecords);
   if (accept != null && accept.contains("text/csv")) {
     sendStream(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,"data.csv",new OCallable<Void,OChunkedResponse>(){
@@ -54,26 +55,27 @@
  else {
     if (iFormat == null)     iFormat=JSON_FORMAT;
  else     iFormat=JSON_FORMAT + "," + iFormat;
-    final StringWriter buffer=new StringWriter();
-    final OJSONWriter json=new OJSONWriter(buffer,iFormat);
-    json.beginObject();
-    final String format=iFetchPlan != null ? iFormat + ",fetchPlan:" + iFetchPlan : iFormat;
-    json.beginCollection(-1,true,"result");
-    formatMultiValue(it,buffer,format);
-    json.endCollection(-1,true);
-    if (iAdditionalProperties != null) {
-      for (      Map.Entry<String,Object> entry : iAdditionalProperties.entrySet()) {
-        final Object v=entry.getValue();
-        if (OMultiValue.isMultiValue(v)) {
-          json.beginCollection(-1,true,entry.getKey());
-          formatMultiValue(OMultiValue.getMultiValueIterator(v),buffer,format);
-          json.endCollection(-1,true);
+    final String sendFormat=iFormat;
+    if (streaming) {
+      sendStream(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,null,new OCallable<Void,OChunkedResponse>(){
+        @Override public Void call(        OChunkedResponse iArgument){
+          try {
+            OutputStreamWriter writer=new OutputStreamWriter(iArgument);
+            writeRecordsOnStream(iFetchPlan,sendFormat,iAdditionalProperties,it,writer);
+            writer.flush();
+          }
+ catch (          IOException e) {
+            e.printStackTrace();
+          }
+          return null;
         }
- else         json.writeAttribute(entry.getKey(),v);
-        if (Thread.currentThread().isInterrupted())         break;
       }
+);
     }
-    json.endObject();
-    send(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,buffer.toString(),null);
+ else {
+      final StringWriter buffer=new StringWriter();
+      writeRecordsOnStream(iFetchPlan,iFormat,iAdditionalProperties,it,buffer);
+      send(OHttpUtils.STATUS_OK_CODE,"OK",OHttpUtils.CONTENT_JSON,buffer.toString(),null);
+    }
   }
 }

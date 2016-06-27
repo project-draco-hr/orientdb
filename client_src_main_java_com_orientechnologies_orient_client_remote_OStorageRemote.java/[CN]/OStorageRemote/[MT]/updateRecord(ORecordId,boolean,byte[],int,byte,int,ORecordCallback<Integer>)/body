@@ -1,15 +1,11 @@
 {
-  return networkOperation(new OStorageRemoteOperation<OStorageOperationResult<Integer>>(){
-    @Override public OStorageOperationResult<Integer> execute(    final OChannelBinaryAsynchClient network) throws IOException {
-      int mode;
-      if (iMode == 1 && iCallback == null)       mode=2;
- else       mode=iMode;
+  final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
+  Integer resVersion=asyncNetworkOperation(new OStorageRemoteOperationWrite(){
+    @Override public void execute(    final OChannelBinaryAsynchClient network,    final OStorageRemoteSession session,    int mode) throws IOException {
       try {
-        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_UPDATE);
+        beginRequest(network,OChannelBinaryProtocol.REQUEST_RECORD_UPDATE,session);
         network.writeRID(iRid);
-        if (network.getSrvProtocolVersion() >= 23) {
-          network.writeBoolean(updateContent);
-        }
+        network.writeBoolean(updateContent);
         network.writeBytes(iContent);
         network.writeVersion(iVersion);
         network.writeByte(iRecordType);
@@ -18,40 +14,22 @@
   finally {
         endRequest(network);
       }
-switch (mode) {
-case 0:
-        try {
-          beginResponse(network);
-          OStorageOperationResult<Integer> r=new OStorageOperationResult<Integer>(network.readVersion());
-          readCollectionChanges(network,ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager());
-          return r;
-        }
-  finally {
-          endResponse(network);
-        }
-case 1:
-      final OStorageRemoteSession session=getCurrentSession();
-    final OSBTreeCollectionManager collectionManager=ODatabaseRecordThreadLocal.INSTANCE.get().getSbTreeCollectionManager();
-  Callable<Object> response=new Callable<Object>(){
-    public Object call() throws Exception {
-      int result;
+    }
+  }
+,new OStorageRemoteOperationRead<Integer>(){
+    @Override public Integer execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session) throws IOException {
       try {
         beginResponse(network,session);
-        result=network.readVersion();
-        if (network.getSrvProtocolVersion() >= 20)         readCollectionChanges(network,collectionManager);
+        Integer r=network.readVersion();
+        readCollectionChanges(network,collectionManager);
+        return r;
       }
   finally {
         endResponse(network);
       }
-      iCallback.call(iRid,result);
-      return null;
     }
   }
-;
-asynchExecutor.submit(new FutureTask<Object>(response));
-}
-return new OStorageOperationResult<Integer>(iVersion);
-}
-}
-,"Error on update record " + iRid);
+,iMode,iRid,iCallback,"Error on update record " + iRid);
+  if (resVersion == null)   resVersion=iVersion;
+  return new OStorageOperationResult<Integer>(resVersion);
 }

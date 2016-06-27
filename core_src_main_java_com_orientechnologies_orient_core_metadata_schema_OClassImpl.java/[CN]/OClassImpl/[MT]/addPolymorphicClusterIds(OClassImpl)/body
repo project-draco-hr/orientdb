@@ -1,24 +1,23 @@
 {
-  boolean found;
-  for (  int i : iBaseClass.polymorphicClusterIds) {
-    found=false;
-    for (    int k : polymorphicClusterIds) {
-      if (i == k) {
-        found=true;
-        break;
-      }
-    }
-    if (!found) {
-      int[] oldClusterId=polymorphicClusterIds;
-      polymorphicClusterIds=OArrays.copyOf(polymorphicClusterIds,polymorphicClusterIds.length + 1);
-      polymorphicClusterIds[polymorphicClusterIds.length - 1]=i;
-      Arrays.sort(polymorphicClusterIds);
+  Set<Integer> clusters=new TreeSet<Integer>();
+  for (  int clusterId : polymorphicClusterIds) {
+    clusters.add(clusterId);
+  }
+  for (  int clusterId : iBaseClass.polymorphicClusterIds) {
+    if (clusters.add(clusterId)) {
       try {
-        addClusterIdToIndexes(i);
+        addClusterIdToIndexes(clusterId);
       }
- catch (      Exception e) {
-        polymorphicClusterIds=oldClusterId;
+ catch (      RuntimeException e) {
+        OLogManager.instance().warn(this,"Error adding clusterId '%i' to index of class '%s'",e,clusterId,getName());
+        clusters.remove(clusterId);
       }
     }
+  }
+  polymorphicClusterIds=new int[clusters.size()];
+  int i=0;
+  for (  Integer cluster : clusters) {
+    polymorphicClusterIds[i]=cluster;
+    i++;
   }
 }

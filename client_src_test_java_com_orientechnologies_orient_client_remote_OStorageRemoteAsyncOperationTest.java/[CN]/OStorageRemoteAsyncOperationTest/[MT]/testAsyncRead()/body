@@ -1,0 +1,35 @@
+{
+  final CallStatus status=new CallStatus();
+  final CountDownLatch callBackWait=new CountDownLatch(1);
+  final CountDownLatch readDone=new CountDownLatch(1);
+  final CountDownLatch callBackDone=new CountDownLatch(1);
+  final Object res=new Object();
+  storage.asyncNetworkOperation(new OStorageRemoteOperationWrite(){
+    @Override public void execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session,    int mode) throws IOException {
+      assertNull(status.status);
+      status.status="write";
+    }
+  }
+,new OStorageRemoteOperationRead<Object>(){
+    @Override public Object execute(    OChannelBinaryAsynchClient network,    OStorageRemoteSession session) throws IOException {
+      try {
+        if (callBackWait.await(10,TimeUnit.MILLISECONDS))         readDone.countDown();
+      }
+ catch (      InterruptedException e) {
+        e.printStackTrace();
+      }
+      return res;
+    }
+  }
+,1,new ORecordId(-1,-1),new ORecordCallback<Object>(){
+    @Override public void call(    ORecordId iRID,    Object iParameter){
+      callBackDone.countDown();
+    }
+  }
+,"");
+  callBackWait.countDown();
+  boolean called=readDone.await(10,TimeUnit.MILLISECONDS);
+  if (!called)   fail("Read not called");
+  called=callBackDone.await(10,TimeUnit.MILLISECONDS);
+  if (!called)   fail("Callback not called");
+}

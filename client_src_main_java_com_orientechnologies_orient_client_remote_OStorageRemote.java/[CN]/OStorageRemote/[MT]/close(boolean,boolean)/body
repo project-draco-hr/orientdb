@@ -1,6 +1,5 @@
 {
   if (status == STATUS.CLOSED)   return;
-  OChannelBinaryAsynchClient network=null;
   stateLock.acquireWriteLock();
   try {
     if (status == STATUS.CLOSED)     return;
@@ -9,17 +8,20 @@
       final Collection<OStorageRemoteNodeSession> nodes=session.getAll();
       if (!nodes.isEmpty()) {
         for (        OStorageRemoteNodeSession nodeSession : nodes) {
+          OChannelBinaryAsynchClient network=null;
           try {
             network=getNetwork(nodeSession.getServerURL());
             network.beginRequest(OChannelBinaryProtocol.REQUEST_DB_CLOSE,session);
             endRequest(network);
-            engine.getConnectionManager().release(network);
+            connectionManager.release(network);
           }
  catch (          OIOException ex) {
             OLogManager.instance().debug(this,"Impossible to comunicate to the server for close: %s",ex);
+            connectionManager.remove(network);
           }
 catch (          IOException ex) {
             OLogManager.instance().debug(this,"Impossible to comunicate to the server for close: %s",ex);
+            connectionManager.remove(network);
           }
         }
         session.close();
@@ -31,25 +33,14 @@ catch (          IOException ex) {
     }
     status=STATUS.CLOSING;
     for (    String url : serverURLs) {
-      engine.getConnectionManager().closePool(url);
+      connectionManager.closePool(url);
     }
     sbTreeCollectionManager.close();
     super.close(iForce,onDelete);
     status=STATUS.CLOSED;
     Orient.instance().unregisterStorage(this);
   }
- catch (  Exception e) {
-    if (network != null) {
-      OLogManager.instance().debug(this,"Error on closing remote connection: %s",e,network);
-      try {
-        network.close();
-      }
- catch (      Exception e2) {
-        OLogManager.instance().debug(this,"Error on closing socket: %s",e2,network);
-      }
-    }
-  }
- finally {
+  finally {
     stateLock.releaseWriteLock();
   }
 }

@@ -1,19 +1,27 @@
 {
   if (key == null)   return false;
   key=getCollatingValue(key);
-  final Set<String> words=splitIntoWords(key.toString());
-  final OModifiableBoolean removed=new OModifiableBoolean(false);
-  for (  final String word : words) {
-    acquireSharedLock();
-    try {
-      final Set<OIdentifiable> recs=(Set<OIdentifiable>)storage.getIndexValue(indexId,word);
-      if (recs != null && !recs.isEmpty()) {
-        storage.updateIndexEntry(indexId,word,new EntityRemover(recs,value,removed));
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
+  try {
+    final Set<String> words=splitIntoWords(key.toString());
+    final OModifiableBoolean removed=new OModifiableBoolean(false);
+    for (    final String word : words) {
+      acquireSharedLock();
+      try {
+        final Set<OIdentifiable> recs=(Set<OIdentifiable>)storage.getIndexValue(indexId,word);
+        if (recs != null && !recs.isEmpty()) {
+          storage.updateIndexEntry(indexId,word,new EntityRemover(recs,value,removed));
+        }
+      }
+  finally {
+        releaseSharedLock();
       }
     }
-  finally {
-      releaseSharedLock();
-    }
+    return removed.getValue();
   }
-  return removed.getValue();
+  finally {
+    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
+  }
 }

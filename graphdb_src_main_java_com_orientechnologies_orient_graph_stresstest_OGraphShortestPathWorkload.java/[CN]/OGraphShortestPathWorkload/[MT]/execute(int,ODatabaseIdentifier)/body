@@ -1,0 +1,25 @@
+{
+  final OrientGraphNoTx g=getGraphNoTx(databaseIdentifier);
+  try {
+    for (    OIdentifiable id : g.getRawGraph().browseClass("V")) {
+      startingVertices.add(id.getIdentity());
+      if (limit > -1 && startingVertices.size() >= limit)       break;
+    }
+  }
+  finally {
+    g.shutdown();
+  }
+  result.total=startingVertices.size();
+  executeOperation(databaseIdentifier,result,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
+      final OWorkLoadContext graphContext=((OWorkLoadContext)context);
+      final OrientBaseGraph graph=graphContext.graph;
+      for (int i=0; i < startingVertices.size(); ++i) {
+        final Object commandResult=graph.command(new OCommandSQL("select shortestPath(?,?, 'out')")).execute(startingVertices.get(context.currentIdx),startingVertices.get(i));
+      }
+      result.current.incrementAndGet();
+      return null;
+    }
+  }
+);
+}

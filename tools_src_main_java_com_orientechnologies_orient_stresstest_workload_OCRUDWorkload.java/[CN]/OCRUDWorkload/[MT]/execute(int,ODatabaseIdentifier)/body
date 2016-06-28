@@ -1,40 +1,40 @@
 {
   createSchema(databaseIdentifier);
-  final ArrayList<ORID> records=new ArrayList<ORID>(creates);
-  for (int i=0; i < creates; ++i)   records.add(null);
-  createsResult=executeOperation(databaseIdentifier,creates,concurrencyLevel,new OCallable<Void,OWorkLoadContext>(){
-    @Override public Void call(    final OWorkLoadContext context){
+  final ArrayList<ORID> records=new ArrayList<ORID>(createsResult.total);
+  for (int i=0; i < createsResult.total; ++i)   records.add(null);
+  executeOperation(databaseIdentifier,createsResult.total,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
       final ODocument doc=createOperation(context.currentIdx);
 synchronized (records) {
         if (records.set(context.currentIdx,doc.getIdentity()) != null)         throw new RuntimeException("Error on creating record with id " + context.currentIdx + " because has been already created");
       }
-      currentCreates.incrementAndGet();
+      createsResult.current.incrementAndGet();
       return null;
     }
   }
 );
-  if (records.size() != creates)   throw new RuntimeException("Error on creating records: found " + records.size() + " but expected "+ creates);
-  readsResult=executeOperation(databaseIdentifier,reads,concurrencyLevel,new OCallable<Void,OWorkLoadContext>(){
-    @Override public Void call(    final OWorkLoadContext context){
-      readOperation(context.db,context.currentIdx);
-      currentReads.incrementAndGet();
+  if (records.size() != createsResult.total)   throw new RuntimeException("Error on creating records: found " + records.size() + " but expected "+ createsResult.total);
+  executeOperation(databaseIdentifier,readsResult.total,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
+      readOperation(((OWorkLoadContext)context).getDb(),context.currentIdx);
+      readsResult.current.incrementAndGet();
       return null;
     }
   }
 );
-  updatesResult=executeOperation(databaseIdentifier,updates,concurrencyLevel,new OCallable<Void,OWorkLoadContext>(){
-    @Override public Void call(    final OWorkLoadContext context){
-      updateOperation(context.db,records.get(context.currentIdx));
-      currentUpdates.incrementAndGet();
+  updatesResult=executeOperation(databaseIdentifier,updatesResult.total,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
+      updateOperation(((OWorkLoadContext)context).getDb(),records.get(context.currentIdx));
+      updatesResult.current.incrementAndGet();
       return null;
     }
   }
 );
-  deletesResult=executeOperation(databaseIdentifier,deletes,concurrencyLevel,new OCallable<Void,OWorkLoadContext>(){
-    @Override public Void call(    final OWorkLoadContext context){
-      deleteOperation(context.db,records.get(context.currentIdx));
+  deletesResult=executeOperation(databaseIdentifier,deletesResult.total,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
+      deleteOperation(((OWorkLoadContext)context).getDb(),records.get(context.currentIdx));
       records.set(context.currentIdx,null);
-      currentDeletes.incrementAndGet();
+      deletesResult.current.incrementAndGet();
       return null;
     }
   }

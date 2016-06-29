@@ -1,5 +1,5 @@
 {
-  executeOperation(databaseIdentifier,resultVertices,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+  final List<OBaseWorkLoadContext> contexts=executeOperation(databaseIdentifier,resultVertices,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
     @Override public Void call(    final OBaseWorkLoadContext context){
       final OWorkLoadContext graphContext=((OWorkLoadContext)context);
       final OrientBaseGraph graph=graphContext.graph;
@@ -19,4 +19,15 @@
     }
   }
 );
+  final OrientGraphNoTx graph=getGraphNoTx(databaseIdentifier);
+  try {
+    OrientVertex lastVertex=null;
+    for (    OBaseWorkLoadContext context : contexts) {
+      if (lastVertex != null)       lastVertex.addEdge("E",((OWorkLoadContext)context).lastVertexToConnect);
+      lastVertex=((OWorkLoadContext)context).lastVertexToConnect;
+    }
+  }
+  finally {
+    graph.shutdown();
+  }
 }

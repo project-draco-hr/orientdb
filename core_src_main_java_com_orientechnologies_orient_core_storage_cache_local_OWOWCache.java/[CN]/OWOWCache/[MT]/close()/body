@@ -11,13 +11,16 @@
       throw OException.wrapException(new OWriteCacheException("Data flush thread was interrupted"),e);
     }
   }
+  final List<Long> result=new ArrayList<Long>();
   filesLock.acquireWriteLock();
   try {
-    final Collection<Integer> fileIds=nameIdMap.values();
-    for (    Integer intId : fileIds) {
-      if (intId >= 0) {
-        files.close(composeFileId(id,intId));
-      }
+    final Collection<Integer> intIds=nameIdMap.values();
+    for (    Integer intId : intIds) {
+      if (intId < 0)       continue;
+      final long fileId=composeFileId(id,intId);
+      final OFileClassic fileClassic=files.remove(fileId);
+      fileClassic.close();
+      result.add(fileId);
     }
     if (nameIdMapHolder != null) {
       nameIdMapHolder.setLength(0);
@@ -28,13 +31,13 @@
       nameIdMapHolder.close();
     }
     nameIdMap.clear();
-    final long[] ids=new long[fileIds.size()];
-    int n=0;
-    for (    long id : fileIds) {
-      ids[n]=id;
-      n++;
+    final long[] ds=new long[result.size()];
+    int counter=0;
+    for (    long id : result) {
+      ds[counter]=id;
+      counter++;
     }
-    return ids;
+    return ds;
   }
   finally {
     filesLock.releaseWriteLock();

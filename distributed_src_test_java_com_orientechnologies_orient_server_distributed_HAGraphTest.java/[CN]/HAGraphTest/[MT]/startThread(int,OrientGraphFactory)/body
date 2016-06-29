@@ -10,7 +10,7 @@
       try {
         String query="select from Test where prop2='v2-1'";
         boolean isRunning=true;
-        for (int i=1; i < TOTAL_CYCLES && isRunning; i++) {
+        for (int i=1; i < TOTAL_CYCLES_PER_THREAD && isRunning; i++) {
           if ((i % 2500) == 0) {
             long et=System.currentTimeMillis();
             log(sb.toString() + " [" + id+ "] Total Records Processed: ["+ i+ "] Current: [2500] Time taken: ["+ (et - st) / 1000 + "] seconds");
@@ -74,7 +74,11 @@ catch (                Exception ex) {
                       vtx1.reload();
                     }
 catch (                    ONeedRetryException ex) {
-                      if (ex instanceof ONeedRetryException || ex.getCause() instanceof ONeedRetryException) {
+                      if (ex instanceof ODistributedRecordLockedException) {
+                        if (k > 20)                         log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] ODistributedRecordLockedException: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] for vertex "+ vtx1);
+                        vtx1.reload();
+                      }
+ else                       if (ex instanceof ONeedRetryException || ex.getCause() instanceof ONeedRetryException) {
                         vtx1.reload();
                       }
  else {
@@ -111,6 +115,7 @@ catch (                    Exception ex) {
   finally {
             graph.shutdown();
           }
+          operations.incrementAndGet();
         }
       }
  catch (      Exception ex) {

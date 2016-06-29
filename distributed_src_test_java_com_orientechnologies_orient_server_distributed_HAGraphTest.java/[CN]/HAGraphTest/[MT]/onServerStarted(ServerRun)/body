@@ -2,5 +2,27 @@
   if (serverStarted++ == 0) {
     createSchemaAndFirstVertices();
     startTest();
+    task=new TimerTask(){
+      @Override public void run(){
+        if (serverDown && !serverRestarted && operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL * 2 / 3) {
+          banner("RESTARTING SERVER " + (SERVERS - 1) + "...");
+          try {
+            serverInstance.get(SERVERS - 1).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
+            if (serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class) != null)             serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class).waitUntilNodeOnline();
+            serverRestarted=true;
+          }
+ catch (          Exception e) {
+            e.printStackTrace();
+          }
+        }
+ else         if (!serverDown && operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL / 3) {
+          banner("SIMULATE SOFT SHUTDOWN OF SERVER " + (SERVERS - 1));
+          serverInstance.get(SERVERS - 1).shutdownServer();
+          serverDown=true;
+        }
+      }
+    }
+;
+    Orient.instance().scheduleTask(task,2000,200);
   }
 }

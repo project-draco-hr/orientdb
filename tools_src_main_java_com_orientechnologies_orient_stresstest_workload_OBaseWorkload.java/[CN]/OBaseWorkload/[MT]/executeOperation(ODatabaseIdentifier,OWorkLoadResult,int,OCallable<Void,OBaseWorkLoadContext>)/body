@@ -1,0 +1,63 @@
+{
+  if (result.total == 0)   return null;
+  final int totalPerThread=result.total / concurrencyLevel;
+  final int totalPerLastThread=totalPerThread + result.total % concurrencyLevel;
+  final Long[] operationTiming=new Long[result.total];
+  final List<OBaseWorkLoadContext> contexts=new ArrayList<OBaseWorkLoadContext>(concurrencyLevel);
+  final Thread[] thread=new Thread[concurrencyLevel];
+  for (int t=0; t < concurrencyLevel; ++t) {
+    final int currentThread=t;
+    final OBaseWorkLoadContext context=getContext();
+    contexts.add(context);
+    thread[t]=new Thread(new Runnable(){
+      @Override public void run(){
+        context.threadId=currentThread;
+        context.totalPerThread=context.threadId < concurrencyLevel - 1 ? totalPerThread : totalPerLastThread;
+        context.init(dbIdentifier);
+        try {
+          final int startIdx=totalPerThread * context.threadId;
+          for (int i=0; i < context.totalPerThread; ++i) {
+            context.currentIdx=startIdx + i;
+            final long startOp=System.nanoTime();
+            try {
+              callback.call(context);
+            }
+ catch (            Exception e) {
+              errors.add(e.toString());
+              if (errors.size() > MAX_ERRORS) {
+                e.printStackTrace();
+                break;
+              }
+            }
+ finally {
+              operationTiming[context.currentIdx]=System.nanoTime() - startOp;
+            }
+          }
+        }
+  finally {
+          context.close();
+        }
+      }
+    }
+);
+  }
+  final long startTime=System.currentTimeMillis();
+  for (int t=0; t < concurrencyLevel; ++t) {
+    thread[t].start();
+  }
+  for (int t=0; t < concurrencyLevel; ++t) {
+    try {
+      thread[t].join();
+    }
+ catch (    InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+  result.totalTime=System.currentTimeMillis() - startTime;
+  Arrays.sort(operationTiming);
+  result.avgNs=(int)(result.totalTime * 1000000 / operationTiming.length);
+  result.percentileAvg=getPercentile(operationTiming,result.avgNs);
+  result.percentile99Ns=operationTiming[(int)(operationTiming.length * 99f / 100f)];
+  result.percentile99_9Ns=operationTiming[(int)(operationTiming.length * 99.9f / 100f)];
+  return contexts;
+}

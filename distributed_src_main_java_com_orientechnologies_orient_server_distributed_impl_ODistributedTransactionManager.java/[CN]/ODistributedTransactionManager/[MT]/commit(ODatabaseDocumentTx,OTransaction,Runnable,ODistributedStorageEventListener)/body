@@ -29,6 +29,7 @@
           final Set<String> involvedClusters=getInvolvedClusters(uResult);
           final Set<String> nodes=getAvailableNodesButLocal(dbCfg,involvedClusters,localNodeName);
           if (nodes.isEmpty()) {
+            localDistributedDatabase.popTxContext(requestId);
             ctx.destroy();
             return null;
           }
@@ -56,6 +57,7 @@
  else {
             final OCallable<Void,ODistributedRequestId> unlockCallback=new OCallable<Void,ODistributedRequestId>(){
               @Override public Void call(              final ODistributedRequestId reqId){
+                localDistributedDatabase.popTxContext(requestId);
                 ctx.destroy();
                 return null;
               }
@@ -65,15 +67,20 @@
           }
         }
  catch (        RuntimeException e) {
+          localDistributedDatabase.popTxContext(requestId);
           ctx.destroy();
           throw e;
         }
 catch (        Exception e) {
+          localDistributedDatabase.popTxContext(requestId);
           ctx.destroy();
           OException.wrapException(new ODistributedException("Cannot commit transaction"),e);
         }
  finally {
-          if (finalExecutionModeSynch)           ctx.destroy();
+          if (finalExecutionModeSynch) {
+            localDistributedDatabase.popTxContext(requestId);
+            ctx.destroy();
+          }
         }
         return null;
       }

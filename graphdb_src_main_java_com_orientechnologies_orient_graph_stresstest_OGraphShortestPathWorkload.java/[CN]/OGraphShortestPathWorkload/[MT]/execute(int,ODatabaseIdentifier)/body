@@ -1,0 +1,37 @@
+{
+  final OrientGraphNoTx g=getGraphNoTx(databaseIdentifier);
+  try {
+    for (    OIdentifiable id : g.getRawGraph().browseClass("V")) {
+      startingVertices.add(id.getIdentity());
+      if (limit > -1 && startingVertices.size() >= limit)       break;
+    }
+  }
+  finally {
+    g.shutdown();
+  }
+  result.total=startingVertices.size();
+  executeOperation(databaseIdentifier,result,concurrencyLevel,new OCallable<Void,OBaseWorkLoadContext>(){
+    @Override public Void call(    final OBaseWorkLoadContext context){
+      final OWorkLoadContext graphContext=((OWorkLoadContext)context);
+      final OrientBaseGraph graph=graphContext.graph;
+      for (int i=0; i < startingVertices.size(); ++i) {
+        final Iterable<OrientVertex> commandResult=graph.command(new OCommandSQL("select shortestPath(?,?, 'both')")).execute(startingVertices.get(context.currentIdx),startingVertices.get(i));
+        for (        OrientVertex v : commandResult) {
+          Collection depth=v.getRecord().field("shortestPath");
+          if (depth != null && !depth.isEmpty()) {
+            totalDepth.addAndGet(depth.size());
+            long max=maxDepth.get();
+            while (depth.size() > max) {
+              if (maxDepth.compareAndSet(max,depth.size()))               break;
+              max=maxDepth.get();
+            }
+          }
+ else           notConnected.incrementAndGet();
+        }
+      }
+      result.current.incrementAndGet();
+      return null;
+    }
+  }
+);
+}

@@ -1,14 +1,15 @@
 {
   final Map<String,String> options=checkOptions(readOptions(args));
-  String dbName=TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-  OStressTester.OMode mode=OStressTester.OMode.valueOf(options.get(OPTION_MODE).toUpperCase());
+  final String dbName=TEMP_DATABASE_NAME + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+  final OStressTester.OMode mode=OStressTester.OMode.valueOf(options.get(OPTION_MODE).toUpperCase());
   String rootPassword=options.get(OPTION_ROOT_PASSWORD);
-  String resultOutputFile=options.get(OPTION_OUTPUT_FILE);
+  final String resultOutputFile=options.get(OPTION_OUTPUT_FILE);
   String plocalPath=options.get(OPTION_PLOCAL_PATH);
-  int operationsPerTransaction=getNumber(options.get(OPTION_TRANSACTIONS),"transactions");
-  int threadsNumber=getNumber(options.get(OPTION_CONCURRENCY),"concurrency");
-  String remoteIp=options.get(OPTION_REMOTE_IP);
-  String workloadCfg=options.get(OPTION_WORKLOAD);
+  final int operationsPerTransaction=getNumber(options.get(OPTION_TRANSACTIONS),"transactions");
+  final int threadsNumber=getNumber(options.get(OPTION_CONCURRENCY),"concurrency");
+  final String remoteIp=options.get(OPTION_REMOTE_IP);
+  final String workloadCfg=options.get(OPTION_WORKLOAD);
+  final boolean keepDatabaseAfterTest=options.get(OPTION_KEEP_DATABASE_AFTER_TEST) != null ? Boolean.parseBoolean(options.get(OPTION_KEEP_DATABASE_AFTER_TEST)) : false;
   int remotePort=2424;
   if (plocalPath != null) {
     if (plocalPath.endsWith(File.separator)) {
@@ -28,7 +29,7 @@
   if (resultOutputFile != null) {
     File outputFile=new File(resultOutputFile);
     if (outputFile.exists()) {
-      throw new IllegalArgumentException(String.format(COMMAND_LINE_PARSER_EXISTING_OUTPUT_FILE,resultOutputFile));
+      outputFile.delete();
     }
     File parentFile=outputFile.getParentFile();
     if (parentFile == null) {
@@ -62,7 +63,7 @@
       throw new Exception(ERROR_OPENING_CONSOLE);
     }
   }
-  final OWorkload workload=parseWorkload(workloadCfg);
+  final List<OWorkload> workloads=parseWorkloads(workloadCfg);
   final ODatabaseIdentifier databaseIdentifier=new ODatabaseIdentifier(mode,dbName,rootPassword,remoteIp,remotePort,plocalPath);
-  return new OStressTester(workload,databaseIdentifier,threadsNumber,operationsPerTransaction,resultOutputFile);
+  return new OStressTester(workloads,databaseIdentifier,threadsNumber,operationsPerTransaction,resultOutputFile,keepDatabaseAfterTest);
 }

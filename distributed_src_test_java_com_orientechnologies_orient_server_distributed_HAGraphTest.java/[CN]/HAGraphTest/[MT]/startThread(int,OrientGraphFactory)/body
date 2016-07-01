@@ -1,0 +1,132 @@
+{
+  Runnable th=new Runnable(){
+    @Override public void run(){
+      boolean useSQL=false;
+      StringBuilder sb=new StringBuilder(".");
+      for (int m=0; m < id; m++) {
+        sb.append(".");
+      }
+      long st=System.currentTimeMillis();
+      try {
+        String query="select from Test where prop2='v2-1'";
+        boolean isRunning=true;
+        for (int i=1; i < TOTAL_CYCLES_PER_THREAD && isRunning; i++) {
+          if ((i % 2500) == 0) {
+            long et=System.currentTimeMillis();
+            log(sb.toString() + " [" + id+ "] Total Records Processed: ["+ i+ "] Current: [2500] Time taken: ["+ (et - st) / 1000 + "] seconds");
+            st=System.currentTimeMillis();
+          }
+          OrientGraph graph=graphFactory.getTx();
+          try {
+            if (useSQL) {
+              boolean update=true;
+              boolean isException=false;
+              String sql="Update Test set prop5='" + String.valueOf(System.currentTimeMillis()) + "', updateTime='"+ new Date().toString()+ "' where prop2='v2-1'";
+              for (int k=0; k < 10 && update; k++) {
+                try {
+                  graph.command(new OCommandSQL(sql)).execute();
+                  if (isException) {
+                    log("********** [" + id + "]["+ k+ "] Update success after distributed lock Exception");
+                  }
+                  update=false;
+                  break;
+                }
+ catch (                ONeedRetryException ex) {
+                  if (ex instanceof OConcurrentModificationException || ex.getCause() instanceof OConcurrentModificationException) {
+                  }
+ else {
+                    isException=true;
+                    log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] Distributed Exception: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] ");
+                  }
+                }
+catch (                ODistributedException ex) {
+                  if (ex.getCause() instanceof OConcurrentModificationException) {
+                  }
+ else {
+                    isException=true;
+                    log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] Distributed Exception: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] ");
+                  }
+                }
+catch (                Exception ex) {
+                  log("[" + id + "]["+ k+ "] Exception "+ ex);
+                }
+              }
+            }
+ else {
+              Iterable<Vertex> vtxs=graph.command(new OCommandSQL(query)).execute();
+              boolean retry=true;
+              for (              Vertex vtx : vtxs) {
+                if (retry) {
+                  retry=true;
+                  boolean isException=false;
+                  for (int k=0; k < 100 && retry; k++) {
+                    OrientVertex vtx1=(OrientVertex)vtx;
+                    try {
+                      vtx1.setProperty("prop5","prop55");
+                      vtx1.setProperty("updateTime",new Date().toString());
+                      graph.commit();
+                      if (isException) {
+                      }
+                      retry=false;
+                      break;
+                    }
+ catch (                    OConcurrentModificationException ex) {
+                      vtx1.reload();
+                    }
+catch (                    ONeedRetryException ex) {
+                      if (ex instanceof ODistributedRecordLockedException) {
+                        if (k > 20)                         log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] ODistributedRecordLockedException: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] for vertex "+ vtx1);
+                        vtx1.reload();
+                      }
+ else                       if (ex instanceof ONeedRetryException || ex.getCause() instanceof ONeedRetryException) {
+                        vtx1.reload();
+                      }
+ else {
+                        if (ex.getCause() instanceof ConcurrentModificationException) {
+                          ex.printStackTrace();
+                        }
+                        log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] Distributed Exception: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] for vertex "+ vtx1);
+                      }
+                      isException=true;
+                    }
+catch (                    ODistributedException ex) {
+                      if (ex.getCause() instanceof ONeedRetryException) {
+                        vtx1.reload();
+                      }
+ else {
+                        if (ex.getCause() instanceof ConcurrentModificationException) {
+                          ex.printStackTrace();
+                        }
+                        log("*$$$$$$$$$$$$$$ [" + id + "]["+ k+ "] Distributed Exception: ["+ ex+ "] Cause: ["+ (ex.getCause() != null ? ex.getCause() : "--")+ "] for vertex "+ vtx1);
+                      }
+                      isException=true;
+                    }
+catch (                    Exception ex) {
+                      log("[" + id + "]["+ k+ "] Exception "+ ex+ " for vertex "+ vtx1);
+                    }
+                  }
+                  if (retry) {
+                    log("********** [" + id + "] Failed to update after Exception for vertex "+ vtx);
+                  }
+                }
+              }
+            }
+          }
+  finally {
+            graph.shutdown();
+          }
+          operations.incrementAndGet();
+        }
+      }
+ catch (      Exception ex) {
+        System.out.println("ID: [" + id + "]********** Exception "+ ex+ " \n\n");
+        ex.printStackTrace();
+      }
+ finally {
+        log("[" + id + "] Done................>>>>>>>>>>>>>>>>>>");
+      }
+    }
+  }
+;
+  return th;
+}

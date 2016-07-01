@@ -1,0 +1,20 @@
+{
+  final String removedServer=serverInstance.get(SERVERS - 1).getServerInstance().getDistributedManager().getLocalNodeName();
+  Assert.assertTrue(serverInstance.get(0).getServerInstance().getDistributedManager().getDatabaseConfiguration(getDatabaseName()).getAllConfiguredServers().contains(removedServer));
+  Assert.assertTrue(serverInstance.get(0).getServerInstance().getDistributedManager().getConfigurationMap().containsKey("dbstatus." + removedServer + "."+ getDatabaseName()));
+  banner("SIMULATE SOFT SHUTDOWN OF SERVER " + (SERVERS - 1));
+  serverInstance.get(SERVERS - 1).shutdownServer();
+  lastNodeIsUp.set(false);
+  banner("RESTARTING TESTS WITH SERVER " + (SERVERS - 1) + " DOWN...");
+  count=10;
+  executeMultipleTest();
+  banner("RESTARTING SERVER " + (SERVERS - 1) + "...");
+  Assert.assertFalse(serverInstance.get(0).getServerInstance().getDistributedManager().getDatabaseConfiguration(getDatabaseName()).getAllConfiguredServers().contains(removedServer));
+  Assert.assertFalse(serverInstance.get(0).getServerInstance().getDistributedManager().getConfigurationMap().containsKey("dbstatus." + removedServer + "."+ getDatabaseName()));
+  serverInstance.get(SERVERS - 1).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
+  if (serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class) != null)   serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class).waitUntilNodeOnline();
+  lastNodeIsUp.set(true);
+  banner("RESTARTING TESTS WITH SERVER " + (SERVERS - 1) + " UP...");
+  count=10;
+  executeMultipleTest();
+}

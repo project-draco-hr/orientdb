@@ -10,20 +10,10 @@
     final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
     final ORemoteTask task=iRequest.getTask();
     final boolean checkNodesAreOnline=task.isNodeOnlineRequired();
-    final Set<String> nodesConcurToTheQuorum=new HashSet<String>();
-    if (iRequest.getTask().getQuorumType() == OCommandDistributedReplicateRequest.QUORUM_TYPE.WRITE) {
-      for (      String node : iNodes) {
-        if (cfg.getServerRole(node) == ODistributedConfiguration.ROLES.MASTER)         nodesConcurToTheQuorum.add(node);
-      }
-      if (localResult != null && cfg.getServerRole(getLocalNodeName()) == ODistributedConfiguration.ROLES.MASTER)       nodesConcurToTheQuorum.add(getLocalNodeName());
-    }
- else {
-      nodesConcurToTheQuorum.addAll(iNodes);
-      if (localResult != null)       nodesConcurToTheQuorum.add(getLocalNodeName());
-    }
+    final Set<String> nodesConcurToTheQuorum=manager.getDistributedStrategy().getNodesConcurInQuorum(manager,cfg,iRequest,iNodes,localResult);
     final int availableNodes=manager.getAvailableNodes(iNodes,databaseName);
     final int expectedResponses=localResult != null ? availableNodes + 1 : availableNodes;
-    final int quorum=calculateQuorum(task.getQuorumType(),iClusterNames,cfg,expectedResponses,nodesConcurToTheQuorum.size(),checkNodesAreOnline);
+    final int quorum=calculateQuorum(task.getQuorumType(),iClusterNames,cfg,expectedResponses,nodesConcurToTheQuorum.size(),checkNodesAreOnline,localNodeName);
     final boolean groupByResponse;
     if (task.getResultStrategy() == OAbstractRemoteTask.RESULT_STRATEGY.UNION) {
       groupByResponse=false;

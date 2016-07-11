@@ -55,17 +55,27 @@
         task.setLastLSN(wrapped.getLSN());
         if (!nodes.isEmpty()) {
           if (syncMode) {
-            final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
-            final Object payload=dResponse.getPayload();
-            if (payload != null) {
-              if (payload instanceof Exception) {
-                executeUndoOnLocalServer(dResponse.getRequestId(),task);
-                if (payload instanceof ONeedRetryException)                 throw (ONeedRetryException)payload;
-                throw OException.wrapException(new ODistributedException("Error on execution distributed CREATE_RECORD"),(Exception)payload);
+            try {
+              final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
+              final Object payload=dResponse.getPayload();
+              if (payload != null) {
+                if (payload instanceof Exception) {
+                  executeUndoOnLocalServer(dResponse.getRequestId(),task);
+                  if (payload instanceof ONeedRetryException)                   throw (ONeedRetryException)payload;
+                  throw OException.wrapException(new ODistributedException("Error on execution distributed create record"),(Exception)payload);
+                }
+                final OPlaceholder masterPlaceholder=(OPlaceholder)payload;
+                iRecordId.copyFrom(masterPlaceholder.getIdentity());
+                return new OStorageOperationResult<OPhysicalPosition>(new OPhysicalPosition(masterPlaceholder.getIdentity().getClusterPosition(),masterPlaceholder.getVersion()));
               }
-              final OPlaceholder masterPlaceholder=(OPlaceholder)payload;
-              iRecordId.copyFrom(masterPlaceholder.getIdentity());
-              return new OStorageOperationResult<OPhysicalPosition>(new OPhysicalPosition(masterPlaceholder.getIdentity().getClusterPosition(),masterPlaceholder.getVersion()));
+            }
+ catch (            RuntimeException e) {
+              executeUndoOnLocalServer(null,task);
+              throw e;
+            }
+catch (            Exception e) {
+              executeUndoOnLocalServer(null,task);
+              ODatabaseException.wrapException(new ODistributedException("Cannot execute distributed create record"),e);
             }
           }
  else {
@@ -88,7 +98,7 @@ catch (  HazelcastException e) {
     throw new OOfflineNodeException("Hazelcast instance is not available");
   }
 catch (  Exception e) {
-    handleDistributedException("Cannot route CREATE_RECORD operation for %s to the distributed node",e,iRecordId);
+    handleDistributedException("Cannot route create record operation for %s to the distributed node",e,iRecordId);
     return null;
   }
 }

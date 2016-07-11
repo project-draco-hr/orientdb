@@ -48,14 +48,24 @@ catch (          Exception e) {
  else {
           final Integer localResultPayload=localResult != null ? localResult.getResult() : null;
           if (syncMode || localResult == null) {
-            final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localResultPayload,unlockCallback);
-            final Object payload=dResponse.getPayload();
-            if (payload instanceof Exception) {
-              executeUndoOnLocalServer(dResponse.getRequestId(),task);
-              if (payload instanceof ONeedRetryException)               throw (ONeedRetryException)payload;
-              throw OException.wrapException(new ODistributedException("Error on execution distributed UPDATE_RECORD"),(Exception)payload);
+            try {
+              final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localResultPayload,unlockCallback);
+              final Object payload=dResponse.getPayload();
+              if (payload instanceof Exception) {
+                executeUndoOnLocalServer(dResponse.getRequestId(),task);
+                if (payload instanceof ONeedRetryException)                 throw (ONeedRetryException)payload;
+                throw OException.wrapException(new ODistributedException("Error on execution distributed update record"),(Exception)payload);
+              }
+              return new OStorageOperationResult<Integer>((Integer)payload);
             }
-            return new OStorageOperationResult<Integer>((Integer)payload);
+ catch (            RuntimeException e) {
+              executeUndoOnLocalServer(null,task);
+              throw e;
+            }
+catch (            Exception e) {
+              executeUndoOnLocalServer(null,task);
+              ODatabaseException.wrapException(new ODistributedException("Cannot execute distributed update record"),e);
+            }
           }
           asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(clusterName),nodes,task,dManager.getNextMessageIdCounter(),localResultPayload,unlockCallback,null));
         }

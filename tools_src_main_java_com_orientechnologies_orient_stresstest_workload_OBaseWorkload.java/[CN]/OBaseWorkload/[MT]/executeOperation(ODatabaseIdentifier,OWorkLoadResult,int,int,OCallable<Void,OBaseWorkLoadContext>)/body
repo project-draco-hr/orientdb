@@ -16,8 +16,13 @@
         context.init(dbIdentifier);
         try {
           final int startIdx=totalPerThread * context.threadId;
+          if (operationsPerTransaction > 0)           beginTransaction(context);
           for (int i=0; i < context.totalPerThread; ++i) {
             context.currentIdx=startIdx + i;
+            if (operationsPerTransaction > 0 && (i + 1) % operationsPerTransaction == 0) {
+              commitTransaction(context);
+              beginTransaction(context);
+            }
             final long startOp=System.nanoTime();
             try {
               callback.call(context);
@@ -33,6 +38,7 @@
               operationTiming[context.currentIdx]=System.nanoTime() - startOp;
             }
           }
+          if (operationsPerTransaction > 0)           commitTransaction(context);
         }
   finally {
           context.close();

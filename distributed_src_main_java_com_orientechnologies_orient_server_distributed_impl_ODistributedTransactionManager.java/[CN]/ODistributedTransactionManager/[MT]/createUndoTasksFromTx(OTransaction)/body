@@ -9,12 +9,20 @@ case ORecordOperation.CREATED:
 case ORecordOperation.UPDATED:
 case ORecordOperation.DELETED:
     final ORecordId rid=(ORecordId)record.getIdentity();
-  final OStorageOperationResult<ORawBuffer> loaded=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying().readRecord(rid,null,true,null);
-if (loaded == null || loaded.getResult() == null) throw new ORecordNotFoundException(rid);
-final ORecord previousRecord=Orient.instance().getRecordFactoryManager().newInstance(loaded.getResult().recordType);
-ORecordInternal.fill(previousRecord,rid,loaded.getResult().version,loaded.getResult().getBuffer(),false);
-if (op.type == ORecordOperation.UPDATED) undoTask=new OUpdateRecordTask(previousRecord,ORecordVersionHelper.clearRollbackMode(previousRecord.getVersion()));
- else undoTask=new OResurrectRecordTask(previousRecord);
+  final AtomicReference<ORecord> previousRecord=new AtomicReference<ORecord>();
+OScenarioThreadLocal.executeAsDefault(new Callable<Object>(){
+  @Override public Object call() throws Exception {
+    final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
+    final ORecordOperation txEntry=db.getTransaction().getRecordEntry(rid);
+    if (txEntry != null && txEntry.type == ORecordOperation.DELETED)     previousRecord.set(txEntry.getRecord());
+ else     previousRecord.set(db.load(rid));
+    return null;
+  }
+}
+);
+if (previousRecord.get() == null) throw new ORecordNotFoundException(rid);
+if (op.type == ORecordOperation.UPDATED) undoTask=new OUpdateRecordTask(previousRecord.get(),ORecordVersionHelper.clearRollbackMode(previousRecord.get().getVersion()));
+ else undoTask=new OResurrectRecordTask(previousRecord.get());
 break;
 default :
 continue;

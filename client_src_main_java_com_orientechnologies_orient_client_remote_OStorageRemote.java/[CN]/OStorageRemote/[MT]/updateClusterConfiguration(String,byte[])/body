@@ -8,8 +8,12 @@ synchronized (clusterConfiguration) {
     members=clusterConfiguration.field("members");
   }
 synchronized (serverURLs) {
+    Set<String> old=new HashSet<String>(serverURLs);
     if (members != null) {
-      if (iConnectedURL != null)       addHost(iConnectedURL);
+      if (iConnectedURL != null) {
+        addHost(iConnectedURL);
+        old.remove(iConnectedURL);
+      }
       for (      ODocument m : members) {
         if (m == null)         continue;
         final String nodeStatus=m.field("status");
@@ -19,8 +23,15 @@ synchronized (serverURLs) {
             if (((String)listener.get("protocol")).equals("ONetworkProtocolBinary")) {
               String url=(String)listener.get("listen");
               if (!serverURLs.contains(url))               addHost(url);
+              old.remove(url);
             }
           }
+        }
+      }
+      for (      String oldUrl : old) {
+        serverURLs.remove(oldUrl);
+        for (        OStorageRemoteSession session : sessions) {
+          session.remove(oldUrl + "/" + getName());
         }
       }
     }

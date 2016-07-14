@@ -5,5 +5,23 @@
     if (version > -1 && iDocument.getVersion() != version)     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
  else     throw new OConcurrentModificationException(iDocument.getIdentity(),iDocument.getVersion(),version,ORecordOperation.DELETED);
   }
+  final OClass class_=ODocumentInternal.getImmutableSchemaClass(iDocument);
+  if (class_ != null) {
+    final Collection<OIndex<?>> indexes=class_.getIndexes();
+    final Deque<TreeMap<OIndex<?>,List<Object>>> indexKeysMapQueue=lockedKeys.get();
+    final TreeMap<OIndex<?>,List<Object>> indexKeysMap=new TreeMap<OIndex<?>,List<Object>>();
+    for (    final OIndex<?> index : indexes) {
+      if (index.getInternal() instanceof OIndexUnique) {
+        OIndexRecorder indexRecorder=new OIndexRecorder((OIndexUnique)index.getInternal());
+        addIndexEntry(iDocument,iDocument.getIdentity(),indexRecorder);
+        indexKeysMap.put(index,indexRecorder.getAffectedKeys());
+      }
+    }
+    for (    Map.Entry<OIndex<?>,List<Object>> entry : indexKeysMap.entrySet()) {
+      final OIndexInternal<?> index=entry.getKey().getInternal();
+      index.lockKeysForUpdateNoTx(entry.getValue());
+    }
+    indexKeysMapQueue.push(indexKeysMap);
+  }
   return RESULT.RECORD_NOT_CHANGED;
 }

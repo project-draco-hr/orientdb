@@ -12,23 +12,27 @@
     }
     if (!(c.getProtocol() instanceof ONetworkProtocolBinary) || c.getData().serializationImpl == null)     continue;
     final ONetworkProtocolBinary p=(ONetworkProtocolBinary)c.getProtocol();
-    final OChannelBinary channel=(OChannelBinary)p.getChannel();
+    final OChannelBinary channel=p.getChannel();
     final ORecordSerializer ser=ORecordSerializerFactory.instance().getFormat(c.getData().serializationImpl);
     if (ser == null)     return;
     final byte[] content=ser.toStream(iConfig,false);
     try {
-      channel.acquireWriteLock();
-      try {
-        channel.writeByte(OChannelBinaryProtocol.PUSH_DATA);
-        channel.writeInt(Integer.MIN_VALUE);
-        channel.writeByte(OChannelBinaryProtocol.REQUEST_PUSH_DISTRIB_CONFIG);
-        channel.writeBytes(content);
-        channel.flush();
-        pushed.add(c.getRemoteAddress());
-        OLogManager.instance().info(this,"Sent updated cluster configuration to the remote client %s",c.getRemoteAddress());
-      }
+      if (channel.tryAcquireWriteLock(TIMEOUT_PUSH)) {
+        try {
+          channel.writeByte(OChannelBinaryProtocol.PUSH_DATA);
+          channel.writeInt(Integer.MIN_VALUE);
+          channel.writeByte(OChannelBinaryProtocol.REQUEST_PUSH_DISTRIB_CONFIG);
+          channel.writeBytes(content);
+          channel.flush();
+          pushed.add(c.getRemoteAddress());
+          OLogManager.instance().info(this,"Sent updated cluster configuration to the remote client %s",c.getRemoteAddress());
+        }
   finally {
-        channel.releaseWriteLock();
+          channel.releaseWriteLock();
+        }
+      }
+ else {
+        OLogManager.instance().info(this,"Timeout on sending updated cluster configuration to the remote client %s",c.getRemoteAddress());
       }
     }
  catch (    IOException e) {

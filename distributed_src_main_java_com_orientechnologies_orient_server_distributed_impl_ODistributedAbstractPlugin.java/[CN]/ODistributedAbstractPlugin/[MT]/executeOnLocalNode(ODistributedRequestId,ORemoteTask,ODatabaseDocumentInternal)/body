@@ -8,17 +8,8 @@
         if (result instanceof Throwable && !(result instanceof OException))         ODistributedServerLog.error(this,nodeName,getNodeNameById(reqId.getNodeId()),DIRECTION.IN,"Error on executing request %d (%s) on local node: ",(Throwable)result,reqId,task);
  else {
           final String sourceNodeName=task.getNodeSource();
-          Long last=lastLSNWriting.get(sourceNodeName);
-          if (last == null)           last=0l;
-          if (task instanceof OAbstractReplicatedTask && System.currentTimeMillis() - last > 2000) {
-            final ODistributedDatabaseImpl ddb=getMessageService().getDatabase(database.getName());
-            final OLogSequenceNumber lastLSN=((OAbstractReplicatedTask)task).getLastLSN();
-            if (lastLSN != null) {
-              ddb.getSyncConfiguration().setLSN(task.getNodeSource(),lastLSN);
-              ODistributedServerLog.debug(this,nodeName,task.getNodeSource(),DIRECTION.NONE,"Updating LSN table to the value %s",lastLSN);
-              lastLSNWriting.put(sourceNodeName,System.currentTimeMillis());
-            }
-          }
+          final ODistributedDatabaseImpl ddb=getMessageService().getDatabase(database.getName());
+          if (!(result instanceof Throwable) && task instanceof OAbstractReplicatedTask)           ddb.setLSN(sourceNodeName,((OAbstractReplicatedTask)task).getLastLSN());
         }
         return result;
       }

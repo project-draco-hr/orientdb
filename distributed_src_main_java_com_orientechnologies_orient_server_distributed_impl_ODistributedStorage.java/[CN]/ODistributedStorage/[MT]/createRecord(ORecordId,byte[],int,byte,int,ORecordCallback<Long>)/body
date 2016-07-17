@@ -4,44 +4,19 @@
     return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
   }
   checkLocalNodeIsAvailable();
+  checkClusterRebalanceIsNotRunning();
   try {
-    String clusterName=getClusterNameByRID(iRecordId);
     final int clusterId=iRecordId.getClusterId();
     if (clusterId == ORID.CLUSTER_ID_INVALID)     throw new IllegalArgumentException("Cluster not valid");
     final String localNodeName=dManager.getLocalNodeName();
     final ODistributedConfiguration dbCfg=distributedConfiguration;
     checkNodeIsMaster(localNodeName,dbCfg);
-    final List<String> nodes=dbCfg.getServers(clusterName,null);
-    if (nodes.isEmpty())     return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
-    String masterNode=nodes.get(0);
-    if (!masterNode.equals(localNodeName)) {
-      final OCluster cl=getClusterByName(clusterName);
-      final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
-      final OClass cls=db.getMetadata().getSchema().getClassByClusterId(cl.getId());
-      String newClusterName=null;
-      if (cls != null) {
-        OClusterSelectionStrategy clSel=cls.getClusterSelection();
-        if (!(clSel instanceof OLocalClusterStrategy)) {
-          dManager.propagateSchemaChanges(db);
-          clSel=cls.getClusterSelection();
-        }
-        if (!(clSel instanceof OLocalClusterStrategy))         throw new ODistributedException("Cannot install local cluster strategy on class '" + cls.getName() + "'");
-        OLogManager.instance().warn(this,"Local node '" + localNodeName + "' is not the master for cluster '"+ clusterName+ "' (it is '"+ masterNode+ "'). Reloading distributed configuration for database '"+ getName()+ "'");
-        ((OLocalClusterStrategy)clSel).readConfiguration();
-        newClusterName=getPhysicalClusterNameById(clSel.getCluster(cls,null));
-        nodes.clear();
-        nodes.addAll(dbCfg.getServers(newClusterName,null));
-        dManager.getAvailableNodes(nodes,getName());
-        masterNode=nodes.get(0);
-      }
-      if (!masterNode.equals(localNodeName))       throw new ODistributedException("Error on inserting into cluster '" + clusterName + "' where local node '"+ localNodeName+ "' is not the master of it, but it is '"+ masterNode+ "'");
-      OLogManager.instance().warn(this,"Local node '" + localNodeName + "' is not the master for cluster '"+ clusterName+ "' (it is '"+ masterNode+ "'). Switching to a valid cluster of the same class: '"+ newClusterName+ "'");
-      clusterName=newClusterName;
-      iRecordId.clusterId=db.getClusterIdByName(newClusterName);
-    }
+    final String clusterName=checkForCluster(iRecordId,localNodeName,dbCfg);
+    final List<String> servers=dbCfg.getServers(clusterName,null);
+    if (servers.isEmpty())     return wrapped.createRecord(iRecordId,iContent,iRecordVersion,iRecordType,iMode,iCallback);
     final String finalClusterName=clusterName;
     final Set<String> clusterNames=Collections.singleton(finalClusterName);
-    nodes.remove(localNodeName);
+    servers.remove(localNodeName);
     Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(finalClusterName);
     if (executionModeSynch == null)     executionModeSynch=iMode == 0;
     final boolean syncMode=executionModeSynch;
@@ -53,10 +28,10 @@
         final OPlaceholder localPlaceholder=new OPlaceholder(iRecordId,localResult.getResult().recordVersion);
         final OCreateRecordTask task=new OCreateRecordTask(iRecordId,iContent,iRecordVersion,iRecordType);
         task.setLastLSN(wrapped.getLSN());
-        if (!nodes.isEmpty()) {
+        if (!servers.isEmpty()) {
           if (syncMode) {
             try {
-              final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,nodes,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
+              final ODistributedResponse dResponse=dManager.sendRequest(getName(),clusterNames,servers,task,dManager.getNextMessageIdCounter(),EXECUTION_MODE.RESPONSE,localPlaceholder,unlockCallback);
               final Object payload=dResponse.getPayload();
               if (payload != null) {
                 if (payload instanceof Exception) {
@@ -79,7 +54,7 @@ catch (            Exception e) {
             }
           }
  else {
-            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(finalClusterName),nodes,task,dManager.getNextMessageIdCounter(),localPlaceholder,unlockCallback,null));
+            asynchronousExecution(new OAsynchDistributedOperation(getName(),Collections.singleton(finalClusterName),servers,task,dManager.getNextMessageIdCounter(),localPlaceholder,unlockCallback,null));
           }
         }
  else         unlockCallback.call(null);

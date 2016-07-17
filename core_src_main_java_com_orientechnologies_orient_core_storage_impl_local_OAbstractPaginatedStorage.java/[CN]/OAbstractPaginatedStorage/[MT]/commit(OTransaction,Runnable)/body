@@ -4,10 +4,11 @@
   final ODatabaseDocumentInternal databaseRecord=(ODatabaseDocumentInternal)clientTx.getDatabase();
   final OIndexManagerProxy indexManager=databaseRecord.getMetadata().getIndexManager();
   final TreeMap<String,OTransactionIndexChanges> indexesToCommit=getSortedIndexEntries(clientTx);
-  ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  final Map<ORecordOperation,Integer> clusterOverrides=new IdentityHashMap<ORecordOperation,Integer>();
+  databaseRecord.getMetadata().makeThreadLocalSchemaSnapshot();
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"%d Committing transaction %d on database '%s' (items=%d)...",Thread.currentThread().getId(),clientTx.getId(),databaseRecord.getName(),clientTx.getEntryCount());
   final Iterable<ORecordOperation> entries=(Iterable<ORecordOperation>)clientTx.getAllRecordEntries();
   final TreeMap<Integer,OCluster> clustersToLock=new TreeMap<Integer,OCluster>();
-  final Map<ORecordOperation,Integer> clusterOverrides=new IdentityHashMap<ORecordOperation,Integer>();
   final Set<ORecordOperation> newRecords=new TreeSet<ORecordOperation>(new Comparator<ORecordOperation>(){
     @Override public int compare(    final ORecordOperation o1,    final ORecordOperation o2){
       return o1.getRecord().getIdentity().compareTo(o2.getRecord().getIdentity());
@@ -38,7 +39,6 @@
       clustersToLock.put(clusterId,getClusterById(clusterId));
     }
   }
-  ORecordId rid2Delete=null;
   final List<ORecordOperation> result=new ArrayList<ORecordOperation>();
   stateLock.acquireReadLock();
   try {
@@ -95,5 +95,6 @@ catch (      RuntimeException e) {
   finally {
     stateLock.releaseReadLock();
   }
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"%d Committed transaction %d on database '%s' (LSN=%s, result=%s)",Thread.currentThread().getId(),clientTx.getId(),databaseRecord.getName(),getLSN(),result);
   return result;
 }

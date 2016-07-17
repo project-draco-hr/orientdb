@@ -2,18 +2,18 @@
   final String localNodeName=dManager.getLocalNodeName();
   try {
     OTransactionInternal.setStatus((OTransactionAbstract)iTx,OTransaction.TXSTATUS.BEGUN);
-    final List<OAbstractRemoteTask> undoTasks=createUndoTasksFromTx(iTx);
-    final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
-    final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
-    final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(storage.getName());
-    Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
-    if (executionModeSynch == null)     executionModeSynch=Boolean.TRUE;
-    final boolean finalExecutionModeSynch=executionModeSynch;
-    final boolean exclusiveLock=iTx.hasRecordCreation();
-    final ODistributedRequestId requestId=new ODistributedRequestId(dManager.getLocalNodeId(),dManager.getNextMessageIdCounter());
-    final ODistributedTxContext ctx=localDistributedDatabase.registerTxContext(requestId);
-    return (List<ORecordOperation>)storage.executeOperationInLock(exclusiveLock,new OCallable<Object,Void>(){
+    return (List<ORecordOperation>)storage.executeOperationInLock(new OCallable<Object,Void>(){
       @Override public Object call(      final Void nothing){
+        final ODistributedConfiguration dbCfg=dManager.getDatabaseConfiguration(storage.getName());
+        checkForClusterIds(iTx,localNodeName,dbCfg);
+        final List<OAbstractRemoteTask> undoTasks=createUndoTasksFromTx(iTx);
+        final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
+        final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
+        Boolean executionModeSynch=dbCfg.isExecutionModeSynchronous(null);
+        if (executionModeSynch == null)         executionModeSynch=Boolean.TRUE;
+        final boolean finalExecutionModeSynch=executionModeSynch;
+        final ODistributedRequestId requestId=new ODistributedRequestId(dManager.getLocalNodeId(),dManager.getNextMessageIdCounter());
+        final ODistributedTxContext ctx=localDistributedDatabase.registerTxContext(requestId);
         try {
           acquireMultipleRecordLocks(iTx,maxAutoRetry,autoRetryDelay,eventListener,ctx);
           final List<ORecordOperation> uResult=(List<ORecordOperation>)OScenarioThreadLocal.executeAsDistributed(new Callable(){
@@ -53,7 +53,7 @@
               }
               ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d). Task: %s - Payload: %s - Tasks: %s",maxAutoRetry,txTask,txTask.getPayload(),txTask.getTasks());
               storage.executeUndoOnLocalServer(requestId,txTask);
-              sendTxCompleted(localNodeName,involvedClusters,nodes,lastResult.getRequestId(),false);
+              sendTxCompleted(localNodeName,involvedClusters,nodes,lastResult.getRequestId(),false,txTask.getPartitionKey());
               throw (ODistributedRecordLockedException)lastResult.getPayload();
             }
  else {

@@ -1,0 +1,35 @@
+{
+  setDataCommandInfo(connection,"Create record");
+  if (!isConnectionAlive(connection))   return;
+  String options=channel.readString();
+  String originalName=channel.readString();
+  File file=File.createTempFile(connection.getDatabase().getName() + "import",originalName);
+  FileOutputStream output=new FileOutputStream(file);
+  byte[] bytes;
+  while ((bytes=channel.readBytes()) != null) {
+    output.write(bytes);
+  }
+  output.close();
+  beginResponse();
+  sendOk(connection,clientTxId);
+  try {
+    ODatabaseImport imp=new ODatabaseImport(connection.getDatabase(),file.getAbsolutePath(),new OCommandOutputListener(){
+      @Override public void onMessage(      String iText){
+        try {
+          if (iText != null)           channel.writeString(iText);
+        }
+ catch (        IOException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+);
+    imp.setOptions(options);
+    imp.importDatabase();
+    imp.close();
+    channel.writeString(null);
+  }
+  finally {
+    endResponse(connection);
+  }
+}

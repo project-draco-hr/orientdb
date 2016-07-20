@@ -4,10 +4,13 @@
     try {
       channel.setWaitResponseTimeout();
       channel.beginRequest(operationId,sessionId,sessionToken);
-      return operation.execute();
+      T result=operation.execute();
+      totalConsecutiveErrors=0;
+      return result;
     }
  catch (    Exception e) {
       lastException=e;
+      handleNewError();
       close();
       if (!autoReconnect)       break;
       if (!manager.isNodeAvailable(server))       break;
@@ -20,9 +23,11 @@
       }
       try {
         connect();
+        totalConsecutiveErrors=0;
       }
  catch (      IOException e1) {
         lastException=e1;
+        handleNewError();
         ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Error on reconnecting to distributed node (%s)",lastException.toString());
       }
     }

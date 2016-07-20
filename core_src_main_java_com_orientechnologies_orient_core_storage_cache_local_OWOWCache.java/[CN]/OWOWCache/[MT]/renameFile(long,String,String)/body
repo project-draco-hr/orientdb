@@ -1,16 +1,23 @@
 {
   final int intId=extractFileId(fileId);
+  fileId=composeFileId(id,intId);
   filesLock.acquireWriteLock();
   try {
-    if (!files.containsKey(intId))     return;
-    final OFileClassic file=files.get(intId);
-    final String osFileName=file.getName();
-    if (osFileName.startsWith(oldFileName)) {
-      final File newFile=new File(storageLocal.getStoragePath() + File.separator + newFileName+ osFileName.substring(osFileName.lastIndexOf(oldFileName) + oldFileName.length()));
-      boolean renamed=file.renameTo(newFile);
-      while (!renamed) {
-        renamed=file.renameTo(newFile);
+    OClosableEntry<Long,OFileClassic> entry=files.acquire(fileId);
+    if (entry == null)     return;
+    try {
+      OFileClassic file=entry.get();
+      final String osFileName=file.getName();
+      if (osFileName.startsWith(oldFileName)) {
+        final File newFile=new File(storageLocal.getStoragePath() + File.separator + newFileName+ osFileName.substring(osFileName.lastIndexOf(oldFileName) + oldFileName.length()));
+        boolean renamed=file.renameTo(newFile);
+        while (!renamed) {
+          renamed=file.renameTo(newFile);
+        }
       }
+    }
+  finally {
+      files.release(entry);
     }
     nameIdMap.remove(oldFileName);
     nameIdMap.put(newFileName,intId);

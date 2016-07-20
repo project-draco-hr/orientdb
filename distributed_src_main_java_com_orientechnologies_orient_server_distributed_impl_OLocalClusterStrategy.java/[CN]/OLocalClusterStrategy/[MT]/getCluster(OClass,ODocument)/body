@@ -1,14 +1,18 @@
 {
   if (!iClass.equals(cls))   throw new IllegalArgumentException("Class '" + iClass + "' is different than the configured one: "+ cls);
+  final OStorage storage=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage();
+  if (!(storage instanceof ODistributedStorage))   throw new IllegalStateException("Storage is not distributed");
   if (bestClusterIds.isEmpty())   readConfiguration();
  else {
-    final ODistributedConfiguration cfg=manager.getDatabaseConfiguration(databaseName);
-    if (lastVersion != cfg.getVersion()) {
+    if (lastVersion != ((ODistributedStorage)storage).getConfigurationUpdated()) {
       readConfiguration();
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"New cluster list for class '%s': %s (dCfgVersion=%d)",cls.getName(),bestClusterIds,lastVersion);
     }
   }
   final int size=bestClusterIds.size();
   if (size == 0)   return -1;
   if (size == 1)   return bestClusterIds.get(0);
-  return bestClusterIds.get((int)(pointer.getAndIncrement() % size));
+  final int cluster=bestClusterIds.get((int)(pointer.getAndIncrement() % size));
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"%d Selected cluster %d for class '%s' from %s (dCfgVersion=%d)",Thread.currentThread().getId(),cluster,cls.getName(),bestClusterIds,lastVersion);
+  return cluster;
 }

@@ -1,0 +1,27 @@
+{
+  ExecutorService executor=Executors.newCachedThreadPool();
+  List<Future<Void>> futures=new ArrayList<Future<Void>>();
+  CountDownLatch latch=new CountDownLatch(1);
+  int limit=60000;
+  OClosableLinkedContainer<Long,CItem> dictionary=new OClosableLinkedContainer<Long,CItem>(16);
+  futures.add(executor.submit(new Adder(dictionary,latch,0,limit / 3)));
+  futures.add(executor.submit(new Adder(dictionary,latch,limit / 3,2 * limit / 3)));
+  AtomicBoolean stop=new AtomicBoolean();
+  for (int i=0; i < 16; i++) {
+    futures.add(executor.submit(new Acquier(dictionary,latch,limit,stop)));
+  }
+  latch.countDown();
+  Thread.sleep(60000);
+  futures.add(executor.submit(new Adder(dictionary,latch,2 * limit / 3,limit)));
+  Thread.sleep(15 * 60000);
+  stop.set(true);
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  dictionary.emptyBuffers();
+  Assert.assertTrue(dictionary.checkAllLRUListItemsInMap());
+  Assert.assertTrue(dictionary.checkAllOpenItemsInLRUList());
+  Assert.assertTrue(dictionary.checkNoClosedItemsInLRUList());
+  Assert.assertTrue(dictionary.checkLRUSize());
+  Assert.assertTrue(dictionary.checkLRUSizeEqualsToCapacity());
+}

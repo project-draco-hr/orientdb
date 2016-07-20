@@ -1,0 +1,46 @@
+{
+  poolFactory.reset();
+  ODatabaseDocumentTx database=poolFactory.get(getDatabaseURL(serverInstance.get(serverNum)),"admin","admin").acquire();
+  try {
+    List<ODocument> result=database.query(new OSQLSynchQuery<OIdentifiable>("select count(*) from Person"));
+    baseCount=((Number)result.get(0).field("count")).intValue();
+  }
+  finally {
+    database.close();
+  }
+  System.out.println("Creating Writers and Readers threads...");
+  final ExecutorService executors=Executors.newCachedThreadPool();
+  runningWriters=new CountDownLatch(executeTestsOnServers.size() * writerCount);
+  int serverId=0;
+  int threadId=0;
+  List<Callable<Void>> workers=new ArrayList<Callable<Void>>();
+  for (  ServerRun server : executeTestsOnServers) {
+    if (server.isActive()) {
+      for (int j=0; j < writerCount; j++) {
+        Callable writer=createWriter(serverId,threadId++,getDatabaseURL(server));
+        workers.add(writer);
+      }
+      Callable<Void> reader=createReader(getDatabaseURL(server));
+      workers.add(reader);
+      serverId++;
+    }
+  }
+  expected=writerCount * count * serverId + baseCount;
+  System.out.println("Expected records=" + expected);
+  List<Future<Void>> futures=executors.invokeAll(workers);
+  System.out.println("Threads started, waiting for the end");
+  for (  Future<Void> future : futures) {
+    future.get();
+  }
+  executors.shutdown();
+  Assert.assertTrue(executors.awaitTermination(1,TimeUnit.MINUTES));
+  System.out.println("All threads have finished, shutting down server instances");
+  for (  ServerRun server : executeTestsOnServers) {
+    if (server.isActive()) {
+      printStats(getDatabaseURL(server));
+    }
+  }
+  onBeforeChecks();
+  checkInsertedEntries();
+  checkIndexedEntries();
+}

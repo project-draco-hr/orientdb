@@ -1,10 +1,18 @@
 {
   key=getCollatingValue(key);
-  acquireSharedLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (!txIsActive)   keyLockManager.acquireExclusiveLock(key);
   try {
-    return storage.removeKeyFromIndex(indexId,key);
+    acquireSharedLock();
+    try {
+      return storage.removeKeyFromIndex(indexId,key);
+    }
+  finally {
+      releaseSharedLock();
+    }
   }
   finally {
-    releaseSharedLock();
+    if (!txIsActive)     keyLockManager.releaseExclusiveLock(key);
   }
 }

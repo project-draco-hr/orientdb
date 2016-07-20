@@ -10,13 +10,27 @@
     if (!onDelete)     makeFullCheckpoint();
     preCloseSteps();
     sbTreeCollectionManager.close();
-    closeClusters(onDelete);
-    closeIndexes(onDelete);
+    clusters.clear();
+    clusterMap.clear();
+    for (    OIndexEngine engine : indexEngines) {
+      if (engine != null && !(engine instanceof OSBTreeIndexEngine || engine instanceof OHashTableIndexEngine)) {
+        if (onDelete)         engine.delete();
+ else         engine.close();
+      }
+    }
+    indexEngines.clear();
+    indexEngineNameMap.clear();
     if (configuration != null)     if (onDelete)     configuration.delete();
  else     configuration.close();
     super.close(force,onDelete);
-    if (writeCache != null)     writeCache.removeLowDiskSpaceListener(this);
-    if (writeAheadLog != null)     writeAheadLog.removeFullCheckpointListener(this);
+    if (writeCache != null) {
+      writeCache.removeLowDiskSpaceListener(this);
+      writeCache.removeBackgroundExceptionListener(this);
+    }
+    if (writeAheadLog != null) {
+      writeAheadLog.removeFullCheckpointListener(this);
+      writeAheadLog.removeLowDiskSpaceListener(this);
+    }
     if (readCache != null)     if (!onDelete)     readCache.closeStorage(writeCache);
  else     readCache.deleteStorage(writeCache);
     if (writeAheadLog != null) {

@@ -1,10 +1,16 @@
 {
   final int intId=extractFileId(fileId);
+  fileId=composeFileId(id,intId);
   filesLock.acquireWriteLock();
   try {
-    if (!isOpen(fileId))     return;
     removeCachedPages(intId);
-    files.get(intId).shrink(0);
+    OClosableEntry<Long,OFileClassic> entry=files.acquire(fileId);
+    try {
+      entry.get().shrink(0);
+    }
+  finally {
+      files.release(entry);
+    }
   }
   finally {
     filesLock.releaseWriteLock();

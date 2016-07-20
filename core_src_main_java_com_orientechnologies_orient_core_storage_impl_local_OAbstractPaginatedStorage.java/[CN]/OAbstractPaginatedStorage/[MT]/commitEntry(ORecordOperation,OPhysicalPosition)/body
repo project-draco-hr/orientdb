@@ -21,24 +21,23 @@ case ORecordOperation.CREATED:
         ORecordInternal.setVersion(rec,ppos.recordVersion);
       }
  else {
-        ORecordInternal.setVersion(rec,updateRecord(rid,ORecordInternal.isContentChanged(rec),stream,-2,ORecordInternal.getRecordType(rec),-1,null).getResult());
+        final OStorageOperationResult<Integer> updateRes=updateRecord(rid,ORecordInternal.isContentChanged(rec),stream,-2,ORecordInternal.getRecordType(rec),-1,null);
+        ORecordInternal.setVersion(rec,updateRes.getResult());
+        if (updateRes.getModifiedRecordContent() != null)         ORecordInternal.fill(rec,rid,updateRes.getResult(),updateRes.getModifiedRecordContent(),false);
       }
-      txEntry.getRecord().fromStream(stream);
       break;
     }
 case ORecordOperation.UPDATED:
 {
     final byte[] stream=rec.toStream();
-    OStorageOperationResult<Integer> updateRes=doUpdateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getVersion(),ORecordInternal.getRecordType(rec),null,cluster);
+    final OStorageOperationResult<Integer> updateRes=doUpdateRecord(rid,ORecordInternal.isContentChanged(rec),stream,rec.getVersion(),ORecordInternal.getRecordType(rec),null,cluster);
     ORecordInternal.setVersion(rec,updateRes.getResult());
-    if (updateRes.getModifiedRecordContent() != null) {
-      ORecordInternal.fill(rec,rid,updateRes.getResult(),updateRes.getModifiedRecordContent(),false);
-    }
- else     txEntry.getRecord().fromStream(stream);
+    if (updateRes.getModifiedRecordContent() != null)     ORecordInternal.fill(rec,rid,updateRes.getResult(),updateRes.getModifiedRecordContent(),false);
     break;
   }
 case ORecordOperation.DELETED:
 {
+  if (rec instanceof ODocument)   ORidBagDeleter.deleteAllRidBags((ODocument)rec);
   deleteRecord(rid,rec.getVersion(),-1,null);
   break;
 }

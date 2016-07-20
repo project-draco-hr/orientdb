@@ -6,6 +6,9 @@
       Iterable<OIdentifiable> matches=fetchAliasCandidates(nextAlias,aliasFilters,iCommandContext,aliasClasses);
       Set<OIdentifiable> ids=new HashSet<OIdentifiable>();
       if (!matches.iterator().hasNext()) {
+        if (pattern.get(nextAlias).isOptionalNode()) {
+          continue;
+        }
         return true;
       }
       matchContext.candidates.put(nextAlias,matches);
@@ -32,12 +35,8 @@
   }
   executionPlan.rootAlias=smallestAlias;
   Iterable<OIdentifiable> allCandidates=matchContext.candidates.get(smallestAlias);
-  for (  OIdentifiable id : allCandidates) {
-    MatchContext childContext=matchContext.copy(smallestAlias,id);
-    childContext.currentEdgeNumber=0;
-    if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
-      return false;
-    }
+  if (!processContextFromCandidates(pattern,executionPlan,matchContext,aliasClasses,aliasFilters,iCommandContext,request,allCandidates,smallestAlias,0)) {
+    return false;
   }
   return true;
 }

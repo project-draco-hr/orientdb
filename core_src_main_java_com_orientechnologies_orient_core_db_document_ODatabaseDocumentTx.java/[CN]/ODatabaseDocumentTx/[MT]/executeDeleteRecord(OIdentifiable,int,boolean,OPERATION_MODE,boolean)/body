@@ -1,7 +1,6 @@
 {
   checkOpeness();
   checkIfActive();
-  checkLowDiskSpaceAndFullCheckpointRequests();
   final ORecordId rid=(ORecordId)record.getIdentity();
   if (rid == null)   throw new ODatabaseException("Cannot delete record because it has no identity. Probably was created from scratch or contains projections of fields rather than a full record");
   if (!rid.isValid())   return;
@@ -16,7 +15,10 @@
     }
     try {
       ORecord rec=record.getRecord();
-      if (rec != null)       callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,rec);
+      if (rec != null) {
+        callbackHooks(ORecordHook.TYPE.BEFORE_DELETE,rec);
+        if (rec instanceof ODocument)         ORidBagDeleter.deleteAllRidBags((ODocument)rec);
+      }
       final OStorageOperationResult<Boolean> operationResult;
       try {
         if (prohibitTombstones) {
@@ -36,6 +38,9 @@
         callbackHooks(ORecordHook.TYPE.DELETE_FAILED,rec);
         throw t;
       }
+ finally {
+        callbackHooks(ORecordHook.TYPE.FINALIZE_DELETION,rec);
+      }
       clearDocumentTracking(rec);
       if (!operationResult.isMoved()) {
         getLocalCache().deleteRecord(rid);
@@ -49,7 +54,6 @@ catch (    Exception t) {
     }
   }
   finally {
-    callbackHooks(ORecordHook.TYPE.FINALIZE_DELETE,record);
     ORecordSerializationContext.pullContext();
     getMetadata().clearThreadLocalSchemaSnapshot();
   }

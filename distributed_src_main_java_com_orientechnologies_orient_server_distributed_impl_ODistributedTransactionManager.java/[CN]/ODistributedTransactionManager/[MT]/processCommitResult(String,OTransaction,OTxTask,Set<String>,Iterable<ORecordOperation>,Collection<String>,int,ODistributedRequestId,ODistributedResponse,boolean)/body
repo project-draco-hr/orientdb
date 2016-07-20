@@ -9,7 +9,8 @@
       if (task instanceof OCreateRecordTask) {
         final OCreateRecordTask t=(OCreateRecordTask)task;
         iTx.updateIdentityAfterCommit(t.getRid(),((OPlaceholder)o).getIdentity());
-        ORecordInternal.setVersion(iTx.getRecord(t.getRid()),((OPlaceholder)o).getVersion());
+        final ORecord rec=iTx.getRecord(t.getRid());
+        if (rec != null)         ORecordInternal.setVersion(rec,((OPlaceholder)o).getVersion());
       }
  else       if (task instanceof OUpdateRecordTask) {
         final OUpdateRecordTask t=(OUpdateRecordTask)task;
@@ -23,7 +24,7 @@
       if (record != null)       ORecordInternal.unsetDirty(record);
     }
     if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction %s completed",reqId);
-    sendTxCompleted(localNodeName,involvedClusters,nodes,reqId,true);
+    sendTxCompleted(localNodeName,involvedClusters,nodes,reqId,true,txTask.getPartitionKey());
   }
  else   if (result instanceof ODistributedRecordLockedException) {
     if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction %s error: record %s is locked",reqId,((ODistributedRecordLockedException)result).getRid());
@@ -31,15 +32,14 @@
     return false;
   }
  else   if (result instanceof Exception) {
-    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction %s error: %s",reqId,result,result.toString());
-    storage.executeUndoOnLocalServer(dResponse.getRequestId(),txTask);
+    if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction %s received error: %s",reqId,result,result.toString());
     if (result instanceof OTransactionException || result instanceof ONeedRetryException)     throw (RuntimeException)result;
     throw OException.wrapException(new OTransactionException("Error on committing distributed transaction"),(Exception)result);
   }
  else {
     if (ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.info(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction %s error, received unknown response type: %s",reqId,result);
     storage.executeUndoOnLocalServer(dResponse.getRequestId(),txTask);
-    sendTxCompleted(localNodeName,involvedClusters,nodes,dResponse.getRequestId(),false);
+    sendTxCompleted(localNodeName,involvedClusters,nodes,dResponse.getRequestId(),false,txTask.getPartitionKey());
     throw new OTransactionException("Error on committing distributed transaction, received unknown response type " + result);
   }
   return true;

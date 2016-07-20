@@ -3,6 +3,7 @@
   ODatabaseRecordThreadLocal.INSTANCE.set(database);
   final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
   final ODistributedTxContext reqContext=ddb.registerTxContext(requestId);
+  final ODistributedConfiguration dCfg=iManager.getDatabaseConfiguration(database.getName());
   database.begin();
   try {
     final OTransactionOptimistic tx=(OTransactionOptimistic)database.getTransaction();
@@ -10,14 +11,18 @@
     for (    OAbstractRecordReplicatedTask task : tasks) {
       if (task instanceof OCreateRecordTask) {
         final OCreateRecordTask createRT=(OCreateRecordTask)task;
+        final ORecordId rid=createRT.getRid();
+        if (rid != null && rid.isPersistent()) {
+          if (rid.getRecord() != null)           continue;
+        }
         final int clId=createRT.clusterId > -1 ? createRT.clusterId : createRT.getRid().isValid() ? createRT.getRid().getClusterId() : -1;
         final String clusterName=clId > -1 ? database.getClusterNameById(clId) : null;
-        tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
+        if (dCfg.isServerContainingCluster(iManager.getLocalNodeName(),clusterName))         tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
       }
     }
     for (    OAbstractRecordReplicatedTask task : tasks) {
       final Object taskResult;
-      if (!task.checkForClusterAvailability(iManager.getLocalNodeName(),iManager.getDatabaseConfiguration(database.getName())))       taskResult=NON_LOCAL_CLUSTER;
+      if (!task.checkForClusterAvailability(iManager.getLocalNodeName(),dCfg))       taskResult=NON_LOCAL_CLUSTER;
  else {
         task.setLockRecords(false);
         reqContext.lock(task.getRid());
@@ -42,25 +47,10 @@
     }
     return result;
   }
- catch (  ONeedRetryException e) {
+ catch (  Throwable e) {
     database.rollback();
-    return e;
-  }
-catch (  OTransactionException e) {
-    database.rollback();
-    return e;
-  }
-catch (  ORecordDuplicatedException e) {
-    database.rollback();
-    return e;
-  }
-catch (  ORecordNotFoundException e) {
-    database.rollback();
-    return e;
-  }
-catch (  Exception e) {
-    database.rollback();
-    ODistributedServerLog.info(this,getNodeSource(),null,DIRECTION.NONE,"Error on distributed transaction commit",e);
+    reqContext.unlock();
+    if (!(e instanceof ONeedRetryException || e instanceof OTransactionException || e instanceof ORecordDuplicatedException|| e instanceof ORecordNotFoundException))     ODistributedServerLog.info(this,getNodeSource(),null,DIRECTION.NONE,"Error on distributed transaction commit",e);
     return e;
   }
 }

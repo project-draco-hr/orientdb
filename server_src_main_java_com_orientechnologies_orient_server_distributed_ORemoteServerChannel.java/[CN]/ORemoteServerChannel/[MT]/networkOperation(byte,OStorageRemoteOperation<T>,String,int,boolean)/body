@@ -4,28 +4,33 @@
     try {
       channel.setWaitResponseTimeout();
       channel.beginRequest(operationId,sessionId,sessionToken);
-      return operation.execute();
+      T result=operation.execute();
+      totalConsecutiveErrors=0;
+      return result;
     }
  catch (    Exception e) {
       lastException=e;
+      handleNewError();
       close();
       if (!autoReconnect)       break;
+      if (!manager.isNodeAvailable(server))       break;
       ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Error on sending message to distributed node (%s) retrying (%d/%d)",lastException.toString(),retry,maxRetry);
-      try {
+      if (retry > 1)       try {
         Thread.sleep(100 * (retry * 2));
       }
  catch (      InterruptedException e1) {
         break;
       }
-      if (!manager.isNodeAvailable(server))       break;
       try {
         connect();
+        totalConsecutiveErrors=0;
       }
  catch (      IOException e1) {
         lastException=e1;
+        handleNewError();
         ODistributedServerLog.warn(this,manager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Error on reconnecting to distributed node (%s)",lastException.toString());
       }
     }
   }
-  throw OException.wrapException(new OStorageException(errorMessage),lastException);
+  throw OException.wrapException(new ODistributedException(errorMessage),lastException);
 }

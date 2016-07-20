@@ -1,0 +1,44 @@
+{
+  if (OScenarioThreadLocal.INSTANCE.isInDatabaseLock()) {
+    final ODistributedConfiguration lastCfg=getDatabaseConfiguration(databaseName);
+    return (T)iCallback.call(lastCfg);
+  }
+  boolean locked=false;
+  final Lock lock=getLock(databaseName + ".cfg");
+  if (timeoutLocking > 0) {
+    try {
+      if (lock.tryLock(timeoutLocking,TimeUnit.MILLISECONDS))       locked=true;
+ else       ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Timeout (%dms) on executing operation in distributed locks",timeoutLocking);
+    }
+ catch (    InterruptedException e) {
+    }
+  }
+ else {
+    lock.lock();
+    locked=true;
+  }
+  if (locked) {
+    try {
+      OScenarioThreadLocal.INSTANCE.setInDatabaseLock(true);
+      final ODistributedConfiguration lastCfg=getLastDatabaseConfiguration(databaseName);
+      final int cfgVersion=lastCfg.getVersion();
+      try {
+        return (T)iCallback.call(lastCfg);
+      }
+  finally {
+        if (lastCfg.getVersion() > cfgVersion)         updateCachedDatabaseConfiguration(databaseName,lastCfg.getDocument(),true,true);
+        OScenarioThreadLocal.INSTANCE.setInDatabaseLock(false);
+      }
+    }
+ catch (    RuntimeException e) {
+      throw e;
+    }
+catch (    Exception e) {
+      throw new RuntimeException(e);
+    }
+ finally {
+      lock.unlock();
+    }
+  }
+  throw new OLockException("Cannot lock distributed database resource after " + timeoutLocking + "ms");
+}

@@ -11,7 +11,26 @@
   if (currentEdge.out) {
     PatternEdge outEdge=currentEdge.edge;
     if (!matchContext.matchedEdges.containsKey(outEdge)) {
-      Object rightValues=outEdge.executeTraversal(matchContext,iCommandContext,matchContext.matched.get(outEdge.out.alias),0);
+      OIdentifiable startingPoint=matchContext.matched.get(outEdge.out.alias);
+      if (startingPoint == null) {
+        Iterable rightCandidates=matchContext.candidates.get(outEdge.out.alias);
+        if (rightCandidates != null) {
+          if (!processContextFromCandidates(pattern,executionPlan,matchContext,aliasClasses,aliasFilters,iCommandContext,request,rightCandidates,outEdge.out.alias,matchContext.currentEdgeNumber)) {
+            return false;
+          }
+        }
+        return true;
+      }
+      Object rightValues=outEdge.executeTraversal(matchContext,iCommandContext,startingPoint,0);
+      if (outEdge.in.isOptionalNode() && (isEmptyResult(rightValues) || !contains(rightValues,matchContext.matched.get(outEdge.in.alias)))) {
+        MatchContext childContext=matchContext.copy(outEdge.in.alias,null);
+        childContext.matched.put(outEdge.in.alias,null);
+        childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+        childContext.matchedEdges.put(outEdge,true);
+        if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+          return false;
+        }
+      }
       if (!(rightValues instanceof Iterable)) {
         rightValues=Collections.singleton(rightValues);
       }
@@ -62,6 +81,15 @@
       }
       if (!matchContext.matchedEdges.containsKey(inEdge)) {
         Object leftValues=inEdge.item.method.executeReverse(matchContext.matched.get(inEdge.in.alias),iCommandContext);
+        if (inEdge.out.isOptionalNode() && (isEmptyResult(leftValues) || !contains(leftValues,matchContext.matched.get(inEdge.out.alias)))) {
+          MatchContext childContext=matchContext.copy(inEdge.out.alias,null);
+          childContext.matched.put(inEdge.out.alias,null);
+          childContext.currentEdgeNumber=matchContext.currentEdgeNumber + 1;
+          childContext.matchedEdges.put(inEdge,true);
+          if (!processContext(pattern,executionPlan,childContext,aliasClasses,aliasFilters,iCommandContext,request)) {
+            return false;
+          }
+        }
         if (!(leftValues instanceof Iterable)) {
           leftValues=Collections.singleton(leftValues);
         }

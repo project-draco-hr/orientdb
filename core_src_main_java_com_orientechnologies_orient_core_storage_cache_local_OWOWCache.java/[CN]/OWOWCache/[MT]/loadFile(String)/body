@@ -1,0 +1,32 @@
+{
+  filesLock.acquireWriteLock();
+  try {
+    Integer fileId=nameIdMap.get(fileName);
+    OFileClassic fileClassic;
+    if (!(fileId == null || fileId < 0)) {
+      final long externalId=composeFileId(id,fileId);
+      fileClassic=files.get(externalId);
+      if (fileClassic != null)       return externalId;
+ else       throw new OStorageException("File with given name " + fileName + " only partially registered in storage");
+    }
+    fileClassic=createFileInstance(fileName);
+    if (!fileClassic.exists())     throw new OStorageException("File with name " + fileName + " does not exist in storage "+ storageLocal.getName());
+ else {
+      OLogManager.instance().debug(this,"File '" + fileName + "' is not registered in 'file name - id' map, but exists in file system. Registering it");
+      if (fileId == null) {
+        ++fileCounter;
+        fileId=fileCounter;
+      }
+ else       fileId=-fileId;
+      openFile(fileClassic);
+      final long externalId=composeFileId(id,fileId);
+      files.add(externalId,fileClassic);
+      nameIdMap.put(fileName,fileId);
+      writeNameIdEntry(new NameFileIdEntry(fileName,fileId),true);
+      return externalId;
+    }
+  }
+  finally {
+    filesLock.releaseWriteLock();
+  }
+}

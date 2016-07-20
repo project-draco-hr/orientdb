@@ -6,6 +6,18 @@
     new File(dbPath).mkdirs();
     final ODatabaseDocumentTx db=new ODatabaseDocumentTx("plocal:" + dbPath);
     final FileInputStream in=new FileInputStream(f){
+      @Override public int read() throws IOException {
+        while (true) {
+          final int read=super.read();
+          if (read > -1)           return read;
+          if (fCompleted.exists())           return 0;
+          try {
+            Thread.sleep(100);
+          }
+ catch (          InterruptedException e) {
+          }
+        }
+      }
       @Override public int read(      final byte[] b,      final int off,      final int len) throws IOException {
         while (true) {
           final int read=super.read(b,off,len);
@@ -34,7 +46,7 @@
 ;
     try {
       final ODistributedAbstractPlugin me=this;
-      executeInDistributedDatabaseLock(databaseName,new OCallable<Void,ODistributedConfiguration>(){
+      executeInDistributedDatabaseLock(databaseName,0,new OCallable<Void,ODistributedConfiguration>(){
         @Override public Void call(        final ODistributedConfiguration cfg){
           try {
             if (delta) {
@@ -68,7 +80,7 @@
   finally {
       in.close();
     }
-    ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Installed database '%s'",databaseName);
+    ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Installed database '%s' (LSN=%s)",databaseName,((OAbstractPaginatedStorage)db.getStorage().getUnderlying()).getLSN());
     return db;
   }
  catch (  IOException e) {

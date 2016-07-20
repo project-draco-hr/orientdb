@@ -1,0 +1,24 @@
+{
+  final OrientGraph graph=new OrientGraph("memory:default",false);
+  graph.setUseLightweightEdges(true);
+  graph.getRawGraph().declareIntent(new OIntentMassiveInsert());
+  final OrientVertexType c1=graph.createVertexType("C1");
+  c1.createProperty("p1",OType.INTEGER);
+  graph.createEdgeType("parent");
+  graph.begin();
+  final OrientVertex first=graph.addVertex("class:C1");
+  first.setProperty("p1",-1);
+  for (int i=0; i < 10; i++) {
+    final OrientVertex v=graph.addVertex("class:C1");
+    v.setProperty("p1",i);
+    first.addEdge("parent",v);
+    graph.command(new OSQLSynchQuery("SELECT from V where p1='" + i + "'")).execute();
+  }
+  graph.commit();
+  final Iterable<Edge> edges=first.getEdges(Direction.BOTH);
+  Iterator<Edge> ter=edges.iterator();
+  for (int i=0; i < 10; i++) {
+    assertTrue(ter.hasNext());
+    assertEquals(ter.next().getVertex(Direction.IN).getProperty("p1"),i);
+  }
+}

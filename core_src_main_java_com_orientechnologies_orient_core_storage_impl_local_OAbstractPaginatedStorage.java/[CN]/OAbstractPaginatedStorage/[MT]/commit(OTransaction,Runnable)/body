@@ -1,17 +1,17 @@
 {
   checkOpeness();
-  checkLowDiskSpaceAndFullCheckpointRequests();
+  checkLowDiskSpaceFullCheckpointRequestsAndBackgroundDataFlushExceptions();
   final ODatabaseDocumentInternal databaseRecord=(ODatabaseDocumentInternal)clientTx.getDatabase();
-  final Map<String,OIndexInternal<?>> indexesToCommit=getChangedIndexes(clientTx,databaseRecord.getMetadata().getIndexManager());
-  ((OMetadataInternal)databaseRecord.getMetadata()).makeThreadLocalSchemaSnapshot();
+  final OIndexManagerProxy indexManager=databaseRecord.getMetadata().getIndexManager();
+  final TreeMap<String,OTransactionIndexChanges> indexesToCommit=getSortedIndexEntries(clientTx);
+  final Map<ORecordOperation,Integer> clusterOverrides=new IdentityHashMap<ORecordOperation,Integer>();
+  databaseRecord.getMetadata().makeThreadLocalSchemaSnapshot();
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"%d Committing transaction %d on database '%s' (items=%d)...",Thread.currentThread().getId(),clientTx.getId(),databaseRecord.getName(),clientTx.getEntryCount());
   final Iterable<ORecordOperation> entries=(Iterable<ORecordOperation>)clientTx.getAllRecordEntries();
-  final TreeMap<Integer,OCluster> clusters=new TreeMap<Integer,OCluster>();
+  final TreeMap<Integer,OCluster> clustersToLock=new TreeMap<Integer,OCluster>();
   final Set<ORecordOperation> newRecords=new TreeSet<ORecordOperation>(new Comparator<ORecordOperation>(){
-    @Override public int compare(    ORecordOperation o1,    ORecordOperation o2){
-      long diff=(o1.getRecord().getIdentity().getClusterPosition() - o2.getRecord().getIdentity().getClusterPosition());
-      if (diff == 0)       return 0;
- else       if (diff < 0)       return -1;
- else       return 1;
+    @Override public int compare(    final ORecordOperation o1,    final ORecordOperation o2){
+      return o1.getRecord().getIdentity().compareTo(o2.getRecord().getIdentity());
     }
   }
 );
@@ -20,11 +20,24 @@
       final ORecord record=txEntry.getRecord();
       if (record instanceof ODocument)       ((ODocument)record).validate();
     }
-    if (txEntry.type == ORecordOperation.CREATED) {
-      newRecords.add(txEntry);
+    if (txEntry.type == ORecordOperation.UPDATED || txEntry.type == ORecordOperation.DELETED) {
+      final int clusterId=txEntry.getRecord().getIdentity().getClusterId();
+      clustersToLock.put(clusterId,getClusterById(clusterId));
     }
-    final int clusterId=txEntry.getRecord().getIdentity().getClusterId();
-    clusters.put(clusterId,getClusterById(clusterId));
+ else     if (txEntry.type == ORecordOperation.CREATED) {
+      newRecords.add(txEntry);
+      final ORecord record=txEntry.getRecord();
+      final ORID rid=record.getIdentity();
+      int clusterId=rid.getClusterId();
+      if (record.isDirty() && clusterId == ORID.CLUSTER_ID_INVALID && record instanceof ODocument) {
+        final OImmutableClass class_=ODocumentInternal.getImmutableSchemaClass(((ODocument)record));
+        if (class_ != null) {
+          clusterId=class_.getClusterForNewInstance((ODocument)record);
+          clusterOverrides.put(txEntry,clusterId);
+        }
+      }
+      clustersToLock.put(clusterId,getClusterById(clusterId));
+    }
   }
   final List<ORecordOperation> result=new ArrayList<ORecordOperation>();
   stateLock.acquireReadLock();
@@ -32,27 +45,26 @@
     try {
       try {
         checkOpeness();
-        if (writeAheadLog == null && clientTx.isUsingLog())         throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
         makeStorageDirty();
         startStorageTx(clientTx);
-        for (        OCluster cluster : clusters.values())         cluster.acquireAtomicExclusiveLock();
-        for (        OIndexInternal<?> index : getSortedIndexes(indexesToCommit))         index.acquireAtomicExclusiveLock();
+        lockIndexKeys(indexManager,indexesToCommit);
+        lockIndexes(indexesToCommit);
+        lockClusters(clustersToLock);
         Map<ORecordOperation,OPhysicalPosition> positions=new IdentityHashMap<ORecordOperation,OPhysicalPosition>();
         for (        ORecordOperation txEntry : newRecords) {
           ORecord rec=txEntry.getRecord();
           if (rec.isDirty()) {
             ORecordId rid=(ORecordId)rec.getIdentity().copy();
             ORecordId oldRID=rid.copy();
-            int clusterId=rid.clusterId;
-            if (rid.clusterId == ORID.CLUSTER_ID_INVALID && rec instanceof ODocument && ODocumentInternal.getImmutableSchemaClass(((ODocument)rec)) != null) {
-              final OClass schemaClass=ODocumentInternal.getImmutableSchemaClass(((ODocument)rec));
-              clusterId=schemaClass.getClusterForNewInstance((ODocument)rec);
-            }
+            final Integer clusterOverride=clusterOverrides.get(txEntry);
+            final int clusterId=clusterOverride == null ? rid.clusterId : clusterOverride;
             final OCluster cluster=getClusterById(clusterId);
             OPhysicalPosition ppos=cluster.allocatePosition(ORecordInternal.getRecordType(rec));
             positions.put(txEntry,ppos);
             rid.clusterId=cluster.getId();
-            if (rid.clusterPosition > -1 && rid.clusterPosition != ppos.clusterPosition)             throw new OTransactionException("New record allocated #" + rid.clusterId + ":"+ ppos.clusterPosition+ " but the expected was "+ rid);
+            if (rid.clusterPosition > -1 && rid.clusterPosition != ppos.clusterPosition) {
+              throw new OTransactionException("New record allocated #" + rid.clusterId + ":"+ ppos.clusterPosition+ " but the expected was "+ rid);
+            }
             rid.clusterPosition=ppos.clusterPosition;
             clientTx.updateIdentityAfterCommit(oldRID,rid);
           }
@@ -61,7 +73,7 @@
           commitEntry(txEntry,positions.get(txEntry));
           result.add(txEntry);
         }
-        commitIndexes(clientTx,indexesToCommit);
+        commitIndexes(indexesToCommit);
         endStorageTx();
         OTransactionAbstract.updateCacheFromEntries(clientTx,entries,true);
       }
@@ -72,15 +84,17 @@ catch (      RuntimeException e) {
         makeRollback(clientTx,e);
       }
  finally {
+        unlockIndexKeys(indexesToCommit);
         transaction.set(null);
       }
     }
   finally {
-      ((OMetadataInternal)databaseRecord.getMetadata()).clearThreadLocalSchemaSnapshot();
+      databaseRecord.getMetadata().clearThreadLocalSchemaSnapshot();
     }
   }
   finally {
     stateLock.releaseReadLock();
   }
+  if (OLogManager.instance().isDebugEnabled())   OLogManager.instance().debug(this,"%d Committed transaction %d on database '%s' (result=%s)",Thread.currentThread().getId(),clientTx.getId(),databaseRecord.getName(),result);
   return result;
 }

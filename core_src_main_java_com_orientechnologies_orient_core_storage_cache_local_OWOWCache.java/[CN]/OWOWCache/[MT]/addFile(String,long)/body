@@ -1,7 +1,6 @@
 {
   filesLock.acquireWriteLock();
   try {
-    initNameIdMapping();
     OFileClassic fileClassic;
     Integer existingFileId=nameIdMap.get(fileName);
     final int intId=extractFileId(fileId);
@@ -9,15 +8,20 @@
       if (existingFileId == intId)       throw new OStorageException("File with name '" + fileName + "'' already exists in storage '"+ storageLocal.getName()+ "'");
  else       throw new OStorageException("File with given name already exists but has different id " + existingFileId + " vs. proposed "+ fileId);
     }
-    fileClassic=files.get(intId);
-    if (fileClassic != null)     throw new OStorageException("File with given id exists but has different name " + fileClassic.getName() + " vs. proposed "+ fileName);
-    if (fileCounter < intId)     fileCounter=intId;
-    fileClassic=createFile(fileName);
-    files.put(intId,fileClassic);
+    fileId=composeFileId(id,intId);
+    fileClassic=files.get(fileId);
+    if (fileClassic != null) {
+      if (!fileClassic.getName().equals(fileName))       throw new OStorageException("File with given id exists but has different name " + fileClassic.getName() + " vs. proposed "+ fileName);
+    }
+ else {
+      if (fileCounter < intId)       fileCounter=intId;
+      fileClassic=createFileInstance(fileName);
+      createFile(fileClassic);
+      files.add(fileId,fileClassic);
+    }
     nameIdMap.put(fileName,intId);
     writeNameIdEntry(new NameFileIdEntry(fileName,intId),true);
-    addFile(fileClassic);
-    return composeFileId(id,intId);
+    return fileId;
   }
   finally {
     filesLock.releaseWriteLock();

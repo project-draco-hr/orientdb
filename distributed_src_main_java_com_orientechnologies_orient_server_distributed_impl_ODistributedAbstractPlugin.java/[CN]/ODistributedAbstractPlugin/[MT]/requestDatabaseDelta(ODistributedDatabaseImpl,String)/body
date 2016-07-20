@@ -21,14 +21,15 @@
     targetNodes.add(entry.getKey());
     ODistributedServerLog.info(this,nodeName,entry.getKey(),DIRECTION.OUT,"Requesting database delta sync for '%s' LSN=%s...",databaseName,entry.getValue());
     final Map<String,Object> results=(Map<String,Object>)sendRequest(databaseName,null,targetNodes,deployTask,getNextMessageIdCounter(),ODistributedRequest.EXECUTION_MODE.RESPONSE,null,null).getPayload();
-    ODistributedServerLog.info(this,nodeName,entry.getKey(),DIRECTION.IN,"Receiving delta sync for '%s'...",databaseName);
     ODistributedServerLog.debug(this,nodeName,selectedNodes.toString(),DIRECTION.OUT,"Database delta sync returned: %s",results);
     final String dbPath=serverInstance.getDatabaseDirectory() + databaseName;
     for (    Map.Entry<String,Object> r : results.entrySet()) {
       final Object value=r.getValue();
       if (value instanceof Boolean)       continue;
  else       if (value instanceof ODistributedDatabaseDeltaSyncException) {
-        ODistributedServerLog.error(this,nodeName,r.getKey(),DIRECTION.IN,"Error on installing database delta %s, requesting full database sync...",(ODistributedDatabaseDeltaSyncException)value,databaseName,dbPath);
+        final ODistributedDatabaseDeltaSyncException exc=(ODistributedDatabaseDeltaSyncException)value;
+        ODistributedServerLog.warn(this,nodeName,r.getKey(),DIRECTION.IN,"Error on installing database delta for '%s' (%s)",databaseName,exc.getMessage());
+        ODistributedServerLog.warn(this,nodeName,r.getKey(),DIRECTION.IN,"Requesting full database '%s' sync...",databaseName);
         throw (ODistributedDatabaseDeltaSyncException)value;
       }
  else       if (value instanceof Throwable) {

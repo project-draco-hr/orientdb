@@ -1,10 +1,18 @@
 {
-  acquireSharedLock();
+  final ODatabase database=getDatabase();
+  final boolean txIsActive=database.getTransaction().isActive();
+  if (!txIsActive)   keyLockManager.lockAllExclusive();
   try {
-    storage.clearIndex(indexId);
-    return this;
+    acquireSharedLock();
+    try {
+      storage.clearIndex(indexId);
+      return this;
+    }
+  finally {
+      releaseSharedLock();
+    }
   }
   finally {
-    releaseSharedLock();
+    if (!txIsActive)     keyLockManager.unlockAllExclusive();
   }
 }

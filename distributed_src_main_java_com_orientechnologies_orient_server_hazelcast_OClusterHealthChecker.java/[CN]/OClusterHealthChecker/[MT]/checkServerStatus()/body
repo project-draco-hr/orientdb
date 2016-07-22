@@ -1,0 +1,19 @@
+{
+  if (manager.getNodeStatus() != ODistributedServerManager.NODE_STATUS.ONLINE)   return;
+  for (  String dbName : manager.getMessageService().getDatabases()) {
+    final ODistributedServerManager.DB_STATUS localNodeStatus=manager.getDatabaseStatus(manager.getLocalNodeName(),dbName);
+    if (localNodeStatus != ODistributedServerManager.DB_STATUS.OFFLINE)     continue;
+    final List<String> servers=manager.getOnlineNodes(dbName);
+    servers.remove(manager.getLocalNodeName());
+    if (servers.isEmpty()) {
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"No server are ONLINE for database '%s'. Considering local copy of database as the good one. Setting status=ONLINE...",dbName);
+      manager.setDatabaseStatus(manager.getLocalNodeName(),dbName,ODistributedServerManager.DB_STATUS.ONLINE);
+    }
+ else {
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Trying to recover current server for database '%s'...",dbName);
+      final boolean result=manager.installDatabase(true,dbName,((ODistributedStorage)manager.getStorage(dbName)).getDistributedConfiguration().getDocument());
+      if (result)       ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Recover complete for database '%s'...",dbName);
+ else       ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Recover cannot be completed for database '%s'...",dbName);
+    }
+  }
+}

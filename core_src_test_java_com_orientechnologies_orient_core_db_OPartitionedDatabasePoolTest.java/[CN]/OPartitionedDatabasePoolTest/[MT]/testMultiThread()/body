@@ -1,0 +1,21 @@
+{
+  Runnable acquirer=new Runnable(){
+    @Override public void run(){
+      ODatabaseDocumentTx db=pool.acquire();
+      try {
+        assertThat(db.isActiveOnCurrentThread()).isTrue();
+        List<ODocument> res=db.query(new OSQLSynchQuery<ODocument>("SELECT * FROM OUser"));
+        assertThat(res).hasSize(3);
+      }
+  finally {
+        db.close();
+      }
+    }
+  }
+;
+  ExecutorService ex=Executors.newCachedThreadPool();
+  for (int i=0; i < 20; i++) {
+    ex.submit(acquirer);
+  }
+  ex.awaitTermination(1,TimeUnit.SECONDS);
+}

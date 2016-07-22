@@ -10,7 +10,7 @@
   }
   final int[] partitionKeys=task.getPartitionKey();
   ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Request %s on database '%s' partitionKeys=%s",request,databaseName,Arrays.toString(partitionKeys));
-  if (partitionKeys.length > 1 || partitionKeys[0] < 0) {
+  if (partitionKeys.length > 1 || partitionKeys[0] == -1) {
     final Set<Integer> involvedWorkerQueues;
     if (partitionKeys.length > 1)     involvedWorkerQueues=getInvolvedQueuesByPartitionKeys(partitionKeys);
  else     involvedWorkerQueues=ALL_QUEUES;
@@ -39,6 +39,17 @@
         workerThreads.get(queue).processRequest(req);
       }
     }
+  }
+ else   if (partitionKeys.length > 1 || partitionKeys[0] == -2) {
+    boolean found=false;
+    for (    ODistributedWorker q : workerThreads) {
+      if (q.localQueue.isEmpty()) {
+        q.processRequest(request);
+        found=true;
+        break;
+      }
+    }
+    if (!found)     workerThreads.get(0).processRequest(request);
   }
  else {
     processRequest(partitionKeys[0],request);

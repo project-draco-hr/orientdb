@@ -8,8 +8,13 @@
     while (pendingReqIterator.hasNext()) {
       final ODistributedTxContextImpl pReq=pendingReqIterator.next();
       if (pReq != null && pReq.getReqId().getNodeId() == iNodeId) {
-        tasks+=pReq.rollback(database);
-        rollbacks++;
+        try {
+          tasks+=pReq.rollback(database);
+          rollbacks++;
+        }
+ catch (        Throwable t) {
+          OLogManager.instance().error(this,"Error on rolling back transaction (req=%s)",pReq.getReqId());
+        }
         pReq.destroy();
         pendingReqIterator.remove();
       }
@@ -18,5 +23,5 @@
   finally {
     database.close();
   }
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: rolled back %d transactions (%d total operations) in database '%s' owned by server '%s'",rollbacks,tasks,databaseName,manager.getNodeNameById(iNodeId));
+  ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: rolled back %d transactions (%d total operations) in database '%s' owned by server '%s'",rollbacks,tasks,databaseName,manager.getNodeNameById(iNodeId));
 }

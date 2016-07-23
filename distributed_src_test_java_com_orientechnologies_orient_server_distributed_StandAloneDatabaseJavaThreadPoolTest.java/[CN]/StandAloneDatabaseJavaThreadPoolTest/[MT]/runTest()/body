@@ -1,0 +1,45 @@
+{
+  OrientBaseGraph orientGraph=new OrientGraphNoTx(getDBURL());
+  createVertexType(orientGraph,"Test");
+  createVertexType(orientGraph,"Test1");
+  orientGraph.shutdown();
+  OrientBaseGraph graph=getGraphFactory().getTx();
+  for (int i=1; i <= 1; i++) {
+    Vertex vertex=graph.addVertex("class:Test");
+    vertex.setProperty("prop1","v1-" + i);
+    vertex.setProperty("prop2","v2-1");
+    vertex.setProperty("prop3","v3-1");
+    graph.commit();
+    if ((i % 100) == 0) {
+      log("Created " + i + " nodes");
+    }
+  }
+  for (int i=1; i <= 200; i++) {
+    Vertex vertex=graph.addVertex("class:Test1");
+    vertex.setProperty("prop1","v1-" + i);
+    vertex.setProperty("prop2","v2-1");
+    vertex.setProperty("prop3","v3-1");
+    graph.commit();
+    if ((i % 10) == 0) {
+      System.out.print("." + i + ".");
+    }
+    if ((i % 100) == 0) {
+      System.out.println();
+    }
+  }
+  graph.shutdown();
+  List<Future<?>> ths=new ArrayList<Future<?>>();
+  for (int i=0; i < 10; i++) {
+    Future<?> future=getExecutorService().submit(startThread(i,getGraphFactory()));
+    ths.add(future);
+  }
+  for (  Future<?> th : ths) {
+    try {
+      th.get();
+    }
+ catch (    Exception ex) {
+      System.out.println("********** Future Exception " + ex);
+      ex.printStackTrace();
+    }
+  }
+}

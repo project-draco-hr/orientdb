@@ -1,11 +1,25 @@
 {
-  final String localNode=dManager.getLocalNodeName();
-  final ODistributedServerManager.DB_STATUS prevStatus=dManager.getDatabaseStatus(localNode,getName());
-  if (prevStatus == ODistributedServerManager.DB_STATUS.ONLINE)   dManager.setDatabaseStatus(localNode,getName(),ODistributedServerManager.DB_STATUS.BACKUP);
   try {
-    return wrapped.backup(out,options,callable,iListener,compressionLevel,bufferSize);
+    return (List<String>)executeOperationInLock(new OCallable<Object,Void>(){
+      @Override public Object call(      Void iArgument){
+        final String localNode=dManager.getLocalNodeName();
+        final ODistributedServerManager.DB_STATUS prevStatus=dManager.getDatabaseStatus(localNode,getName());
+        if (prevStatus == ODistributedServerManager.DB_STATUS.ONLINE)         dManager.setDatabaseStatus(localNode,getName(),ODistributedServerManager.DB_STATUS.BACKUP);
+        try {
+          return wrapped.backup(out,options,callable,iListener,compressionLevel,bufferSize);
+        }
+ catch (        IOException e) {
+          throw OException.wrapException(new OIOException("Error on executing backup"),e);
+        }
+ finally {
+          if (prevStatus == ODistributedServerManager.DB_STATUS.ONLINE)           dManager.setDatabaseStatus(localNode,getName(),ODistributedServerManager.DB_STATUS.ONLINE);
+        }
+      }
+    }
+);
   }
-  finally {
-    if (prevStatus == ODistributedServerManager.DB_STATUS.ONLINE)     dManager.setDatabaseStatus(localNode,getName(),ODistributedServerManager.DB_STATUS.ONLINE);
+ catch (  InterruptedException e) {
+    Thread.currentThread().interrupt();
+    throw OException.wrapException(new OIOException("Backup interrupted"),e);
   }
 }

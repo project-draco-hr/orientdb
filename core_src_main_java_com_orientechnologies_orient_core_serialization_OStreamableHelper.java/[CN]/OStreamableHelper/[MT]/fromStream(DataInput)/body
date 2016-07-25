@@ -1,0 +1,49 @@
+{
+  Object object=null;
+  final byte objectType=in.readByte();
+switch (objectType) {
+case NULL:
+    return null;
+case STREAMABLE:
+  final String payloadClassName=in.readUTF();
+try {
+  object=Class.forName(payloadClassName).newInstance();
+  ((OStreamable)object).fromStream(in);
+}
+ catch (Exception e) {
+  OException.wrapException(new OSerializationException("Cannot unmarshall object from distributed request"),e);
+}
+break;
+case SERIALIZABLE:
+final byte[] buffer=new byte[in.readInt()];
+in.readFully(buffer);
+final ByteArrayInputStream mem=new ByteArrayInputStream(buffer);
+final ObjectInputStream ois=new ObjectInputStream(mem);
+try {
+try {
+object=ois.readObject();
+}
+ catch (ClassNotFoundException e) {
+OException.wrapException(new OSerializationException("Cannot unmarshall object from distributed request"),e);
+}
+}
+  finally {
+ois.close();
+mem.close();
+}
+break;
+case STRING:
+return in.readUTF();
+case INTEGER:
+return in.readInt();
+case SHORT:
+return in.readShort();
+case LONG:
+return in.readLong();
+case BOOLEAN:
+return in.readBoolean();
+default :
+throw new OSerializationException("Object type not supported: " + objectType);
+}
+return object;
+}

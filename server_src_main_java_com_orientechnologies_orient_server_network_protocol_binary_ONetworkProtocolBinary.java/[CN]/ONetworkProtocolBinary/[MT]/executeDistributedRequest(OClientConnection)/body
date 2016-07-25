@@ -1,20 +1,9 @@
 {
   setDataCommandInfo(connection,"Distributed request");
   checkServerAccess("server.replication",connection);
-  final byte[] serializedReq=channel.readBytes();
   final ODistributedServerManager manager=server.getDistributedManager();
   final ODistributedRequest req=new ODistributedRequest(manager.getTaskFactory());
-  final ObjectInputStream in=new ObjectInputStream(new ByteArrayInputStream(serializedReq));
-  try {
-    req.readExternal(in);
-  }
- catch (  ClassNotFoundException e) {
-    throw new IOException("Error on unmarshalling of remote task",e);
-  }
- finally {
-    in.close();
-  }
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,manager.getLocalNodeName(),manager.getNodeNameById(req.getId().getNodeId()),ODistributedServerLog.DIRECTION.IN,"Received request %s (%d bytes)",req,serializedReq.length);
+  req.fromStream(channel.getDataInput());
   final String dbName=req.getDatabaseName();
   if (dbName != null) {
     final ODistributedDatabase ddb=manager.getMessageService().getDatabase(dbName);

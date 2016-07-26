@@ -21,7 +21,20 @@
   final AtomicReference<OLogSequenceNumber> endLSN=new AtomicReference<OLogSequenceNumber>();
   final AtomicReference<ODistributedDatabaseDeltaSyncException> exception=new AtomicReference<ODistributedDatabaseDeltaSyncException>();
   try {
-    endLSN.set(((OAbstractPaginatedStorage)storage).recordsChangedAfterLSN(startLSN,fileOutputStream,excludedClusterNames));
+    final AtomicLong counter=new AtomicLong(0);
+    endLSN.set(((OAbstractPaginatedStorage)storage).recordsChangedAfterLSN(startLSN,fileOutputStream,excludedClusterNames,new OCommandOutputListener(){
+      @Override public void onMessage(      final String iText){
+        if (iText.startsWith("read")) {
+          if (counter.incrementAndGet() % 100000 == 0) {
+            ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"- %s",iText);
+          }
+        }
+ else         if (counter.incrementAndGet() % 1000 == 0) {
+          ODistributedServerLog.info(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.OUT,"- %s",iText);
+        }
+      }
+    }
+));
     if (endLSN.get() == null) {
       exception.set(new ODistributedDatabaseDeltaSyncException(startLSN));
     }

@@ -1,5 +1,12 @@
 {
   if (requestId == null)   return;
-  final ODistributedRequestId owner=lockManager.remove(iRecord.getIdentity());
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s unlocked record %s in database '%s' (owner=%s)",requestId,iRecord,databaseName,owner);
+  final ODistributedLock owner=lockManager.remove(iRecord.getIdentity());
+  if (owner != null) {
+    if (!owner.reqId.equals(requestId)) {
+      ODistributedServerLog.error(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: cannot unlocked record %s in database '%s' because owner %s <> current %s (thread=%d)",iRecord,databaseName,owner.reqId,requestId,Thread.currentThread().getId());
+      return;
+    }
+    owner.lock.countDown();
+  }
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s unlocked record %s in database '%s' (owner=%s, thread=%d)",requestId,iRecord,databaseName,owner != null ? owner.reqId : "null",Thread.currentThread().getId());
 }

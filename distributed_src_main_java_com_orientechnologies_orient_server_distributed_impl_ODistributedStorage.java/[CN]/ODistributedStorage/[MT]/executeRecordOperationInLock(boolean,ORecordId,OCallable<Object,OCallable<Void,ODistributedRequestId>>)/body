@@ -1,17 +1,16 @@
 {
-  final AtomicBoolean acquiredClusterLock=new AtomicBoolean(false);
-  final AtomicBoolean acquiredRecordLock=new AtomicBoolean(false);
+  final ORecordId rid2Lock;
+  if (!rid.isPersistent())   rid2Lock=new ORecordId(rid.getClusterId(),-1l);
+ else   rid2Lock=rid;
   ODistributedRequestId requestId=null;
-  final int partition=rid.clusterId % clusterLocks.length;
-  messageManagementLock.readLock().lock();
+  final AtomicBoolean lockReleased=new AtomicBoolean(false);
   try {
-    clusterLocks[partition].acquire();
-    acquiredClusterLock.set(true);
-    requestId=acquireRecordLock(rid);
-    acquiredRecordLock.set(true);
+    requestId=acquireRecordLock(rid2Lock);
+    final ODistributedRequestId finalReqId=requestId;
     final OCallable<Void,ODistributedRequestId> unlockCallback=new OCallable<Void,ODistributedRequestId>(){
-      @Override public Void call(      final ODistributedRequestId req){
-        if (acquiredClusterLock.compareAndSet(true,false))         clusterLocks[partition].release();
+      @Override public Void call(      final ODistributedRequestId requestId){
+        releaseRecordLock(rid2Lock,finalReqId);
+        lockReleased.set(true);
         return null;
       }
     }
@@ -25,19 +24,7 @@
   }
   finally {
     if (iUnlockAtTheEnd) {
-      if (acquiredClusterLock.compareAndSet(true,false))       clusterLocks[partition].release();
-      if (acquiredRecordLock.compareAndSet(true,false)) {
-        localDistributedDatabase.unlockRecord(rid,requestId);
-        if (eventListener != null) {
-          try {
-            eventListener.onAfterRecordUnlock(rid);
-          }
- catch (          Throwable t) {
-            ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Caught exception during ODistributedStorageEventListener.onAfterRecordUnlock",t);
-          }
-        }
-      }
+      if (lockReleased.compareAndSet(false,true))       releaseRecordLock(rid2Lock,requestId);
     }
-    messageManagementLock.readLock().unlock();
   }
 }

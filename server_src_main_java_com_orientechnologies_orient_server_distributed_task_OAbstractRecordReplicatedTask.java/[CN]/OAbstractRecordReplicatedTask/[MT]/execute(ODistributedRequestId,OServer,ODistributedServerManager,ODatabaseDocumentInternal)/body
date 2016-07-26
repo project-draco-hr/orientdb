@@ -1,13 +1,14 @@
 {
   final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+  ORecordId rid2Lock=rid;
+  if (!rid.isPersistent())   rid2Lock=new ORecordId(rid.getClusterId(),-1l);
   if (lockRecords) {
-    final ODistributedRequestId lockHolder=ddb.lockRecord(rid,requestId);
-    if (lockHolder != null)     throw new ODistributedRecordLockedException(rid,lockHolder);
+    ddb.lockRecord(rid2Lock,requestId,OGlobalConfiguration.DISTRIBUTED_CRUD_TASK_SYNCH_TIMEOUT.getValueAsLong() / 2);
   }
   try {
     return executeRecordTask(requestId,iServer,iManager,database);
   }
   finally {
-    if (lockRecords)     ddb.unlockRecord(rid,requestId);
+    if (lockRecords)     ddb.unlockRecord(rid2Lock,requestId);
   }
 }

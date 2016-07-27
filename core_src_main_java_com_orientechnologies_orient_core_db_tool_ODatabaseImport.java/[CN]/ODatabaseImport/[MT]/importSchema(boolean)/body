@@ -1,4 +1,7 @@
 {
+  if (!clustersImported) {
+    removeDefaultClusters();
+  }
   listener.onMessage("\nImporting database schema...");
   jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
   @SuppressWarnings("unused") int schemaVersion=jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"version\"").readNumber(OJSONReader.ANY_NUMBER,true);
@@ -64,8 +67,16 @@
       if (cls != null) {
         if (cls.getDefaultClusterId() != classDefClusterId)         cls.setDefaultClusterId(classDefClusterId);
       }
- else       cls=(OClassImpl)database.getMetadata().getSchema().createClass(className,new int[]{classDefClusterId});
-      if (classClusterIds != null) {
+ else       if (clustersImported) {
+        cls=(OClassImpl)database.getMetadata().getSchema().createClass(className,new int[]{classDefClusterId});
+      }
+ else       if (className.equalsIgnoreCase("ORestricted")) {
+        cls=(OClassImpl)database.getMetadata().getSchema().createAbstractClass(className);
+      }
+ else {
+        cls=(OClassImpl)database.getMetadata().getSchema().createClass(className);
+      }
+      if (classClusterIds != null && clustersImported) {
         classClusterIds=classClusterIds.substring(1,classClusterIds.length() - 1);
         for (        int i : OStringSerializerHelper.splitIntArray(classClusterIds)) {
           if (i != -1)           cls.addClusterId(i);

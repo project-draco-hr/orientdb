@@ -22,10 +22,33 @@
       final CountDownLatch syncLatch=new CountDownLatch(involvedWorkerQueues.size());
       final ODistributedRequest syncRequest=new ODistributedRequest(manager.getTaskFactory(),request.getId().getNodeId(),-1,databaseName,new OSynchronizedTaskWrapper(syncLatch));
       for (      int queue : involvedWorkerQueues)       workerThreads.get(queue).processRequest(syncRequest);
+      long taskTimeout=request.getTask().getDistributedTimeout();
       try {
-        syncLatch.await();
+        if (taskTimeout <= 0)         syncLatch.await();
+ else {
+          final long start=System.currentTimeMillis();
+          final long cycleTimeout=Math.min(taskTimeout,2000);
+          boolean locked=false;
+          do {
+            if (syncLatch.await(cycleTimeout,TimeUnit.MILLISECONDS)) {
+              locked=true;
+              break;
+            }
+            if (this.workerThreads.size() == 0)             break;
+          }
+ while (System.currentTimeMillis() - start < taskTimeout);
+          if (!locked) {
+            final String msg=String.format("Cannot execute distributed request (%s) because all worker threads (%d) are busy",request,workerThreads.size());
+            ODistributedWorker.sendResponseBack(manager,request,new ODistributedOperationException(msg));
+            return;
+          }
+        }
       }
  catch (      InterruptedException e) {
+        Thread.currentThread().interrupt();
+        final String msg=String.format("Cannot execute distributed request (%s) because all worker threads (%d) are busy",request,workerThreads.size());
+        ODistributedWorker.sendResponseBack(manager,request,new ODistributedOperationException(msg));
+        return;
       }
       final CountDownLatch queueLatch=new CountDownLatch(1);
       int i=0;

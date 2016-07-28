@@ -2,20 +2,25 @@
   final ORID rid=iRecord.getIdentity();
   final ODistributedLock lock=new ODistributedLock(iRequestId);
   ODistributedLock currentLock=lockManager.putIfAbsent(rid,lock);
-  if (currentLock != null && timeout > 0) {
+  if (currentLock != null) {
     if (iRequestId.equals(currentLock.reqId)) {
       ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s locked record %s in database '%s' owned by %s (thread=%d)",iRequestId,iRecord,databaseName,currentLock.reqId,Thread.currentThread().getId());
       currentLock=null;
     }
- else {
-      try {
-        if (timeout > 0)         currentLock.lock.await(timeout,TimeUnit.MILLISECONDS);
- else         currentLock.lock.await();
-        currentLock=lockManager.putIfAbsent(rid,lock);
+ else     if (timeout > 0) {
+      final long startTime=System.currentTimeMillis();
+      do {
+        try {
+          if (timeout > 0)           currentLock.lock.await(timeout,TimeUnit.MILLISECONDS);
+ else           currentLock.lock.await();
+          currentLock=lockManager.putIfAbsent(rid,lock);
+        }
+ catch (        InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
       }
- catch (      InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+ while (currentLock != null && System.currentTimeMillis() - startTime < timeout);
     }
   }
   if (currentLock != null) {

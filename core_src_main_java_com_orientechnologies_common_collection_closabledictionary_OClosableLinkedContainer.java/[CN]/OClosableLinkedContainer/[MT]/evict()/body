@@ -1,10 +1,14 @@
 {
+  final long start=Orient.instance().getProfiler().startChrono();
+  final int initialSize=lruList.size();
+  int closedFiles=0;
   while (lruList.size() > openLimit) {
     Iterator<OClosableEntry<K,V>> iterator=lruList.iterator();
     boolean entryClosed=false;
     while (iterator.hasNext()) {
       OClosableEntry<K,V> entry=iterator.next();
       if (entry.makeClosed()) {
+        closedFiles++;
         iterator.remove();
         entryClosed=true;
         break;
@@ -12,4 +16,8 @@
     }
     if (!entryClosed)     break;
   }
+  if (closedFiles > 0) {
+    OLogManager.instance().debug(this,"Reached maximum of opened files %d (max=%d), closed %d files. Consider to raise this limit by increasing the global setting '%s' and the OS limit on opened files per processor",initialSize,openLimit,closedFiles,OGlobalConfiguration.OPEN_FILES_LIMIT.getKey());
+  }
+  Orient.instance().getProfiler().stopChrono("disk.closeFiles","Close the opened files because reached the configured limit",start);
 }

@@ -12,14 +12,21 @@
   table.setColumnHidden("#");
   if (members != null) {
     final List<String> orderedServers=new ArrayList<String>(members.size());
+    final Set<String> operations=new LinkedHashSet<String>();
     for (    ODocument fromMember : members) {
       if (fromMember != null) {
         String serverName=fromMember.field("name");
         orderedServers.add(serverName);
-        table.setColumnAlignment(serverName + (manager.getLocalNodeName().equals(serverName) ? "*" : ""),OTableFormatter.ALIGNMENT.RIGHT);
+        final ODocument messages=fromMember.field("messages");
+        if (messages != null) {
+          for (          String opName : messages.fieldNames()) {
+            operations.add(opName);
+          }
+        }
       }
     }
     Collections.sort(orderedServers);
+    final ODocument rowTotals=new ODocument();
     for (    String server : orderedServers) {
       ODocument member=null;
       for (      ODocument m : members) {
@@ -31,16 +38,33 @@
       if (member == null)       continue;
       final ODocument row=new ODocument();
       rows.add(row);
-      row.field("Servers",server + (manager.getLocalNodeName().equals(server) ? "*" : ""));
+      row.field("Servers",formatServerName(manager,server));
       final ODocument messages=member.field("messages");
       if (messages == null)       continue;
-      for (      String opName : messages.fieldNames()) {
+      long total=0;
+      for (      String opName : operations) {
         final Long counter=messages.field(opName);
+        if (counter == null) {
+          row.field(opName,"");
+          continue;
+        }
+        total+=counter;
         final String value=String.format("%,d",counter);
         row.field(opName,value);
+        sumTotal(rowTotals,opName,counter);
+        table.setColumnAlignment(opName,OTableFormatter.ALIGNMENT.RIGHT);
       }
+      row.field("TOTAL",String.format("%,d",total));
+      sumTotal(rowTotals,"TOTAL",total);
     }
+    table.setFooter(rowTotals);
+    rowTotals.field("Servers","TOTAL");
+    for (    String opName : operations) {
+      rowTotals.field(opName,String.format("%,d",rowTotals.field(opName)));
+    }
+    rowTotals.field("TOTAL",String.format("%,d",rowTotals.field("TOTAL")));
   }
+  table.setColumnAlignment("TOTAL",OTableFormatter.ALIGNMENT.RIGHT);
   table.writeRecords(rows,-1);
   buffer.append("\n");
   return buffer.toString();

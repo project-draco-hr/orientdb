@@ -1,11 +1,13 @@
 {
   final ORID rid=iRecord.getIdentity();
   final ODistributedLock lock=new ODistributedLock(iRequestId);
+  boolean newLock=true;
   ODistributedLock currentLock=lockManager.putIfAbsent(rid,lock);
   if (currentLock != null) {
     if (iRequestId.equals(currentLock.reqId)) {
       ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s locked record %s in database '%s' owned by %s (thread=%d)",iRequestId,iRecord,databaseName,currentLock.reqId,Thread.currentThread().getId());
       currentLock=null;
+      newLock=false;
     }
  else     if (timeout > 0) {
       final long startTime=System.currentTimeMillis();
@@ -38,4 +40,5 @@
     ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s cannot lock record %s in database '%s' owned by %s (thread=%d)",iRequestId,iRecord,databaseName,currentLock.reqId,Thread.currentThread().getId());
   }
   if (currentLock != null)   throw new ODistributedRecordLockedException(rid,currentLock.reqId,timeout);
+  return newLock;
 }

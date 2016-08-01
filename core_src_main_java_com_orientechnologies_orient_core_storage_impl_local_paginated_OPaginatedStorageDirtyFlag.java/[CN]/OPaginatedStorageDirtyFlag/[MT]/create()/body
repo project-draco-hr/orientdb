@@ -9,8 +9,16 @@
     final boolean fileCreated=dirtyFile.createNewFile();
     if (!fileCreated)     throw new IllegalStateException("Cannot create file : " + dirtyFilePath);
     dirtyFileData=new RandomAccessFile(dirtyFile,"rwd");
-    dirtyFileData.seek(0);
-    dirtyFileData.writeBoolean(true);
+    channel=dirtyFileData.getChannel();
+    if (OGlobalConfiguration.FILE_LOCK.getValueAsBoolean()) {
+      lockFile();
+    }
+    channel.position(0);
+    ByteBuffer buffer=ByteBuffer.allocate(1);
+    buffer.position(0);
+    buffer.put((byte)1);
+    buffer.position(0);
+    channel.write(buffer);
     dirtyFlag=true;
   }
   finally {

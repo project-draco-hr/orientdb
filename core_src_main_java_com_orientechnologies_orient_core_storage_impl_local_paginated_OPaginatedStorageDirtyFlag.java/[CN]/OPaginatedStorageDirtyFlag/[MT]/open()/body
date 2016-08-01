@@ -4,8 +4,16 @@
     dirtyFile=new File(dirtyFilePath);
     if (!dirtyFile.exists())     throw new IllegalStateException("File '" + dirtyFilePath + "' does not exist.");
     dirtyFileData=new RandomAccessFile(dirtyFile,"rwd");
-    dirtyFileData.seek(0);
-    dirtyFlag=dirtyFileData.readBoolean();
+    channel=dirtyFileData.getChannel();
+    if (OGlobalConfiguration.FILE_LOCK.getValueAsBoolean()) {
+      lockFile();
+    }
+    channel.position(0);
+    ByteBuffer buffer=ByteBuffer.allocate(1);
+    buffer.position(0);
+    channel.read(buffer);
+    buffer.position(0);
+    dirtyFlag=buffer.get() > 0;
   }
   finally {
     lock.unlock();

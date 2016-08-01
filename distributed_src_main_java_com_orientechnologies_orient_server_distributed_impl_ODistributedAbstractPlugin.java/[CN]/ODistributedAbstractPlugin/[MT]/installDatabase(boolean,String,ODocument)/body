@@ -1,5 +1,11 @@
 {
   final ODistributedConfiguration cfg=new ODistributedConfiguration(config);
+  final Collection<String> nodes=cfg.getServers(null,nodeName);
+  getAvailableNodes(nodes,databaseName);
+  if (nodes.size() == 0) {
+    ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Cannot install database '%s' on local node, because no servers are ONLINE",databaseName);
+    return false;
+  }
   ODistributedServerLog.info(this,nodeName,null,DIRECTION.NONE,"Current node started as %s for database '%s'",cfg.getServerRole(nodeName),databaseName);
   final Set<String> configuredDatabases=serverInstance.getAvailableStorageNames().keySet();
   if (!iStartup && configuredDatabases.contains(databaseName))   return false;
@@ -8,12 +14,12 @@
   updateCachedDatabaseConfiguration(databaseName,config,true,false);
   final ODistributedDatabaseImpl distrDatabase=messageService.registerDatabase(databaseName);
   final Boolean autoDeploy=config.field("autoDeploy");
-  if (autoDeploy == null || !autoDeploy) {
-    setDatabaseStatus(nodeName,databaseName,DB_STATUS.ONLINE);
-    return false;
-  }
   boolean databaseInstalled;
   if (!distrDatabase.exists() || distrDatabase.getSyncConfiguration().isEmpty()) {
+    if (autoDeploy == null || !autoDeploy) {
+      setDatabaseStatus(nodeName,databaseName,DB_STATUS.ONLINE);
+      return false;
+    }
     databaseInstalled=requestFullDatabase(distrDatabase,databaseName,iStartup);
   }
  else {
@@ -22,6 +28,10 @@
     }
  catch (    ODistributedDatabaseDeltaSyncException e) {
       removeStorage(databaseName);
+      if (autoDeploy == null || !autoDeploy) {
+        setDatabaseStatus(nodeName,databaseName,DB_STATUS.ONLINE);
+        return false;
+      }
       databaseInstalled=requestFullDatabase(distrDatabase,databaseName,iStartup);
     }
   }

@@ -4,19 +4,22 @@
     startTest();
     task=new TimerTask(){
       @Override public void run(){
-        if (serverDown.get() && !serverRestarted.get() && operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL * 2 / 3) {
+        final OServer server2=serverInstance.get(SERVERS - 1).getServerInstance();
+        if (server2 != null)         if (serverDown.get() && !serverRestarting.get() && !serverRestarted.get()&& !server2.isActive()&& operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL * 2 / 4) {
+          serverRestarting.set(true);
           banner("RESTARTING SERVER " + (SERVERS - 1) + "...");
           try {
             serverInstance.get(SERVERS - 1).startServer(getDistributedServerConfiguration(serverInstance.get(SERVERS - 1)));
             if (serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class) != null)             serverInstance.get(SERVERS - 1).server.getPluginByClass(OHazelcastPlugin.class).waitUntilNodeOnline();
+            sleep=0;
             serverRestarted.set(true);
           }
  catch (          Exception e) {
             e.printStackTrace();
           }
         }
- else         if (!serverDown.get() && operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL / 3) {
-          sleep=10;
+ else         if (!serverDown.get() && server2.isActive() && operations.get() >= TOTAL_CYCLES_PER_THREAD * CONCURRENCY_LEVEL * 1 / 4) {
+          sleep=30;
           banner("SIMULATE SOFT SHUTDOWN OF SERVER " + (SERVERS - 1));
           serverInstance.get(SERVERS - 1).shutdownServer();
           serverDown.set(true);

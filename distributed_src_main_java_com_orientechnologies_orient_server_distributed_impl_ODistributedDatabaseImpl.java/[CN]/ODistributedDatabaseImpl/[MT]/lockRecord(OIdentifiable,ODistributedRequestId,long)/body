@@ -1,11 +1,13 @@
 {
   final ORID rid=iRecord.getIdentity();
   final ODistributedLock lock=new ODistributedLock(iRequestId);
+  boolean newLock=true;
   ODistributedLock currentLock=lockManager.putIfAbsent(rid,lock);
   if (currentLock != null) {
     if (iRequestId.equals(currentLock.reqId)) {
       ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s locked record %s in database '%s' owned by %s (thread=%d)",iRequestId,iRecord,databaseName,currentLock.reqId,Thread.currentThread().getId());
       currentLock=null;
+      newLock=false;
     }
  else     if (timeout > 0) {
       final long startTime=System.currentTimeMillis();
@@ -26,7 +28,7 @@
   if (currentLock != null) {
     final String lockingNodeName=manager.getNodeNameById(currentLock.reqId.getNodeId());
     if (lockingNodeName == null || !manager.isNodeAvailable(lockingNodeName)) {
-      ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: forcing unlock of record %s in database '%s' because the owner server '%s' is offline (reqId=%s ownerReqId=%s, thread=%d)",iRecord.getIdentity(),databaseName,iRequestId,currentLock.reqId,Thread.currentThread().getId());
+      ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: forcing unlock of record %s in database '%s' because the owner server '%s' is offline (reqId=%s ownerReqId=%s, thread=%d)",iRecord.getIdentity(),databaseName,lockingNodeName,iRequestId,currentLock.reqId,Thread.currentThread().getId());
       lockManager.put(rid,lock);
       currentLock=null;
     }
@@ -37,5 +39,6 @@
  else {
     ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction: %s cannot lock record %s in database '%s' owned by %s (thread=%d)",iRequestId,iRecord,databaseName,currentLock.reqId,Thread.currentThread().getId());
   }
-  if (currentLock != null)   throw new ODistributedRecordLockedException(rid,currentLock.reqId);
+  if (currentLock != null)   throw new ODistributedRecordLockedException(rid,currentLock.reqId,timeout);
+  return newLock;
 }

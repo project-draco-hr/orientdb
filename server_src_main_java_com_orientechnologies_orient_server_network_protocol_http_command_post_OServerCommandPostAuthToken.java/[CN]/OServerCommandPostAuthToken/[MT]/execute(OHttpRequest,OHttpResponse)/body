@@ -4,6 +4,11 @@
   iRequest.databaseName=urlParts[1];
   iRequest.data.commandInfo="Generate authentication token";
   Map<String,String> content=iRequest.getUrlEncodedContent();
+  if (content == null) {
+    ODocument result=new ODocument().field("error","missing_auth_data");
+    sendError(iRequest,iResponse,result);
+    return false;
+  }
   String signedToken="";
   String grantType=content.get("grant_type").toLowerCase();
   String username=content.get("username");
@@ -15,7 +20,7 @@
     if (authenticatedRid == null) {
       sendAuthorizationRequest(iRequest,iResponse,iRequest.databaseName);
     }
- else {
+ else     if (tokenHandler != null) {
       ODatabaseDocument db=null;
       OSecurityUser user=null;
       try {
@@ -40,6 +45,10 @@ catch (      OLockException e) {
       }
       result=new ODocument().field("access_token",signedToken).field("expires_in",3600);
       iResponse.writeRecord(result,RESPONSE_FORMAT,null);
+    }
+ else {
+      result=new ODocument().field("error","unsupported_grant_type");
+      sendError(iRequest,iResponse,result);
     }
   }
  else {

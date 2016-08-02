@@ -1,18 +1,23 @@
 {
   String senderNodeName=null;
-  while (true) {
+  for (int retry=0; retry < 10; retry++) {
     senderNodeName=manager.getNodeNameById(iRequest.getId().getNodeId());
     if (senderNodeName != null)     break;
     try {
-      Thread.sleep(100);
+      Thread.sleep(200);
     }
  catch (    InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ODistributedException("Execution has been interrupted");
     }
   }
+  if (senderNodeName == null) {
+    ODistributedServerLog.warn(this,localNodeName,senderNodeName,DIRECTION.IN,"Sender server id %d is not registered in the cluster configuration, discard the request: (%s) (worker=%d)",iRequest.getId().getNodeId(),iRequest,id);
+    sendResponseBack(iRequest,new ODistributedException("Sender server id " + iRequest.getId().getNodeId() + " is not registered in the cluster configuration, discard the request"));
+    return;
+  }
   final ORemoteTask task=iRequest.getTask();
-  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,senderNodeName,DIRECTION.IN,"Received request: (%s) worker=%d",iRequest,id);
+  if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,localNodeName,senderNodeName,DIRECTION.IN,"Received request: (%s) (worker=%d)",iRequest,id);
   Object responsePayload;
   OSecurityUser origin=null;
   try {

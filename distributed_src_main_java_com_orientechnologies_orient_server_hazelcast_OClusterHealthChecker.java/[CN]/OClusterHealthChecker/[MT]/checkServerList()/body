@@ -1,0 +1,21 @@
+{
+  final Set<String> activeServers=manager.getActiveServers();
+  for (  String server : activeServers) {
+    int id=manager.getNodeIdByName(server);
+    if (id == -1) {
+      ODistributedServerLog.info(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Server '%s' was not found in the list of registered servers. Reloading configuration from cluster...",server);
+      ((OHazelcastPlugin)manager).reloadRegisteredNodes();
+      id=manager.getNodeIdByName(server);
+      if (id == -1) {
+        ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Server '%s' was not found in the list of registered servers after the update, setting the server as OFFLINE...",server);
+        try {
+          ((OHazelcastPlugin)manager).restartNode(server);
+        }
+ catch (        IOException e) {
+          ODistributedServerLog.warn(this,manager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error on restarting server '%s' (error=%s)",server,e);
+        }
+      }
+      break;
+    }
+  }
+}

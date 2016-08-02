@@ -1,0 +1,78 @@
+{
+  log("Creating data for database " + dbName);
+  checkAndCreateDatabase(dbName);
+  int totalClassCount=50;
+  int mainNodeDataCount=50;
+  OrientBaseGraph orientGraph=new OrientGraphNoTx(getDBURL());
+  createVertexTypeWithUniqueIndex(orientGraph,"Test","property1","property2");
+  for (int i=1; i <= totalClassCount; i++) {
+    createVertexType(orientGraph,"Test" + i,"property1","property2");
+  }
+  orientGraph.shutdown();
+  OrientBaseGraph graph=getGraphFactory().getTx();
+  boolean addTestData=true;
+  String query="select count(*) as dataCount from TestNode";
+  Iterable<Vertex> vtxs=graph.command(new OCommandSQL(query)).execute();
+  for (  Vertex vtx : vtxs) {
+    long count=vtx.getProperty("dataCount");
+    addTestData=(count == 0);
+  }
+  if (addTestData) {
+    for (int i=1; i <= mainNodeDataCount; i++) {
+      Vertex vertex=graph.addVertex("class:TestNode");
+      vertex.setProperty("property1","value1-" + i);
+      vertex.setProperty("property2","value2-" + i);
+      vertex.setProperty("property3","value3-" + i);
+      vertex.setProperty("property4","value4-" + i);
+      vertex.setProperty("prop-6","value6-" + i);
+      vertex.setProperty("prop-7","v7-1");
+      vertex.setProperty("prop-8","v7-1");
+      vertex.setProperty("prop-9","v7-1");
+      vertex.setProperty("prop-10","v7-1");
+      vertex.setProperty("prop11","v7-1");
+      vertex.setProperty("prop12","v7-1");
+      vertex.setProperty("prop13","v7-1");
+      vertex.setProperty("prop14","v7-1");
+      vertex.setProperty("prop15",System.currentTimeMillis());
+      graph.commit();
+      if ((i % 100) == 0) {
+        log("Created " + i + " nodes");
+      }
+    }
+  }
+  int edgeCounter=1;
+  for (int j=1; j <= totalClassCount; j++) {
+    String edgeName="Test" + j;
+    String className=edgeName + "Node";
+    for (int i=1; i <= 500; i++) {
+      Vertex vertex=graph.addVertex("class:" + className);
+      vertex.setProperty("property1","value1-" + i);
+      vertex.setProperty("property2","value2-" + i);
+      vertex.setProperty("property3","value3-" + i);
+      vertex.setProperty("property4","value4-1");
+      vertex.setProperty("prop-6","value6-" + i);
+      vertex.setProperty("prop-7","value7-" + i);
+      vertex.setProperty("prop-8","value7-1");
+      vertex.setProperty("prop-9","value7-1");
+      vertex.setProperty("prop-10","value7-1");
+      vertex.setProperty("prop11","value7-1");
+      vertex.setProperty("prop12","value7-1");
+      vertex.setProperty("prop13","value7-1");
+      vertex.setProperty("prop14",System.currentTimeMillis());
+      vertex.setProperty("prop15",System.currentTimeMillis());
+      graph.commit();
+      if ((i % 50) == 0) {
+        System.out.print(".[" + j + "]"+ i+ ".");
+      }
+      String edgeSQL="Create EDGE " + edgeName + " FROM (SELECT FROM TestNode WHERE property1='value1-"+ edgeCounter+ "') "+ "TO (SELECT FROM "+ className+ " WHERE property1='value1-"+ i+ "') ";
+      edgeCounter++;
+      if (edgeCounter > mainNodeDataCount) {
+        edgeCounter=1;
+      }
+      graph.command(new OCommandSQL(edgeSQL)).execute();
+    }
+    System.out.println();
+  }
+  graph.shutdown();
+  log("Done. Creating data for database " + dbName);
+}

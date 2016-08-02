@@ -1,0 +1,34 @@
+{
+  final Lock lock=getLock(CONFIG_REGISTEREDNODES);
+  lock.lock();
+  try {
+    final ODocument registeredNodesFromCluster=new ODocument();
+    final String registeredNodesFromClusterAsJson=(String)configurationMap.get(CONFIG_REGISTEREDNODES);
+    if (registeredNodesFromClusterAsJson != null) {
+      registeredNodesFromCluster.fromJSON(registeredNodesFromClusterAsJson);
+      registeredNodeById=registeredNodesFromCluster.field("ids",OType.EMBEDDEDLIST);
+      registeredNodeByName=registeredNodesFromCluster.field("names",OType.EMBEDDEDMAP);
+      if (registeredNodeByName.containsKey(nodeName)) {
+        nodeId=registeredNodeByName.get(nodeName);
+      }
+ else {
+        registeredNodeById.add(nodeName);
+        nodeId=registeredNodeById.size() - 1;
+        registeredNodeByName.put(nodeName,nodeId);
+      }
+    }
+ else {
+      nodeId=0;
+      registeredNodeById=new ArrayList<String>();
+      registeredNodeById.add(nodeName);
+      registeredNodesFromCluster.field("ids",registeredNodeById,OType.EMBEDDEDLIST);
+      registeredNodeByName=new HashMap<String,Integer>();
+      registeredNodeByName.put(nodeName,nodeId);
+      registeredNodesFromCluster.field("names",registeredNodeByName,OType.EMBEDDEDMAP);
+    }
+    configurationMap.put(CONFIG_REGISTEREDNODES,registeredNodesFromCluster.toJSON());
+  }
+  finally {
+    lock.unlock();
+  }
+}

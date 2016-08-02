@@ -3,9 +3,9 @@
   totalReceivedRequests.incrementAndGet();
   if (task instanceof OAbstractReplicatedTask) {
     final OLogSequenceNumber taskLastLSN=((OAbstractReplicatedTask)task).getLastLSN();
-    final OLogSequenceNumber lastLSN=getLastLSN(task.getNodeSource());
+    final OLogSequenceNumber lastLSN=getLastLSN(manager.getNodeNameById(request.getId().getNodeId()));
     if (taskLastLSN != null && lastLSN != null && taskLastLSN.compareTo(lastLSN) < 0) {
-      ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Skipped request %s on database '%s' because LSN %s < current LSN %s",request,databaseName,taskLastLSN,lastLSN);
+      ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Skipped request %s on database '%s' because LSN %s < current LSN %s",request,databaseName,taskLastLSN,lastLSN);
       return;
     }
   }
@@ -39,7 +39,7 @@
  while (System.currentTimeMillis() - start < taskTimeout);
           if (!locked) {
             final String msg=String.format("Cannot execute distributed request (%s) because all worker threads (%d) are busy",request,workerThreads.size());
-            ODistributedWorker.sendResponseBack(manager,request,new ODistributedOperationException(msg));
+            ODistributedWorker.sendResponseBack(this,manager,request,new ODistributedOperationException(msg));
             return;
           }
         }
@@ -47,7 +47,7 @@
  catch (      InterruptedException e) {
         Thread.currentThread().interrupt();
         final String msg=String.format("Cannot execute distributed request (%s) because all worker threads (%d) are busy",request,workerThreads.size());
-        ODistributedWorker.sendResponseBack(manager,request,new ODistributedOperationException(msg));
+        ODistributedWorker.sendResponseBack(this,manager,request,new ODistributedOperationException(msg));
         return;
       }
       final CountDownLatch queueLatch=new CountDownLatch(1);

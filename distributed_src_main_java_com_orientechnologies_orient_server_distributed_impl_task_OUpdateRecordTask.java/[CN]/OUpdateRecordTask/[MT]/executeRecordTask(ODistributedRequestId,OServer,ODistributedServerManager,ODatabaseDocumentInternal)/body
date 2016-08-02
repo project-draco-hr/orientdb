@@ -7,19 +7,24 @@
     if (record == null)     ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> Error on updating record %s",rid);
   }
  else {
-    final ORecord loadedRecord=previousRecord.copy();
-    final int loadedVersion=loadedRecord.getVersion();
-    if (loadedRecord instanceof ODocument) {
-      final ODocument newDocument=(ODocument)getRecord();
-      final ODocument loadedDocument=(ODocument)loadedRecord;
-      loadedDocument.merge(newDocument,false,false).getVersion();
-      ORecordInternal.setVersion(loadedDocument,version);
+    final int loadedVersion=previousRecord.getVersion();
+    if (loadedVersion == version + 1 && Arrays.equals(content,previousRecordContent)) {
+      record=previousRecord;
     }
- else     ORecordInternal.fill(loadedRecord,rid,version,content,true);
-    loadedRecord.setDirty();
-    record=database.save(loadedRecord);
-    if (record == null)     ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> Error on updating record %s",rid);
-    if (version < 0 && ODistributedServerLog.isDebugEnabled())     ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> Reverted %s from version %d to %d",rid,loadedVersion,record.getVersion());
+ else {
+      final ORecord loadedRecord=previousRecord.copy();
+      if (loadedRecord instanceof ODocument) {
+        final ODocument newDocument=(ODocument)getRecord();
+        final ODocument loadedDocument=(ODocument)loadedRecord;
+        loadedDocument.merge(newDocument,false,false).getVersion();
+        ORecordInternal.setVersion(loadedDocument,version);
+      }
+ else       ORecordInternal.fill(loadedRecord,rid,version,content,true);
+      loadedRecord.setDirty();
+      record=database.save(loadedRecord);
+      if (record == null)       ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> Error on updating record %s",rid);
+      if (version < 0 && ODistributedServerLog.isDebugEnabled())       ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> Reverted %s from version %d to %d",rid,loadedVersion,record.getVersion());
+    }
   }
   if (ODistributedServerLog.isDebugEnabled())   ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"+-> updated record %s/%s v.%d [%s]",database.getName(),rid.toString(),record.getVersion(),record);
   return record.getVersion();

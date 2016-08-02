@@ -1,0 +1,36 @@
+{
+  Orient.instance().scheduleTask(new TimerTask(){
+    @Override public void run(){
+      try {
+        final long now=System.currentTimeMillis();
+        final long timeout=OGlobalConfiguration.DISTRIBUTED_TX_EXPIRE_TIMEOUT.getValueAsLong();
+        ODatabaseDocumentTx database=null;
+        for (final Iterator<ODistributedTxContextImpl> it=activeTxContexts.values().iterator(); it.hasNext(); ) {
+          final ODistributedTxContextImpl ctx=it.next();
+          if (ctx != null) {
+            final long started=ctx.getStartedOn();
+            final long elapsed=now - started;
+            if (elapsed > timeout) {
+              if (database == null)               database=getDatabaseInstance();
+              ODistributedServerLog.debug(this,localNodeName,null,DIRECTION.NONE,"Distributed transaction %s on database '%s' is expired after %dms",ctx.getReqId(),databaseName,elapsed);
+              try {
+                ctx.rollback(database);
+                ctx.destroy();
+              }
+ catch (              Throwable t) {
+                ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Error on rolling back distributed transaction %s on database '%s'",ctx.getReqId(),databaseName);
+              }
+ finally {
+                it.remove();
+              }
+            }
+          }
+        }
+      }
+ catch (      Throwable t) {
+        ODistributedServerLog.info(this,localNodeName,null,DIRECTION.NONE,"Error on checking for expired distributed transaction on database '%s'",databaseName);
+      }
+    }
+  }
+,OGlobalConfiguration.DISTRIBUTED_TX_EXPIRE_TIMEOUT.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_TX_EXPIRE_TIMEOUT.getValueAsLong() / 2);
+}

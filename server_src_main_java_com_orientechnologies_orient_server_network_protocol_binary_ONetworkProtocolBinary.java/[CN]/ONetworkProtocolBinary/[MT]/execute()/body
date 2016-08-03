@@ -3,52 +3,14 @@
   if (isShutdownFlag())   return;
   clientTxId=0;
   okSent=false;
-  long timer=0;
-  OClientConnection connection=null;
-  try {
-    requestType=channel.readByte();
-    clientTxId=channel.readInt();
-    timer=Orient.instance().getProfiler().startChrono();
-    try {
-      connection=onBeforeRequest();
-    }
- catch (    Exception e) {
-      if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE) {
-        sendError(connection,clientTxId,e);
-        handleConnectionError(connection,e);
-        onAfterRequest(connection);
-        sendShutdown();
-      }
-      return;
-    }
-    OLogManager.instance().debug(this,"Request id:" + clientTxId + " type:"+ requestType);
-    try {
-      if (!executeRequest(connection)) {
-        OLogManager.instance().error(this,"Request not supported. Code: " + requestType);
-        channel.clearInput();
-        sendErrorOrDropConnection(connection,clientTxId,new ONetworkProtocolException("Request not supported. Code: " + requestType));
-      }
-    }
-  finally {
-      requests++;
-      onAfterRequest(connection);
-    }
+  requestType=channel.readByte();
+  clientTxId=channel.readInt();
+  OClientConnection connection=server.getClientConnectionManager().getConnection(clientTxId,this);
+  if (isHandshaking(requestType)) {
+    handshakeRequest(connection,requestType,clientTxId);
   }
- catch (  IOException e) {
-    OLogManager.instance().debug(this,"I/O Error on client clientId=%d reqType=%d",clientTxId,requestType,e);
-    sendShutdown();
+ else   if (isDistributed(requestType)) {
+    distributedRequest(connection,requestType,clientTxId);
   }
-catch (  OException e) {
-    sendErrorOrDropConnection(connection,clientTxId,e);
-  }
-catch (  RuntimeException e) {
-    sendErrorOrDropConnection(connection,clientTxId,e);
-  }
-catch (  Throwable t) {
-    sendErrorOrDropConnection(connection,clientTxId,t);
-  }
- finally {
-    Orient.instance().getProfiler().stopChrono("server.network.requests","Total received requests",timer,"server.network.requests");
-    OSerializationThreadLocal.INSTANCE.get().clear();
-  }
+ else   sessionRequest(connection,requestType,clientTxId);
 }

@@ -1,0 +1,29 @@
+{
+  long timer=0;
+  try {
+    timer=Orient.instance().getProfiler().startChrono();
+    connection=onBeforeOperationalRequest(connection,channel);
+    OLogManager.instance().debug(this,"Request id:" + clientTxId + " type:"+ requestType);
+    try {
+switch (requestType) {
+case OChannelBinaryProtocol.DISTRIBUTED_REQUEST:
+        executeDistributedRequest(connection);
+      break;
+case OChannelBinaryProtocol.DISTRIBUTED_RESPONSE:
+    executeDistributedResponse(connection);
+  break;
+}
+}
+  finally {
+requests++;
+afterOperationRequest(connection);
+}
+}
+ catch (Throwable t) {
+OLogManager.instance().warn(this,"I/O Error on distributed channel  clientId=%d reqType=%d",clientTxId,requestType,t);
+sendShutdown();
+}
+ finally {
+Orient.instance().getProfiler().stopChrono("server.network.requests","Total received requests",timer,"server.network.requests");
+}
+}

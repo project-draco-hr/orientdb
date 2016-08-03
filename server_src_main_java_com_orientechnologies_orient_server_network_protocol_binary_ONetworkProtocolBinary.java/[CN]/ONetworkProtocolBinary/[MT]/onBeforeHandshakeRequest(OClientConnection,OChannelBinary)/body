@@ -1,5 +1,4 @@
 {
-  OClientConnection connection=server.getClientConnectionManager().getConnection(clientTxId,this);
   try {
     boolean noToken=false;
     if (connection == null && clientTxId < 0 && (requestType == OChannelBinaryProtocol.REQUEST_DB_OPEN || requestType == OChannelBinaryProtocol.REQUEST_CONNECT)) {
@@ -42,16 +41,7 @@
         connection.acquire();
       }
       if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE) {
-        if (requests == 0) {
-          final ODistributedServerManager manager=server.getDistributedManager();
-          if (manager != null)           try {
-            manager.waitUntilNodeOnline(manager.getLocalNodeName(),connection.getToken().getDatabase());
-          }
- catch (          InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new OInterruptedException("Request interrupted");
-          }
-        }
+        waitDistribuedIsOnline(connection);
         connection.init(server);
       }
       if (connection.getData().serverUser) {
@@ -69,5 +59,17 @@ catch (  IOException e) {
     ODatabaseRecordThreadLocal.INSTANCE.remove();
     throw e;
   }
+  if (connection != null) {
+    connection.statsUpdate();
+  }
+ else {
+    ODatabaseRecordThreadLocal.INSTANCE.remove();
+    if (requestType != OChannelBinaryProtocol.REQUEST_DB_CLOSE && requestType != OChannelBinaryProtocol.REQUEST_SHUTDOWN) {
+      OLogManager.instance().debug(this,"Found unknown session %d, shutdown current connection",clientTxId);
+      shutdown();
+      throw new OIOException("Found unknown session " + clientTxId);
+    }
+  }
+  OServerPluginHelper.invokeHandlerCallbackOnBeforeClientRequest(server,connection,(byte)requestType);
   return connection;
 }

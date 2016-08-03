@@ -1,17 +1,20 @@
 {
   try {
+    if (connection == null && requestType == OChannelBinaryProtocol.REQUEST_DB_CLOSE)     return null;
     if (connection != null && !Boolean.TRUE.equals(connection.getTokenBased())) {
       connection.setTokenBytes(null);
       connection.acquire();
     }
  else {
-      tokenConnection=true;
+      if (!tokenConnection) {
+        throw new OIOException("Found unknown session " + clientTxId);
+      }
       byte[] bytes=channel.readBytes();
       if (connection == null && bytes != null && bytes.length > 0) {
         connection=server.getClientConnectionManager().connect(this);
       }
       if (connection == null) {
-        throw new OTokenSecurityException("missing session and token");
+        throw new OIOException("Found unknown session " + clientTxId);
       }
       connection.acquire();
       connection.validateSession(bytes,server.getTokenHandler(),this);

@@ -3,35 +3,5 @@
   for (  ORecordOperation op : iTx.getAllRecordEntries()) {
     recordsToLock.add((ORecordId)op.record.getIdentity());
   }
-  Collections.sort(recordsToLock);
-  ORecordId lastRecordCannotLock=null;
-  ODistributedRequestId lastLockHolder=null;
-  final long begin=System.currentTimeMillis();
-  for (int retry=1; retry <= maxAutoRetry; ++retry) {
-    lastRecordCannotLock=null;
-    lastLockHolder=null;
-    for (    ORecordId rid : recordsToLock) {
-      try {
-        reqContext.lock(rid);
-      }
- catch (      ODistributedRecordLockedException e) {
-        lastRecordCannotLock=rid;
-        lastLockHolder=e.getLockHolder();
-        reqContext.unlock();
-        if (autoRetryDelay > -1 && retry + 1 <= maxAutoRetry)         Thread.sleep(autoRetryDelay / 2 + new Random().nextInt(autoRetryDelay));
-        ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction: %s cannot lock records %s because owned by %s (retry %d/%d, thread=%d)",reqContext.getReqId(),recordsToLock,lastLockHolder,retry,maxAutoRetry,Thread.currentThread().getId());
-        break;
-      }
-    }
-    if (lastRecordCannotLock == null) {
-      if (eventListener != null)       for (      ORecordId rid : recordsToLock)       try {
-        eventListener.onAfterRecordLock(rid);
-      }
- catch (      Throwable t) {
-        ODistributedServerLog.error(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Caught exception during ODistributedStorageEventListener.onAfterRecordLock",t);
-      }
-      break;
-    }
-  }
-  if (lastRecordCannotLock != null)   throw new ODistributedRecordLockedException(lastRecordCannotLock,lastLockHolder,System.currentTimeMillis() - begin);
+  acquireMultipleRecordLocks(this,dManager,localDistributedDatabase,recordsToLock,maxAutoRetry,autoRetryDelay,eventListener,reqContext,-1);
 }

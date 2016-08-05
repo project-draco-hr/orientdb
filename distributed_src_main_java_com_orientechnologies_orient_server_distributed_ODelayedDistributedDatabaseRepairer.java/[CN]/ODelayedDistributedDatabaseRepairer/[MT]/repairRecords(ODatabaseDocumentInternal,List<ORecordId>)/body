@@ -1,0 +1,118 @@
+{
+  final ODistributedConfiguration dCfg=dManager.getDatabaseConfiguration(databaseName);
+  final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
+  final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
+  final ODistributedRequestId requestId=new ODistributedRequestId(dManager.getLocalNodeId(),dManager.getNextMessageIdCounter());
+  final ODistributedDatabase localDistributedDatabase=dManager.getMessageService().getDatabase(databaseName);
+  final ODistributedTxContext ctx=localDistributedDatabase.registerTxContext(requestId);
+  try {
+    ODistributedTransactionManager.acquireMultipleRecordLocks(this,dManager,localDistributedDatabase,rids,maxAutoRetry,autoRetryDelay,null,ctx,2000);
+    try {
+      final Set<String> clusterNames=new HashSet();
+      for (      ORecordId rid : rids)       clusterNames.add(db.getClusterNameById(rid.clusterId));
+      final Collection<String> involvedServers=dCfg.getServers(clusterNames);
+      final Set<String> nonLocalServers=new HashSet<String>(involvedServers);
+      nonLocalServers.remove(dManager.getLocalNodeName());
+      final OTxTaskResult localResult=new OTxTaskResult();
+      for (      ORecordId rid : rids) {
+        final OStorageOperationResult<ORawBuffer> res;
+        if (rid.clusterPosition > -1)         res=db.getStorage().readRecord(rid,null,true,null);
+ else         res=null;
+        if (res != null)         localResult.results.add(res.getResult());
+ else         localResult.results.add(null);
+      }
+      ODistributedServerLog.info(this,dManager.getLocalNodeName(),involvedServers.toString(),ODistributedServerLog.DIRECTION.OUT,"Auto repairing records %s on servers %s (reqId=%s)...",rids,involvedServers,requestId);
+      final ORepairRecordsTask tx=new ORepairRecordsTask();
+      for (      ORecordId rid : rids)       tx.add(new OReadRecordTask(rid));
+      ODistributedResponse response=dManager.sendRequest(databaseName,clusterNames,nonLocalServers,tx,requestId.getMessageId(),ODistributedRequest.EXECUTION_MODE.RESPONSE,localResult,null);
+      final Map<String,OCompletedTxTask> repairMap=new HashMap<String,OCompletedTxTask>(rids.size());
+      for (      String server : involvedServers) {
+        final OCompletedTxTask completedTask=new OCompletedTxTask(requestId,false,tx.getPartitionKey());
+        repairMap.put(server,completedTask);
+      }
+      try {
+        if (response != null) {
+          final Object payload=response.getPayload();
+          if (payload instanceof Map) {
+            final List<ODistributedConflictResolver> conflictResolvers=dManager.getConflictResolver();
+            final Map<String,Object> map=(Map<String,Object>)payload;
+            for (int i=0; i < localResult.results.size(); ++i) {
+              final Map<Object,List<String>> groupedResult=new HashMap<Object,List<String>>();
+              final ORecordId rid=rids.get(i);
+              for (              Map.Entry<String,Object> entry : map.entrySet()) {
+                if (entry.getValue() instanceof Throwable) {
+                  ODistributedServerLog.info(this,dManager.getLocalNodeName(),entry.getKey(),ODistributedServerLog.DIRECTION.IN,"Error on auto repairing record %s on servers %s (error=%s)",rid,entry.getKey(),entry.getValue());
+                  return false;
+                }
+                final OTxTaskResult v=(OTxTaskResult)entry.getValue();
+                final Object remoteValue=v.results.get(i);
+                List<String> group=groupedResult.get(remoteValue);
+                if (group == null) {
+                  group=new ArrayList<String>();
+                  groupedResult.put(remoteValue,group);
+                }
+                group.add(entry.getKey());
+              }
+              if (groupedResult.size() == 1)               continue;
+              ODocument config=null;
+              Object winner=null;
+              Map<Object,List<String>> candidates=groupedResult;
+              for (              ODistributedConflictResolver conflictResolver : conflictResolvers) {
+                final ODistributedConflictResolver.OConflictResult conflictResult=conflictResolver.onConflict(databaseName,db.getClusterNameById(rid.clusterId),rid,dManager,candidates,config);
+                winner=conflictResult.winner;
+                if (winner != null)                 break;
+                candidates=conflictResult.candidates;
+              }
+              if (winner == null)               continue;
+              for (              Map.Entry<Object,List<String>> entry : groupedResult.entrySet()) {
+                final Object value=entry.getKey();
+                final List<String> servers=entry.getValue();
+                for (                String server : servers) {
+                  ODistributedServerLog.info(this,dManager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Preparing fix for record %s on servers %s, value=%s...",rid,server,winner);
+                  if (!winner.equals(value)) {
+                    final OCompletedTxTask completedTask=repairMap.get(server);
+                    if (winner instanceof ORawBuffer && value instanceof ORawBuffer) {
+                      final ORawBuffer winnerRecord=(ORawBuffer)winner;
+                      completedTask.addFixTask(new OUpdateRecordTask(rid,winnerRecord.buffer,ORecordVersionHelper.setRollbackMode(winnerRecord.version),winnerRecord.recordType));
+                    }
+ else                     if (winner instanceof ORecordNotFoundException && value instanceof ORawBuffer) {
+                      completedTask.addFixTask(new ODeleteRecordTask(rid,-1));
+                    }
+ else                     if (value instanceof Throwable) {
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+  finally {
+        int repaired=0;
+        for (        Map.Entry<String,OCompletedTxTask> entry : repairMap.entrySet()) {
+          final String server=entry.getKey();
+          final OCompletedTxTask task=entry.getValue();
+          repaired+=task.getFixTasks().size();
+          if (dManager.getLocalNodeName().equals(server))           dManager.executeOnLocalNode(requestId,task,db);
+ else {
+            final List<String> servers=new ArrayList<String>();
+            servers.add(server);
+            dManager.getAvailableNodes(servers,databaseName);
+            if (!servers.isEmpty()) {
+              response=dManager.sendRequest(databaseName,clusterNames,servers,task,dManager.getNextMessageIdCounter(),ODistributedRequest.EXECUTION_MODE.RESPONSE,null,null);
+            }
+          }
+        }
+        if (repaired == 0)         ODistributedServerLog.info(this,dManager.getLocalNodeName(),involvedServers.toString(),ODistributedServerLog.DIRECTION.OUT,"Auto repairing completed. No fix is needed (reqId=%s)",repaired,requestId);
+ else         ODistributedServerLog.info(this,dManager.getLocalNodeName(),involvedServers.toString(),ODistributedServerLog.DIRECTION.OUT,"Auto repairing completed. Sent %d fix messages for %d records (reqId=%s)",repaired,rids.size(),requestId);
+      }
+    }
+  finally {
+      localDistributedDatabase.popTxContext(requestId);
+      ctx.destroy();
+    }
+  }
+ catch (  ODistributedRecordLockedException e) {
+  }
+  return true;
+}

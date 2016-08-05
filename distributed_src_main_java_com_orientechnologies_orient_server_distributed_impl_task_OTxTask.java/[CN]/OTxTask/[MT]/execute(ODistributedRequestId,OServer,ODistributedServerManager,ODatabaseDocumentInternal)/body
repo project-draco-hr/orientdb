@@ -1,13 +1,14 @@
 {
-  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Committing transaction against db=%s...",database.getName());
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Committing transaction db=%s (reqId=%s)...",database.getName(),requestId);
   ODatabaseRecordThreadLocal.INSTANCE.set(database);
   final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
   final ODistributedTxContext reqContext=ddb.registerTxContext(requestId);
   final ODistributedConfiguration dCfg=iManager.getDatabaseConfiguration(database.getName());
+  result=new OTxTaskResult();
+  if (tasks.size() == 0)   return result;
   database.begin();
   try {
     final OTransactionOptimistic tx=(OTransactionOptimistic)database.getTransaction();
-    result=new OTxTaskResult();
     for (    OAbstractRecordReplicatedTask task : tasks) {
       if (task instanceof OCreateRecordTask) {
         final OCreateRecordTask createRT=(OCreateRecordTask)task;
@@ -20,12 +21,15 @@
         if (dCfg.isServerContainingCluster(iManager.getLocalNodeName(),clusterName))         tx.addRecord(createRT.getRecord(),ORecordOperation.CREATED,clusterName);
       }
     }
+    final List<ORecordId> rids2Lock=new ArrayList<ORecordId>();
+    for (    OAbstractRecordReplicatedTask task : tasks)     rids2Lock.add(task.getRid());
+    Collections.sort(rids2Lock);
+    for (    ORecordId rid : rids2Lock)     reqContext.lock(rid);
     for (    OAbstractRecordReplicatedTask task : tasks) {
       final Object taskResult;
       if (!task.checkForClusterAvailability(iManager.getLocalNodeName(),dCfg))       taskResult=NON_LOCAL_CLUSTER;
  else {
         task.setLockRecords(false);
-        reqContext.lock(task.getRid());
         task.checkRecordExists();
         taskResult=task.execute(requestId,iServer,iManager,database);
         reqContext.addUndoTask(task.getUndoTask(requestId));
@@ -48,9 +52,13 @@
     return result;
   }
  catch (  Throwable e) {
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Rolling back transaction db=%s (reqId=%s error=%s)...",database.getName(),requestId,e);
     database.rollback();
     reqContext.unlock();
     if (!(e instanceof ONeedRetryException || e instanceof OTransactionException || e instanceof ORecordDuplicatedException|| e instanceof ORecordNotFoundException))     ODistributedServerLog.info(this,getNodeSource(),null,DIRECTION.NONE,"Error on distributed transaction commit",e);
     return e;
+  }
+ finally {
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),DIRECTION.IN,"Transaction completed db=%s (reqId=%s)...",database.getName(),requestId);
   }
 }

@@ -1,0 +1,64 @@
+{
+  OrientBaseGraph graph=localFactory0.getTx();
+  OrientVertex product;
+  try {
+    product=graph.addVertex("class:Product-Type");
+    product.setProperty("status","ok");
+  }
+  finally {
+    graph.shutdown();
+  }
+  banner("CORRUPT A RECORD IN SERVER 0");
+  graph=localFactory0.getNoTx();
+  try {
+    final OrientVertex product2=graph.getVertex(product.getIdentity());
+    product2.getRecord().field("status","corrupted0");
+    final Object result=updateRemoteRecord(0,product2.getRecord(),new String[]{serverInstance.get(0).getServerInstance().getDistributedManager().getLocalNodeName()});
+    Assert.assertFalse(result instanceof Throwable);
+  }
+  finally {
+    graph.shutdown();
+  }
+  banner("CORRUPT A RECORD IN SERVER 1 WITH THE HIGHEST VERSION (=WINNER)");
+  graph=localFactory1.getNoTx();
+  try {
+    final OrientVertex product2=graph.getVertex(product.getIdentity());
+    product2.getRecord().field("status","thisIsTheMostRecent");
+    ORecordInternal.setVersion(product2.getRecord(),ORecordVersionHelper.setRollbackMode(1000));
+    Object result=updateRemoteRecord(1,product2.getRecord(),new String[]{serverInstance.get(1).getServerInstance().getDistributedManager().getLocalNodeName()});
+    Assert.assertFalse(result instanceof Throwable);
+  }
+  finally {
+    graph.shutdown();
+  }
+  serverInstance.get(0).getServerInstance().getDistributedManager().getMessageService().getDatabase(getDatabaseName()).getDatabaseRapairer().repairRecord((ORecordId)product.getIdentity());
+  Thread.sleep(3000);
+  banner("EXPECTING AUTO RECOVER ON ALL NODES...");
+  graph=localFactory0.getNoTx();
+  try {
+    final OrientVertex product2=graph.getVertex(product.getIdentity());
+    Assert.assertEquals("thisIsTheMostRecent",product2.getProperty("status"));
+    Assert.assertEquals(1000,product2.getRecord().getVersion());
+  }
+  finally {
+    graph.shutdown();
+  }
+  graph=localFactory1.getNoTx();
+  try {
+    final OrientVertex product2=graph.getVertex(product.getIdentity());
+    Assert.assertEquals("thisIsTheMostRecent",product2.getProperty("status"));
+    Assert.assertEquals(1000,product2.getRecord().getVersion());
+  }
+  finally {
+    graph.shutdown();
+  }
+  graph=localFactory2.getNoTx();
+  try {
+    final OrientVertex product2=graph.getVertex(product.getIdentity());
+    Assert.assertEquals("thisIsTheMostRecent",product2.getProperty("status"));
+    Assert.assertEquals(1000,product2.getRecord().getVersion());
+  }
+  finally {
+    graph.shutdown();
+  }
+}

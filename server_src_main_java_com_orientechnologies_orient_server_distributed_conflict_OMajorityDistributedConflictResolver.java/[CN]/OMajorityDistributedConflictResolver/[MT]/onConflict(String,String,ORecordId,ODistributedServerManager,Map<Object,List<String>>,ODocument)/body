@@ -1,0 +1,37 @@
+{
+  final OConflictResult result=new OConflictResult();
+  final Object bestResult=getBestResult(candidates,null);
+  if (bestResult == null)   return result;
+  final ODistributedConfiguration dCfg=dManager.getDatabaseConfiguration(databaseName);
+  final int writeQuorum=dCfg.getWriteQuorum(clusterName,dManager.getAvailableNodes(databaseName),dManager.getLocalNodeName());
+  final int bestResultServerCount=candidates.get(bestResult).size();
+  if (bestResultServerCount >= writeQuorum) {
+    OLogManager.instance().info(this,"Majority Conflict Resolver decided the value '%s' is the winner for record %s, because is major than the configured writeQuorum (%d). Servers ok=%s",bestResult,rid,writeQuorum,candidates.get(result.winner));
+    result.winner=bestResult;
+  }
+ else {
+    final List<Object> exclude=new ArrayList<Object>();
+    exclude.add(bestResult);
+    final Object secondBestResult=getBestResult(candidates,exclude);
+    if (bestResultServerCount > candidates.get(secondBestResult).size()) {
+      OLogManager.instance().info(this,"Majority Conflict Resolver decided the value '%s' is the winner for the record %s because it is the majority even if under the configured writeQuorum (%d). Servers ok=%s",bestResult,rid,writeQuorum,candidates.get(result.winner));
+      result.winner=bestResult;
+    }
+ else {
+      OLogManager.instance().info(this,"Majority Conflict Resolver could not find a winner for the record %s: %s",rid,candidates);
+      result.candidates.put(bestResult,candidates.get(bestResult));
+      result.candidates.put(secondBestResult,candidates.get(secondBestResult));
+      exclude.add(secondBestResult);
+      Object lastBestResult=getBestResult(candidates,exclude);
+      int resultCount=candidates.get(secondBestResult).size();
+      while (lastBestResult != null && resultCount == bestResultServerCount && exclude.size() < candidates.size()) {
+        result.candidates.put(lastBestResult,candidates.get(lastBestResult));
+        exclude.add(lastBestResult);
+        lastBestResult=getBestResult(candidates,exclude);
+        if (lastBestResult == null)         break;
+        resultCount=candidates.get(lastBestResult).size();
+      }
+    }
+  }
+  return result;
+}

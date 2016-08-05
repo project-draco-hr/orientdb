@@ -3,8 +3,11 @@
   try {
     final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
     if (ppos == null)     return new OStorageOperationResult<Boolean>(false);
-    if (version > -1 && ppos.recordVersion != version)     if (OFastConcurrentModificationException.enabled())     throw OFastConcurrentModificationException.instance();
- else     throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
+    if (version > -1 && ppos.recordVersion != version) {
+      Orient.instance().getProfiler().updateCounter(PROFILER_CONFLICT_RECORD,"Number of conflicts during updating and deleting records",+1,"db.*.conflictRecord");
+      if (OFastConcurrentModificationException.enabled())       throw OFastConcurrentModificationException.instance();
+ else       throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
+    }
     makeStorageDirty();
     atomicOperationsManager.startAtomicOperation((String)null,true);
     try {

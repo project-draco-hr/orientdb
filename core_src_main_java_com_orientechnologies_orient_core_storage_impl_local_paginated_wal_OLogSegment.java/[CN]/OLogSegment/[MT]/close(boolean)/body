@@ -2,7 +2,25 @@
   if (!closed) {
     lastReadRecord.clear();
     stopFlush(flush);
-    rndFile.close();
+    if (!closer.isShutdown()) {
+      closer.shutdown();
+      try {
+        if (!closer.awaitTermination(OGlobalConfiguration.WAL_SHUTDOWN_TIMEOUT.getValueAsInteger(),TimeUnit.MILLISECONDS))         throw new OStorageException("WAL file auto close task '" + getPath() + "' cannot be stopped");
+      }
+ catch (      InterruptedException e) {
+        OLogManager.instance().error(this,"Shutdown of file auto close thread was interrupted");
+      }
+    }
+    fileLock.lock();
+    try {
+      if (rndFile != null) {
+        rndFile.close();
+        rndFile=null;
+      }
+    }
+  finally {
+      fileLock.unlock();
+    }
     closed=true;
   }
 }

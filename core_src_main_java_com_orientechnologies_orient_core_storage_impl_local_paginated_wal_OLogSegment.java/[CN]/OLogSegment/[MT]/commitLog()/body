@@ -18,12 +18,17 @@
     byte[] pageContent=new byte[OWALPage.PAGE_SIZE];
     OLogRecord first=toFlush.get(0);
     int curIndex=(int)(first.writeFrom / OWALPage.PAGE_SIZE);
-synchronized (rndFile) {
+    fileLock.lock();
+    try {
+      final RandomAccessFile rndFile=getRndFile();
       long pagesCount=rndFile.length() / OWALPage.PAGE_SIZE;
       if (pagesCount > curIndex) {
         rndFile.seek(curIndex * OWALPage.PAGE_SIZE);
         rndFile.readFully(pageContent);
       }
+    }
+  finally {
+      fileLock.unlock();
     }
     OLogSequenceNumber lsn=null;
     int pageIndex=0;
@@ -42,9 +47,14 @@ synchronized (rndFile) {
         written+=contentLength;
         pos=writeContentInPage(pageContent,pos,log.record,written == log.record.length,fromRecord,contentLength);
         if (OWALPage.PAGE_SIZE - pos < OWALPage.MIN_RECORD_SIZE) {
-synchronized (rndFile) {
+          fileLock.lock();
+          try {
+            final RandomAccessFile rndFile=getRndFile();
             rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
-            flushPage(pageContent);
+            flushPage(pageContent,rndFile);
+          }
+  finally {
+            fileLock.unlock();
           }
           if (pendingLSNToFlush != null) {
             this.writeAheadLog.setFlushedLsn(pendingLSNToFlush);
@@ -57,14 +67,24 @@ synchronized (rndFile) {
       }
     }
     if (lastToFlush) {
-synchronized (rndFile) {
+      fileLock.lock();
+      try {
+        RandomAccessFile rndFile=getRndFile();
         rndFile.seek(pageIndex * OWALPage.PAGE_SIZE);
-        flushPage(pageContent);
+        flushPage(pageContent,rndFile);
+      }
+  finally {
+        fileLock.unlock();
       }
     }
     if (OGlobalConfiguration.WAL_SYNC_ON_PAGE_FLUSH.getValueAsBoolean()) {
-synchronized (rndFile) {
+      fileLock.lock();
+      try {
+        final RandomAccessFile rndFile=getRndFile();
         rndFile.getFD().sync();
+      }
+  finally {
+        fileLock.unlock();
       }
     }
     this.writeAheadLog.setFlushedLsn(lsn);

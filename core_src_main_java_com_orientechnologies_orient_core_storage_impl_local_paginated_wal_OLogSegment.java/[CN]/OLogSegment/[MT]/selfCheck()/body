@@ -1,10 +1,15 @@
 {
   if (!logCache.isEmpty())   throw new IllegalStateException("WAL cache is not empty, we cannot verify WAL after it was started to be used");
-synchronized (rndFile) {
+  fileLock.lock();
+  try {
+    final RandomAccessFile rndFile=getRndFile();
     long pagesCount=rndFile.length() / OWALPage.PAGE_SIZE;
     if (rndFile.length() % OWALPage.PAGE_SIZE > 0) {
       OLogManager.instance().error(this,"Last WAL page was written partially, auto fix");
       rndFile.setLength(OWALPage.PAGE_SIZE * pagesCount);
     }
+  }
+  finally {
+    fileLock.unlock();
   }
 }

@@ -16,26 +16,20 @@
       currentTimeout=synchTimeout - elapsed;
       int synchronizingNodes=0;
       int missingActiveNodes=0;
-      synchronousResponsesLock.lock();
-      try {
-        for (Iterator<Map.Entry<String,Object>> iter=responses.entrySet().iterator(); iter.hasNext(); ) {
-          final Map.Entry<String,Object> curr=iter.next();
-          if (curr.getValue() == NO_RESPONSE) {
-            final ODistributedServerManager.DB_STATUS dbStatus=dManager.getDatabaseStatus(curr.getKey(),getDatabaseName());
+      for (Iterator<Map.Entry<String,Object>> iter=responses.entrySet().iterator(); iter.hasNext(); ) {
+        final Map.Entry<String,Object> curr=iter.next();
+        if (curr.getValue() == NO_RESPONSE) {
+          final ODistributedServerManager.DB_STATUS dbStatus=dManager.getDatabaseStatus(curr.getKey(),getDatabaseName());
 switch (dbStatus) {
 case SYNCHRONIZING:
-              synchronizingNodes++;
-            missingActiveNodes++;
-          break;
+            synchronizingNodes++;
+          missingActiveNodes++;
+        break;
 case ONLINE:
-        missingActiveNodes++;
-      break;
-  }
+      missingActiveNodes++;
+    break;
 }
 }
-}
-  finally {
-synchronousResponsesLock.unlock();
 }
 if (missingActiveNodes == 0) {
 ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"No more active nodes to wait for request (%s): anticipate timeout (saved %d ms)",request,currentTimeout);
@@ -48,8 +42,6 @@ ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,DIRECTION.NONE
 continue;
 }
  else if (synchronizingNodes > 0) {
-currentTimeout=synchTimeout;
-ODistributedServerLog.debug(this,dManager.getLocalNodeName(),null,DIRECTION.NONE,"%d nodes are in synchronization mode during request (%s): enlarge timeout +%dms, wait again for %dms",synchronizingNodes,request,synchTimeout,currentTimeout);
 }
 }
 return isMinimumQuorumReached() || receivedResponses >= totalExpectedResponses;

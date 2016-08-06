@@ -1,0 +1,81 @@
+{
+  Runnable th=new Runnable(){
+    @Override public void run(){
+      log("Starting runnable for vertex update thread for property value " + propertyValue);
+      long st=System.currentTimeMillis();
+      try {
+        String query="select from TestNode where property4='" + propertyValue + "'";
+        boolean isRunning=true;
+        for (int i=1; i < 100000000 && isRunning; i++) {
+          if ((i % 100) == 0) {
+            long et=System.currentTimeMillis();
+            log(" Total Records Processed: [" + i + "] Time taken for [100] records: ["+ (et - st) / 1000 + "] seconds");
+            st=System.currentTimeMillis();
+          }
+          OrientGraph graph=graphFactory.getTx();
+          try {
+            Iterable<Vertex> vtxs=graph.command(new OCommandSQL(query)).execute();
+            boolean retry=true;
+            for (            Vertex vtx : vtxs) {
+              if (retry) {
+                retry=true;
+                boolean isException=false;
+                Exception tex=null;
+                int k=1;
+                for (; k <= 100 && retry; k++) {
+                  OrientVertex vtx1=(OrientVertex)vtx;
+                  try {
+                    vtx1.setProperty("prop5","prop55");
+                    vtx1.setProperty("updateTime",new Date().toString());
+                    graph.commit();
+                    if (isException) {
+                    }
+                    retry=false;
+                    break;
+                  }
+ catch (                  Exception ex) {
+                    if (ex instanceof ODatabaseException || ex instanceof ONeedRetryException || ex instanceof ODistributedException) {
+                      tex=ex;
+                      if (ex instanceof ONeedRetryException || ex.getCause() instanceof ONeedRetryException) {
+                        try {
+                          Thread.sleep(new Random().nextInt(500));
+                        }
+ catch (                        InterruptedException e) {
+                          e.printStackTrace();
+                        }
+                        vtx1.reload();
+                      }
+ else {
+                        log("[" + id + "]["+ vtx+ "][ Retry: "+ k+ "] Failed to update. OrientDB Exception ["+ ex+ "]");
+                      }
+                      isException=true;
+                    }
+ else {
+                      tex=ex;
+                      log("[" + id + "]["+ k+ "] Failed to update non OrientDB Exception ["+ ex+ "] for vertex ["+ vtx1+ "]");
+                    }
+                  }
+                }
+                if (retry) {
+                  log("*******#################******* [" + id + "]["+ vtx+ "][ Retry: "+ k+ "] Failed to update after Exception ["+ ((tex != null) ? tex : "----")+ "]");
+                }
+              }
+            }
+          }
+  finally {
+            graph.shutdown();
+          }
+        }
+      }
+ catch (      Exception ex) {
+        System.out.println("ID: [" + id + "]********** Exception "+ ex+ " \n\n");
+        ex.printStackTrace();
+      }
+ finally {
+        log("[" + id + "] Done................>>>>>>>>>>>>>>>>>>");
+      }
+    }
+  }
+;
+  return th;
+}

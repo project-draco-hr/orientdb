@@ -1,0 +1,57 @@
+{
+  final OConflictResult result=new OConflictResult();
+  if (!candidates.isEmpty()) {
+    final Map<byte[],List<String>> candidatesGroupedByContent=new HashMap<byte[],List<String>>();
+    for (    Map.Entry<Object,List<String>> entry : candidates.entrySet()) {
+      final Object key=entry.getKey();
+      if (key instanceof ORawBuffer) {
+        final byte[] content=((ORawBuffer)key).buffer;
+        boolean matched=false;
+        for (        Map.Entry<byte[],List<String>> matchEntry : candidatesGroupedByContent.entrySet()) {
+          if (Arrays.equals(content,matchEntry.getKey())) {
+            matchEntry.getValue().addAll(entry.getValue());
+            matched=true;
+            break;
+          }
+        }
+        if (!matched) {
+          candidatesGroupedByContent.put(content,entry.getValue());
+        }
+      }
+    }
+    if (!candidatesGroupedByContent.isEmpty()) {
+      int maxServerList=-1;
+      for (      Map.Entry<byte[],List<String>> matchEntry : candidatesGroupedByContent.entrySet()) {
+        final List<String> servers=matchEntry.getValue();
+        if (servers.size() > maxServerList) {
+          maxServerList=servers.size();
+        }
+      }
+      final List<byte[]> winners=new ArrayList<byte[]>();
+      for (      Map.Entry<byte[],List<String>> matchEntry : candidatesGroupedByContent.entrySet()) {
+        final List<String> servers=matchEntry.getValue();
+        if (servers.size() == maxServerList)         winners.add(matchEntry.getKey());
+      }
+      if (winners.size() == 1) {
+        final byte[] winnerContent=winners.get(0);
+        int maxVersion=-1;
+        for (        Map.Entry<Object,List<String>> entry : candidates.entrySet()) {
+          final Object key=entry.getKey();
+          if (key instanceof ORawBuffer) {
+            final byte[] content=((ORawBuffer)key).buffer;
+            if (Arrays.equals(winnerContent,content) && ((ORawBuffer)key).version > maxVersion) {
+              maxVersion=((ORawBuffer)key).version;
+              result.winner=key;
+            }
+          }
+        }
+        OLogManager.instance().info(this,"Content Conflict Resolver decided the value '%s' is the winner for record %s, because the content is the majority. Assigning the highest version (%d)",result.winner,rid,maxVersion);
+      }
+ else {
+        result.candidates=candidates;
+        OLogManager.instance().info(this,"Content Conflict Resolver cannot decided the winner for record %s, because there is no majoriy in the content",rid);
+      }
+    }
+  }
+  return result;
+}

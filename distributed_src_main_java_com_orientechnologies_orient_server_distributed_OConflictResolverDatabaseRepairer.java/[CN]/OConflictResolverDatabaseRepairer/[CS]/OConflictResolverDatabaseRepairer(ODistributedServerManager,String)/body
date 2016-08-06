@@ -1,0 +1,27 @@
+{
+  this.dManager=manager;
+  this.databaseName=databaseName;
+  final String chain=OGlobalConfiguration.DISTRIBUTED_CONFLICT_RESOLVER_REPAIRER_CHAIN.getValueAsString();
+  final String[] items=chain.split(",");
+  for (  String item : items) {
+    final ODistributedConflictResolver cr=conflictResolverFactory.getImplementation(item);
+    if (cr == null)     throw new OConfigurationException("Cannot find '" + item + "' conflict resolver implementation. Available are: "+ conflictResolverFactory.getRegisteredImplementationNames());
+    conflictResolvers.add(cr);
+  }
+  checkTask=new TimerTask(){
+    @Override public void run(){
+      final long start=System.currentTimeMillis();
+      try {
+        check();
+      }
+ catch (      Throwable t) {
+        OLogManager.instance().error(this,"Error on repairing distributed database",t);
+      }
+ finally {
+        totalTimeProcessing.addAndGet(System.currentTimeMillis() - start);
+      }
+    }
+  }
+;
+  Orient.instance().scheduleTask(checkTask,OGlobalConfiguration.DISTRIBUTED_CONFLICT_RESOLVER_REPAIRER_CHECK_EVERY.getValueAsLong(),OGlobalConfiguration.DISTRIBUTED_CONFLICT_RESOLVER_REPAIRER_CHECK_EVERY.getValueAsLong());
+}

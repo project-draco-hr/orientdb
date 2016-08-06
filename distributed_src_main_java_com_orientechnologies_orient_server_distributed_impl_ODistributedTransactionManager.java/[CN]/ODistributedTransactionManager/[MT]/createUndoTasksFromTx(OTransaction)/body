@@ -15,7 +15,15 @@ OScenarioThreadLocal.executeAsDefault(new Callable<Object>(){
     final ODatabaseDocumentInternal db=ODatabaseRecordThreadLocal.INSTANCE.get();
     final ORecordOperation txEntry=db.getTransaction().getRecordEntry(rid);
     if (txEntry != null && txEntry.type == ORecordOperation.DELETED)     previousRecord.set(txEntry.getRecord());
- else     previousRecord.set(db.load(rid));
+ else {
+      final OStorageOperationResult<ORawBuffer> loadedBuffer=ODatabaseRecordThreadLocal.INSTANCE.get().getStorage().getUnderlying().readRecord(rid,null,true,null);
+      if (loadedBuffer != null) {
+        final ORecord loaded=Orient.instance().getRecordFactoryManager().newInstance(loadedBuffer.getResult().recordType);
+        ORecordInternal.fill(loaded,rid,loadedBuffer.getResult().version,loadedBuffer.getResult().getBuffer(),false);
+        previousRecord.set(loaded);
+      }
+ else       previousRecord.set(db.load(rid));
+    }
     return null;
   }
 }

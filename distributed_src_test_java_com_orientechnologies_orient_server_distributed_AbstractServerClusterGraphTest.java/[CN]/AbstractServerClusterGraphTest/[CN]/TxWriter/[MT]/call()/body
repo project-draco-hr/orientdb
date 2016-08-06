@@ -1,36 +1,59 @@
 {
   String name=Integer.toString(serverId);
-  for (int i=0; i < count; i++) {
-    final OrientGraph graph=factory.getTx();
-    try {
-      if ((i + 1) % 100 == 0)       System.out.println("\nWriter " + databaseUrl + " managed "+ (i + 1)+ "/"+ count+ " vertices so far");
+synchronized (lock) {
+    if (rootVertexId == null) {
+      OrientGraph graph=factory.getTx();
       try {
-        OrientVertex person=createVertex(graph,serverId,threadId,i);
-        updateVertex(graph,person);
-        checkVertex(graph,person);
-        graph.commit();
-        Assert.assertTrue(person.getIdentity().isPersistent());
+        OrientVertex root=createVertex(graph,serverId,threadId,0);
+        rootVertexId=root.getIdentity();
       }
- catch (      Exception e) {
-        graph.rollback();
-        throw e;
+  finally {
+        graph.shutdown();
+      }
+    }
+  }
+  int itemInTx=0;
+  final OrientGraph graph=factory.getTx();
+  try {
+    for (int i=1; i <= count; i++) {
+      if (i % 100 == 0)       System.out.println("\nWriter " + databaseUrl + " managed "+ i+ "/"+ count+ " vertices so far");
+      for (int retry=0; retry < 100; retry++) {
+        try {
+          OrientVertex person=createVertex(graph,serverId,threadId,i);
+          updateVertex(graph,person);
+          final OrientVertex root=graph.getVertex(rootVertexId);
+          root.addEdge("E",person);
+          if (i % 10 == 0 || i == count) {
+            graph.commit();
+            itemInTx=0;
+          }
+ else           itemInTx++;
+          break;
+        }
+ catch (        ONeedRetryException e) {
+          graph.rollback();
+          i-=itemInTx;
+          itemInTx=0;
+        }
+catch (        Exception e) {
+          graph.rollback();
+          throw e;
+        }
       }
       if (delayWriter > 0)       Thread.sleep(delayWriter);
     }
- catch (    InterruptedException e) {
-      System.out.println("Writer received interrupt (db=" + databaseUrl);
-      Thread.currentThread().interrupt();
-      break;
-    }
-catch (    Exception e) {
-      System.out.println("Writer received exception (db=" + databaseUrl);
-      e.printStackTrace();
-      break;
-    }
+  }
+ catch (  InterruptedException e) {
+    System.out.println("Writer received interrupt (db=" + databaseUrl);
+    Thread.currentThread().interrupt();
+  }
+catch (  Exception e) {
+    System.out.println("Writer received exception (db=" + databaseUrl);
+    e.printStackTrace();
+  }
  finally {
-      runningWriters.countDown();
-      graph.shutdown();
-    }
+    runningWriters.countDown();
+    graph.shutdown();
   }
   System.out.println("\nWriter " + name + " END");
   return null;

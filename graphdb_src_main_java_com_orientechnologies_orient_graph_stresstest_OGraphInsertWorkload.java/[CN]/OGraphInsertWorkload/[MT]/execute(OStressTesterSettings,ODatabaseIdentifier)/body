@@ -37,10 +37,6 @@
       }
  else       graphContext.lastVertexToConnect=v;
       resultVertices.current.incrementAndGet();
-      if (settings.operationsPerTransaction > 0 && context.currentIdx % settings.operationsPerTransaction == 0) {
-        graph.commit();
-        graph.begin();
-      }
       return null;
     }
   }
@@ -49,8 +45,14 @@
   try {
     OrientVertex lastVertex=null;
     for (    OBaseWorkLoadContext context : contexts) {
-      if (lastVertex != null)       lastVertex.addEdge("E",((OWorkLoadContext)context).lastVertexToConnect);
-      lastVertex=((OWorkLoadContext)context).lastVertexToConnect;
+      for (int retry=0; retry < 100; ++retry)       try {
+        if (lastVertex != null)         lastVertex.addEdge("E",((OWorkLoadContext)context).lastVertexToConnect);
+        lastVertex=((OWorkLoadContext)context).lastVertexToConnect;
+      }
+ catch (      ONeedRetryException e) {
+        lastVertex.reload();
+        ((OWorkLoadContext)context).lastVertexToConnect.reload();
+      }
     }
   }
   finally {

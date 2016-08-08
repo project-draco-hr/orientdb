@@ -5,35 +5,29 @@
     OLogSequenceNumber minLsn=findMinLsn(writeAheadLog.getFlushedLsn(),writeCachePages);
     if (minLsn == null)     return;
     OLogManager.instance().debug(this,"Start fuzzy checkpoint flushed LSN is %s",minLsn);
-    try {
-      writeAheadLog.logFuzzyCheckPointStart(minLsn);
-      for (      Integer intId : nameIdMap.values()) {
-        if (intId < 0)         continue;
-        final long fileId=composeFileId(id,intId);
-        final OClosableEntry<Long,OFileClassic> entry=files.acquire(fileId);
-        try {
-          final OFileClassic fileClassic=entry.get();
-          fileClassic.synch();
-        }
-  finally {
-          files.release(entry);
-        }
+    writeAheadLog.logFuzzyCheckPointStart(minLsn);
+    for (    Integer intId : nameIdMap.values()) {
+      if (intId < 0)       continue;
+      final long fileId=composeFileId(id,intId);
+      final OClosableEntry<Long,OFileClassic> entry=files.acquire(fileId);
+      try {
+        final OFileClassic fileClassic=entry.get();
+        fileClassic.synch();
       }
-      writeAheadLog.logFuzzyCheckPointEnd();
-      writeAheadLog.flush();
-      if (minLsn.compareTo(new OLogSequenceNumber(-1,-1)) > 0)       writeAheadLog.cutTill(minLsn);
+  finally {
+        files.release(entry);
+      }
     }
- catch (    IOException ioe) {
-      OLogManager.instance().error(this,"Error during fuzzy checkpoint",ioe);
-      fireBackgroundDataProcessingExceptionEvent(ioe);
-    }
-catch (    RuntimeException e) {
-      OLogManager.instance().error(this,"Error during fuzzy checkpoint",e);
-      fireBackgroundDataProcessingExceptionEvent(e);
-    }
+    writeAheadLog.logFuzzyCheckPointEnd();
+    writeAheadLog.flush();
+    if (minLsn.compareTo(new OLogSequenceNumber(-1,-1)) > 0)     writeAheadLog.cutTill(minLsn);
     OLogManager.instance().debug(this,"End fuzzy checkpoint");
   }
-  finally {
+ catch (  Throwable e) {
+    OLogManager.instance().error(this,"Error during fuzzy checkpoint",e);
+    fireBackgroundDataProcessingExceptionEvent(e);
+  }
+ finally {
     if (statistic != null)     statistic.stopFuzzyCheckpointTimer();
   }
 }

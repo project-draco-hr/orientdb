@@ -1,0 +1,86 @@
+{
+  Thread.sleep(2000);
+  OrientBaseGraph graph=localFactory0.getNoTx();
+  graph.createVertexType("Employee");
+  graph.shutdown();
+  final ODistributedConfiguration cfg=serverInstance.get(1).getServerInstance().getDistributedManager().getDatabaseConfiguration(getDatabaseName());
+  String localCluster=null;
+  final Set<String> owner=cfg.getClustersOwnedByServer(serverInstance.get(1).getServerInstance().getDistributedManager().getLocalNodeName());
+  for (  String s : owner) {
+    if (s.toLowerCase().startsWith("employee")) {
+      localCluster=s;
+      break;
+    }
+  }
+  graph=localFactory1.getTx();
+  OrientVertex employee;
+  try {
+    employee=graph.addVertex("Employee",localCluster);
+    employee.setProperty("status","ok");
+  }
+  finally {
+    graph.shutdown();
+  }
+  banner("CREATE 10 RECORDS ONLY ON local (1) SERVER and 0");
+  graph=localFactory1.getTx();
+  try {
+    for (int i=0; i < 10; ++i) {
+      OrientVertex v=graph.addVertex("Employee",localCluster);
+      v.setProperty("status","onlyServer0and1");
+      graph.getRawGraph().getStorage().getUnderlying().createRecord((ORecordId)v.getRecord().getIdentity(),v.getRecord().toStream(),v.getRecord().getVersion(),ODocument.RECORD_TYPE,0,null);
+      final ODistributedResponse result=createRemoteRecord(0,v.getRecord(),new String[]{serverInstance.get(0).getServerInstance().getDistributedManager().getLocalNodeName()});
+      Assert.assertFalse(result.getPayload() instanceof Throwable);
+    }
+  }
+  finally {
+    graph.rollback();
+  }
+  banner("CREATE 10 RECORDS ONLY ON SERVER 0");
+  graph=localFactory1.getTx();
+  try {
+    for (int i=0; i < 10; ++i) {
+      OrientVertex v=graph.addVertex("Employee",localCluster);
+      v.setProperty("status","onlyServer0and1");
+      graph.getRawGraph().getStorage().getUnderlying().createRecord((ORecordId)v.getRecord().getIdentity(),v.getRecord().toStream(),v.getRecord().getVersion(),ODocument.RECORD_TYPE,0,null);
+    }
+  }
+  finally {
+    graph.rollback();
+  }
+  graph=localFactory1.getTx();
+  try {
+    OrientVertex v=graph.addVertex("Employee",localCluster);
+    v.setProperty("status","check");
+    graph.commit();
+    Assert.fail();
+  }
+ catch (  ODistributedOperationException e) {
+    Assert.assertTrue(true);
+  }
+ finally {
+    graph.shutdown();
+  }
+  Thread.sleep(5000);
+  banner("CHECK RECORDS...");
+  graph=localFactory0.getNoTx();
+  try {
+    Assert.assertEquals(21,graph.countVertices("Employee"));
+  }
+  finally {
+    graph.shutdown();
+  }
+  graph=localFactory1.getNoTx();
+  try {
+    Assert.assertEquals(21,graph.countVertices("Employee"));
+  }
+  finally {
+    graph.shutdown();
+  }
+  graph=localFactory2.getNoTx();
+  try {
+    Assert.assertEquals(21,graph.countVertices("Employee"));
+  }
+  finally {
+    graph.shutdown();
+  }
+}

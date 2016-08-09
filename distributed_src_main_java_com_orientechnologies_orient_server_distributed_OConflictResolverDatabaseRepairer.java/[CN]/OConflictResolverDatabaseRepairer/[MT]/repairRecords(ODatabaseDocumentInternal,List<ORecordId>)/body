@@ -25,9 +25,9 @@
       final ORepairRecordsTask tx=new ORepairRecordsTask();
       for (      ORecordId rid : rids)       tx.add(new OReadRecordTask(rid));
       ODistributedResponse response=dManager.sendRequest(databaseName,clusterNames,nonLocalServers,tx,requestId.getMessageId(),ODistributedRequest.EXECUTION_MODE.RESPONSE,localResult,null);
-      final Map<String,OCompletedTxTask> repairMap=new HashMap<String,OCompletedTxTask>(rids.size());
+      final Map<String,OCompleted2pcTask> repairMap=new HashMap<String,OCompleted2pcTask>(rids.size());
       for (      String server : involvedServers) {
-        final OCompletedTxTask completedTask=new OCompletedTxTask(requestId,false,tx.getPartitionKey());
+        final OCompleted2pcTask completedTask=new OCompleted2pcTask(requestId,false,tx.getPartitionKey());
         repairMap.put(server,completedTask);
       }
       try {
@@ -69,7 +69,7 @@
                 for (                String server : servers) {
                   ODistributedServerLog.info(this,dManager.getLocalNodeName(),server,ODistributedServerLog.DIRECTION.OUT,"Preparing fix for record %s on servers %s, value=%s...",rid,server,winner);
                   if (!winner.equals(value)) {
-                    final OCompletedTxTask completedTask=repairMap.get(server);
+                    final OCompleted2pcTask completedTask=repairMap.get(server);
                     if (winner instanceof ORawBuffer && value instanceof ORawBuffer) {
                       final ORawBuffer winnerRecord=(ORawBuffer)winner;
                       completedTask.addFixTask(new OUpdateRecordTask(rid,winnerRecord.buffer,ORecordVersionHelper.setRollbackMode(winnerRecord.version),winnerRecord.recordType));
@@ -88,9 +88,9 @@
       }
   finally {
         int repaired=0;
-        for (        Map.Entry<String,OCompletedTxTask> entry : repairMap.entrySet()) {
+        for (        Map.Entry<String,OCompleted2pcTask> entry : repairMap.entrySet()) {
           final String server=entry.getKey();
-          final OCompletedTxTask task=entry.getValue();
+          final OCompleted2pcTask task=entry.getValue();
           repaired+=task.getFixTasks().size();
           if (dManager.getLocalNodeName().equals(server))           dManager.executeOnLocalNode(requestId,task,db);
  else {

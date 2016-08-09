@@ -1,0 +1,31 @@
+{
+  final String clusterName=database.getClusterNameById(clusterId);
+  ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.IN,"Repairing cluster '%s' db=%s (reqId=%s)...",clusterName,database.getName(),requestId);
+  ODatabaseRecordThreadLocal.INSTANCE.set(database);
+  final ODistributedDatabase ddb=iManager.getMessageService().getDatabase(database.getName());
+  final ODistributedTxContext reqContext=ddb.registerTxContext(requestId);
+  try {
+    final ODistributedConfiguration dCfg=iManager.getDatabaseConfiguration(database.getName());
+    reqContext.lock(new ORecordId(clusterId,-1));
+    for (    OAbstractRecordReplicatedTask task : tasks) {
+      final Object taskResult;
+      if (!task.checkForClusterAvailability(iManager.getLocalNodeName(),dCfg))       taskResult=NON_LOCAL_CLUSTER;
+ else {
+        task.setLockRecords(false);
+        task.checkRecordExists();
+        taskResult=task.execute(requestId,iServer,iManager,database);
+        reqContext.addUndoTask(task.getUndoTask(requestId));
+      }
+      result.results.add(taskResult);
+    }
+    return null;
+  }
+ catch (  Throwable e) {
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.IN,"Rolling back transaction db=%s (reqId=%s error=%s)...",database.getName(),requestId,e);
+    reqContext.unlock();
+    return e;
+  }
+ finally {
+    ODistributedServerLog.debug(this,iManager.getLocalNodeName(),getNodeSource(),ODistributedServerLog.DIRECTION.IN,"Transaction completed db=%s (reqId=%s)...",database.getName(),requestId);
+  }
+}

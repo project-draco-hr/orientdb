@@ -51,7 +51,7 @@
             ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction succeeded. Tasks: %s",txTask.getTasks());
             return null;
           }
-          ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d). Task: %s - Payload: %s - Tasks: %s",maxAutoRetry,txTask,txTask.getPayload(),txTask.getTasks());
+          ODistributedServerLog.debug(this,localNodeName,null,ODistributedServerLog.DIRECTION.NONE,"Distributed transaction retries exceed maximum auto-retries (%d). Task: %s - Tasks: %s",maxAutoRetry,txTask,txTask.getTasks());
           storage.executeUndoOnLocalServer(requestId,txTask);
           sendTxCompleted(localNodeName,involvedClusters,nodes,lastResult.getRequestId(),false,txTask.getPartitionKey());
           throw (ODistributedRecordLockedException)lastResult.getPayload();
@@ -102,14 +102,17 @@ catch (    Exception e) {
  catch (  OValidationException e) {
     throw e;
   }
+catch (  OConcurrentCreateException e) {
+    localDistributedDatabase.getDatabaseRapairer().repairCluster(e.getActualRid().getClusterId());
+    throw e;
+  }
 catch (  Exception e) {
     for (    ORecordOperation op : iTx.getAllRecordEntries()) {
-      localDistributedDatabase.getDatabaseRapairer().repairRecord((ORecordId)op.getRecord().getIdentity());
       if (iTx.hasRecordCreation()) {
         final ORecordId lockEntireCluster=(ORecordId)op.getRecord().getIdentity().copy();
-        lockEntireCluster.clusterPosition=-1;
-        localDistributedDatabase.getDatabaseRapairer().repairRecord(lockEntireCluster);
+        localDistributedDatabase.getDatabaseRapairer().repairCluster(lockEntireCluster.clusterId);
       }
+      localDistributedDatabase.getDatabaseRapairer().repairRecord((ORecordId)op.getRecord().getIdentity());
     }
     storage.handleDistributedException("Cannot route TX operation against distributed node",e);
   }

@@ -1,0 +1,39 @@
+{
+  final OStorage storage=db.getStorage().getUnderlying();
+  final long[] localClusterRange=storage.getClusterDataRange(clusterId);
+  final long localEnd=localClusterRange[1];
+  final int batchMax=OGlobalConfiguration.DISTRIBUTED_CONFLICT_RESOLVER_REPAIRER_BATCH.getValueAsInteger();
+  int recordRepaired=0;
+  for (  Map.Entry<String,Object> entry : repairInfoResult.entrySet()) {
+    final String server=entry.getKey();
+    final ODistributedServerManager.DB_STATUS status=dManager.getDatabaseStatus(server,databaseName);
+    if (status != ODistributedServerManager.DB_STATUS.ONLINE) {
+      ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Cannot align missing records of cluster '%s' on server %s, because is not ONLINE (status=%s)",clusterNames.get(0),server,status);
+      return 0;
+    }
+    final Object result=entry.getValue();
+    if (result instanceof Long) {
+      final long remoteEnd=(Long)result;
+      OTxTask task=new OTxTask();
+      for (long pos=remoteEnd + 1; pos <= localEnd; ++pos) {
+        final ORecordId rid=new ORecordId(clusterId,pos);
+        final ORawBuffer rawRecord=storage.readRecord(rid,null,true,null).getResult();
+        task.add(new OCreateRecordTask(rid,rawRecord.buffer,rawRecord.version,rawRecord.recordType));
+        recordRepaired++;
+        if (task.getTasks().size() > batchMax) {
+          final List<String> servers=new ArrayList<String>(1);
+          servers.add(server);
+          final ODistributedResponse response=dManager.sendRequest(databaseName,clusterNames,servers,task,dManager.getNextMessageIdCounter(),ODistributedRequest.EXECUTION_MODE.RESPONSE,null,null);
+          task=new OTxTask();
+        }
+      }
+      if (!task.getTasks().isEmpty()) {
+        final List<String> servers=new ArrayList<String>(1);
+        servers.add(server);
+        final ODistributedResponse response=dManager.sendRequest(databaseName,clusterNames,servers,task,dManager.getNextMessageIdCounter(),ODistributedRequest.EXECUTION_MODE.RESPONSE,null,null);
+      }
+      ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Aligned %d records of cluster '%s'",task.getTasks().size(),clusterNames.get(0));
+    }
+  }
+  return recordRepaired;
+}

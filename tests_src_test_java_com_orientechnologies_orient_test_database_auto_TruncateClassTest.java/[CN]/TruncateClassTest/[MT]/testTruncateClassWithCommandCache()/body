@@ -1,0 +1,18 @@
+{
+  OSchema schema=database.getMetadata().getSchema();
+  OClass testClass=getOrCreateClass(schema);
+  boolean ccWasEnabled=database.getMetadata().getCommandCache().isEnabled();
+  database.getMetadata().getCommandCache().enable();
+  database.command(new OCommandSQL("truncate class test_class")).execute();
+  database.save(new ODocument(testClass).field("name","x").field("data",Arrays.asList(1,2)));
+  database.save(new ODocument(testClass).field("name","y").field("data",Arrays.asList(3,0)));
+  List<ODocument> result=database.query(new OSQLSynchQuery<ODocument>("select from test_class"));
+  Assert.assertEquals(result.size(),2);
+  database.command(new OCommandSQL("truncate class test_class")).execute();
+  result=database.query(new OSQLSynchQuery<ODocument>("select from test_class"));
+  Assert.assertEquals(result.size(),0);
+  schema.dropClass("test_class");
+  if (!ccWasEnabled) {
+    database.getMetadata().getCommandCache().disable();
+  }
+}

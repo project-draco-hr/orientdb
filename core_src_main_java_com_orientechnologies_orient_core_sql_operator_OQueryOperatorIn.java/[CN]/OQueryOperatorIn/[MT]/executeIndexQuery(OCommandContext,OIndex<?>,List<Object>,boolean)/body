@@ -5,10 +5,29 @@
   if (!internalIndex.canBeUsedInEqualityOperators())   return null;
   if (indexDefinition.getParamCount() == 1) {
     final Object inKeyValue=keyParams.get(0);
-    final Collection<Object> inParams;
+    Collection<Object> inParams;
     if (inKeyValue instanceof List<?>)     inParams=(Collection<Object>)inKeyValue;
  else     if (inKeyValue instanceof OSQLFilterItem)     inParams=(Collection<Object>)((OSQLFilterItem)inKeyValue).getValue(null,null,iContext);
  else     inParams=Collections.singleton(inKeyValue);
+    if (inParams instanceof OResultSet) {
+      Set newInParams=new HashSet();
+      for (      Object o : ((OResultSet)inParams)) {
+        if (o instanceof ODocument && ((ODocument)o).getIdentity().getClusterId() < -1) {
+          ODocument doc=(ODocument)o;
+          String[] fieldNames=doc.fieldNames();
+          if (fieldNames.length == 1) {
+            newInParams.add(doc.field(fieldNames[0]));
+          }
+ else {
+            newInParams.add(o);
+          }
+        }
+ else {
+          newInParams.add(o);
+        }
+      }
+      inParams=newInParams;
+    }
     final List<Object> inKeys=new ArrayList<Object>();
     boolean containsNotCompatibleKey=false;
     for (    final Object keyValue : inParams) {

@@ -1,4 +1,5 @@
 {
+  if (clusterId < 0)   return;
   final ODistributedConfiguration dCfg=dManager.getDatabaseConfiguration(databaseName);
   final int maxAutoRetry=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY.getValueAsInteger();
   final int autoRetryDelay=OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY.getValueAsInteger();
@@ -9,8 +10,8 @@
   final ODistributedTxContext ctx=localDistributedDatabase.registerTxContext(requestId);
   final String serverOwner=dCfg.getClusterOwner(clusterName);
   if (serverOwner == null || !serverOwner.equals(dManager.getLocalNodeName())) {
-    ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Cannot auto repair cluster '%s' because current server (%s) is not the owner (owner=%s reqId=%s)",clusterName,dManager.getLocalNodeName(),serverOwner,requestId);
-    return true;
+    ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Cannot auto repair cluster '%s' (%d) because current server (%s) is not the owner (owner=%s reqId=%s)",clusterName,clusterId,dManager.getLocalNodeName(),serverOwner,requestId);
+    return;
   }
   try {
     final List<ORecordId> rids=new ArrayList<ORecordId>(1);
@@ -22,7 +23,7 @@
       final Collection<String> involvedServers=dCfg.getServers(clusterNames);
       final Set<String> nonLocalServers=new HashSet<String>(involvedServers);
       nonLocalServers.remove(dManager.getLocalNodeName());
-      ODistributedServerLog.info(this,dManager.getLocalNodeName(),involvedServers.toString(),ODistributedServerLog.DIRECTION.OUT,"Auto repairing cluster '%s' on servers %s (reqId=%s)...",clusterName,involvedServers,requestId);
+      ODistributedServerLog.info(this,dManager.getLocalNodeName(),involvedServers.toString(),ODistributedServerLog.DIRECTION.OUT,"Auto repairing cluster '%s' (%d) on servers %s (reqId=%s)...",clusterName,clusterId,involvedServers,requestId);
       final OClusterRepairInfoTask task=new OClusterRepairInfoTask(clusterId);
       final ODistributedResponse response=dManager.sendRequest(databaseName,clusterNames,nonLocalServers,task,requestId.getMessageId(),ODistributedRequest.EXECUTION_MODE.RESPONSE,null,null);
       int repaired=0;
@@ -44,7 +45,7 @@
   }
  catch (  Throwable e) {
     ODistributedServerLog.info(this,dManager.getLocalNodeName(),null,ODistributedServerLog.DIRECTION.NONE,"Error executing auto repairing on cluster '%s' (error=%s, reqId=%s)",clusterName,e.toString(),requestId);
-    return false;
+    return;
   }
-  return true;
+  return;
 }

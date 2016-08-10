@@ -1,7 +1,6 @@
 {
   final OStorage storage=db.getStorage().getUnderlying();
-  final long[] localClusterRange=storage.getClusterDataRange(clusterId);
-  final long localEnd=localClusterRange[1];
+  final long localEnd=storage.getClusterById(clusterId).getNextPosition() - 1;
   final int batchMax=OGlobalConfiguration.DISTRIBUTED_CONFLICT_RESOLVER_REPAIRER_BATCH.getValueAsInteger();
   int recordRepaired=0;
   for (  Map.Entry<String,Object> entry : repairInfoResult.entrySet()) {
@@ -18,6 +17,7 @@
       for (long pos=remoteEnd + 1; pos <= localEnd; ++pos) {
         final ORecordId rid=new ORecordId(clusterId,pos);
         final ORawBuffer rawRecord=storage.readRecord(rid,null,true,null).getResult();
+        if (rawRecord == null)         continue;
         task.add(new OCreateRecordTask(rid,rawRecord.buffer,rawRecord.version,rawRecord.recordType));
         recordRepaired++;
         if (task.getTasks().size() > batchMax) {

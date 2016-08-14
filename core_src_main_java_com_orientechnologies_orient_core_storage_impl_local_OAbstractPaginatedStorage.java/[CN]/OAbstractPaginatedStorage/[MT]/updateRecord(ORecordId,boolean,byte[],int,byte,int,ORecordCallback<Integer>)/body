@@ -2,27 +2,25 @@
   checkOpeness();
   checkLowDiskSpaceFullCheckpointRequestsAndBackgroundDataFlushExceptions();
   final OCluster cluster=getClusterById(rid.clusterId);
+  final OStorageOperationResult<Integer> result;
   if (transaction.get() != null) {
-    final long timer=Orient.instance().getProfiler().startChrono();
+    result=doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
+  }
+ else {
+    stateLock.acquireReadLock();
     try {
-      return doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
+      final Lock lock=recordVersionManager.acquireExclusiveLock(rid);
+      try {
+        checkOpeness();
+        result=doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
+      }
+  finally {
+        lock.unlock();
+      }
     }
   finally {
-      Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
+      stateLock.releaseReadLock();
     }
   }
-  stateLock.acquireReadLock();
-  try {
-    final Lock lock=recordVersionManager.acquireExclusiveLock(rid);
-    try {
-      checkOpeness();
-      return doUpdateRecord(rid,updateContent,content,version,recordType,callback,cluster);
-    }
-  finally {
-      lock.unlock();
-    }
-  }
-  finally {
-    stateLock.releaseReadLock();
-  }
+  return result;
 }

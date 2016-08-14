@@ -1,5 +1,4 @@
 {
-  final long timer=Orient.instance().getProfiler().startChrono();
   try {
     final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
     if (!checkForRecordValidity(ppos)) {
@@ -36,11 +35,12 @@
     }
     if (callback != null)     callback.call(rid,ppos.recordVersion);
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Updated record %s v.%s size=%d",rid,ppos.recordVersion,content.length);
+    recordUpdated.incrementAndGet();
     if (contentModified)     return new OStorageOperationResult<Integer>(ppos.recordVersion,content,false);
  else     return new OStorageOperationResult<Integer>(ppos.recordVersion);
   }
  catch (  OConcurrentModificationException e) {
-    Orient.instance().getProfiler().updateCounter(PROFILER_CONFLICT_RECORD,"Number of conflicts during updating and deleting records",+1,"db.*.conflictRecord");
+    recordConflict.incrementAndGet();
     throw e;
   }
 catch (  IOException ioe) {
@@ -48,8 +48,5 @@ catch (  IOException ioe) {
     final int recordVersion=-1;
     if (callback != null)     callback.call(rid,recordVersion);
     return new OStorageOperationResult<Integer>(recordVersion);
-  }
- finally {
-    Orient.instance().getProfiler().stopChrono(PROFILER_UPDATE_RECORD,"Update a record to database",timer,"db.*.updateRecord");
   }
 }

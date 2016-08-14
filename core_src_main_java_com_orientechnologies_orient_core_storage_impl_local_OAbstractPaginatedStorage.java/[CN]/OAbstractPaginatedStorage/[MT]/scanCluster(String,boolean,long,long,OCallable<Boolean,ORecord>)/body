@@ -5,31 +5,27 @@
   if (!(cluster instanceof OPaginatedCluster))   throw new IllegalArgumentException("Cluster '" + iClusterName + "' (type="+ cluster.getClass()+ ") does not support scan");
   final long scanBatchSize=OGlobalConfiguration.QUERY_SCAN_BATCH_SIZE.getValueAsLong();
   if (transaction.get() != null) {
-    final long timer=Orient.instance().getProfiler().startChrono();
-    try {
-      if (scanBatchSize > 0) {
-        long lastPos;
-        if (iAscendingOrder) {
-          do {
-            lastPos=((OPaginatedCluster)cluster).scan(true,iFrom,iTo,scanBatchSize,iCallback);
-            iFrom=lastPos + 1;
-          }
+    if (scanBatchSize > 0) {
+      long lastPos;
+      if (iAscendingOrder) {
+        do {
+          lastPos=((OPaginatedCluster)cluster).scan(true,iFrom,iTo,scanBatchSize,iCallback);
+          iFrom=lastPos + 1;
+        }
  while (lastPos >= 0);
-        }
- else {
-          do {
-            lastPos=((OPaginatedCluster)cluster).scan(false,iFrom,iTo,scanBatchSize,iCallback);
-            iTo=lastPos - 1;
-          }
- while (lastPos > 0);
-        }
       }
- else       ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,0,iCallback);
-      return;
+ else {
+        do {
+          lastPos=((OPaginatedCluster)cluster).scan(false,iFrom,iTo,scanBatchSize,iCallback);
+          iTo=lastPos - 1;
+        }
+ while (lastPos > 0);
+      }
     }
-  finally {
-      Orient.instance().getProfiler().stopChrono(PROFILER_READ_RECORD,"Read a record from database",timer,"db.*.readRecord");
+ else {
+      ((OPaginatedCluster)cluster).scan(iAscendingOrder,iFrom,iTo,0,iCallback);
     }
+    return;
   }
   if (scanBatchSize > 0) {
     long lastPos;
@@ -48,5 +44,7 @@
  while (lastPos > 0);
     }
   }
- else   scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,0,iCallback);
+ else {
+    scanClusterInLock(iAscendingOrder,(OPaginatedCluster)cluster,iFrom,iTo,0,iCallback);
+  }
 }

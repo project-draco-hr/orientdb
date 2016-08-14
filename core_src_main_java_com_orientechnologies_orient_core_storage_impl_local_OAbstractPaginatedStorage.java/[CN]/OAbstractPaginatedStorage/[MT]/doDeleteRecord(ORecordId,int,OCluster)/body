@@ -1,10 +1,9 @@
 {
-  final long timer=Orient.instance().getProfiler().startChrono();
   try {
     final OPhysicalPosition ppos=cluster.getPhysicalPosition(new OPhysicalPosition(rid.clusterPosition));
     if (ppos == null)     return new OStorageOperationResult<Boolean>(false);
     if (version > -1 && ppos.recordVersion != version) {
-      Orient.instance().getProfiler().updateCounter(PROFILER_CONFLICT_RECORD,"Number of conflicts during updating and deleting records",+1,"db.*.conflictRecord");
+      recordConflict.incrementAndGet();
       if (OFastConcurrentModificationException.enabled())       throw OFastConcurrentModificationException.instance();
  else       throw new OConcurrentModificationException(rid,ppos.recordVersion,version,ORecordOperation.DELETED);
     }
@@ -22,13 +21,11 @@
       return new OStorageOperationResult<Boolean>(false);
     }
     if (OLogManager.instance().isDebugEnabled())     OLogManager.instance().debug(this,"Deleted record %s v.%s",rid,version);
+    recordDeleted.incrementAndGet();
     return new OStorageOperationResult<Boolean>(true);
   }
  catch (  IOException ioe) {
     OLogManager.instance().error(this,"Error on deleting record " + rid + "( cluster: "+ cluster+ ")",ioe);
     throw OException.wrapException(new OStorageException("Error on deleting record " + rid + "( cluster: "+ cluster+ ")"),ioe);
-  }
- finally {
-    Orient.instance().getProfiler().stopChrono(PROFILER_DELETE_RECORD,"Delete a record from database",timer,"db.*.deleteRecord");
   }
 }

@@ -1,6 +1,7 @@
 {
   final OSessionStoragePerformanceStatistic statistic=performanceStatisticManager.getSessionPerformanceStatistic();
   atomicOperationsManager.acquireReadLock(this);
+  long browsed=0;
   try {
     acquireSharedLock();
     try {
@@ -10,7 +11,6 @@
       final long progressDump=recordsToScan / 10;
       final int prefetchPages=OGlobalConfiguration.QUERY_SCAN_PREFETCH_PAGES.getValueAsInteger();
       long clusterPosition=ascendingOrder ? firstPos : lastPos;
-      long browsed=0;
       for (; ascendingOrder ? clusterPosition <= lastPos : clusterPosition >= firstPos; clusterPosition+=(ascendingOrder ? 1 : -1)) {
         startOperation();
         if (statistic != null)         statistic.startRecordReadTimer();
@@ -30,7 +30,9 @@
             Thread.currentThread().interrupt();
             break;
           }
-          if (++browsed == limit)           return clusterPosition;
+          if (++browsed == limit) {
+            return clusterPosition;
+          }
         }
   finally {
           if (statistic != null)           statistic.stopRecordReadTimer();
@@ -45,6 +47,7 @@
   }
   finally {
     atomicOperationsManager.releaseReadLock(this);
+    storageLocal.getRecordScanned().addAndGet(browsed);
     OLogManager.instance().debug(this,"Scan cluster id=%d completed",id);
   }
 }

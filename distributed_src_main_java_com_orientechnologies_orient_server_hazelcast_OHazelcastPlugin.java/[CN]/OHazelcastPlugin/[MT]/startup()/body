@@ -9,7 +9,8 @@
   status=NODE_STATUS.STARTING;
   final String localNodeName=nodeName;
   activeNodes.clear();
-  activeNodesNamesByMemberId.clear();
+  activeNodesNamesByUuid.clear();
+  activeNodesUuidByName.clear();
   for (  ORemoteServerController server : remoteServers.values())   server.close();
   remoteServers.clear();
   registeredNodeById=null;
@@ -19,7 +20,8 @@
     nodeUuid=hazelcastInstance.getCluster().getLocalMember().getUuid();
     OLogManager.instance().info(this,"Starting distributed server '%s' (hzID=%s)...",localNodeName,nodeUuid);
     activeNodes.put(localNodeName,hazelcastInstance.getCluster().getLocalMember());
-    activeNodesNamesByMemberId.put(nodeUuid,localNodeName);
+    activeNodesNamesByUuid.put(nodeUuid,localNodeName);
+    activeNodesUuidByName.put(localNodeName,nodeUuid);
     configurationMap=new OHazelcastDistributedMap(hazelcastInstance);
     OServer.registerServerInstance(localNodeName,serverInstance);
     for (    Member m : hazelcastInstance.getCluster().getMembers()) {
@@ -27,7 +29,8 @@
         final String memberName=getNodeName(m);
         if (memberName != null && !memberName.startsWith("ext:")) {
           activeNodes.put(memberName,m);
-          activeNodesNamesByMemberId.put(m.getUuid(),memberName);
+          activeNodesNamesByUuid.put(m.getUuid(),memberName);
+          activeNodesUuidByName.put(memberName,m.getUuid());
         }
  else         if (!m.equals(hazelcastInstance.getCluster().getLocalMember()))         ODistributedServerLog.warn(this,localNodeName,null,DIRECTION.NONE,"Cannot find configuration for member: %s",m);
       }

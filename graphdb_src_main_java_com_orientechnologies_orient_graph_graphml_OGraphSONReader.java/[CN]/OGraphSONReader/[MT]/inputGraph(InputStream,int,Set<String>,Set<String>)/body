@@ -1,0 +1,38 @@
+{
+  final JsonParser jp=jsonFactory.createJsonParser(jsonInputStream);
+  final BatchGraph batchGraph=BatchGraph.wrap(graph,bufferSize);
+  final ElementFactory elementFactory=new GraphElementFactory(batchGraph);
+  OGraphSONUtility graphson=new OGraphSONUtility(GraphSONMode.NORMAL,elementFactory,vertexPropertyKeys,edgePropertyKeys);
+  long importedVertices=0;
+  long importedEdges=0;
+  while (jp.nextToken() != JsonToken.END_OBJECT) {
+    final String fieldname=jp.getCurrentName() == null ? "" : jp.getCurrentName();
+    if (fieldname.equals(GraphSONTokens.MODE)) {
+      jp.nextToken();
+      final GraphSONMode mode=GraphSONMode.valueOf(jp.getText());
+      graphson=new OGraphSONUtility(mode,elementFactory,vertexPropertyKeys,edgePropertyKeys);
+    }
+ else     if (fieldname.equals(GraphSONTokens.VERTICES)) {
+      jp.nextToken();
+      while (jp.nextToken() != JsonToken.END_ARRAY) {
+        final JsonNode node=jp.readValueAsTree();
+        graphson.vertexFromJson(node);
+        importedVertices++;
+        printStatus(jp,importedVertices,importedEdges);
+      }
+    }
+ else     if (fieldname.equals(GraphSONTokens.EDGES)) {
+      jp.nextToken();
+      while (jp.nextToken() != JsonToken.END_ARRAY) {
+        final JsonNode node=jp.readValueAsTree();
+        final Vertex inV=batchGraph.getVertex(OGraphSONUtility.getTypedValueFromJsonNode(node.get(GraphSONTokens._IN_V)));
+        final Vertex outV=batchGraph.getVertex(OGraphSONUtility.getTypedValueFromJsonNode(node.get(GraphSONTokens._OUT_V)));
+        graphson.edgeFromJson(node,outV,inV);
+        importedEdges++;
+        printStatus(jp,importedVertices,importedEdges);
+      }
+    }
+  }
+  jp.close();
+  batchGraph.commit();
+}

@@ -1,0 +1,30 @@
+{
+  Object returnValue=value;
+  if (includeType) {
+    String type=determineType(value);
+    ObjectNode valueAndType=jsonNodeFactory.objectNode();
+    valueAndType.put(GraphSONTokens.TYPE,type);
+    if (type.equals(GraphSONTokens.TYPE_LIST)) {
+      ArrayNode list=(ArrayNode)value;
+      ArrayNode valueArray=valueAndType.putArray(GraphSONTokens.VALUE);
+      for (int ix=0; ix < list.size(); ix++) {
+        addObject(valueArray,getValue(getTypedValueFromJsonNode(list.get(ix)),includeType));
+      }
+    }
+ else     if (type.equals(GraphSONTokens.TYPE_MAP)) {
+      ObjectNode convertedMap=jsonNodeFactory.objectNode();
+      ObjectNode jsonObject=(ObjectNode)value;
+      Iterator keyIterator=jsonObject.fieldNames();
+      while (keyIterator.hasNext()) {
+        Object key=keyIterator.next();
+        convertedMap.put(key.toString(),jsonObject.get(key.toString()));
+      }
+      valueAndType.put(GraphSONTokens.VALUE,convertedMap);
+    }
+ else {
+      putObject(valueAndType,GraphSONTokens.VALUE,value);
+    }
+    returnValue=valueAndType;
+  }
+  return returnValue;
+}
